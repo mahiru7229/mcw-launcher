@@ -10,3 +10,4 @@ class Version:
     assets: str
     main_class: str
     java_version: dict
+    raw_json: dict
