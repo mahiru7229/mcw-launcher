@@ -1,3 +1,3 @@
 # Zen Launcher
 
-Currently indevelopment.
+Currently under development.
