@@ -22,6 +22,7 @@ class HttpDownloader:
         url: link
         path: where you saving this file
         """
+        path.parent.mkdir(parents=True, exist_ok=True)
         with httpx.stream("GET", url, timeout=timeout) as response:
             response.raise_for_status()
             with path.open("wb") as file:
@@ -47,10 +48,11 @@ class HttpDownloader:
                     return client_path
 
                 HttpDownloader.delete_file(client_path)
-            except (httpx.HTTPError,OSError):
+            except (httpx.HTTPError,OSError) as e:
+                print(e)
                 HttpDownloader.delete_file(client_path)
 
-        raise RuntimeError("Cannot download!")
+        raise RuntimeError("Cannot download!:")
 
 
     
