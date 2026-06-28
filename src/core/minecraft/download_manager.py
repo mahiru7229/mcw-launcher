@@ -1,6 +1,6 @@
 from src.models.minecraft.version import Version
 from src.models.minecraft.download import DownloadClient
-from src.core.network.downloader import HttpDownloader
+from src.core.network.httpx_downloader import HttpDownloader
 from pathlib import Path
 import hashlib
 import httpx
