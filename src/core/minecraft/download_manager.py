@@ -1,16 +1,41 @@
 from src.models.minecraft.version import Version
 from src.models.minecraft.download import DownloadClient
+from src.core.network.downloader import HttpDownloader
 from pathlib import Path
 import hashlib
 import httpx
 import json
-
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 class DownloadClientManager:
 
     @staticmethod
-    def download_client(version: Version):
-        ...
-    
+    def load(version: Version) -> Path:
+        client_data = DownloadClientManager._load_download(version.path)
+        client_obj = DownloadClientManager._load_download_object(client_data)
+
+        client_dir = PROJECT_ROOT / "downloads" / "versions" / version.id
+        client_dir.mkdir(parents=True, exist_ok=True)
+
+        client_path = client_dir / f"{version.id}.jar"
+
+        if (
+            client_path.exists()
+            and HttpDownloader.verify_sha1(client_path, client_obj.sha1)
+        ):
+            return client_path
+
+        if client_path.exists():
+            HttpDownloader.delete_file(client_path)
+
+        downloaded = HttpDownloader.download(
+            client_obj,
+            client_path,
+        )
+
+        if downloaded is not None:
+            return downloaded
+
+        raise RuntimeError("Cannot download client.jar")
 
 
     @staticmethod
@@ -23,14 +48,12 @@ class DownloadClientManager:
     @staticmethod
     def _load_download_object(download_dict:dict) -> DownloadClient:
         return DownloadClient(
-            url= download_dict.downloads["client"]["url"],
-            sha1=download_dict.downloads["client"]["sha1"],
-            size=int(download_dict.downloads["client"]["size"])
+            url= download_dict["downloads"]["client"]["url"],
+            sha1=download_dict["downloads"]["client"]["sha1"],
+            size=int(download_dict["downloads"]["client"]["size"])
         )
 
-    @staticmethod
-    def _check_sha1(path:Path):
-        pass
+
 
 
 

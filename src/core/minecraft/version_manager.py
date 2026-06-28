@@ -43,10 +43,12 @@ class VersionManager:
     @staticmethod
     def _download_version(version:VersionManifestManager) -> Path | None:
         global VERSIONS_PATH
+        global VERSIONS_DIR
+        VERSIONS_DIR = VERSIONS_DIR / version.id
         VERSIONS_DIR.mkdir(parents=True,exist_ok=True)
         try:
             req = requests.get(version.url, timeout=10)
-            VERSIONS_PATH = VERSIONS_DIR / f"{version.id}.json"
+            VERSIONS_PATH = VERSIONS_DIR  / f"{version.id}.json"
             VERSIONS_PATH.write_text(req.text, encoding="utf-8")
             return VERSIONS_PATH
         except requests.RequestException:
