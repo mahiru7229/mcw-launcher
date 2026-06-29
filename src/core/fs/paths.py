@@ -1,4 +1,5 @@
 from pathlib import Path
+from src.models.minecraft.version import Version
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -7,11 +8,11 @@ class Paths:
     ROOT = PROJECT_ROOT / "downloads"
 
     @staticmethod
-    def version_dir(version):
+    def version_dir(version:Version):
         return Paths.ROOT / "versions" / version.id
 
     @staticmethod
-    def client(version):
+    def client(version:Version):
         return Paths.version_dir(version) / f"{version.id}.jar"
 
     @staticmethod
@@ -25,5 +26,9 @@ class Paths:
 
 
     @staticmethod
-    def version_json(version) -> Path:
+    def version_json(version:Version) -> Path:
         return Paths.version_dir(version) / f"{version.id}.json"
+    
+    @staticmethod
+    def asset_index(version:Version):
+        return Paths.ROOT / "assets" / "indexes" / f"{version.assets}.json"
