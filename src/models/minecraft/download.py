@@ -6,4 +6,3 @@ class DownloadClient:
     url:str
     sha1:str
     size:int
-    path:Path

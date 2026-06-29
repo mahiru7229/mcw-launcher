@@ -1,7 +1,8 @@
 from src.models.minecraft.version import Version
-from src.models.minecraft.download import DownloadClient
+from src.models.minecraft.library import DownloadLibrary
 from src.core.network.httpx_downloader import HttpDownloader
 from pathlib import Path
+from src.core.fs.paths import Paths
 import hashlib
 import httpx
 import json
@@ -13,8 +14,8 @@ class DownloadLibraryManager:
         library_data = DownloadLibraryManager._load_download(version.path)
         library_list = DownloadLibraryManager._load_download_object(library_data)
 
-        libraries_dir = PROJECT_ROOT / "downloads" / "libraries"
-
+        libraries_dir = Paths.libraries()
+        libraries_dirs = []
         for library in library_list:
 
             library_path = libraries_dir / library.path
@@ -26,6 +27,7 @@ class DownloadLibraryManager:
                     library.sha1,
                 )
             ):
+                libraries_dirs.append(library_path)
                 continue
 
             HttpDownloader.delete_file(library_path)
@@ -34,13 +36,13 @@ class DownloadLibraryManager:
                 library,
                 library_path,
             )
-
+            libraries_dirs.append(library_path)
             if downloaded is None:
                 raise RuntimeError(
                     f"Cannot download library: {library.path}"
                 )
 
-        return libraries_dir
+        return libraries_dirs
 
     @staticmethod
     def _load_download(path:Path) -> dict:
@@ -50,16 +52,16 @@ class DownloadLibraryManager:
             return {}
     
     @staticmethod
-    def _load_download_object(download_dict:dict) -> list[DownloadClient]:
-        download_content:list[DownloadClient] = []
+    def _load_download_object(download_dict:dict) -> list[DownloadLibrary]:
+        download_content:list[DownloadLibrary] = []
         for download in download_dict["libraries"]:
-            download_content.extend(
-                [DownloadClient(
+            download_content.append(
+                DownloadLibrary(
                     url=download["downloads"]["artifact"]["url"],
                     sha1=download["downloads"]["artifact"]["sha1"],
                     size=download["downloads"]["artifact"]["size"],
                     path=Path(download["downloads"]["artifact"]["path"])
-                )]
+                )
             )
 
 

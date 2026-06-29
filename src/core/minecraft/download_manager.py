@@ -2,10 +2,11 @@ from src.models.minecraft.version import Version
 from src.models.minecraft.download import DownloadClient
 from src.core.network.httpx_downloader import HttpDownloader
 from pathlib import Path
+from src.core.fs.paths import Paths
 import hashlib
 import httpx
 import json
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
 class DownloadClientManager:
 
     @staticmethod
@@ -13,10 +14,11 @@ class DownloadClientManager:
         client_data = DownloadClientManager._load_download(version.path)
         client_obj = DownloadClientManager._load_download_object(client_data)
 
-        client_dir = PROJECT_ROOT / "downloads" / "versions" / version.id
+        client_dir = Paths.version_dir(version)
         client_dir.mkdir(parents=True, exist_ok=True)
 
-        client_path = client_dir / f"{version.id}.jar"
+        client_path = Paths.client(version)
+        print("CLIENT PATH:", client_path)
 
         if (
             client_path.exists()
