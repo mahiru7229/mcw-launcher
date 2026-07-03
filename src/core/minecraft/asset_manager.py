@@ -8,7 +8,7 @@ import json
 import concurrent.futures 
 
 MAIN_LINK = "https://resources.download.minecraft.net"
-MAX_WORKERS = 10
+MAX_WORKERS = 20
 
 class AssetManager:
     @staticmethod
@@ -19,7 +19,6 @@ class AssetManager:
         assets = AssetManager._parse_assets(assets_data)
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            # Giao việc cho các luồng
             futures = [executor.submit(AssetManager._download_single_asset, asset) for asset in assets]
             
 
@@ -33,7 +32,6 @@ class AssetManager:
 
     @staticmethod
     def _download_single_asset(asset: DownloadAsset) -> None:
-        """✨ Hàm mới mình thêm vào để các luồng có thể tự gọi và xử lý từng file"""
         asset_path = Paths.asset_object(asset)
         if (asset_path.exists() and HttpDownloader.verify_sha1(asset_path, asset.sha1)):
             return

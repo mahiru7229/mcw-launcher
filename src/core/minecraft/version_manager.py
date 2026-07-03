@@ -64,7 +64,7 @@ class VersionManager:
     @staticmethod
     def _parse_version(version_data:dict,version_path:str) -> Version | None:
         try:
-            print(version_data)
+            # print(version_data) -> for debugging
             return Version(
                 id=version_data["id"],
                 arguments=version_data["arguments"],

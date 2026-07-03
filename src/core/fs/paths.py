@@ -1,16 +1,40 @@
 from pathlib import Path
 from src.models.minecraft.version import Version
 from src.models.minecraft.assets import DownloadAsset
-
+from src.models.instance.instance import Instance
+import json
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Paths:
-    ROOT = PROJECT_ROOT / "downloads"
+    CACHE_ROOT = PROJECT_ROOT / "cache" # place that saves minecraft contents
+    INSTANCES_ROOT = PROJECT_ROOT / "instances"
+
+    @staticmethod
+    def instances_root() -> Path:
+        instance_dir = Paths.INSTANCES_ROOT
+        instance_dir.mkdir(parents=True, exist_ok=True)
+        return instance_dir
+    
+    @staticmethod
+    def load_instance_dir(instance_name:str) -> Path:
+        instance_dir = Paths.INSTANCES_ROOT / instance_name
+        instance_dir.mkdir(parents=True, exist_ok=True)
+        return instance_dir
+    
+    @staticmethod
+    def instance_data_path_create():
+        instance_path = Paths.instances_root() / "instances.json"
+        instance_path.write_text(json.dumps({"instances":[]}, indent=4),encoding="utf-8")
+        return instance_path
+    @staticmethod
+    def instance_data_path():
+        instance_path = Paths.instances_root() / "instances.json"
+        return instance_path
 
     @staticmethod
     def version_dir(version:Version):
-        return Paths.ROOT / "versions" / version.id
+        return Paths.CACHE_ROOT / "versions" / version.id
 
     @staticmethod
     def client(version:Version):
@@ -18,12 +42,12 @@ class Paths:
 
     @staticmethod
     def libraries():
-        return Paths.ROOT / "libraries"
+        return Paths.CACHE_ROOT / "libraries"
     
     
     @staticmethod
     def version_manifest() -> Path:
-        return Paths.ROOT / "manifest" / "version_manifest_v2.json"
+        return Paths.CACHE_ROOT / "manifest" / "version_manifest_v2.json"
 
 
     @staticmethod
@@ -32,23 +56,24 @@ class Paths:
     
     @staticmethod
     def asset_index(version:Version):
-        return Paths.ROOT / "assets" / "indexes" / f"{version.assets}.json"
+        return Paths.CACHE_ROOT / "assets" / "indexes" / f"{version.assets}.json"
     
     @staticmethod
     def asset_index_dir():
-        return Paths.ROOT / "assets" / "objects" 
+        return Paths.CACHE_ROOT / "assets" / "objects" 
 
 
     @staticmethod
     def asset_object(asset: DownloadAsset):
-        directory = Paths.ROOT / "assets" / "objects" / asset.sha1[:2] 
+        directory = Paths.CACHE_ROOT / "assets" / "objects" / asset.sha1[:2] 
         directory.mkdir(parents=True, exist_ok=True)
         return directory / asset.sha1
     
     @staticmethod
     def assets_dir():
-        return Paths.ROOT / "assets" 
+        return Paths.CACHE_ROOT / "assets" 
     
     @staticmethod
     def natives(version:Version):
-        return Paths.ROOT / "downloads" / "natives" / version.id
+        return Paths.CACHE_ROOT / "natives" / version.id
+

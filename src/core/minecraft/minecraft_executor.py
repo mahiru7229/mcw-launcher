@@ -11,16 +11,21 @@ from src.core.minecraft.asset_manager import AssetManager
 from src.core.minecraft.classpath_builder import ClasspathBuilder
 from src.core.minecraft.launcher_manager import LauncherManager
 from src.core.minecraft.context_builder import ContextBuilder
+from src.models.minecraft.version import Version
+from src.models.instance.instance import Instance
 
+
+
+#NEED TO CHANGE THE CORE
 
 class MinecraftExecutor:
     @staticmethod
-    def run(version):
+    def run(instance:Instance):
         VersionManifestManager.get()
-        VersionManager.load(version.id)
+        version = VersionManager.load(instance.version_id)
         DownloadClientManager.load(version)
         DownloadLibraryManager.load(version)
         AssetManager.load(version)
-        context = ContextBuilder.build(version)
+        context = ContextBuilder.build(instance,version)
         cmd = LauncherManager.build(version, context)
         JavaRuntime.run(LauncherManager.select_java(), cmd)

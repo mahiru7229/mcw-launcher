@@ -1,25 +1,26 @@
 from src.core.fs.paths import Paths
 from src.models.minecraft.version import Version
 from src.core.minecraft.classpath_builder import ClasspathBuilder
+from src.models.instance.instance import Instance
+from pathlib import Path
 
 
 class ContextBuilder:
 
     @staticmethod
-    def build(version:Version):
+    def build(instance:Instance,version:Version):
         classpath = ClasspathBuilder.build(
             version,
             Paths.client(version),
             Paths.libraries()
         )
-
         return {
             "classpath": classpath,
             "natives_directory": str(Paths.natives(version)),
             "launcher_name": "mcw-launcher",
             "launcher_version": "1.0",
 
-            "game_directory": str(Paths.ROOT / "game"),
+            "game_directory": str(Path(instance.instance_dir)),
             "assets_root": str(Paths.assets_dir()),
             "assets_index_name": version.assets,
 
