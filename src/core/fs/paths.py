@@ -10,6 +10,12 @@ class Paths:
     CACHE_ROOT = PROJECT_ROOT / "cache" # place that saves minecraft contents
     INSTANCES_ROOT = PROJECT_ROOT / "instances"
 
+    @staticmethod
+    def instance_metadata(instance_name: str) -> Path:
+        return Paths.load_instance_dir(instance_name) / "instance.json"
+
+
+
 
     @staticmethod
     def instance_settings_path(instance:Instance) -> Path:

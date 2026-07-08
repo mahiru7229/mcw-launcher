@@ -2,6 +2,7 @@ import subprocess
 import threading
 from pathlib import Path
 from src.models.instance.instance import Instance
+from src.core.fs.paths import Paths
 
 class JavaRuntime:
 
@@ -19,7 +20,7 @@ class JavaRuntime:
 
         process = subprocess.Popen(
             full_cmd,
-            cwd=str(instance.instance_dir),
+            cwd=str(Paths.load_instance_dir(instance.name)),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

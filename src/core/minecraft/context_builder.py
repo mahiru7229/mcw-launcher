@@ -21,7 +21,7 @@ class ContextBuilder:
             "launcher_name": "mcw-launcher",
             "launcher_version": "1.0",
 
-            "game_directory": str(Path(instance.instance_dir)),
+            "game_directory": str(Paths.load_instance_dir(instance.name)),
             "assets_root": str(Paths.assets_dir()),
             "assets_index_name": version.assets,
 
