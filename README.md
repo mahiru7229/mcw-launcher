@@ -1,4 +1,4 @@
-# MCW Launcher
+# Zen Launcher
 
 A lightweight Minecraft Launcher written in Python.
 
