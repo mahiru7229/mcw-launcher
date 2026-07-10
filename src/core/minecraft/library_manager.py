@@ -1,13 +1,12 @@
 from pathlib import Path
 import concurrent.futures
 import json
-import platform
-import re
+
 from src.core.fs.paths import Paths
 from src.core.network.httpx_downloader import HttpDownloader
 from src.models.minecraft.library import DownloadLibrary
 from src.models.minecraft.version import Version
-from src.core.minecraft.library_rule_manager import LibraryRuleManager
+
 MAX_WORKERS = 20
 
 
@@ -28,8 +27,7 @@ class DownloadLibraryManager:
                 future_to_library = {
                     executor.submit(
                         DownloadLibraryManager._download_single_library,
-                        library,
-                        version
+                        library
                     ): library
                     for library in libraries
                 }
@@ -52,13 +50,16 @@ class DownloadLibraryManager:
         return downloaded_paths
 
     @staticmethod
-    def _download_single_library(library: DownloadLibrary, version: Version) -> Path:
+    def _download_single_library(library: DownloadLibrary) -> Path:
         library_path = Paths.libraries() / library.path
 
-        if library_path.exists() and HttpDownloader.verify_sha1(library_path, library.sha1):
-            if library.is_native:
-                DownloadLibraryManager._extract_native(library_path, version, library.sha1)
-
+        if (
+            library_path.exists()
+            and HttpDownloader.verify_sha1(
+                library_path,
+                library.sha1
+            )
+        ):
             return library_path
 
         HttpDownloader.delete_file(library_path)
@@ -74,9 +75,6 @@ class DownloadLibraryManager:
                 f"Cannot download library: {library.path}"
             )
 
-        if library.is_native:
-                DownloadLibraryManager._extract_native(library_path, version, library.sha1)
-        
         return library_path
 
     @staticmethod
@@ -87,70 +85,25 @@ class DownloadLibraryManager:
             return {}
 
     @staticmethod
-    def _extract_native(native_path: Path, version: Version, sha1: str) -> None:
-        import zipfile
+    def _load_download_object(
+        download_dict: dict
+    ) -> list[DownloadLibrary]:
 
-        destination = Paths.natives(version)
-        marker_dir = destination / ".extracted"
-        marker_path = marker_dir / sha1
-
-        if marker_path.exists():
-            return
-
-        destination.mkdir(parents=True, exist_ok=True)
-        marker_dir.mkdir(parents=True, exist_ok=True)
-
-        with zipfile.ZipFile(native_path, "r") as archive:
-            for member in archive.infolist():
-                if member.filename.startswith("META-INF/"):
-                    continue
-
-                archive.extract(member, destination)
-
-        marker_path.touch()
-
-    @staticmethod
-    def _load_download_object(download_dict: dict) -> list[DownloadLibrary]:
         libraries: list[DownloadLibrary] = []
 
         for download in download_dict.get("libraries", []):
-            if not LibraryRuleManager.is_allowed(download):
-                continue
 
-            downloads = download.get("downloads", {})
+            artifact = download.get("downloads", {}).get("artifact")
 
-            artifact = downloads.get("artifact")
-
-            if artifact:
-                libraries.append(
-                    DownloadLibrary(
-                        url=artifact["url"],
-                        sha1=artifact["sha1"],
-                        size=artifact["size"],
-                        path=Path(artifact["path"]),
-                        is_native=False
-                    )
-                )
-
-            native_name = download.get("natives", {}).get("windows")
-
-            if not native_name:
-                continue
-
-            native_name = native_name.replace("${arch}", "64")
-
-            native_artifact = downloads.get("classifiers", {}).get(native_name)
-
-            if not native_artifact:
+            if artifact is None:
                 continue
 
             libraries.append(
                 DownloadLibrary(
-                    url=native_artifact["url"],
-                    sha1=native_artifact["sha1"],
-                    size=native_artifact["size"],
-                    path=Path(native_artifact["path"]),
-                    is_native=True
+                    url=artifact["url"],
+                    sha1=artifact["sha1"],
+                    size=artifact["size"],
+                    path=Path(artifact["path"])
                 )
             )
 

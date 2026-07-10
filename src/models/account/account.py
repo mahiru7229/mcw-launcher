@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 
-@dataclass(slots=True)
+@dataclass
 class Account:
     account_id:str
     account_type:str

@@ -3,7 +3,7 @@ from pathlib import Path
 from dataclasses import dataclass
 
 
-@dataclass(slots=True)
+@dataclass
 class Instance:
     instance_id: str
     name:str

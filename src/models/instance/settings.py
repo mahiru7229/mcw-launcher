@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 
 
 
-@dataclass(slots=True)
+@dataclass
 class InstanceSettings:
     java_path: Path
     min_memory: int = 1024

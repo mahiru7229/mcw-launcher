@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 
-@dataclass(slots=True)
+@dataclass
 class Authentication:
     player_name: str
     uuid: str
