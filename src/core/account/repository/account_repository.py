@@ -3,32 +3,51 @@ import sqlite3
 from src.core.fs.paths import Paths
 from src.models.account.account import Account
 from src.models.account.account_source import AccountSource
-
+from src.core.security.token_cipher import TokenCipher
 
 class AccountRepository:
 
     @staticmethod
     def save(account: Account) -> None:
         database_path = Paths.account_database_path()
+        access_token = (
+        TokenCipher.encrypt(account.access_token)
+        if account.access_token
+        else None
+        )
 
+        refresh_token = (
+            TokenCipher.encrypt(account.refresh_token)
+            if account.refresh_token
+            else None
+        )
         with sqlite3.connect(database_path) as connection:
             connection.execute("""
                 INSERT INTO accounts (
                     account_id,
                     account_type,
                     username,
-                    uuid
+                    uuid,
+                    access_token,
+                    refresh_token,
+                    token_expires_at
                 )
-                VALUES (?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(account_id) DO UPDATE SET
                     account_type = excluded.account_type,
                     username = excluded.username,
-                    uuid = excluded.uuid
+                    uuid = excluded.uuid,
+                    access_token = excluded.access_token,
+                    refresh_token = excluded.refresh_token,
+                    token_expires_at = excluded.token_expires_at
             """, (
                 account.account_id,
                 account.account_type.value,
                 account.username,
-                account.uuid
+                account.uuid,
+                access_token,
+                refresh_token,
+                account.token_expires_at
             ))
 
             connection.commit()
@@ -41,7 +60,7 @@ class AccountRepository:
             connection.row_factory = sqlite3.Row
 
             row = connection.execute("""
-                SELECT account_id, account_type, username, uuid
+                SELECT account_id,account_type,username,uuid,access_token,refresh_token,token_expires_at
                 FROM accounts
                 WHERE account_id = ?
             """, (account_id,)).fetchone()
@@ -59,7 +78,7 @@ class AccountRepository:
             connection.row_factory = sqlite3.Row
 
             rows = connection.execute("""
-                SELECT account_id, account_type, username, uuid
+                SELECT account_id,account_type,username,uuid,access_token,refresh_token,token_expires_at
                 FROM accounts
                 ORDER BY username ASC
             """).fetchall()
@@ -96,12 +115,27 @@ class AccountRepository:
 
     @staticmethod
     def _row_to_account(row: sqlite3.Row) -> Account:
-        return Account(
-            account_id=row["account_id"],
-            account_type=AccountSource(row["account_type"]),
-            username=row["username"],
-            uuid=row["uuid"]
+        access_token = (
+        TokenCipher.decrypt(row["access_token"])
+        if row["access_token"]
+        else None
+            )
+
+        refresh_token = (
+            TokenCipher.decrypt(row["refresh_token"])
+            if row["refresh_token"]
+            else None
         )
+        
+        return Account(
+        account_id=row["account_id"],
+        account_type=AccountSource(row["account_type"]),
+        username=row["username"],
+        uuid=row["uuid"],
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_expires_at=row["token_expires_at"]
+    )
     
     def set_selected_account(account_id: str) -> bool:
         account = AccountRepository.get(account_id)

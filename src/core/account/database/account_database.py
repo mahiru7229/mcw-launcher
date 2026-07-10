@@ -16,7 +16,11 @@ class AccountDatabase:
                     account_id TEXT PRIMARY KEY,
                     account_type TEXT NOT NULL,
                     username TEXT NOT NULL,
-                    uuid TEXT NOT NULL
+                    uuid TEXT NOT NULL,
+                    access_token TEXT,
+                    refresh_token TEXT,
+                    token_expires_at INTEGER
+
                 )
             """)
 
