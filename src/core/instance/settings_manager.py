@@ -126,6 +126,7 @@ class SettingsManager:
         java = data.get("java", {})
         window = data.get("window", {})
         launch = data.get("launch", {})
+        print(data)
         return InstanceSettings(
             java_path=java.get("path", ""),
             min_memory=int(java.get("min_memory", 1024)),
