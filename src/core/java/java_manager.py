@@ -84,7 +84,7 @@ class JavaManager:
                             )
                     except (FileNotFoundError, OSError):
                         continue
-                    java_path = Path(java_home) / "bin" / "java.exe"
+                    java_path = Path(java_home) / "bin" / "javaw.exe"
                     if java_path.is_file():
                         java_homes.append(java_path)
         except (FileNotFoundError, PermissionError, OSError):
@@ -112,7 +112,7 @@ class JavaManager:
                 if not vendor_dir.is_dir():
                     continue
                 for java_home in vendor_dir.iterdir():
-                    java_executable = java_home / "bin" / "java.exe"
+                    java_executable = java_home / "bin" / "javaw.exe"
                     if java_executable.is_file():
                         java_paths.append(java_executable)
         return java_paths
@@ -154,19 +154,30 @@ class JavaManager:
             return None
         home_path = Path(java_home)
         candidates = [
-            home_path / "bin" / "java.exe",
-            home_path / "java.exe",
+            home_path / "bin" / "javaw.exe",
+            home_path / "javaw.exe",
         ] # they can return include "bin" dir, making this crash, so we tried 2 paths
         for java_path in candidates:
             if java_path.is_file():
                 return [java_path]
         return None
     @staticmethod
-    def _get_java_in_path() -> list[Path]:
+    def _get_java_in_path() -> list[Path] | None:
         try:
-            result = subprocess.run(["where", "java"], capture_output=True, text=True, check=True, timeout=8,)
+            result = subprocess.run(
+                ["where", "java"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=8,
+            )
 
-        except (subprocess.CalledProcessError, FileNotFoundError, PermissionError, OSError):
+        except (
+            subprocess.CalledProcessError,
+            FileNotFoundError,
+            PermissionError,
+            OSError,
+        ):
             return None
 
         paths = result.stdout.splitlines()
@@ -174,7 +185,18 @@ class JavaManager:
         if not paths:
             return None
 
-        return [Path(p.strip()) for p in paths]
+        java_paths: list[Path] = []
+
+        for p in paths:
+            java = Path(p.strip())
+            javaw = java.with_name("javaw.exe")
+
+            if javaw.exists():
+                java_paths.append(javaw)
+            else:
+                java_paths.append(java)
+
+        return java_paths
 
     @staticmethod
     def _get_major_version(java_path: Path) -> int | None:
