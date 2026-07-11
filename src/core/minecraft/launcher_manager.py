@@ -19,9 +19,6 @@ class LauncherManager:
         )
 
         jvm_args, game_args = ArgumentBuilder.build(version, context, settings,account)
-        #FOR DEBUG ONLY ===========
-        print(settings.offline_multiplayer_enabled, account.account_type)
-        #FOR DEBUG ONLY ===========
         main_class = version.main_class
 
         cmd = [

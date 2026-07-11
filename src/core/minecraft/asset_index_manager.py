@@ -1,34 +1,75 @@
-from src.models.minecraft.version import Version
-from src.models.minecraft.assets_index import DownloadAssetIndex
-from src.core.network.httpx_downloader import HttpDownloader
 from pathlib import Path
+
 from src.core.fs.paths import Paths
+from src.core.network.httpx_downloader import HttpDownloader
+from src.core.progress.progress_reporter import ProgressReporter
+from src.models.minecraft.assets_index import DownloadAssetIndex
+from src.models.minecraft.version import Version
+from src.models.progress.progress_stage import ProgressStage
 
 
 class AssetIndexManager:
 
     @staticmethod
-    def load(version: Version) -> Path:
-        assets_index_data = AssetIndexManager._parse_assets_index(version)
-        asset_index_path = Paths.asset_index(version)
-        if asset_index_path.exists():
-            if HttpDownloader.verify_sha1(asset_index_path,assets_index_data.sha1):
-                return asset_index_path
-            HttpDownloader.delete_file(asset_index_path)
+    def load(
+        version: Version,
+        reporter: ProgressReporter | None = None,
+    ) -> Path:
+        asset_index = AssetIndexManager._parse_assets_index(
+            version
+        )
 
-        download = HttpDownloader.download(assets_index_data, asset_index_path, 2,20.0)
-        if download is not None:
-            return download
-        raise RuntimeError(f"Cannot download {version.assets}.json")
-        
-               
+        asset_index_path = Paths.asset_index(version)
+
+        if (
+            asset_index_path.exists()
+            and HttpDownloader.verify_sha1(
+                asset_index_path,
+                asset_index.sha1,
+            )
+        ):
+            return asset_index_path
+
+        if asset_index_path.exists():
+            HttpDownloader.delete_file(
+                asset_index_path
+            )
+
+        return HttpDownloader.download(
+            download_info=asset_index,
+            path=asset_index_path,
+            max_retry=2,
+            timeout=20.0,
+            reporter=reporter,
+            progress_stage=(
+                ProgressStage.DOWNLOADING_ASSET_INDEX
+            ),
+            progress_message=(
+                f"Downloading asset index "
+                f"{version.assets}.json..."
+            ),
+        )
 
     @staticmethod
-    def _parse_assets_index(version: Version):
-        return DownloadAssetIndex(
-            url=version.asset_index["url"],
-            sha1=version.asset_index["sha1"],
-            size=int(version.asset_index["size"]),
-            id=version.asset_index["id"]
-        )
-    
+    def _parse_assets_index(
+        version: Version,
+    ) -> DownloadAssetIndex:
+        try:
+            asset_index = version.asset_index
+
+            return DownloadAssetIndex(
+                url=asset_index["url"],
+                sha1=asset_index["sha1"],
+                size=int(asset_index["size"]),
+                id=asset_index["id"],
+            )
+
+        except (
+            KeyError,
+            TypeError,
+            ValueError,
+        ) as error:
+            raise RuntimeError(
+                f"Invalid asset index data for "
+                f"Minecraft {version.id}"
+            ) from error
