@@ -2,7 +2,7 @@ import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
-
+from src.core.fs.paths import Paths
 from src.models.instance.instance import Instance
 from src.models.java.java import JavaInstallation
 
@@ -11,7 +11,7 @@ class JavaRuntime:
 
     @staticmethod
     def run(
-        java: JavaInstallation,
+        java: Path,
         command: list[str],
         instance: Instance,
     ) -> subprocess.Popen:
@@ -20,7 +20,7 @@ class JavaRuntime:
         if os.name == "nt":
             creation_flags = subprocess.CREATE_NO_WINDOW
 
-        log_dir = instance.instance_dir / "logs"
+        log_dir = Paths.load_instance_dir(instance.name) / "logs"
         log_dir.mkdir(
             parents=True,
             exist_ok=True,
@@ -41,10 +41,10 @@ class JavaRuntime:
         try:
             return subprocess.Popen(
                 [
-                    str(java.path),
+                    str(java),
                     *command,
                 ],
-                cwd=instance.instance_dir,
+                cwd=Paths.load_instance_dir(instance.name),
                 stdin=subprocess.DEVNULL,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
