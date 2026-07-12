@@ -1,146 +1,133 @@
 # MCW Launcher
 
-A lightweight Minecraft Launcher written in Python.
+> A lightweight, modular, and open-source Minecraft Launcher built with Python.
 
-> ⚠️ This project is currently under active development.
+> ⚠️ This project is currently in **Pre-Beta**.
 
-> This document was created with assistance from ChatGPT.
 ---
 
 ## Features
 
 ### Minecraft
 
-- Download Minecraft versions
-- Download libraries
-- Download assets
-- Launch Minecraft
-- Offline authentication
+- ✅ Support Minecraft **1.13 → Latest**
+- ✅ Automatic Java selection
+- ✅ Vanilla launcher support
+- ✅ Progress callback system
 
-### Instance System
+### Instance
 
-- Create instance
-- Rename instance
-- Delete instance
-- Clone instance
-- Per-instance metadata
-- Per-instance settings
+- ✅ Create
+- ✅ Rename
+- ✅ Clone
+- ✅ Delete
+- ✅ Import / Export (`.mcwpack`)
 
-### Package System
+### Account
 
-- Export instance to `.mcwpack`
-- Import `.mcwpack`
-- Package validation
+- ✅ Offline Authentication
+- 🚧 Microsoft Authentication (In Progress)
 
-### Java
+### Core
 
-- Detect Java installation
-- Custom JVM arguments
-- Per-instance memory settings
+- ✅ Modular architecture
+- ✅ Shared HTTP client
+- ✅ Progress API
+- ✅ Unit tests
+- ✅ GitHub Actions CI
 
 ---
 
 ## Project Structure
 
 ```text
-src/
-├── core/
-│   ├── instance/
-│   ├── java/
-│   ├── minecraft/
-│   ├── network/
-│   └── package/
+launcher.py
 │
-├── models/
-│   ├── instance/
-│   ├── java/
-│   ├── minecraft/
-│   └── package/
-```
-
----
-
-## Package Format
-
-MCW Launcher uses its own package format:
-
-```
-.mcwpack
-```
-
-Example:
-
-```text
-package.mcwpack
+├── src/
+│   ├── core/
+│   ├── gui/
+│   ├── models/
+│   └── ...
 │
-├── package.json
-├── instance.json
-├── settings.json
-├── mods/
-├── resourcepacks/
+├── docs/
+├── test/
 └── ...
 ```
 
 ---
 
-## Current Status
+## Build
 
-Implemented:
-
-- Java Runtime
-- Download System
-- Launch Pipeline
-- Instance System
-- Package System
-- Settings System
-
-In Progress:
-
-- Microsoft Authentication
-- GUI
-- Fabric / Forge support
-
----
-
-## Requirements
-
-- Python 3.12+
-- Java 17+
-
-Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-Run
+### Run
 
 ```bash
 python launcher.py
 ```
 
+### Build EXE
+
+```bash
+python -m PyInstaller ^
+    --onefile ^
+    --windowed ^
+    --clean ^
+    launcher.py
+```
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| docs/gui-api.en.md | GUI API Documentation |
+| docs/gui-api.vi.md | Hướng dẫn phát triển GUI |
+
+---
+
+## Testing
+
+Run all tests
+
+```bash
+pytest
+```
+
+GitHub Actions automatically runs all tests on every push and pull request.
+
 ---
 
 ## Roadmap
 
-### v0.3
+### Beta
 
 - Microsoft Authentication
-- Multiple Accounts
-- Account Manager
-
-### v0.4
-
+- Official GUI
 - Fabric
 - Forge
 - NeoForge
-- Quilt
 
-### v0.5
+### Future
 
-- GUI
-- Better UX
-- Theme Support
+- Theme System
+- Plugin Support
+- Multi-language GUI
+
+---
+
+
+## Project Status
+
+| Component | Status |
+|-----------|--------|
+| Core | ✅ Stable |
+| GUI | 🚧 Experimental |
+| Offline Authentication | ✅ Stable |
+| Microsoft Authentication | 🚧 In Progress |
+| Instance System | ✅ Stable |
+| Mod Loader | ⏳ Planned |
+| Unit Tests | ✅ Core Covered |
+| GitHub Actions | ✅ Enabled |
 
 ---
 
