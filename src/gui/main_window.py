@@ -24,8 +24,6 @@ from src.models.account.account_source import AccountSource
 from src.models.progress.progress_event import ProgressEvent
 
 
-#THIS BUILD WAS CREATED BY CHATGPT 5.2
-
 
 class TaskWorker(QObject):
     finished = Signal(object)
@@ -54,6 +52,7 @@ class MainWindow(QMainWindow):
 
         self._busy = False
         self._threads: list[QThread] = []
+        self._task_contexts: dict[TaskWorker, tuple[QThread, Callable[[Any], None] | None, bool]] = {}
         self._manifest_versions: list[Any] = []
 
         self.setWindowTitle("MCW Launcher Beta")
@@ -329,47 +328,77 @@ class MainWindow(QMainWindow):
         worker = TaskWorker(task)
         worker.moveToThread(thread)
 
-        thread.started.connect(worker.run)
-        worker.finished.connect(lambda result: self._task_finished(thread, worker, result, on_success, lock_ui))
-        worker.failed.connect(lambda error: self._task_failed(thread, worker, error, lock_ui))
-
         self._threads.append(thread)
+        self._task_contexts[worker] = (thread, on_success, lock_ui)
+
+        thread.started.connect(worker.run)
+        worker.finished.connect(self._task_finished, Qt.ConnectionType.QueuedConnection)
+        worker.failed.connect(self._task_failed, Qt.ConnectionType.QueuedConnection)
+        thread.finished.connect(lambda finished_thread=thread: self._cleanup_thread(finished_thread))
+
         thread.start()
 
-    def _task_finished(self, thread: QThread, worker: TaskWorker, result: Any, on_success: Callable[[Any], None] | None, lock_ui: bool) -> None:
-        if on_success is not None:
-            on_success(result)
+    @Slot(object)
+    def _task_finished(self, result: Any) -> None:
+        worker = self.sender()
 
-        if lock_ui:
-            self._set_busy(False)
+        if not isinstance(worker, TaskWorker):
+            return
 
-        worker.deleteLater()
-        thread.quit()
-        thread.wait()
-        thread.deleteLater()
+        context = self._task_contexts.pop(worker, None)
 
-        if thread in self._threads:
-            self._threads.remove(thread)
+        if context is None:
+            return
 
-    def _task_failed(self, thread: QThread, worker: TaskWorker, error: Exception, lock_ui: bool) -> None:
+        thread, on_success, lock_ui = context
+
+        try:
+            if on_success is not None:
+                on_success(result)
+        except Exception as error:
+            self._show_task_error(error)
+        finally:
+            if lock_ui:
+                self._set_busy(False)
+
+            worker.deleteLater()
+            thread.quit()
+
+    @Slot(object)
+    def _task_failed(self, error: Exception) -> None:
+        worker = self.sender()
+
+        if not isinstance(worker, TaskWorker):
+            return
+
+        context = self._task_contexts.pop(worker, None)
+
+        if context is None:
+            return
+
+        thread, _on_success, lock_ui = context
+
         if lock_ui:
             self._set_busy(False)
 
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
+        self._show_task_error(error)
 
+        worker.deleteLater()
+        thread.quit()
+
+    def _show_task_error(self, error: Exception) -> None:
         message = f"{type(error).__name__}: {error}"
         self._set_status("Task failed")
         self._append_log(message)
         QMessageBox.critical(self, "MCW Launcher", message)
 
-        worker.deleteLater()
-        thread.quit()
-        thread.wait()
-        thread.deleteLater()
-
+    def _cleanup_thread(self, thread: QThread) -> None:
         if thread in self._threads:
             self._threads.remove(thread)
+
+        thread.deleteLater()
 
     def _load_manifest(self) -> list[Any]:
         versions = VersionManifestManager.get()
