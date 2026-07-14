@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.core.fs.paths import Paths
+from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.instance.settings_manager import SettingsManager
 from src.core.java.java_runtime import JavaRuntime
 from src.core.java.java_selector import JavaSelector
@@ -18,6 +19,24 @@ from src.core.minecraft.version_manifest_manager import (
     VersionManifestManager,
 )
 from src.models.progress.progress_stage import ProgressStage
+
+
+class FakeRunLock:
+    def __init__(self) -> None:
+        self.tracked_process = None
+        self.released = False
+
+    def track_process(self, process) -> bool:
+        self.tracked_process = process
+        return True
+
+    def release(self) -> None:
+        self.released = True
+
+
+@pytest.fixture(autouse=True)
+def patch_instance_run_lock(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(InstanceRunLock, "acquire", lambda instance: FakeRunLock())
 
 
 def make_instance(
@@ -804,3 +823,37 @@ def test_run_propagates_pipeline_exception_and_does_not_emit_finished(
     ][-1] is (
         ProgressStage.DOWNLOADING_LIBRARIES
     )
+
+def test_run_tracks_java_process_with_instance_lock(monkeypatch: pytest.MonkeyPatch):
+    instance = make_instance()
+    process = object()
+    run_lock = FakeRunLock()
+
+    patch_pipeline(monkeypatch)
+    monkeypatch.setattr(InstanceRunLock, "acquire", lambda received_instance: run_lock)
+    monkeypatch.setattr(JavaRuntime, "run", lambda java, command, received_instance: process)
+
+    MinecraftExecutor.run(instance=instance, authentication=object(), account=object())
+
+    assert run_lock.tracked_process is process
+    assert run_lock.released is False
+
+
+def test_run_releases_instance_lock_when_preparation_fails(monkeypatch: pytest.MonkeyPatch):
+    run_lock = FakeRunLock()
+    expected_error = RuntimeError("version manifest failed")
+
+    patch_pipeline(monkeypatch)
+    monkeypatch.setattr(InstanceRunLock, "acquire", lambda instance: run_lock)
+
+    def fail_manifest():
+        raise expected_error
+
+    monkeypatch.setattr(VersionManifestManager, "get", fail_manifest)
+
+    with pytest.raises(RuntimeError) as error:
+        MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object())
+
+    assert error.value is expected_error
+    assert run_lock.released is True
+    assert run_lock.tracked_process is None

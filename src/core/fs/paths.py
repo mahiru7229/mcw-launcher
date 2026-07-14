@@ -16,6 +16,7 @@ class Paths:
     ACCOUNTS_ROOT = PROJECT_ROOT / "accounts"
     CONFIG_ROOT = PROJECT_ROOT / "config"
     THEME_ROOT = PROJECT_ROOT / "themes" 
+    INSTANCE_LOCKS_ROOT = INSTANCES_ROOT / ".runtime" / "locks"
     
     @staticmethod
     def initialize() -> None:
@@ -24,6 +25,7 @@ class Paths:
             Paths.INSTANCES_ROOT,
             Paths.ACCOUNTS_ROOT,
             Paths.CONFIG_ROOT,
+            Paths.INSTANCE_LOCKS_ROOT,
         ]
 
         for directory in directories:

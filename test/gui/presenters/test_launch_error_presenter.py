@@ -1,3 +1,4 @@
+from src.core.instance.errors import InstanceAlreadyRunningError
 from src.gui.presenters.launch_error_presenter import LaunchErrorPresenter
 
 
@@ -21,3 +22,12 @@ def test_presents_generic_launch_error():
 
     assert view.title == "Minecraft launch failed"
     assert view.status == "Launch failed"
+
+
+def test_presents_instance_already_running_error():
+    view = LaunchErrorPresenter.present(InstanceAlreadyRunningError("Survival"))
+
+    assert view.title == "Instance already running"
+    assert view.status == "Instance already running"
+    assert "Close that game" in view.message
+    assert "Survival" in view.message

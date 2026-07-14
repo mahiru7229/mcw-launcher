@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.core.instance.errors import InstanceAlreadyRunningError
+
 
 @dataclass(frozen=True, slots=True)
 class LaunchErrorView:
@@ -15,6 +17,14 @@ class LaunchErrorPresenter:
     def present(cls, error: Exception) -> LaunchErrorView:
         technical_message = str(error).strip() or type(error).__name__
         normalized = technical_message.lower()
+
+        if isinstance(error, InstanceAlreadyRunningError):
+            return cls._build(
+                title="Instance already running",
+                summary="This instance is already being used by Minecraft. Close that game before launching the same instance again.",
+                status="Instance already running",
+                technical_message=technical_message,
+            )
 
         if "sha-256" in normalized or "checksum" in normalized:
             return cls._build(
