@@ -14,6 +14,7 @@ from src.core.minecraft.download_manager import DownloadClientManager
 from src.core.minecraft.launcher_manager import LauncherManager
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.minecraft.minecraft_executor import MinecraftExecutor
+from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.minecraft.version_manifest_manager import (
     VersionManifestManager,
@@ -857,3 +858,30 @@ def test_run_releases_instance_lock_when_preparation_fails(monkeypatch: pytest.M
     assert error.value is expected_error
     assert run_lock.released is True
     assert run_lock.tracked_process is None
+
+
+def test_fabric_instance_uses_resolved_knot_client(monkeypatch: pytest.MonkeyPatch):
+    instance = SimpleNamespace(name="Fabric Test", version_id="1.21.1", mod_loader=("fabric", "0.19.3"))
+    fabric_version = SimpleNamespace(
+        id="fabric-loader-0.19.3-1.21.1",
+        java_version={"majorVersion": 21},
+        main_class="net.fabricmc.loader.impl.launch.knot.KnotClient",
+    )
+    launched = {}
+
+    monkeypatch.setattr(VersionManifestManager, "get", lambda: [])
+    monkeypatch.setattr(ModLoaderManager, "load", lambda received_instance, reporter=None: fabric_version)
+    monkeypatch.setattr(DownloadClientManager, "load", lambda **kwargs: Path("client.jar"))
+    monkeypatch.setattr(DownloadLibraryManager, "load", lambda **kwargs: [])
+    monkeypatch.setattr(AssetManager, "load", lambda **kwargs: Path("assets"))
+    monkeypatch.setattr(SettingsManager, "load", lambda received_instance: object())
+    monkeypatch.setattr(ContextBuilder, "build", lambda *args: {})
+    monkeypatch.setattr(LauncherManager, "build", lambda version, *args: [version.main_class])
+    monkeypatch.setattr(JavaSelector, "select_java", lambda major: Path("javaw.exe"))
+    monkeypatch.setattr(JavaRuntime, "run", lambda java, command, received_instance: launched.update(command=command) or object())
+
+    result = MinecraftExecutor.run(instance=instance, authentication=object(), account=object())
+
+    assert launched["command"] == ["net.fabricmc.loader.impl.launch.knot.KnotClient"]
+    assert result["minecraftVersion"] == "fabric-loader-0.19.3-1.21.1"
+    assert result["minecraftJavaMajorVersion"] == 21

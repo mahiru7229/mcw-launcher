@@ -292,6 +292,8 @@
     "progress.message.started": "ĐÃ KHỞI ĐỘNG",
     "instance_settings.java.file_filter": "File thực thi Java (java.exe javaw.exe);;Tất cả file (*)",
     "task.busy": "Một tác vụ khác vẫn đang chạy.",
-    "task.close_while_active": "Không thể đóng TaskRunner khi vẫn còn tác vụ đang chạy."
+    "task.close_while_active": "Không thể đóng TaskRunner khi vẫn còn tác vụ đang chạy.",
+    "fabric.repair.button": "Sửa chữa Fabric",
+    "fabric.repair.tooltip": "Tạo lại metadata Fabric và kiểm tra thư viện Loader mà không thay đổi mod hoặc thế giới đã lưu."
   }
 }

@@ -83,3 +83,19 @@ def test_manage_loader_uses_stable_version_when_applying_fabric_to_vanilla(app):
 
     assert page.manage_loader_version_combo.currentData() == "0.19.3"
     assert page.selected_manage_loader() == ("fabric", "0.19.3")
+
+
+def test_repair_fabric_is_only_available_for_fabric_instances(app):
+    page = InstancesPage()
+    fabric = make_instance()
+    page.set_instances([fabric], fabric.name)
+    emitted = []
+    page.repair_loader_requested.connect(emitted.append)
+
+    assert page.repair_loader_button.isEnabled() is True
+    page._request_loader_repair()
+    assert emitted == [fabric.name]
+
+    vanilla = make_instance(name="Vanilla", mod_loader=("vanilla", "-1"))
+    page.set_instances([vanilla], vanilla.name)
+    assert page.repair_loader_button.isEnabled() is False

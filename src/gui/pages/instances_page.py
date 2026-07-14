@@ -21,6 +21,7 @@ class InstancesPage(BasePage):
     export_requested = Signal(str, object, bool)
     fabric_versions_requested = Signal(str)
     loader_change_requested = Signal(str, str, str)
+    repair_loader_requested = Signal(str)
     manage_mods_requested = Signal(str)
 
     def __init__(self) -> None:
@@ -84,6 +85,10 @@ class InstancesPage(BasePage):
         self.apply_loader_button = QPushButton("Apply mod loader")
         self.apply_loader_button.clicked.connect(self._request_loader_change)
         self.apply_loader_button.setEnabled(False)
+        self.repair_loader_button = QPushButton("Repair Fabric")
+        self.repair_loader_button.setToolTip("Rebuild Fabric metadata and verify Loader libraries without changing mods or saves.")
+        self.repair_loader_button.clicked.connect(self._request_loader_repair)
+        self.repair_loader_button.setEnabled(False)
 
         self.target_name_input = QLineEdit()
         self.target_name_input.setPlaceholderText("New name or clone name")
@@ -117,6 +122,7 @@ class InstancesPage(BasePage):
         manage_card.layout.addWidget(self.manage_loader_version_combo)
         manage_card.layout.addWidget(self.manage_loader_status)
         manage_card.layout.addWidget(self.apply_loader_button)
+        manage_card.layout.addWidget(self.repair_loader_button)
         manage_card.layout.addWidget(QLabel("Target name"))
         manage_card.layout.addWidget(self.target_name_input)
         manage_card.layout.addWidget(self.include_saves_checkbox)
@@ -193,6 +199,7 @@ class InstancesPage(BasePage):
             self._set_manage_loader_available(False)
             self.manage_loader_status.setText(tr("Select an instance to manage its mod loader."))
             self.manage_mods_button.setEnabled(False)
+            self.repair_loader_button.setEnabled(False)
             return
 
         loader_name, loader_version = self._instance_loader(instance)
@@ -206,6 +213,7 @@ class InstancesPage(BasePage):
         self.manage_loader_combo.setCurrentIndex(max(0, self.manage_loader_combo.findData(loader_name)))
         self.manage_loader_combo.blockSignals(False)
         self.manage_mods_button.setEnabled(loader_name == "fabric")
+        self.repair_loader_button.setEnabled(loader_name == "fabric")
         self._manage_loader_selected()
 
     def _set_manage_loader_available(self, available: bool) -> None:
@@ -213,6 +221,8 @@ class InstancesPage(BasePage):
         self.manage_loader_version_combo.setEnabled(False)
         self.manage_loader_version_combo.clear()
         self.apply_loader_button.setEnabled(available)
+        if not available:
+            self.repair_loader_button.setEnabled(False)
 
     def _manage_loader_selected(self, _loader_text: str = "") -> None:
         instance = self._instances.get(self.current_instance_name())
@@ -223,7 +233,9 @@ class InstancesPage(BasePage):
         is_fabric = self.manage_loader_combo.currentData() == "fabric"
         self.manage_loader_version_combo.clear()
         self.manage_loader_version_combo.setEnabled(is_fabric)
-        self.manage_mods_button.setEnabled(self._instance_loader(instance)[0] == "fabric")
+        current_is_fabric = self._instance_loader(instance)[0] == "fabric"
+        self.manage_mods_button.setEnabled(current_is_fabric)
+        self.repair_loader_button.setEnabled(current_is_fabric)
 
         if not is_fabric:
             self.manage_loader_status.setText(tr("Apply Vanilla to remove Fabric Loader from this instance. Mod files are kept in its mods folder."))
@@ -298,6 +310,13 @@ class InstancesPage(BasePage):
             QMessageBox.information(self, tr("Fabric Loader"), tr("Select a Fabric Loader version first."))
             return
         self.loader_change_requested.emit(name, loader_name, loader_version)
+
+    def _request_loader_repair(self) -> None:
+        name = self.current_instance_name()
+        instance = self._instances.get(name)
+        if instance is None or self._instance_loader(instance)[0] != "fabric":
+            return
+        self.repair_loader_requested.emit(name)
 
     def _confirm_delete(self) -> None:
         name = self.current_instance_name()

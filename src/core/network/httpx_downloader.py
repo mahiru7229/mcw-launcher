@@ -204,12 +204,9 @@ class HttpDownloader:
         )
 
     @staticmethod
-    def verify_sha1(
-        path: Path,
-        expected_sha1: str,
-    ) -> bool:
+    def calculate_sha1(path: Path) -> str | None:
         if not path.is_file():
-            return False
+            return None
 
         sha1 = hashlib.sha1()
 
@@ -217,14 +214,63 @@ class HttpDownloader:
             with path.open("rb") as file:
                 while chunk := file.read(8192):
                     sha1.update(chunk)
-
         except OSError:
-            return False
+            return None
 
-        return (
-            sha1.hexdigest().lower()
-            == expected_sha1.lower()
-        )
+        return sha1.hexdigest().lower()
+
+    @staticmethod
+    def verify_sha1(
+        path: Path,
+        expected_sha1: str,
+    ) -> bool:
+        actual_sha1 = HttpDownloader.calculate_sha1(path)
+        return actual_sha1 is not None and actual_sha1 == expected_sha1.lower()
+
+    @staticmethod
+    def download_and_hash(url: str, path: Path, max_retry: int = 2, timeout: float = 20.0, force: bool = False) -> tuple[Path, str, int]:
+        path_lock = HttpDownloader._get_path_lock(path)
+
+        with path_lock:
+            if path.is_file() and not force:
+                sha1 = HttpDownloader.calculate_sha1(path)
+                if sha1 is not None:
+                    return path, sha1, path.stat().st_size
+
+            if max_retry < 1:
+                raise ValueError("max_retry must be at least 1")
+
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temp_path = path.with_name(f"{path.name}.part")
+            last_error: Exception | None = None
+
+            for attempt in range(1, max_retry + 1):
+                sha1 = hashlib.sha1()
+                size = 0
+
+                try:
+                    HttpDownloader.delete_file(temp_path)
+                    client = HttpDownloader.get_client()
+
+                    with client.stream("GET", url, timeout=timeout) as response:
+                        response.raise_for_status()
+                        with temp_path.open("wb") as file:
+                            for chunk in response.iter_bytes(chunk_size=CHUNK_SIZE):
+                                if not chunk:
+                                    continue
+                                file.write(chunk)
+                                sha1.update(chunk)
+                                size += len(chunk)
+
+                    temp_path.replace(path)
+                    return path, sha1.hexdigest().lower(), size
+                except (httpx.HTTPError, OSError) as error:
+                    last_error = error
+                    HttpDownloader.delete_file(temp_path)
+                    if attempt < max_retry:
+                        time.sleep(min(2 ** (attempt - 1), 8))
+
+            raise RuntimeError(f"Failed to download '{path.name}' after {max_retry} attempts") from last_error
 
     @staticmethod
     def delete_file(path: Path) -> None:

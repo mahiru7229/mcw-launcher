@@ -31,6 +31,15 @@ class ModLoaderManager:
         raise RuntimeError(f"Unsupported mod loader: {loader_name}")
 
     @staticmethod
+    def repair(instance: Instance, reporter: ProgressReporter | None = None) -> Version:
+        loader_name, loader_version = ModLoaderManager.normalize(getattr(instance, "mod_loader", ("vanilla", "-1")))
+        if loader_name != ModLoaderManager.FABRIC:
+            raise RuntimeError("Only Fabric instances can be repaired.")
+
+        base_version = VersionManager.load(instance.version_id)
+        return FabricVersionManager.repair(base_version, loader_version, reporter)
+
+    @staticmethod
     def resolve(game_version: str, loader_name: str, loader_version: str = AUTO) -> tuple[str, str]:
         loader_name, loader_version = ModLoaderManager.normalize((loader_name, loader_version))
 

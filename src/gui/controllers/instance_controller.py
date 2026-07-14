@@ -8,6 +8,7 @@ from PySide6.QtCore import Signal, Slot
 
 from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.instance_run_lock import InstanceRunLock
+from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.gui.controllers.base_controller import BaseController
@@ -105,6 +106,21 @@ class InstanceController(BaseController):
 
         self._task_runner.run("instance.loader", task, f"Applying {loader_name.title()} to '{name}'...")
 
+    def repair_loader(self, name: str) -> None:
+        name = name.strip()
+        if not name:
+            return
+
+        def task() -> Any:
+            instance = InstanceManager.load(name)
+            if InstanceRunLock.is_active(instance):
+                raise RuntimeError("Close Minecraft before repairing this instance's mod loader.")
+            version = ModLoaderManager.repair(instance)
+            DownloadLibraryManager.load(version)
+            return instance
+
+        self._task_runner.run("instance.loader.repair", task, f"Repairing Fabric for '{name}'...")
+
     def rename(self, source_name: str, target_name: str) -> None:
         source_name = source_name.strip()
         target_name = self._validated_name(target_name)
@@ -169,6 +185,9 @@ class InstanceController(BaseController):
             loader_name, loader_version = ModLoaderManager.normalize(result.mod_loader)
             loader_text = loader_name if loader_name == "vanilla" else f"{loader_name} {loader_version}"
             self.status_changed.emit(f"Applied {loader_text} to '{selected_name}'")
+        elif task_id == "instance.loader.repair":
+            selected_name = result.name
+            self.status_changed.emit(f"Repaired Fabric for '{selected_name}'")
         elif task_id == "instance.export":
             self.export_finished.emit(result)
             self.status_changed.emit("Instance export completed")

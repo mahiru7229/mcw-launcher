@@ -875,3 +875,29 @@ def test_download_and_verify_chains_last_error(
         )
 
     assert error.value.__cause__ is expected
+
+def test_download_and_hash_writes_file_and_returns_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    content = b"fabric-library"
+    response = DummyResponse(chunks=[content[:6], content[6:]], headers={"Content-Length": str(len(content))})
+    client = DummyClient(response)
+    monkeypatch.setattr(HttpDownloader, "get_client", lambda: client)
+    path = tmp_path / "libraries" / "fabric.jar"
+
+    downloaded, sha1, size = HttpDownloader.download_and_hash("https://example.com/fabric.jar", path)
+
+    assert downloaded == path
+    assert path.read_bytes() == content
+    assert sha1 == hashlib.sha1(content).hexdigest()
+    assert size == len(content)
+
+
+def test_download_and_hash_reuses_existing_file_without_network(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    path = tmp_path / "fabric.jar"
+    path.write_bytes(b"cached")
+    monkeypatch.setattr(HttpDownloader, "get_client", lambda: (_ for _ in ()).throw(AssertionError("network should not be used")))
+
+    downloaded, sha1, size = HttpDownloader.download_and_hash("https://example.com/fabric.jar", path)
+
+    assert downloaded == path
+    assert sha1 == hashlib.sha1(b"cached").hexdigest()
+    assert size == 6

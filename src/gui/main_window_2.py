@@ -143,6 +143,7 @@ class MainWindow(QMainWindow):
         self.instances_page.create_requested.connect(self.instance_controller.create)
         self.instances_page.fabric_versions_requested.connect(self.mod_loader_controller.load_fabric_versions)
         self.instances_page.loader_change_requested.connect(self.instance_controller.change_loader)
+        self.instances_page.repair_loader_requested.connect(self.instance_controller.repair_loader)
         self.instances_page.manage_mods_requested.connect(self._open_mod_manager)
         self.instances_page.rename_requested.connect(self.instance_controller.rename)
         self.instances_page.clone_requested.connect(self.instance_controller.clone)

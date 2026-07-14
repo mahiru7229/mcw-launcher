@@ -44,3 +44,22 @@ def test_resolve_fabric_legacy_missing_version_uses_recommended_loader(monkeypat
     monkeypatch.setattr(FabricVersionManager, "recommended_loader_version", lambda game_version: "0.19.3")
 
     assert ModLoaderManager.resolve("1.21.1", "fabric", "-1") == ("fabric", "0.19.3")
+
+
+def test_repairs_fabric_instance(monkeypatch):
+    expected = object()
+    instance = SimpleNamespace(version_id="1.20.1", mod_loader=("fabric", "0.19.3"))
+    base_version = object()
+    monkeypatch.setattr(VersionManager, "load", lambda version_id: base_version)
+    monkeypatch.setattr(FabricVersionManager, "repair", lambda version, loader_version, reporter=None: expected)
+
+    assert ModLoaderManager.repair(instance) is expected
+
+
+def test_repair_rejects_vanilla_instance():
+    instance = SimpleNamespace(version_id="1.20.1", mod_loader=("vanilla", "-1"))
+
+    import pytest
+
+    with pytest.raises(RuntimeError, match="Only Fabric instances"):
+        ModLoaderManager.repair(instance)

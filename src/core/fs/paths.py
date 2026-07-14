@@ -147,6 +147,33 @@ class Paths:
         return directory / f"{directory.name}.json"
 
     @staticmethod
+    def fabric_metadata_root() -> Path:
+        return Paths.CACHE_ROOT / "modloaders" / "fabric"
+
+    @staticmethod
+    def fabric_catalog_json(game_version: str) -> Path:
+        from urllib.parse import quote
+
+        filename = quote(game_version, safe="") or "unknown"
+        return Paths.fabric_metadata_root() / "catalogs" / f"{filename}.json"
+
+    @staticmethod
+    def fabric_install_metadata_json(game_version: str, loader_version: str) -> Path:
+        from urllib.parse import quote
+
+        game = quote(game_version, safe="") or "unknown"
+        loader = quote(loader_version, safe="") or "unknown"
+        return Paths.fabric_metadata_root() / "install" / game / f"{loader}.json"
+
+    @staticmethod
+    def fabric_profile_json(game_version: str, loader_version: str) -> Path:
+        from urllib.parse import quote
+
+        game = quote(game_version, safe="") or "unknown"
+        loader = quote(loader_version, safe="") or "unknown"
+        return Paths.fabric_metadata_root() / "profiles" / game / f"{loader}.json"
+
+    @staticmethod
     def instance_mods_dir(instance: Instance) -> Path:
         directory = Path(instance.instance_dir) / "mods"
         directory.mkdir(parents=True, exist_ok=True)

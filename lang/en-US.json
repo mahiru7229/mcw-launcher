@@ -292,7 +292,9 @@
     "progress.message.started": "STARTED",
     "instance_settings.java.file_filter": "Java executable (java.exe javaw.exe);;All files (*)",
     "task.busy": "Another task is still running.",
-    "task.close_while_active": "Cannot close TaskRunner while a task is active."
+    "task.close_while_active": "Cannot close TaskRunner while a task is active.",
+    "fabric.repair.button": "Repair Fabric",
+    "fabric.repair.tooltip": "Rebuild Fabric metadata and verify Loader libraries without changing mods or saves."
   },
   "aliases": {
     "MCW Launcher": "app.name",
@@ -582,6 +584,8 @@
     "STARTED": "progress.message.started",
     "Java executable (java.exe javaw.exe);;All files (*)": "instance_settings.java.file_filter",
     "Another task is still running.": "task.busy",
-    "Cannot close TaskRunner while a task is active.": "task.close_while_active"
+    "Cannot close TaskRunner while a task is active.": "task.close_while_active",
+    "Repair Fabric": "fabric.repair.button",
+    "Rebuild Fabric metadata and verify Loader libraries without changing mods or saves.": "fabric.repair.tooltip"
   }
 }
