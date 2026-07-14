@@ -16,9 +16,11 @@ from src.gui.controllers.instance_controller import InstanceController
 from src.gui.controllers.launch_controller import LaunchController
 from src.gui.controllers.mod_controller import ModController
 from src.gui.controllers.mod_loader_controller import ModLoaderController
+from src.gui.controllers.modrinth_controller import ModrinthController
 from src.gui.controllers.settings_controller import InstanceSettingsController
 from src.gui.controllers.version_controller import VersionController
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
+from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
 from src.gui.localization import retranslate_widget_tree
 from src.gui.pages.about_page import AboutPage
 from src.gui.pages.account_page import AccountPage
@@ -48,6 +50,7 @@ class MainWindow(QMainWindow):
         self.instance_controller = InstanceController(self.task_runner)
         self.mod_loader_controller = ModLoaderController(self.task_runner)
         self.mod_controller = ModController(self.task_runner)
+        self.modrinth_controller = ModrinthController(self.task_runner)
         self.instance_settings_controller = InstanceSettingsController()
         self.gui_settings_controller = GuiSettingsController()
         self._startup_settings = self.gui_settings_controller.load()
@@ -55,6 +58,7 @@ class MainWindow(QMainWindow):
         language_manager.set_language(self._startup_settings.get("language", "en-US"), notify=False)
         self.launch_controller = LaunchController(self.task_runner)
         self.running_instances_timer = QTimer(self)
+        self._modrinth_tasks: set[str] = set()
         self.running_instances_timer.setInterval(1000)
 
         self._build_ui()
@@ -102,6 +106,8 @@ class MainWindow(QMainWindow):
         self.logs_page = LogsPage()
         self.about_page = AboutPage()
         self.mod_manager_dialog = ModManagerDialog(self)
+        self.modrinth_mod_dialog = ModrinthBrowserDialog("mod", self)
+        self.modrinth_modpack_dialog = ModrinthBrowserDialog("modpack", self)
 
         self.pages = {
             "home": self.home_page,
@@ -145,6 +151,7 @@ class MainWindow(QMainWindow):
         self.instances_page.loader_change_requested.connect(self.instance_controller.change_loader)
         self.instances_page.repair_loader_requested.connect(self.instance_controller.repair_loader)
         self.instances_page.manage_mods_requested.connect(self._open_mod_manager)
+        self.instances_page.browse_modpacks_requested.connect(self._open_modrinth_modpacks)
         self.instances_page.rename_requested.connect(self.instance_controller.rename)
         self.instances_page.clone_requested.connect(self.instance_controller.clone)
         self.instances_page.delete_requested.connect(self.instance_controller.delete)
@@ -180,8 +187,20 @@ class MainWindow(QMainWindow):
         self.mod_manager_dialog.add_requested.connect(self.mod_controller.add)
         self.mod_manager_dialog.remove_requested.connect(self.mod_controller.remove)
         self.mod_manager_dialog.enabled_requested.connect(self.mod_controller.set_enabled)
+        self.mod_manager_dialog.modrinth_requested.connect(self._open_modrinth_mod_browser)
         self.mod_controller.instance_changed.connect(self.mod_manager_dialog.set_instance)
         self.mod_controller.mods_changed.connect(self.mod_manager_dialog.set_mods)
+
+        self.modrinth_mod_dialog.search_requested.connect(self._search_modrinth_mods)
+        self.modrinth_modpack_dialog.search_requested.connect(self._search_modrinth_modpacks)
+        self.modrinth_mod_dialog.versions_requested.connect(self.modrinth_controller.load_versions)
+        self.modrinth_modpack_dialog.versions_requested.connect(self.modrinth_controller.load_versions)
+        self.modrinth_mod_dialog.install_mod_requested.connect(self._install_modrinth_mod)
+        self.modrinth_modpack_dialog.install_modpack_requested.connect(self.modrinth_controller.install_modpack)
+        self.modrinth_controller.search_results_changed.connect(self._set_modrinth_results)
+        self.modrinth_controller.versions_changed.connect(self._set_modrinth_versions)
+        self.modrinth_controller.mod_installed.connect(self._modrinth_mod_installed)
+        self.modrinth_controller.modpack_installed.connect(self._modrinth_modpack_installed)
 
         self.launch_controller.progress_received.connect(self._on_progress)
         self.launch_controller.launch_finished.connect(self.launch_control.set_result)
@@ -189,6 +208,8 @@ class MainWindow(QMainWindow):
 
         self.task_runner.task_started.connect(self._on_task_started)
         self.task_runner.task_failed.connect(self._on_task_failed)
+        self.task_runner.task_succeeded.connect(self._on_task_completed)
+        self.task_runner.task_failed.connect(self._on_task_completed)
         self.task_runner.busy_changed.connect(self._set_busy)
         self.task_runner.busy_changed.connect(self.mod_manager_dialog.set_busy)
         self.task_runner.task_rejected.connect(lambda message: QMessageBox.information(self, tr("MCW Launcher"), tr(message)))
@@ -199,6 +220,7 @@ class MainWindow(QMainWindow):
             self.instance_controller,
             self.mod_loader_controller,
             self.mod_controller,
+            self.modrinth_controller,
             self.instance_settings_controller,
             self.gui_settings_controller,
             self.launch_controller,
@@ -255,6 +277,61 @@ class MainWindow(QMainWindow):
         self.mod_manager_dialog.raise_()
         self.mod_manager_dialog.activateWindow()
 
+    def _open_modrinth_mod_browser(self) -> None:
+        instance = self.mod_controller.current_instance
+        if instance is None:
+            QMessageBox.information(self, tr("modrinth.title"), tr("modrinth.mod.no_instance"))
+            return
+        self.modrinth_mod_dialog.set_instance(instance)
+        self.modrinth_mod_dialog.show()
+        self.modrinth_mod_dialog.raise_()
+        self.modrinth_mod_dialog.activateWindow()
+        self.modrinth_controller.search("mod", "", "downloads", 0, game_version=instance.version_id)
+
+    def _open_modrinth_modpacks(self) -> None:
+        self.modrinth_modpack_dialog.set_instance(None)
+        self.modrinth_modpack_dialog.show()
+        self.modrinth_modpack_dialog.raise_()
+        self.modrinth_modpack_dialog.activateWindow()
+        self.modrinth_controller.search("modpack", "", "downloads", 0)
+
+    def _search_modrinth_mods(self, project_type: str, query: str, index: str, offset: int) -> None:
+        self.modrinth_controller.search(project_type, query, index, offset, game_version=self.modrinth_mod_dialog.game_version)
+
+    def _search_modrinth_modpacks(self, project_type: str, query: str, index: str, offset: int) -> None:
+        self.modrinth_controller.search(project_type, query, index, offset)
+
+    def _install_modrinth_mod(self, version_id: str) -> None:
+        instance = self.mod_controller.current_instance
+        if instance is None:
+            QMessageBox.information(self, tr("modrinth.title"), tr("modrinth.mod.no_instance"))
+            return
+        self.modrinth_controller.install_mod(instance.name, version_id)
+
+    def _set_modrinth_results(self, project_type: str, result: object) -> None:
+        dialog = self.modrinth_mod_dialog if project_type == "mod" else self.modrinth_modpack_dialog
+        dialog.set_search_result(result)
+
+    def _set_modrinth_versions(self, project_type: str, project_id: str, versions: list) -> None:
+        dialog = self.modrinth_mod_dialog if project_type == "mod" else self.modrinth_modpack_dialog
+        dialog.set_versions(project_id, versions)
+
+    def _modrinth_mod_installed(self, result: object) -> None:
+        self.mod_controller.refresh()
+        count = len(getattr(result, "installed_files", ()) or ())
+        warnings = tuple(getattr(result, "warnings", ()) or ())
+        message = tr("modrinth.mod.installed", count=count)
+        if warnings:
+            message += "\n\n" + "\n".join(str(item) for item in warnings)
+        QMessageBox.information(self, tr("modrinth.mod.install"), message)
+
+    def _modrinth_modpack_installed(self, result: object) -> None:
+        instance = getattr(result, "instance", None)
+        selected_name = str(getattr(instance, "name", ""))
+        self.instance_controller.refresh(selected_name=selected_name)
+        self.modrinth_modpack_dialog.close()
+        QMessageBox.information(self, tr("modrinth.modpack.install"), tr("modrinth.modpack.installed", name=selected_name))
+
     def _account_selected(self, account: object | None) -> None:
         self.home_page.set_account(account)
         self.right_panel.set_account(account)
@@ -296,14 +373,28 @@ class MainWindow(QMainWindow):
             self.launch_control,
             self.right_panel,
             self.mod_manager_dialog,
+            self.modrinth_mod_dialog,
+            self.modrinth_modpack_dialog,
         ):
             retranslate_dynamic = getattr(widget, "retranslate_dynamic", None)
             if callable(retranslate_dynamic):
                 retranslate_dynamic()
 
     def _on_task_started(self, _task_id: str, message: str, blocking: bool) -> None:
+        if _task_id.startswith("modrinth."):
+            self._modrinth_tasks.add(_task_id)
+            self.modrinth_mod_dialog.set_busy(True)
+            self.modrinth_modpack_dialog.set_busy(True)
         if blocking or not self.task_runner.is_busy:
             self._set_status(message)
+
+    def _on_task_completed(self, task_id: str, _result: object) -> None:
+        if not task_id.startswith("modrinth."):
+            return
+        self._modrinth_tasks.discard(task_id)
+        busy = bool(self._modrinth_tasks)
+        self.modrinth_mod_dialog.set_busy(busy)
+        self.modrinth_modpack_dialog.set_busy(busy)
 
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if task_id != self.launch_controller.TASK_ID:

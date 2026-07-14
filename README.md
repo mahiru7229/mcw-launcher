@@ -1,136 +1,293 @@
 # MCW Launcher
 
-> A lightweight, modular, and open-source Minecraft Launcher built with Python.
+<p align="center">
+  <strong>A modular, instance-based Minecraft launcher written in Python.</strong>
+</p>
 
-> ⚠️ This project is currently in **Beta**.
+<p align="center">
+  <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
+    <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License">
+  </a>
+  <img src="https://img.shields.io/badge/Platform-Windows-0078D4" alt="Windows">
+  <img src="https://img.shields.io/badge/Status-Beta-orange" alt="Beta">
+</p>
+
+> [!WARNING]
+> MCW Launcher is under active beta development. Back up important worlds before testing new builds.
 
 ---
+
+## Overview
+
+MCW Launcher is an open-source Minecraft launcher focused on isolated instances, a modular core, visible launch progress, and a GUI that remains separate from launcher logic.
+
+The project is currently developed primarily for Windows and uses PySide6 for its graphical interface.
 
 ## Features
 
-### Minecraft
+### Minecraft launching
 
-- ✅ Support **all** Minecraft versions.
-- ✅ Automatic Java selection
-- ✅ Vanilla launcher support
-- ✅ Progress callback system
+- Launch Vanilla Minecraft across modern and legacy version formats.
+- Download and verify the client, libraries, assets, and native files.
+- Build modern and legacy launch arguments.
+- Select a compatible Java runtime automatically.
+- Download and manage compatible Java runtimes when required.
+- Display structured progress while preparing and launching the game.
 
-### Instance
+### Instance management
 
-- ✅ Create
-- ✅ Rename
-- ✅ Clone
-- ✅ Delete
-- ✅ Import / Export (`.mcwpack`)
+Each instance has its own game directory, metadata, settings, saves, mods, and runtime state.
 
-### Account
+- Create, rename, clone, and delete instances.
+- Import and export instances using the `.mcwpack` format.
+- Include or exclude saves while cloning or exporting.
+- Configure memory, resolution, fullscreen mode, Java path, JVM arguments, and game arguments per instance.
+- Prevent the same instance from being launched more than once at the same time.
+- Show instances that are currently preparing or running.
 
-- ✅ Offline Authentication
-- 🚧 Microsoft Authentication (In Progress)
+### Fabric and mods
 
-### Core
+- Create Vanilla or Fabric instances.
+- Automatically select a recommended stable Fabric Loader version.
+- Change or repair the Fabric Loader version from instance management.
+- Cache Fabric metadata and reuse it when possible.
+- Manage Fabric mods in a dedicated window.
+- Add, remove, enable, or disable mod files.
+- Read metadata from `fabric.mod.json`.
+- Drag and drop supported mod JAR files into the Mod Manager.
 
-- ✅ Modular architecture
-- ✅ Shared HTTP client
-- ✅ Progress API
-- ✅ Unit tests
-- ✅ GitHub Actions CI
+> Fabric API is a separate mod and is not installed automatically by the Fabric Loader itself.
 
----
+### Accounts
 
-## Project Structure
+- Offline account support.
+- SQLite account storage.
+- Windows DPAPI protection for stored authentication tokens.
+- Microsoft authentication code is under development and may not be ready for normal use.
+
+### Language packs
+
+Built-in language packs:
+
+- `en-US.json` — English - US
+- `vi-VN.json` — Tiếng Việt - Việt Nam
+
+Language packs use semantic keys such as:
 
 ```text
-launcher.py
-│
+instance.create.success
+mod_manager.add_files
+launcher_settings.language.label
+```
+
+A new language can be added by placing another compatible JSON file inside the `lang` directory. Missing translations fall back to `en-US`.
+
+See [`docs/LANGUAGE_PACKS.md`](docs/LANGUAGE_PACKS.md) for the pack format.
+
+### Reliability and development
+
+- Shared HTTP client and reusable download pipeline.
+- SHA-1 verification for Minecraft files.
+- Atomic writes for important cache and metadata files.
+- SQLite schema initialization and migration.
+- Runtime instance locks with stale-lock recovery.
+- Automated tests through GitHub Actions.
+- Modular managers, models, controllers, pages, and presenters.
+
+---
+
+## Project structure
+
+```text
+mcw-launcher/
+├── launcher.py
+├── mcw_launcher.spec
+├── lang/
+│   ├── en-US.json
+│   └── vi-VN.json
 ├── src/
 │   ├── core/
+│   │   ├── account/
+│   │   ├── auth/
+│   │   ├── instance/
+│   │   ├── java/
+│   │   ├── language/
+│   │   ├── minecraft/
+│   │   ├── mod/
+│   │   ├── modloader/
+│   │   ├── network/
+│   │   └── package/
 │   ├── gui/
-│   ├── models/
-│   └── ...
-│
+│   └── models/
 ├── docs/
 ├── test/
-└── ...
+└── themes/
 ```
+
+The GUI calls the public launcher core instead of implementing Minecraft logic directly.
 
 ---
 
-## Build
+## Requirements
 
-### Run
+### Running a packaged build
 
-```bash
+- Windows 10 or Windows 11, 64-bit.
+- Internet access for the first download of a Minecraft version.
+- Enough free storage for Minecraft assets, libraries, Java runtimes, instances, and mods.
+
+Java can be detected or provisioned by the launcher.
+
+### Running from source
+
+- Python 3.12 is recommended.
+- Git is optional but recommended.
+
+Create a virtual environment:
+
+```powershell
+git clone https://github.com/mahiru7229/mcw-launcher.git
+cd mcw-launcher
+
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+python -m pip install --upgrade pip
+python -m pip install PySide6 requests httpx cryptography
+```
+
+Start the launcher:
+
+```powershell
 python launcher.py
 ```
-
-### Build EXE
-
-```bash
-python -m PyInstaller ^
-    --onefile ^
-    --windowed ^
-    --clean ^
-    launcher.py
-```
-
----
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| docs/gui-api.en.md | GUI API Documentation |
-| docs/gui-api.vi.md | Hướng dẫn phát triển GUI |
 
 ---
 
 ## Testing
 
-Run all tests
+Install test dependencies:
 
-```bash
-pytest
+```powershell
+python -m pip install pytest pytest-cov
 ```
 
-GitHub Actions automatically runs all tests on every push and pull request.
+Run the full test suite:
+
+```powershell
+python -m pytest test -v
+```
+
+GitHub Actions also runs the tests on pushes and pull requests targeting `main`.
+
+---
+
+## Build a Windows executable
+
+Install PyInstaller:
+
+```powershell
+python -m pip install pyinstaller
+```
+
+Build using the project specification:
+
+```powershell
+python -m PyInstaller --clean mcw_launcher.spec
+```
+
+The specification creates a windowed executable and bundles the built-in language packs.
+
+Windows SmartScreen may warn about unsigned beta builds. Code signing is not currently included.
+
+---
+
+## Runtime data
+
+When running from source, runtime data is created beside the project. In a packaged build, it is created beside the executable.
+
+```text
+accounts/       Account database
+cache/          Minecraft and mod-loader cache
+config/         Launcher configuration
+instances/      Instance directories and metadata
+lang/           External language packs
+runtimes/       Managed Java runtimes
+themes/         Theme assets
+```
+
+Do not commit runtime data, downloaded Minecraft files, account databases, or personal worlds.
+
+---
+
+## Documentation
+
+| Document | Purpose |
+|---|---|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core architecture |
+| [`docs/INSTANCE_SYSTEM.md`](docs/INSTANCE_SYSTEM.md) | Instance metadata and lifecycle |
+| [`docs/PACKAGE_FORMAT.md`](docs/PACKAGE_FORMAT.md) | `.mcwpack` package format |
+| [`docs/LANGUAGE_PACKS.md`](docs/LANGUAGE_PACKS.md) | Creating language packs |
+| [`docs/gui-api.en.md`](docs/gui-api.en.md) | GUI integration API in English |
+| [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API in Vietnamese |
+
+---
+
+## Current status
+
+| Component | Status |
+|---|---|
+| Vanilla launch pipeline | Available |
+| Instance system | Available |
+| Offline accounts | Available |
+| Automatic Java handling | Available |
+| PySide6 GUI | Beta |
+| Fabric Loader | Beta |
+| Fabric Mod Manager | Beta |
+| English and Vietnamese language packs | Available |
+| Microsoft authentication | In development |
+| Forge / NeoForge / Quilt | Not currently supported |
+| Theme system | Early development |
 
 ---
 
 ## Roadmap
 
-### Beta
+Near-term priorities:
 
-- Microsoft Authentication
-- Official GUI
-- Fabric
-- Forge
-- NeoForge
+- Improve Fabric compatibility and diagnostics.
+- Improve mod dependency warnings.
+- Continue replacing hard-coded GUI text with semantic translation keys.
+- Complete Microsoft authentication.
+- Improve packaged-build testing and release automation.
+- Expand theme and visual customization support.
 
-### Future
-
-- Theme System
-- Plugin Support
-- Multi-language GUI
+Other mod loaders should be developed and tested on separate branches before being included in stable beta releases.
 
 ---
 
+## Contributing
 
-## Project Status
+Bug reports and focused pull requests are welcome.
 
-| Component | Status |
-|-----------|--------|
-| Core | ✅ Stable |
-| GUI | 🚧 Experimental |
-| Offline Authentication | ✅ Stable |
-| Microsoft Authentication | 🚧 In Progress |
-| Instance System | ✅ Stable |
-| Mod Loader | ⏳ Planned |
-| Unit Tests | ✅ Core Covered |
-| GitHub Actions | ✅ Enabled |
+When reporting a bug, include:
+
+- MCW Launcher version.
+- Windows version.
+- Minecraft version.
+- Selected Java and mod-loader version.
+- Reproduction steps.
+- Relevant logs or screenshots.
+
+Please avoid committing downloaded game files, account data, tokens, worlds, build output, or local cache directories.
 
 ---
 
 ## License
 
-MIT License
+MCW Launcher is released under the [MIT License](LICENSE).
+
+Copyright © mahiru7229.

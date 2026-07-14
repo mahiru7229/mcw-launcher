@@ -18,6 +18,7 @@ class ModManagerDialog(QDialog):
     add_requested = Signal(list, bool)
     remove_requested = Signal(list)
     enabled_requested = Signal(list, bool)
+    modrinth_requested = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -70,6 +71,8 @@ class ModManagerDialog(QDialog):
         action_row = QHBoxLayout()
         self.add_button = QPushButton("Add mod files")
         self.add_button.setObjectName("PrimaryButton")
+        self.modrinth_button = QPushButton("Browse Modrinth")
+        self.modrinth_button.clicked.connect(self.modrinth_requested.emit)
         self.enable_button = QPushButton("Enable")
         self.disable_button = QPushButton("Disable")
         self.remove_button = QPushButton("Remove")
@@ -79,6 +82,7 @@ class ModManagerDialog(QDialog):
         self.disable_button.clicked.connect(lambda: self._request_enabled(False))
         self.remove_button.clicked.connect(self._request_remove)
         action_row.addWidget(self.add_button)
+        action_row.addWidget(self.modrinth_button)
         action_row.addWidget(self.enable_button)
         action_row.addWidget(self.disable_button)
         action_row.addWidget(self.remove_button)
@@ -236,6 +240,7 @@ class ModManagerDialog(QDialog):
 
     def _set_actions_enabled(self, enabled: bool) -> None:
         self.add_button.setEnabled(enabled)
+        self.modrinth_button.setEnabled(enabled)
         self.enable_button.setEnabled(enabled)
         self.disable_button.setEnabled(enabled)
         self.remove_button.setEnabled(enabled)
@@ -252,6 +257,7 @@ class ModManagerDialog(QDialog):
         self.set_instance(instance)
         if instance is not None:
             self.set_mods(mods)
+        self.modrinth_button.setText(tr("modrinth.browse"))
         self._render_details()
 
     @staticmethod

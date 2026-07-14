@@ -1,0 +1,135 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from src.core.fs.paths import Paths
+from src.core.instance.instance_run_lock import InstanceRunLock
+from src.core.mod.mod_manager import ModManager
+from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.modrinth.modrinth_client import ModrinthClient
+from src.core.modrinth.modrinth_downloader import ModrinthDownloader
+from src.core.modrinth.modrinth_registry import ModrinthRegistry
+from src.models.instance.instance import Instance
+from src.models.modrinth.install_result import ModrinthModInstallResult
+from src.models.modrinth.project import ModrinthProject
+from src.models.modrinth.version import ModrinthVersion
+
+
+class ModrinthModInstaller:
+    MAX_DEPENDENCIES = 64
+
+    @staticmethod
+    def install(instance: Instance, version_id: str, install_dependencies: bool = True) -> ModrinthModInstallResult:
+        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
+        if loader_name != ModLoaderManager.FABRIC:
+            raise RuntimeError("Modrinth mod installation currently requires a Fabric instance.")
+        if InstanceRunLock.is_active(instance):
+            raise RuntimeError("Close Minecraft before installing or updating mods.")
+
+        root_version = ModrinthClient.get_version(version_id)
+        plan, projects, warnings = ModrinthModInstaller._build_plan(root_version, instance.version_id, install_dependencies)
+        registry = ModrinthRegistry.load(instance)
+        registry_mods = registry.setdefault("mods", {})
+        installed_projects: list[str] = []
+        installed_files: list[str] = []
+
+        for version in plan:
+            project = projects[version.project_id]
+            file = version.primary_file(".jar")
+            cache_path = Paths.modrinth_file_cache(version.project_id, version.version_id, file.filename)
+            ModrinthDownloader.download_file(file, cache_path)
+            added = ModManager.add_mods(instance, [cache_path], replace=True)
+            if not added:
+                raise RuntimeError(f"Mod '{project.title}' was downloaded but could not be added to the instance.")
+
+            previous = registry_mods.get(version.project_id, {}) if isinstance(registry_mods.get(version.project_id), dict) else {}
+            previous_name = str(previous.get("fileName") or "")
+            new_name = added[0].file_name
+            if previous_name and previous_name.casefold() != new_name.casefold():
+                previous_path = ModrinthRegistry.safe_tracked_path(instance, previous_name)
+                if previous_path is not None:
+                    previous_path.unlink(missing_ok=True)
+                    previous_path.with_name(previous_path.name + ModManager.DISABLED_SUFFIX).unlink(missing_ok=True)
+
+            registry_mods[version.project_id] = {
+                "projectId": version.project_id,
+                "versionId": version.version_id,
+                "versionNumber": version.version_number,
+                "fileName": new_name,
+                "sha1": file.sha1,
+                "title": project.title,
+            }
+            installed_projects.append(project.title)
+            installed_files.append(new_name)
+
+        ModrinthRegistry.save(instance, registry)
+        return ModrinthModInstallResult(installed_projects=tuple(installed_projects), installed_files=tuple(installed_files), warnings=tuple(warnings))
+
+    @staticmethod
+    def _build_plan(root_version: ModrinthVersion, game_version: str, install_dependencies: bool) -> tuple[list[ModrinthVersion], dict[str, ModrinthProject], list[str]]:
+        plan: list[ModrinthVersion] = []
+        projects: dict[str, ModrinthProject] = {}
+        warnings: list[str] = []
+        visited_versions: set[str] = set()
+        visiting_projects: set[str] = set()
+        selected_projects: dict[str, str] = {}
+
+        def visit(version: ModrinthVersion) -> None:
+            if version.version_id in visited_versions:
+                return
+            if len(visited_versions) >= ModrinthModInstaller.MAX_DEPENDENCIES:
+                raise RuntimeError("The Modrinth dependency graph is too large to install safely.")
+            ModrinthModInstaller._validate_version(version, game_version)
+            selected_version = selected_projects.get(version.project_id)
+            if selected_version is not None and selected_version != version.version_id:
+                warnings.append(f"Conflicting dependency versions for project {version.project_id}; keeping {selected_version} and skipping {version.version_id}.")
+                return
+            selected_projects[version.project_id] = version.version_id
+
+            project = projects.get(version.project_id)
+            if project is None:
+                project = ModrinthClient.get_project(version.project_id)
+                projects[version.project_id] = project
+            if project.project_type != "mod":
+                raise RuntimeError(f"'{project.title}' is not a Modrinth mod project.")
+            if project.client_side == "unsupported":
+                raise RuntimeError(f"'{project.title}' does not support the Minecraft client.")
+
+            if version.project_id in visiting_projects:
+                return
+            visiting_projects.add(version.project_id)
+            try:
+                if install_dependencies:
+                    for dependency in version.dependencies:
+                        if dependency.dependency_type != "required":
+                            continue
+                        dependency_version = ModrinthModInstaller._resolve_dependency(dependency.version_id, dependency.project_id, game_version)
+                        if dependency_version is None:
+                            label = dependency.file_name or dependency.project_id or dependency.version_id or "unknown dependency"
+                            warnings.append(f"Required external dependency could not be installed automatically: {label}")
+                            continue
+                        visit(dependency_version)
+            finally:
+                visiting_projects.discard(version.project_id)
+
+            visited_versions.add(version.version_id)
+            plan.append(version)
+
+        visit(root_version)
+        return plan, projects, warnings
+
+    @staticmethod
+    def _resolve_dependency(version_id: str, project_id: str, game_version: str) -> ModrinthVersion | None:
+        if version_id:
+            return ModrinthClient.get_version(version_id)
+        if project_id:
+            return ModrinthClient.select_version(project_id, game_version=game_version, loader="fabric")
+        return None
+
+    @staticmethod
+    def _validate_version(version: ModrinthVersion, game_version: str) -> None:
+        if "fabric" not in version.loaders:
+            raise RuntimeError(f"Modrinth version '{version.version_number}' does not support Fabric.")
+        if game_version not in version.game_versions:
+            raise RuntimeError(f"Modrinth version '{version.version_number}' does not support Minecraft {game_version}.")
+        version.primary_file(".jar")

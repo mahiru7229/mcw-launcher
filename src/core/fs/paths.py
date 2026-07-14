@@ -180,6 +180,39 @@ class Paths:
         return directory
 
     @staticmethod
+    def modrinth_root() -> Path:
+        directory = Paths.CACHE_ROOT / "content" / "modrinth"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def modrinth_api_cache(cache_key: str) -> Path:
+        return Paths.modrinth_root() / "api" / f"{cache_key}.json"
+
+    @staticmethod
+    def modrinth_file_cache(project_id: str, version_id: str, filename: str) -> Path:
+        from urllib.parse import quote
+
+        project = quote(str(project_id).strip(), safe="") or "unknown-project"
+        version = quote(str(version_id).strip(), safe="") or "unknown-version"
+        safe_name = Path(str(filename)).name or "download.bin"
+        return Paths.modrinth_root() / "files" / project / version / safe_name
+
+    @staticmethod
+    def modrinth_pack_cache(project_id: str, version_id: str, filename: str) -> Path:
+        return Paths.modrinth_file_cache(project_id, version_id, filename)
+
+    @staticmethod
+    def modrinth_staging_root() -> Path:
+        directory = Paths.modrinth_root() / "staging"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def modrinth_instance_registry(instance: Instance) -> Path:
+        return Path(instance.instance_dir) / ".mcw" / "modrinth.json"
+
+    @staticmethod
     def libraries():
         return Paths.CACHE_ROOT / "libraries"
     

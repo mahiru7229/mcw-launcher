@@ -23,6 +23,7 @@ class InstancesPage(BasePage):
     loader_change_requested = Signal(str, str, str)
     repair_loader_requested = Signal(str)
     manage_mods_requested = Signal(str)
+    browse_modpacks_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__("Instances", "Create and manage isolated Minecraft instances, including Fabric Loader and per-instance mods.")
@@ -61,6 +62,8 @@ class InstancesPage(BasePage):
         create_button = QPushButton("Create instance")
         create_button.setObjectName("PrimaryButton")
         create_button.clicked.connect(self._request_create)
+        self.browse_modpacks_button = QPushButton("Browse Modrinth modpacks")
+        self.browse_modpacks_button.clicked.connect(self.browse_modpacks_requested.emit)
         create_card.layout.addWidget(QLabel("Name"))
         create_card.layout.addWidget(self.create_name_input)
         create_card.layout.addWidget(QLabel("Minecraft version"))
@@ -70,6 +73,7 @@ class InstancesPage(BasePage):
         create_card.layout.addWidget(self.create_loader_combo)
         create_card.layout.addWidget(self.create_loader_status)
         create_card.layout.addWidget(create_button)
+        create_card.layout.addWidget(self.browse_modpacks_button)
         self.root_layout.addWidget(create_card)
 
         manage_card = CardWidget("Manage selected instance", "Change the selected instance's Fabric Loader version without recreating it.")
@@ -343,4 +347,5 @@ class InstancesPage(BasePage):
             self.export_requested.emit(name, output_path, self.include_saves_checkbox.isChecked())
 
     def retranslate_dynamic(self) -> None:
+        self.browse_modpacks_button.setText(tr("modrinth.modpack.browse"))
         self._render_instance(self.current_instance_name())

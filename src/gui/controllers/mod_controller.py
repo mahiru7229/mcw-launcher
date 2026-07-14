@@ -23,6 +23,10 @@ class ModController(BaseController):
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
 
+    @property
+    def current_instance(self) -> Instance | None:
+        return self._instance
+
     def set_instance(self, instance: Instance | None) -> None:
         self._instance = instance
         self._scan_pending = False
