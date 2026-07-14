@@ -15,3 +15,4 @@ dist/
 MCW-Launcher.spec
 test.py
 GUI_STRUCTURE.txt
+runtimes/
