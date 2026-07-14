@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget
 
@@ -42,6 +43,8 @@ class MainWindow(QMainWindow):
         self.instance_settings_controller = InstanceSettingsController()
         self.gui_settings_controller = GuiSettingsController()
         self.launch_controller = LaunchController(self.task_runner)
+        self.running_instances_timer = QTimer(self)
+        self.running_instances_timer.setInterval(1000)
 
         self._build_ui()
         self._connect_signals()
@@ -114,6 +117,7 @@ class MainWindow(QMainWindow):
         self.right_panel.manage_accounts_requested.connect(lambda: self.show_page("accounts"))
         self.right_panel.manage_instances_requested.connect(lambda: self.show_page("instances"))
         self.right_panel.refresh_requested.connect(self._refresh_all)
+        self.running_instances_timer.timeout.connect(self.instance_controller.refresh_running)
 
         self.account_page.create_offline_requested.connect(self.account_controller.create_offline)
         self.account_page.select_requested.connect(self.account_controller.select)
@@ -145,6 +149,7 @@ class MainWindow(QMainWindow):
 
         self.instance_controller.instances_changed.connect(self.instances_page.set_instances)
         self.instance_controller.instances_changed.connect(self.instance_settings_page.set_instances)
+        self.instance_controller.running_instances_changed.connect(self.right_panel.set_running_instances)
         self.instance_controller.selected_instance_changed.connect(self._instance_selected)
         self.instance_controller.export_finished.connect(self._show_export_finished)
 
@@ -153,6 +158,7 @@ class MainWindow(QMainWindow):
 
         self.launch_controller.progress_received.connect(self._on_progress)
         self.launch_controller.launch_finished.connect(self.launch_control.set_result)
+        self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
 
         self.task_runner.task_started.connect(self._on_task_started)
         self.task_runner.task_failed.connect(self._on_task_failed)
@@ -185,12 +191,15 @@ class MainWindow(QMainWindow):
         self.show_page(settings.get("start_page", "home"))
         self.account_controller.refresh()
         self.instance_controller.refresh()
+        self.instance_controller.refresh_running(force=True)
+        self.running_instances_timer.start()
         self.version_controller.refresh()
         self.logs_page.append(f"Started {LAUNCHER_NAME}")
 
     def _refresh_all(self) -> None:
         self.account_controller.refresh()
         self.instance_controller.refresh()
+        self.instance_controller.refresh_running(force=True)
         self.version_controller.refresh()
         self._set_status("Refreshing launcher data...")
 
@@ -231,6 +240,7 @@ class MainWindow(QMainWindow):
         self.launch_control.set_failed(str(error))
         self.home_page.set_status("Launch failed")
         self.right_panel.set_status("Launch failed")
+        self.instance_controller.refresh_running(force=True)
 
     def _on_progress(self, event: object) -> None:
         self.launch_control.set_progress_event(event)

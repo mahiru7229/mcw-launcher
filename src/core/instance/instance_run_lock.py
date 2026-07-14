@@ -17,6 +17,17 @@ from src.models.instance.instance import Instance
 
 
 @dataclass(frozen=True, slots=True)
+class RunningInstanceInfo:
+    instance_id: str | None
+    name: str
+    state: str
+    launcher_pid: int | None
+    minecraft_pid: int | None
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True, slots=True)
 class _LockSnapshot:
     payload: dict[str, Any] | None
     identity: tuple[int, int, int, int]
@@ -88,6 +99,33 @@ class InstanceRunLock:
         return snapshot is not None and cls._snapshot_is_active(snapshot)
 
     @classmethod
+    def list_active(cls) -> list[RunningInstanceInfo]:
+        Paths.INSTANCE_LOCKS_ROOT.mkdir(parents=True, exist_ok=True)
+        running_instances: list[RunningInstanceInfo] = []
+
+        try:
+            lock_paths = list(Paths.INSTANCE_LOCKS_ROOT.glob("*.lock"))
+        except OSError:
+            return running_instances
+
+        for lock_path in lock_paths:
+            snapshot = cls._read_snapshot(lock_path)
+
+            if snapshot is None:
+                continue
+
+            if not cls._snapshot_is_active(snapshot):
+                cls._remove_if_unchanged(lock_path, snapshot)
+                continue
+
+            running_instance = cls._running_instance_from_payload(snapshot.payload)
+
+            if running_instance is not None:
+                running_instances.append(running_instance)
+
+        return sorted(running_instances, key=lambda item: item.name.casefold())
+
+    @classmethod
     def lock_path_for(cls, instance: Instance) -> Path:
         Paths.INSTANCE_LOCKS_ROOT.mkdir(parents=True, exist_ok=True)
         identity = cls._instance_identity(instance)
@@ -123,6 +161,34 @@ class InstanceRunLock:
         instance_dir = getattr(instance, "instance_dir", None)
         resolved_dir = Path(instance_dir) if instance_dir is not None else Paths.load_instance_dir(instance.name)
         return f"path:{os.path.normcase(str(resolved_dir.resolve()))}"
+
+    @classmethod
+    def _running_instance_from_payload(cls, payload: dict[str, Any] | None) -> RunningInstanceInfo | None:
+        if payload is None:
+            return None
+
+        name = payload.get("instance_name")
+
+        if not isinstance(name, str) or not name.strip():
+            return None
+
+        minecraft_pid = cls._read_pid(payload.get("minecraft_pid"))
+        state = payload.get("state")
+
+        if state not in {"preparing", "running"}:
+            state = "running" if minecraft_pid is not None else "preparing"
+
+        instance_id = payload.get("instance_id")
+
+        return RunningInstanceInfo(
+            instance_id=instance_id if isinstance(instance_id, str) and instance_id else None,
+            name=name.strip(),
+            state=state,
+            launcher_pid=cls._read_pid(payload.get("launcher_pid")),
+            minecraft_pid=minecraft_pid,
+            created_at=str(payload.get("created_at", "")),
+            updated_at=str(payload.get("updated_at", "")),
+        )
 
     @classmethod
     def _build_payload(cls, instance: Instance, token: str, state: str, minecraft_pid: int | None) -> dict[str, Any]:

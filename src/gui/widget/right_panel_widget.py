@@ -13,6 +13,8 @@ class RightPanelWidget(QFrame):
     manage_instances_requested = Signal()
     refresh_requested = Signal()
 
+    MAX_RUNNING_INSTANCES = 4
+
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("RightPanel")
@@ -62,6 +64,16 @@ class RightPanelWidget(QFrame):
         self.instance_card.layout.addWidget(instance_button)
         layout.addWidget(self.instance_card)
 
+        self.running_card = CardWidget("Running instances")
+        self.running_count = QLabel("No instances running")
+        self.running_count.setObjectName("ValueLabel")
+        self.running_list = QLabel("Minecraft sessions will appear here.")
+        self.running_list.setObjectName("TinyLabel")
+        self.running_list.setWordWrap(True)
+        self.running_card.layout.addWidget(self.running_count)
+        self.running_card.layout.addWidget(self.running_list)
+        layout.addWidget(self.running_card)
+
         status_card = CardWidget("Launcher state")
         self.status_badge = QLabel("READY")
         self.status_badge.setObjectName("StatusBadge")
@@ -102,6 +114,29 @@ class RightPanelWidget(QFrame):
         self.instance_version.setText(f"Minecraft: {instance.version_id}")
         self.instance_loader.setText(f"Loader: {loader_text}")
         self.instance_path.setText(f"Path: {Path(instance.instance_dir)}")
+
+    def set_running_instances(self, running_instances: list[object]) -> None:
+        count = len(running_instances)
+
+        if count == 0:
+            self.running_count.setText("No instances running")
+            self.running_list.setText("Minecraft sessions will appear here.")
+            return
+
+        noun = "instance" if count == 1 else "instances"
+        self.running_count.setText(f"{count} {noun} running")
+
+        lines = []
+        for running_instance in running_instances[:self.MAX_RUNNING_INSTANCES]:
+            name = str(getattr(running_instance, "name", "Unknown instance"))
+            state = str(getattr(running_instance, "state", "running")).replace("_", " ").title()
+            lines.append(f"• {name} — {state}")
+
+        hidden_count = count - self.MAX_RUNNING_INSTANCES
+        if hidden_count > 0:
+            lines.append(f"+ {hidden_count} more")
+
+        self.running_list.setText("\n".join(lines))
 
     def set_busy(self, busy: bool) -> None:
         self.status_badge.setText("BUSY" if busy else "READY")

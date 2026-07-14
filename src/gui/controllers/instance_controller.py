@@ -7,6 +7,7 @@ from typing import Any
 from PySide6.QtCore import Signal, Slot
 
 from src.core.instance.instance_manager import InstanceManager
+from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.minecraft.version_manager import VersionManager
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
@@ -14,6 +15,7 @@ from src.gui.task_runner import TaskRunner
 
 class InstanceController(BaseController):
     instances_changed = Signal(list, str)
+    running_instances_changed = Signal(list)
     selected_instance_changed = Signal(object)
     export_finished = Signal(object)
 
@@ -23,6 +25,7 @@ class InstanceController(BaseController):
         super().__init__()
         self._task_runner = task_runner
         self._selected_name = ""
+        self._running_signature: tuple[tuple[object, ...], ...] | None = None
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
 
@@ -41,6 +44,16 @@ class InstanceController(BaseController):
         self.instances_changed.emit(instances, preferred)
         self.select(preferred)
         self.log_created.emit(f"Instances refreshed: {len(instances)} found")
+
+    def refresh_running(self, force: bool = False) -> None:
+        running_instances = InstanceRunLock.list_active()
+        signature = tuple((item.instance_id, item.name, item.state, item.launcher_pid, item.minecraft_pid) for item in running_instances)
+
+        if not force and signature == self._running_signature:
+            return
+
+        self._running_signature = signature
+        self.running_instances_changed.emit(running_instances)
 
     def select(self, name: str) -> None:
         self._selected_name = name.strip()

@@ -10,14 +10,11 @@ from src.gui.widget.launch_control_style import LAUNCH_CONTROL_STYLE
 class LaunchControlWidget(QFrame):
     launch_clicked = Signal()
 
+    BUTTON_TEXT = "Launch"
+
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("LaunchControl")
-
-        self._selected_instance = ""
-        self._busy = False
-        self._busy_button_text = "WORKING..."
-
         self._build_ui()
         self.setStyleSheet(LAUNCH_CONTROL_STYLE)
 
@@ -57,7 +54,7 @@ class LaunchControlWidget(QFrame):
         progress_layout.addWidget(self.detail_label)
         progress_layout.addWidget(self.progress_bar)
 
-        self.launch_button = QPushButton("LAUNCH")
+        self.launch_button = QPushButton(self.BUTTON_TEXT)
         self.launch_button.setObjectName("PrimaryButton")
         self.launch_button.setFixedSize(230, 72)
         self.launch_button.clicked.connect(self.launch_clicked.emit)
@@ -65,9 +62,8 @@ class LaunchControlWidget(QFrame):
         layout.addLayout(progress_layout, 1)
         layout.addWidget(self.launch_button)
 
-    def set_selected_instance(self, instance: object | None) -> None:
-        self._selected_instance = getattr(instance, "name", "") if instance is not None else ""
-        self._refresh_launch_button()
+    def set_selected_instance(self, _instance: object | None) -> None:
+        self._keep_launch_button_text()
 
     def set_status(self, message: str, detail: str | None = None) -> None:
         self.status_label.setText(message)
@@ -82,9 +78,7 @@ class LaunchControlWidget(QFrame):
         self.detail_label.setText(view.detail)
         self.stage_label.setText(view.stage_text)
         self._set_stage_state("busy")
-
-        self._busy_button_text = view.button_text
-        self._refresh_launch_button()
+        self._keep_launch_button_text()
 
         if view.percentage is None:
             self.progress_bar.setRange(0, 0)
@@ -106,6 +100,7 @@ class LaunchControlWidget(QFrame):
         self.detail_label.setText(f"Java: {java_path}")
         self.stage_label.setText("RUNNING")
         self._set_stage_state("success")
+        self._keep_launch_button_text()
 
     def set_failed(self, message: str) -> None:
         self.progress_bar.setRange(0, 100)
@@ -115,11 +110,11 @@ class LaunchControlWidget(QFrame):
         self.detail_label.setText(message or "Minecraft could not be started.")
         self.stage_label.setText("FAILED")
         self._set_stage_state("error")
+        self._keep_launch_button_text()
 
     def set_busy(self, busy: bool) -> None:
-        self._busy = busy
         self.launch_button.setEnabled(not busy)
-        self._refresh_launch_button()
+        self._keep_launch_button_text()
 
     def reset_progress(self) -> None:
         self.progress_bar.setRange(0, 100)
@@ -129,17 +124,11 @@ class LaunchControlWidget(QFrame):
         self.detail_label.setText("Select an account and an instance, then launch.")
         self.stage_label.setText("READY")
         self._set_stage_state("success")
+        self._keep_launch_button_text()
 
-    def _refresh_launch_button(self) -> None:
-        if self._busy:
-            self.launch_button.setText(self._busy_button_text)
-            return
-
-        if self._selected_instance:
-            self.launch_button.setText(f"LAUNCH\n{self._selected_instance}")
-            return
-
-        self.launch_button.setText("LAUNCH")
+    def _keep_launch_button_text(self) -> None:
+        if self.launch_button.text() != self.BUTTON_TEXT:
+            self.launch_button.setText(self.BUTTON_TEXT)
 
     def _set_stage_state(self, state: str) -> None:
         self.stage_label.setProperty("state", state)
