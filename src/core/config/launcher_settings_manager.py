@@ -12,7 +12,7 @@ from src.core.fs.paths import Paths
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 2
+    SCHEMA_VERSION = 3
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
         "gui": {
@@ -26,6 +26,13 @@ class LauncherSettingsManager:
         },
         "window": {
             "geometry": None,
+        },
+        "appearance": {
+            "theme": "mcw-default",
+        },
+        "modrinth": {
+            "include_beta": False,
+            "include_alpha": False,
         },
         "updates": {
             "auto_check": True,
@@ -149,6 +156,13 @@ class LauncherSettingsManager:
         window = normalized.setdefault("window", {})
         geometry = window.get("geometry")
         window["geometry"] = geometry if isinstance(geometry, str) and geometry else None
+
+        appearance = normalized.setdefault("appearance", {})
+        appearance["theme"] = str(appearance.get("theme") or "mcw-default").strip() or "mcw-default"
+
+        modrinth = normalized.setdefault("modrinth", {})
+        modrinth["include_beta"] = self._as_bool(modrinth.get("include_beta"), False)
+        modrinth["include_alpha"] = self._as_bool(modrinth.get("include_alpha"), False)
 
         updates = normalized.setdefault("updates", {})
         updates["auto_check"] = self._as_bool(updates.get("auto_check"), True)

@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QComboBox, QGridLayout, QLabel, QLineEdit, QMessag
 from src.core.language.language_manager import tr
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
+from src.gui.theme.runtime import set_theme_icon
 
 
 class AccountPage(BasePage):
@@ -15,7 +16,7 @@ class AccountPage(BasePage):
     refresh_requested = Signal()
 
     def __init__(self) -> None:
-        super().__init__("Accounts", "Store offline accounts now; Microsoft authentication can be plugged into this page later.")
+        super().__init__("Accounts", "Store offline accounts now; Microsoft authentication can be plugged into this page later.", "accounts")
         self._accounts: dict[str, object] = {}
         self._build_ui()
 
@@ -32,11 +33,11 @@ class AccountPage(BasePage):
         self.uuid_value.setWordWrap(True)
 
         action_grid = QGridLayout()
-        select_button = QPushButton("Use selected account")
+        select_button = set_theme_icon(QPushButton("Use selected account"), "icon.action.account")
         select_button.setObjectName("PrimaryButton")
-        remove_button = QPushButton("Remove")
+        remove_button = set_theme_icon(QPushButton("Remove"), "icon.action.remove")
         remove_button.setObjectName("DangerButton")
-        refresh_button = QPushButton("Refresh")
+        refresh_button = set_theme_icon(QPushButton("Refresh"), "icon.action.refresh")
         select_button.clicked.connect(lambda: self.select_requested.emit(self.current_account_id()))
         remove_button.clicked.connect(self._confirm_remove)
         refresh_button.clicked.connect(self.refresh_requested.emit)
@@ -54,10 +55,10 @@ class AccountPage(BasePage):
         create_card = CardWidget("Create offline account", "Minecraft usernames use 3-16 letters, numbers, or underscores.")
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Example: Steve")
-        create_button = QPushButton("Create and select")
+        create_button = set_theme_icon(QPushButton("Create and select"), "icon.action.add")
         create_button.setObjectName("PrimaryButton")
         create_button.clicked.connect(lambda: self.create_offline_requested.emit(self.username_input.text()))
-        microsoft_button = QPushButton("Microsoft account — in progress")
+        microsoft_button = set_theme_icon(QPushButton("Microsoft account — in progress"), "icon.action.account")
         microsoft_button.setEnabled(False)
         create_card.layout.addWidget(QLabel("Username"))
         create_card.layout.addWidget(self.username_input)

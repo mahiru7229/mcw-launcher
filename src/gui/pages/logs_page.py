@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QHBoxLayout, QPushButton, QTextEdit
 
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
+from src.gui.theme.runtime import set_theme_icon
 
 
 class LogsPage(BasePage):
@@ -15,7 +16,7 @@ class LogsPage(BasePage):
     open_logs_folder_requested = Signal()
 
     def __init__(self) -> None:
-        super().__init__("Logs", "Frontend activity and structured progress events appear here.")
+        super().__init__("Logs", "Frontend activity and structured progress events appear here.", "logs")
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -24,10 +25,10 @@ class LogsPage(BasePage):
         self.output.setObjectName("LogOutput")
         self.output.setReadOnly(True)
         buttons = QHBoxLayout()
-        copy_button = QPushButton("Copy all")
-        clear_button = QPushButton("Clear")
-        export_button = QPushButton("Export diagnostics")
-        open_folder_button = QPushButton("Open logs folder")
+        copy_button = set_theme_icon(QPushButton("Copy all"), "icon.action.copy")
+        clear_button = set_theme_icon(QPushButton("Clear"), "icon.action.clear")
+        export_button = set_theme_icon(QPushButton("Export diagnostics"), "icon.action.export")
+        open_folder_button = set_theme_icon(QPushButton("Open logs folder"), "icon.action.folder")
         copy_button.clicked.connect(lambda: QGuiApplication.clipboard().setText(self.output.toPlainText()))
         clear_button.clicked.connect(self.output.clear)
         export_button.clicked.connect(self.export_diagnostics_requested.emit)

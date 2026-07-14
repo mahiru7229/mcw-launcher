@@ -2,39 +2,41 @@
 
 Automatic updates use a GitHub Release ZIP. The ZIP must contain the packaged launcher executable and may contain any other file or directory that should overwrite the current installation.
 
-## Build Beta 3
+## Build a release package
 
-After building the EXE with PyInstaller:
+After building the EXE with PyInstaller, pass the target version to the package builder:
 
 ```powershell
-python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.5.0-beta.3"
+python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.5.0-beta.6"
 ```
 
 The command creates:
 
 ```text
-MCW-Launcher-v0.5.0-beta.3-windows-x64.zip
-MCW-Launcher-v0.5.0-beta.3-windows-x64.zip.sha256
+MCW-Launcher-v0.5.0-beta.6-windows-x64.zip
+MCW-Launcher-v0.5.0-beta.6-windows-x64.zip.sha256
 ```
 
 The package contains a single wrapper directory:
 
 ```text
-MCW-Launcher-v0.5.0-beta.3-windows-x64/
+MCW-Launcher-v0.5.0-beta.6-windows-x64/
 ├── MCW Launcher.exe
 ├── mcw-update.json
 ├── lang/
+├── themes/
+├── docs/
 ├── README.md
 └── LICENSE
 ```
 
-`mcw-update.json` lets Beta 3 and later verify that the downloaded package matches the selected GitHub release before replacing files.
+`mcw-update.json` lets the updater verify that the downloaded package matches the selected GitHub release before replacing files.
 
-## Test the Beta 2 → Beta 3 updater
+## Test an updater transition
 
-1. Build and publish the Beta 3 ZIP as an asset of a GitHub pre-release tagged `v0.5.0-beta.3`.
+1. Build and publish the newer ZIP as an asset of a GitHub release with a higher semantic version.
 2. The asset name should contain `MCW`, `windows`, and `x64`.
-3. Start the packaged Beta 2 launcher.
+3. Start a packaged launcher build that contains the current updater but reports an older test version.
 4. Use **Launcher Settings → Check for updates** if the automatic check has already run recently.
 5. Confirm the update prompt, release notes, package size, backup, overwrite, restart, and `logs/updater.log`.
 6. Confirm `config`, `instances`, `accounts`, and other user data remain intact.

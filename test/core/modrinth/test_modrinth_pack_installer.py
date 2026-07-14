@@ -109,3 +109,14 @@ def test_blank_modpack_name_uses_next_available_project_name(tmp_path, monkeypat
     (tmp_path / "instances" / "Test Pack (2)").mkdir(parents=True)
 
     assert InstanceManager.next_available_name("Test Pack") == "Test Pack (3)"
+
+
+def test_modpack_version_respects_enabled_release_channels(tmp_path, monkeypatch):
+    configure_paths(tmp_path, monkeypatch)
+    project = ModrinthProject(project_id="pack-project", slug="pack", title="Test Pack", description="", project_type="modpack")
+    version = ModrinthVersion(version_id="pack-alpha", project_id="pack-project", name="Alpha", version_number="1.0-alpha", version_type="alpha", game_versions=("1.20.1",), loaders=("fabric",), files=(ModrinthFile(url="https://cdn.modrinth.com/pack.mrpack", filename="pack.mrpack", sha1="a", sha512="b", size=1, primary=True),))
+    monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: project)
+    monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: version)
+
+    with pytest.raises(RuntimeError, match="disabled alpha channel"):
+        ModrinthPackInstaller.install("pack-project", "pack-alpha", "Alpha Pack", True, ("release",))

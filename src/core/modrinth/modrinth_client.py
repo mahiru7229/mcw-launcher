@@ -68,7 +68,7 @@ class ModrinthClient:
         return ModrinthClient._parse_project(payload)
 
     @staticmethod
-    def list_project_versions(project_id: str, loader: str = "fabric", game_version: str = "", force_refresh: bool = False) -> list[ModrinthVersion]:
+    def list_project_versions(project_id: str, loader: str = "fabric", game_version: str = "", version_types: tuple[str, ...] | list[str] | set[str] | None = None, force_refresh: bool = False) -> list[ModrinthVersion]:
         identifier = ModrinthClient._required(project_id, "Project ID")
         params: dict[str, str] = {"include_changelog": "false"}
         if loader:
@@ -79,6 +79,8 @@ class ModrinthClient:
         if not isinstance(payload, list):
             raise RuntimeError(f"Modrinth versions for '{identifier}' are unavailable.")
         versions = [ModrinthClient._parse_version(item) for item in payload if isinstance(item, dict)]
+        allowed_types = ModrinthClient.normalize_version_types(version_types)
+        versions = [version for version in versions if version.version_type in allowed_types]
         return sorted(versions, key=ModrinthClient._version_sort_key, reverse=True)
 
     @staticmethod
@@ -90,11 +92,20 @@ class ModrinthClient:
         return ModrinthClient._parse_version(payload)
 
     @staticmethod
-    def select_version(project_id: str, game_version: str, loader: str = "fabric") -> ModrinthVersion:
-        versions = ModrinthClient.list_project_versions(project_id, loader=loader, game_version=game_version)
+    def select_version(project_id: str, game_version: str, loader: str = "fabric", version_types: tuple[str, ...] | list[str] | set[str] | None = None) -> ModrinthVersion:
+        versions = ModrinthClient.list_project_versions(project_id, loader=loader, game_version=game_version, version_types=version_types)
         if not versions:
             raise RuntimeError(f"No {loader.title()} version of this project supports Minecraft {game_version}.")
         return versions[0]
+
+
+    @staticmethod
+    def normalize_version_types(version_types: tuple[str, ...] | list[str] | set[str] | None = None) -> tuple[str, ...]:
+        if version_types is None:
+            return ("release", "beta", "alpha")
+        normalized = {str(item).strip().lower() for item in version_types if str(item).strip()}
+        allowed = tuple(item for item in ("release", "beta", "alpha") if item in normalized)
+        return allowed or ("release",)
 
     @staticmethod
     def _version_sort_key(version: ModrinthVersion) -> tuple[int, int, str]:

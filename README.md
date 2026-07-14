@@ -61,6 +61,25 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 
 > Fabric API is a separate mod and is not installed automatically by the Fabric Loader itself.
 
+### Modrinth
+
+- Search and install Fabric mods from Modrinth.
+- Install required Modrinth dependencies automatically.
+- Search `.mrpack` modpacks and create isolated instances automatically.
+- Filter versions by Release, Beta, and Alpha channels. Release remains enabled by default; Beta and Alpha require explicit opt-in.
+- Persist channel preferences in `config/launcher_settings.json`.
+- Verify downloaded files and protect modpack extraction paths.
+
+### PNG themes
+
+- Load themes from `themes/<theme-id>/theme.json`.
+- Replace launcher backgrounds, page backgrounds, dialogs, cards, buttons, inputs, progress bars, scrollbars, badges, logos, navigation icons, action icons, and state icons with PNG assets.
+- Reload and preview themes from Launcher Settings.
+- Fall back per component to the built-in CSS interface when a PNG is missing, invalid, or unreadable.
+- Ship external themes beside the EXE so visual assets can be updated without rebuilding the launcher.
+
+See [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) for every filename, path, and recommended canvas size.
+
 ### Accounts
 
 - Offline account support.
@@ -118,6 +137,8 @@ mcw-launcher/
 │   │   ├── minecraft/
 │   │   ├── mod/
 │   │   ├── modloader/
+│   │   ├── modrinth/
+│   │   ├── theme/
 │   │   ├── network/
 │   │   └── package/
 │   ├── gui/
@@ -231,6 +252,8 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | [`docs/INSTANCE_SYSTEM.md`](docs/INSTANCE_SYSTEM.md) | Instance metadata and lifecycle |
 | [`docs/PACKAGE_FORMAT.md`](docs/PACKAGE_FORMAT.md) | `.mcwpack` package format |
 | [`docs/LANGUAGE_PACKS.md`](docs/LANGUAGE_PACKS.md) | Creating language packs |
+| [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) | PNG theme filenames, paths, and canvas sizes |
+| [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md) | Building updater-compatible release ZIPs |
 | [`docs/gui-api.en.md`](docs/gui-api.en.md) | GUI integration API in English |
 | [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API in Vietnamese |
 
@@ -247,10 +270,12 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | PySide6 GUI | Beta |
 | Fabric Loader | Beta |
 | Fabric Mod Manager | Beta |
+| Modrinth mods and Fabric modpacks | Beta |
+| Release/Beta/Alpha Modrinth channels | Available |
 | English and Vietnamese language packs | Available |
 | Microsoft authentication | In development |
 | Forge / NeoForge / Quilt | Not currently supported |
-| Theme system | Early development |
+| Optional PNG theme system | Beta |
 
 ---
 
@@ -263,7 +288,7 @@ Near-term priorities:
 - Continue replacing hard-coded GUI text with semantic translation keys.
 - Complete Microsoft authentication.
 - Improve packaged-build testing and release automation.
-- Expand theme and visual customization support.
+- Test and expand community PNG themes.
 
 Other mod loaders should be developed and tested on separate branches before being included in stable beta releases.
 

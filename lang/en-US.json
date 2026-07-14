@@ -370,7 +370,16 @@
     "diagnostics.export.title": "Export diagnostics",
     "diagnostics.file_filter": "Text files (*.txt)",
     "diagnostics.export.success": "Diagnostic report saved to:\n{path}",
-    "diagnostics.open_logs": "Open logs folder"
+    "diagnostics.open_logs": "Open logs folder",
+    "modrinth.channel.release_always": "Release is always enabled. Enable prerelease channels only when needed.",
+    "modrinth.channel.beta": "Include Beta",
+    "modrinth.channel.alpha": "Include Alpha",
+    "modrinth.channel.no_versions": "No compatible versions are available in the enabled channels: {channels}.",
+    "launcher_settings.modrinth.title": "Modrinth release channels",
+    "launcher_settings.modrinth.subtitle": "Release versions are always shown. Beta and Alpha can be enabled for both mods and modpacks.",
+    "launcher_settings.theme.title": "Appearance and PNG theme",
+    "launcher_settings.theme.subtitle": "Missing or invalid PNG files safely fall back to the built-in CSS interface.",
+    "launcher_settings.theme.reload": "Reload and preview theme"
   },
   "aliases": {
     "MCW Launcher": "app.name",

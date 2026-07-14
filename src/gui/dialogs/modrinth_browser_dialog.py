@@ -3,29 +3,33 @@ from __future__ import annotations
 import re
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout
+from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
 from src.core.instance.instance_manager import InstanceManager
 from src.core.language.language_manager import tr
 from src.models.instance.instance import Instance
 from src.models.modrinth.project import ModrinthProject, ModrinthSearchResult
 from src.models.modrinth.version import ModrinthVersion
+from src.gui.theme.runtime import set_theme_icon
 
 
 class ModrinthBrowserDialog(QDialog):
     search_requested = Signal(str, str, str, int)
     versions_requested = Signal(str, str, str)
     install_mod_requested = Signal(str)
-    install_modpack_requested = Signal(str, str, str, bool)
+    install_modpack_requested = Signal(str, str, str, bool, object)
+    channel_preferences_changed = Signal(bool, bool)
 
     PAGE_SIZE = 25
 
     def __init__(self, project_type: str, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("ModrinthDialog")
         self.project_type = project_type
         self._instance: Instance | None = None
         self._result: ModrinthSearchResult | None = None
         self._projects: list[ModrinthProject] = []
+        self._all_versions: list[ModrinthVersion] = []
         self._versions: list[ModrinthVersion] = []
         self._selected_project: ModrinthProject | None = None
         self._offset = 0
@@ -56,13 +60,26 @@ class ModrinthBrowserDialog(QDialog):
         self.sort_combo.addItem("Downloads", "downloads")
         self.sort_combo.addItem("Recently updated", "updated")
         self.sort_combo.addItem("Newest", "newest")
-        self.search_button = QPushButton()
+        self.search_button = set_theme_icon(QPushButton(), "icon.action.search")
         self.search_button.setObjectName("PrimaryButton")
         self.search_button.clicked.connect(self._request_search)
         search_row.addWidget(self.search_input, 1)
         search_row.addWidget(self.sort_combo)
         search_row.addWidget(self.search_button)
         root.addLayout(search_row)
+
+        channel_row = QHBoxLayout()
+        self.release_channel_label = QLabel("Release channel: Release is always enabled")
+        self.release_channel_label.setObjectName("MutedLabel")
+        self.include_beta_checkbox = QCheckBox("Beta")
+        self.include_alpha_checkbox = QCheckBox("Alpha")
+        self.include_beta_checkbox.toggled.connect(self._channels_changed)
+        self.include_alpha_checkbox.toggled.connect(self._channels_changed)
+        channel_row.addWidget(self.release_channel_label)
+        channel_row.addStretch()
+        channel_row.addWidget(self.include_beta_checkbox)
+        channel_row.addWidget(self.include_alpha_checkbox)
+        root.addLayout(channel_row)
 
         self.results_table = QTableWidget(0, 5)
         self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -78,8 +95,8 @@ class ModrinthBrowserDialog(QDialog):
         page_row = QHBoxLayout()
         self.result_count_label = QLabel()
         self.result_count_label.setObjectName("MutedLabel")
-        self.previous_button = QPushButton()
-        self.next_button = QPushButton()
+        self.previous_button = set_theme_icon(QPushButton(), "icon.action.previous")
+        self.next_button = set_theme_icon(QPushButton(), "icon.action.next")
         self.previous_button.clicked.connect(self._previous_page)
         self.next_button.clicked.connect(self._next_page)
         page_row.addWidget(self.result_count_label)
@@ -95,7 +112,7 @@ class ModrinthBrowserDialog(QDialog):
         self.instance_name_input.textEdited.connect(self._instance_name_edited)
         self.optional_checkbox = QCheckBox()
         self.optional_checkbox.setChecked(True)
-        self.install_button = QPushButton()
+        self.install_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.install_button.setObjectName("PrimaryButton")
         self.install_button.setEnabled(False)
         self.install_button.clicked.connect(self._request_install)
@@ -116,11 +133,30 @@ class ModrinthBrowserDialog(QDialog):
     def game_version(self) -> str:
         return self._instance.version_id if self._instance is not None else ""
 
+    @property
+    def allowed_version_types(self) -> tuple[str, ...]:
+        values = ["release"]
+        if self.include_beta_checkbox.isChecked():
+            values.append("beta")
+        if self.include_alpha_checkbox.isChecked():
+            values.append("alpha")
+        return tuple(values)
+
+    def set_channel_preferences(self, include_beta: bool, include_alpha: bool) -> None:
+        self.include_beta_checkbox.blockSignals(True)
+        self.include_alpha_checkbox.blockSignals(True)
+        self.include_beta_checkbox.setChecked(bool(include_beta))
+        self.include_alpha_checkbox.setChecked(bool(include_alpha))
+        self.include_beta_checkbox.blockSignals(False)
+        self.include_alpha_checkbox.blockSignals(False)
+        self._apply_version_filter()
+
     def set_instance(self, instance: Instance | None) -> None:
         self._instance = instance
         self._offset = 0
         self._result = None
         self._projects = []
+        self._all_versions = []
         self._versions = []
         self._selected_project = None
         self._suggested_instance_name = ""
@@ -139,14 +175,12 @@ class ModrinthBrowserDialog(QDialog):
         self.results_table.setRowCount(len(self._projects))
         headers = [tr("modrinth.column.name"), tr("modrinth.column.author"), tr("modrinth.column.downloads"), tr("modrinth.column.updated"), tr("modrinth.column.description")]
         self.results_table.setHorizontalHeaderLabels(headers)
-
         for row, project in enumerate(self._projects):
             values = [project.title, project.author or tr("common.unknown"), f"{project.downloads:,}", project.date_modified[:10], project.description]
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
                 item.setData(Qt.ItemDataRole.UserRole, project)
                 self.results_table.setItem(row, column, item)
-
         start = result.offset + 1 if result.projects else 0
         end = result.offset + len(result.projects)
         self.result_count_label.setText(tr("modrinth.results.range", start=start, end=end, total=result.total_hits))
@@ -163,7 +197,25 @@ class ModrinthBrowserDialog(QDialog):
     def set_versions(self, project_id: str, versions: list[ModrinthVersion]) -> None:
         if self._selected_project is None or self._selected_project.project_id != project_id:
             return
-        self._versions = list(versions)
+        self._all_versions = list(versions)
+        self._apply_version_filter()
+
+    def set_busy(self, busy: bool) -> None:
+        self.search_button.setEnabled(not busy)
+        self.results_table.setEnabled(not busy)
+        self.version_combo.setEnabled(not busy)
+        self.include_beta_checkbox.setEnabled(not busy)
+        self.include_alpha_checkbox.setEnabled(not busy)
+        self.install_button.setEnabled(not busy and bool(self._versions))
+        self.previous_button.setEnabled(not busy and self._result is not None and self._result.offset > 0)
+        self.next_button.setEnabled(not busy and self._result is not None and self._result.offset + self._result.limit < self._result.total_hits)
+
+    def show_error(self, title: str, message: str) -> None:
+        QMessageBox.critical(self, title, message)
+
+    def _apply_version_filter(self) -> None:
+        allowed = set(self.allowed_version_types)
+        self._versions = [version for version in self._all_versions if version.version_type in allowed]
         self.version_combo.blockSignals(True)
         self.version_combo.clear()
         for version in self._versions:
@@ -174,18 +226,15 @@ class ModrinthBrowserDialog(QDialog):
             self.version_combo.addItem(label, version.version_id)
         self.version_combo.blockSignals(False)
         self.install_button.setEnabled(bool(self._versions))
-        self._version_selected()
+        if self._versions:
+            self._version_selected()
+        elif self._selected_project is not None:
+            channels = ", ".join(item.title() for item in self.allowed_version_types)
+            self.details_label.setText(tr("modrinth.channel.no_versions", channels=channels))
 
-    def set_busy(self, busy: bool) -> None:
-        self.search_button.setEnabled(not busy)
-        self.results_table.setEnabled(not busy)
-        self.version_combo.setEnabled(not busy)
-        self.install_button.setEnabled(not busy and bool(self._versions))
-        self.previous_button.setEnabled(not busy and self._result is not None and self._result.offset > 0)
-        self.next_button.setEnabled(not busy and self._result is not None and self._result.offset + self._result.limit < self._result.total_hits)
-
-    def show_error(self, title: str, message: str) -> None:
-        QMessageBox.critical(self, title, message)
+    def _channels_changed(self, _checked: bool) -> None:
+        self._apply_version_filter()
+        self.channel_preferences_changed.emit(self.include_beta_checkbox.isChecked(), self.include_alpha_checkbox.isChecked())
 
     def _request_search(self) -> None:
         if self.project_type == "mod" and self._instance is None:
@@ -203,6 +252,7 @@ class ModrinthBrowserDialog(QDialog):
         if not isinstance(project, ModrinthProject):
             return
         self._selected_project = project
+        self._all_versions = []
         self._versions = []
         self.version_combo.clear()
         self.install_button.setEnabled(False)
@@ -233,7 +283,7 @@ class ModrinthBrowserDialog(QDialog):
             self.install_mod_requested.emit(version.version_id)
             return
         name = self.instance_name_input.text().strip()
-        self.install_modpack_requested.emit(project.project_id, version.version_id, name, self.optional_checkbox.isChecked())
+        self.install_modpack_requested.emit(project.project_id, version.version_id, name, self.optional_checkbox.isChecked(), self.allowed_version_types)
 
     def _selected_version(self) -> ModrinthVersion | None:
         index = self.version_combo.currentIndex()
@@ -266,6 +316,9 @@ class ModrinthBrowserDialog(QDialog):
                 self.context_label.setText(tr("modrinth.mod.context", instance=self._instance.name, minecraft=self._instance.version_id))
         else:
             self.context_label.setText(tr("modrinth.modpack.context"))
+        self.release_channel_label.setText(tr("modrinth.channel.release_always"))
+        self.include_beta_checkbox.setText(tr("modrinth.channel.beta"))
+        self.include_alpha_checkbox.setText(tr("modrinth.channel.alpha"))
         self.search_input.setPlaceholderText(tr("modrinth.search.placeholder"))
         self.search_button.setText(tr("common.search"))
         self.previous_button.setText(tr("common.previous"))

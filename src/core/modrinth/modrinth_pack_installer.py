@@ -31,7 +31,7 @@ class ModrinthPackInstaller:
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
 
     @staticmethod
-    def install(project_id: str, version_id: str, instance_name: str, install_optional_files: bool = True) -> ModrinthModpackInstallResult:
+    def install(project_id: str, version_id: str, instance_name: str, install_optional_files: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None) -> ModrinthModpackInstallResult:
         project = ModrinthClient.get_project(project_id)
         requested_name = str(instance_name or "").strip()
         base_name = ModrinthPackInstaller._validated_instance_name(requested_name or project.title)
@@ -44,6 +44,9 @@ class ModrinthPackInstaller:
         version = ModrinthClient.get_version(version_id)
         if version.project_id != project.project_id:
             raise RuntimeError("The selected Modrinth version does not belong to this modpack.")
+        allowed_types = ModrinthClient.normalize_version_types(allowed_version_types)
+        if version.version_type not in allowed_types:
+            raise RuntimeError(f"Modrinth modpack version '{version.version_number}' uses the disabled {version.version_type} channel.")
         pack_file = version.primary_file(".mrpack")
         pack_path = Paths.modrinth_pack_cache(project.project_id, version.version_id, pack_file.filename)
         ModrinthDownloader.download_file(pack_file, pack_path)

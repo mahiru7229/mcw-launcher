@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QL
 
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
+from src.gui.theme.runtime import set_theme_icon
 
 
 class InstanceSettingsPage(BasePage):
@@ -12,14 +13,14 @@ class InstanceSettingsPage(BasePage):
     save_requested = Signal(str, dict)
 
     def __init__(self) -> None:
-        super().__init__("Instance Settings", "Settings are loaded and saved through the public SettingsManager API.")
+        super().__init__("Instance Settings", "Settings are loaded and saved through the public SettingsManager API.", "instance_settings")
         self._build_ui()
 
     def _build_ui(self) -> None:
         selector_card = CardWidget("Target instance")
         self.instance_combo = QComboBox()
         self.instance_combo.currentTextChanged.connect(self.load_requested.emit)
-        reload_button = QPushButton("Reload settings")
+        reload_button = set_theme_icon(QPushButton("Reload settings"), "icon.action.refresh")
         reload_button.clicked.connect(lambda: self.load_requested.emit(self.current_instance_name()))
         selector_card.layout.addWidget(self.instance_combo)
         selector_card.layout.addWidget(reload_button)
@@ -28,7 +29,7 @@ class InstanceSettingsPage(BasePage):
         java_card = CardWidget("Java and memory")
         self.java_path_input = QLineEdit()
         self.java_path_input.setPlaceholderText("Leave empty for automatic Java selection")
-        browse_button = QPushButton("Browse Java executable")
+        browse_button = set_theme_icon(QPushButton("Browse Java executable"), "icon.action.folder")
         browse_button.clicked.connect(self._browse_java)
         memory_grid = QGridLayout()
         self.min_memory = QSpinBox()
@@ -65,9 +66,11 @@ class InstanceSettingsPage(BasePage):
 
         arguments_card = CardWidget("Custom arguments", "Enter one argument per line.")
         self.jvm_arguments = QTextEdit()
+        self.jvm_arguments.setObjectName("ArgumentEditor")
         self.jvm_arguments.setPlaceholderText("JVM arguments")
         self.jvm_arguments.setFixedHeight(90)
         self.game_arguments = QTextEdit()
+        self.game_arguments.setObjectName("ArgumentEditor")
         self.game_arguments.setPlaceholderText("Game arguments")
         self.game_arguments.setFixedHeight(90)
         arguments_card.layout.addWidget(QLabel("JVM arguments"))
@@ -76,7 +79,7 @@ class InstanceSettingsPage(BasePage):
         arguments_card.layout.addWidget(self.game_arguments)
         self.root_layout.addWidget(arguments_card)
 
-        save_button = QPushButton("Save instance settings")
+        save_button = set_theme_icon(QPushButton("Save instance settings"), "icon.action.save")
         save_button.setObjectName("PrimaryButton")
         save_button.setMinimumHeight(48)
         save_button.clicked.connect(lambda: self.save_requested.emit(self.current_instance_name(), self.form_data()))

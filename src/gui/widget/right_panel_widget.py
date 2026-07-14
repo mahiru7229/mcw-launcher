@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
 from src.core.language.language_manager import tr
 from src.gui.widget.card_widget import CardWidget
+from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap
 
 
 class RightPanelWidget(QFrame):
@@ -45,7 +46,7 @@ class RightPanelWidget(QFrame):
         self.account_uuid = QLabel("UUID: -")
         self.account_uuid.setObjectName("TinyLabel")
         self.account_uuid.setWordWrap(True)
-        account_button = QPushButton("Manage accounts")
+        account_button = set_theme_icon(QPushButton("Manage accounts"), "icon.action.account")
         account_button.clicked.connect(self.manage_accounts_requested.emit)
         self.account_card.layout.addWidget(self.account_name)
         self.account_card.layout.addWidget(self.account_type)
@@ -63,9 +64,9 @@ class RightPanelWidget(QFrame):
         self.instance_path = QLabel("Path: -")
         self.instance_path.setObjectName("TinyLabel")
         self.instance_path.setWordWrap(True)
-        instance_button = QPushButton("Manage instances")
+        instance_button = set_theme_icon(QPushButton("Manage instances"), "icon.action.instance")
         instance_button.clicked.connect(self.manage_instances_requested.emit)
-        self.manage_mods_button = QPushButton("Manage mods")
+        self.manage_mods_button = set_theme_icon(QPushButton("Manage mods"), "icon.action.mods")
         self.manage_mods_button.setEnabled(False)
         self.manage_mods_button.clicked.connect(lambda: self.manage_mods_requested.emit(self._instance_name))
         self.instance_card.layout.addWidget(self.instance_name)
@@ -87,13 +88,15 @@ class RightPanelWidget(QFrame):
         layout.addWidget(self.running_card)
 
         status_card = CardWidget("Launcher state")
+        self.status_icon = set_theme_pixmap(QLabel(), "icon.state.ready", 32, 32)
         self.status_badge = QLabel("READY")
         self.status_badge.setObjectName("StatusBadge")
         self.status_text = QLabel("Waiting for a task.")
         self.status_text.setObjectName("MutedLabel")
         self.status_text.setWordWrap(True)
-        refresh_button = QPushButton("Refresh data")
+        refresh_button = set_theme_icon(QPushButton("Refresh data"), "icon.action.refresh")
         refresh_button.clicked.connect(self.refresh_requested.emit)
+        status_card.layout.addWidget(self.status_icon)
         status_card.layout.addWidget(self.status_badge)
         status_card.layout.addWidget(self.status_text)
         status_card.layout.addWidget(refresh_button)
@@ -163,6 +166,7 @@ class RightPanelWidget(QFrame):
 
     def set_busy(self, busy: bool) -> None:
         self._busy = busy
+        set_theme_pixmap(self.status_icon, "icon.state.busy" if busy else "icon.state.ready", 32, 32)
         self.status_badge.setText(tr("BUSY" if busy else "READY"))
         self.status_badge.setObjectName("WarningBadge" if busy else "StatusBadge")
         self.status_badge.style().unpolish(self.status_badge)

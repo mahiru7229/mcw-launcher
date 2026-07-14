@@ -3,7 +3,7 @@ from PySide6.QtWidgets import QFrame, QLabel, QScrollArea, QVBoxLayout, QWidget
 
 
 class BasePage(QScrollArea):
-    def __init__(self, title: str, subtitle: str) -> None:
+    def __init__(self, title: str, subtitle: str, page_id: str = "generic") -> None:
         super().__init__()
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setWidgetResizable(True)
@@ -11,6 +11,7 @@ class BasePage(QScrollArea):
 
         page = QWidget()
         page.setObjectName("PageViewport")
+        page.setProperty("themePage", str(page_id))
         self.setWidget(page)
         self.root_layout = QVBoxLayout(page)
         self.root_layout.setContentsMargins(28, 24, 28, 24)

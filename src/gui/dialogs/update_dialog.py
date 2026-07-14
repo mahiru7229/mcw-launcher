@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QPlainTextEdit,
 
 from src.core.language.language_manager import tr
 from src.models.update.update_info import UpdateInfo
+from src.gui.theme.runtime import set_theme_icon
 
 
 class UpdateDialog(QDialog):
@@ -16,6 +17,7 @@ class UpdateDialog(QDialog):
     def __init__(self, info: UpdateInfo, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.info = info
+        self.setObjectName("UpdateDialog")
         self.decision = self.LATER
         self.setWindowTitle(tr("update.dialog.title"))
         self.setModal(True)
@@ -40,16 +42,17 @@ class UpdateDialog(QDialog):
         layout.addWidget(notes_label)
 
         notes = QPlainTextEdit()
+        notes.setObjectName("DetailsOutput")
         notes.setReadOnly(True)
         notes.setPlainText(info.release_notes or tr("update.dialog.no_release_notes"))
         layout.addWidget(notes, 1)
 
         button_box = QDialogButtonBox()
-        update_button = QPushButton(tr("update.dialog.update_now"))
+        update_button = set_theme_icon(QPushButton(tr("update.dialog.update_now")), "icon.action.update")
         update_button.setObjectName("PrimaryButton")
-        later_button = QPushButton(tr("update.dialog.later"))
-        dont_ask_button = QPushButton(tr("update.dialog.dont_ask_again"))
-        release_button = QPushButton(tr("update.dialog.open_release"))
+        later_button = set_theme_icon(QPushButton(tr("update.dialog.later")), "icon.action.previous")
+        dont_ask_button = set_theme_icon(QPushButton(tr("update.dialog.dont_ask_again")), "icon.action.disable")
+        release_button = set_theme_icon(QPushButton(tr("update.dialog.open_release")), "icon.action.release")
         release_button.setEnabled(bool(info.release_url))
         button_box.addButton(update_button, QDialogButtonBox.ButtonRole.AcceptRole)
         button_box.addButton(later_button, QDialogButtonBox.ButtonRole.RejectRole)

@@ -27,6 +27,7 @@ class Paths:
             Paths.ACCOUNTS_ROOT,
             Paths.CONFIG_ROOT,
             Paths.LOGS_ROOT,
+            Paths.THEME_ROOT,
             Paths.INSTANCE_LOCKS_ROOT,
         ]
 

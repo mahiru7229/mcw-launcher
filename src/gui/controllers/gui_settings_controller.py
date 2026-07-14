@@ -18,6 +18,9 @@ class GuiSettingsController(BaseController):
         "language": "en-US",
         "auto_check_updates": True,
         "update_channel": "beta",
+        "theme": "mcw-default",
+        "modrinth_include_beta": False,
+        "modrinth_include_alpha": False,
     }
 
     def __init__(self) -> None:
@@ -37,6 +40,8 @@ class GuiSettingsController(BaseController):
         gui = data.get("gui", {})
         launch = data.get("launch", {})
         updates = data.get("updates", {})
+        appearance = data.get("appearance", {})
+        modrinth = data.get("modrinth", {})
         self._current = {
             "start_page": str(gui.get("start_page", self.DEFAULTS["start_page"])),
             "show_snapshots": bool(gui.get("show_snapshots", self.DEFAULTS["show_snapshots"])),
@@ -45,6 +50,9 @@ class GuiSettingsController(BaseController):
             "language": str(gui.get("language", self.DEFAULTS["language"])),
             "auto_check_updates": bool(updates.get("auto_check", self.DEFAULTS["auto_check_updates"])),
             "update_channel": str(updates.get("channel", self.DEFAULTS["update_channel"])),
+            "theme": str(appearance.get("theme", self.DEFAULTS["theme"])),
+            "modrinth_include_beta": bool(modrinth.get("include_beta", self.DEFAULTS["modrinth_include_beta"])),
+            "modrinth_include_alpha": bool(modrinth.get("include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
         }
         self.settings_changed.emit(dict(self._current))
         return dict(self._current)
@@ -58,6 +66,9 @@ class GuiSettingsController(BaseController):
             "language": str(data.get("language", self.DEFAULTS["language"])),
             "auto_check_updates": bool(data.get("auto_check_updates", self.DEFAULTS["auto_check_updates"])),
             "update_channel": str(data.get("update_channel", self.DEFAULTS["update_channel"])),
+            "theme": str(data.get("theme", self.DEFAULTS["theme"])),
+            "modrinth_include_beta": bool(data.get("modrinth_include_beta", self.DEFAULTS["modrinth_include_beta"])),
+            "modrinth_include_alpha": bool(data.get("modrinth_include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
         }
         self._settings.save({
             "gui": {
@@ -66,22 +77,30 @@ class GuiSettingsController(BaseController):
                 "remember_window_size": self._current["remember_window_size"],
                 "language": self._current["language"],
             },
-            "launch": {
-                "debug_mode": self._current["debug_mode"],
-            },
+            "launch": {"debug_mode": self._current["debug_mode"]},
             "updates": {
                 "auto_check": self._current["auto_check_updates"],
                 "channel": self._current["update_channel"],
+            },
+            "appearance": {"theme": self._current["theme"]},
+            "modrinth": {
+                "include_beta": self._current["modrinth_include_beta"],
+                "include_alpha": self._current["modrinth_include_alpha"],
             },
         })
         self.settings_changed.emit(dict(self._current))
         self.status_changed.emit(tr("Launcher settings saved"))
         self.log_created.emit(tr("GUI preferences saved"))
 
-
     def set_auto_check_updates(self, enabled: bool) -> None:
         self._current["auto_check_updates"] = bool(enabled)
         self._settings.update_section("updates", {"auto_check": bool(enabled)})
+        self.settings_changed.emit(dict(self._current))
+
+    def set_modrinth_channels(self, include_beta: bool, include_alpha: bool) -> None:
+        self._current["modrinth_include_beta"] = bool(include_beta)
+        self._current["modrinth_include_alpha"] = bool(include_alpha)
+        self._settings.update_section("modrinth", {"include_beta": bool(include_beta), "include_alpha": bool(include_alpha)})
         self.settings_changed.emit(dict(self._current))
 
     def reset(self) -> None:

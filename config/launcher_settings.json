@@ -1,5 +1,5 @@
 {
-    "schema_version": 2,
+    "schema_version": 3,
     "gui": {
         "start_page": "home",
         "show_snapshots": false,
@@ -12,9 +12,16 @@
     "window": {
         "geometry": "AdnQywADAAAAAACgAAAAIwAABt8AAAPFAAAAoAAAAEIAAAbfAAADxQAAAAAAAAAAB4AAAACgAAAAQgAABt8AAAPF"
     },
+    "appearance": {
+        "theme": "mcw-default"
+    },
+    "modrinth": {
+        "include_beta": false,
+        "include_alpha": false
+    },
     "updates": {
         "auto_check": true,
         "channel": "beta",
-        "last_checked_at": "2026-07-14T19:00:23.269620+00:00"
+        "last_checked_at": "2026-07-14T20:19:24.007518+00:00"
     }
 }

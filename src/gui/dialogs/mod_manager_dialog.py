@@ -11,6 +11,7 @@ from src.core.language.language_manager import tr
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.models.instance.instance import Instance
 from src.models.mod.mod_info import ModInfo
+from src.gui.theme.runtime import set_theme_icon
 
 
 class ModManagerDialog(QDialog):
@@ -25,6 +26,7 @@ class ModManagerDialog(QDialog):
         self._instance: Instance | None = None
         self._mods: list[ModInfo] = []
         self.setWindowTitle("Mod Manager")
+        self.setObjectName("ModManagerDialog")
         self.resize(1050, 680)
         self.setAcceptDrops(True)
         self._build_ui()
@@ -46,9 +48,9 @@ class ModManagerDialog(QDialog):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search name, mod id, version, or file...")
         self.search_input.textChanged.connect(self._apply_filter)
-        refresh_button = QPushButton("Refresh")
+        refresh_button = set_theme_icon(QPushButton("Refresh"), "icon.action.refresh")
         refresh_button.clicked.connect(self.refresh_requested.emit)
-        open_folder_button = QPushButton("Open mod folder")
+        open_folder_button = set_theme_icon(QPushButton("Open mod folder"), "icon.action.folder")
         open_folder_button.clicked.connect(self._open_folder)
         search_row.addWidget(self.search_input, 1)
         search_row.addWidget(refresh_button)
@@ -69,13 +71,13 @@ class ModManagerDialog(QDialog):
         root.addWidget(self.table, 1)
 
         action_row = QHBoxLayout()
-        self.add_button = QPushButton("Add mod files")
+        self.add_button = set_theme_icon(QPushButton("Add mod files"), "icon.action.add")
         self.add_button.setObjectName("PrimaryButton")
-        self.modrinth_button = QPushButton("Browse Modrinth")
+        self.modrinth_button = set_theme_icon(QPushButton("Browse Modrinth"), "icon.action.modrinth")
         self.modrinth_button.clicked.connect(self.modrinth_requested.emit)
-        self.enable_button = QPushButton("Enable")
-        self.disable_button = QPushButton("Disable")
-        self.remove_button = QPushButton("Remove")
+        self.enable_button = set_theme_icon(QPushButton("Enable"), "icon.action.enable")
+        self.disable_button = set_theme_icon(QPushButton("Disable"), "icon.action.disable")
+        self.remove_button = set_theme_icon(QPushButton("Remove"), "icon.action.remove")
         self.remove_button.setObjectName("DangerButton")
         self.add_button.clicked.connect(self._choose_add)
         self.enable_button.clicked.connect(lambda: self._request_enabled(True))
@@ -90,6 +92,7 @@ class ModManagerDialog(QDialog):
         root.addLayout(action_row)
 
         self.details = QPlainTextEdit()
+        self.details.setObjectName("DetailsOutput")
         self.details.setReadOnly(True)
         self.details.setPlaceholderText("Select a mod to view metadata and dependencies.")
         self.details.setMaximumHeight(170)

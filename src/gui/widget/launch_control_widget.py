@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QPushBu
 
 from src.core.language.language_manager import tr
 from src.gui.presenters.progress_presenter import ProgressPresenter
-from src.gui.widget.launch_control_style import LAUNCH_CONTROL_STYLE
+from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap
 
 
 class LaunchControlWidget(QFrame):
@@ -23,7 +23,6 @@ class LaunchControlWidget(QFrame):
         self._status_message = "Ready"
         self._detail_message = "Select an account and an instance, then launch."
         self._build_ui()
-        self.setStyleSheet(LAUNCH_CONTROL_STYLE)
 
     def _build_ui(self) -> None:
         layout = QHBoxLayout(self)
@@ -38,6 +37,8 @@ class LaunchControlWidget(QFrame):
         status_row.setContentsMargins(0, 0, 0, 0)
         status_row.setSpacing(10)
 
+        self.stage_icon = set_theme_pixmap(QLabel(), "icon.state.ready", 32, 32)
+
         self.status_label = QLabel("Ready")
         self.status_label.setObjectName("ValueLabel")
 
@@ -45,6 +46,7 @@ class LaunchControlWidget(QFrame):
         self.stage_label.setObjectName("StageBadge")
         self.stage_label.setProperty("state", "success")
 
+        status_row.addWidget(self.stage_icon)
         status_row.addWidget(self.status_label, 1)
         status_row.addWidget(self.stage_label)
 
@@ -61,7 +63,7 @@ class LaunchControlWidget(QFrame):
         progress_layout.addWidget(self.detail_label)
         progress_layout.addWidget(self.progress_bar)
 
-        self.launch_button = QPushButton(self.BUTTON_TEXT)
+        self.launch_button = set_theme_icon(QPushButton(self.BUTTON_TEXT), "icon.action.launch", 40)
         self.launch_button.setObjectName("PrimaryButton")
         self.launch_button.setFixedSize(230, 72)
         self.launch_button.clicked.connect(self.launch_clicked.emit)
@@ -162,6 +164,8 @@ class LaunchControlWidget(QFrame):
             self._keep_launch_button_text()
 
     def _set_stage_state(self, state: str) -> None:
+        icon_state = "ready" if state == "success" and self._mode == "idle" else state
+        set_theme_pixmap(self.stage_icon, f"icon.state.{icon_state}", 32, 32)
         self.stage_label.setProperty("state", state)
         self.stage_label.style().unpolish(self.stage_label)
         self.stage_label.style().polish(self.stage_label)

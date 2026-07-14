@@ -370,6 +370,15 @@
     "diagnostics.export.title": "Xuất chẩn đoán",
     "diagnostics.file_filter": "Tệp văn bản (*.txt)",
     "diagnostics.export.success": "Đã lưu báo cáo chẩn đoán tại:\n{path}",
-    "diagnostics.open_logs": "Mở thư mục log"
+    "diagnostics.open_logs": "Mở thư mục log",
+    "modrinth.channel.release_always": "Release luôn được bật. Chỉ bật kênh thử nghiệm khi cần.",
+    "modrinth.channel.beta": "Bao gồm Beta",
+    "modrinth.channel.alpha": "Bao gồm Alpha",
+    "modrinth.channel.no_versions": "Không có phiên bản tương thích trong các kênh đang bật: {channels}.",
+    "launcher_settings.modrinth.title": "Kênh phát hành Modrinth",
+    "launcher_settings.modrinth.subtitle": "Phiên bản Release luôn được hiển thị. Có thể bật Beta và Alpha cho cả mod lẫn modpack.",
+    "launcher_settings.theme.title": "Giao diện và theme PNG",
+    "launcher_settings.theme.subtitle": "PNG bị thiếu hoặc lỗi sẽ tự quay về giao diện CSS mặc định.",
+    "launcher_settings.theme.reload": "Tải lại và xem trước theme"
   }
 }

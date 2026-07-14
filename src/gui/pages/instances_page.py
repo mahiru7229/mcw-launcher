@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QL
 from src.core.language.language_manager import tr
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
+from src.gui.theme.runtime import set_theme_icon
 
 
 class InstancesPage(BasePage):
@@ -26,7 +27,7 @@ class InstancesPage(BasePage):
     browse_modpacks_requested = Signal()
 
     def __init__(self) -> None:
-        super().__init__("Instances", "Create and manage isolated Minecraft instances, including Fabric Loader and per-instance mods.")
+        super().__init__("Instances", "Create and manage isolated Minecraft instances, including Fabric Loader and per-instance mods.", "instances")
         self._instances: dict[str, object] = {}
         self._versions: list[object] = []
         self._fabric_versions: dict[str, list[object]] = {}
@@ -40,7 +41,7 @@ class InstancesPage(BasePage):
         self.instance_combo.currentTextChanged.connect(self._instance_selected)
         self.instance_info = QLabel("No instance selected")
         self.instance_info.setObjectName("MutedLabel")
-        refresh_button = QPushButton("Refresh instances")
+        refresh_button = set_theme_icon(QPushButton("Refresh instances"), "icon.action.refresh")
         refresh_button.clicked.connect(self.refresh_requested.emit)
         selected_card.layout.addWidget(self.instance_combo)
         selected_card.layout.addWidget(self.instance_info)
@@ -59,10 +60,10 @@ class InstancesPage(BasePage):
         self.create_loader_status = QLabel("Fabric Loader versions can be changed later under Manage selected instance.")
         self.create_loader_status.setObjectName("MutedLabel")
         self.create_loader_status.setWordWrap(True)
-        create_button = QPushButton("Create instance")
+        create_button = set_theme_icon(QPushButton("Create instance"), "icon.action.add")
         create_button.setObjectName("PrimaryButton")
         create_button.clicked.connect(self._request_create)
-        self.browse_modpacks_button = QPushButton("Browse Modrinth modpacks")
+        self.browse_modpacks_button = set_theme_icon(QPushButton("Browse Modrinth modpacks"), "icon.action.modrinth")
         self.browse_modpacks_button.clicked.connect(self.browse_modpacks_requested.emit)
         create_card.layout.addWidget(QLabel("Name"))
         create_card.layout.addWidget(self.create_name_input)
@@ -86,10 +87,10 @@ class InstancesPage(BasePage):
         self.manage_loader_status = QLabel("Select an instance to manage its mod loader.")
         self.manage_loader_status.setObjectName("MutedLabel")
         self.manage_loader_status.setWordWrap(True)
-        self.apply_loader_button = QPushButton("Apply mod loader")
+        self.apply_loader_button = set_theme_icon(QPushButton("Apply mod loader"), "icon.action.save")
         self.apply_loader_button.clicked.connect(self._request_loader_change)
         self.apply_loader_button.setEnabled(False)
-        self.repair_loader_button = QPushButton("Repair Fabric")
+        self.repair_loader_button = set_theme_icon(QPushButton("Repair Fabric"), "icon.action.repair")
         self.repair_loader_button.setToolTip("Rebuild Fabric metadata and verify Loader libraries without changing mods or saves.")
         self.repair_loader_button.clicked.connect(self._request_loader_repair)
         self.repair_loader_button.setEnabled(False)
@@ -98,13 +99,13 @@ class InstancesPage(BasePage):
         self.target_name_input.setPlaceholderText("New name or clone name")
         self.include_saves_checkbox = QCheckBox("Include saves when cloning or exporting")
         action_grid = QGridLayout()
-        rename_button = QPushButton("Rename")
-        clone_button = QPushButton("Clone")
-        delete_button = QPushButton("Delete")
+        rename_button = set_theme_icon(QPushButton("Rename"), "icon.action.edit")
+        clone_button = set_theme_icon(QPushButton("Clone"), "icon.action.clone")
+        delete_button = set_theme_icon(QPushButton("Delete"), "icon.action.remove")
         delete_button.setObjectName("DangerButton")
-        import_button = QPushButton("Import .mcwpack")
-        export_button = QPushButton("Export .mcwpack")
-        self.manage_mods_button = QPushButton("Manage mods")
+        import_button = set_theme_icon(QPushButton("Import .mcwpack"), "icon.action.import")
+        export_button = set_theme_icon(QPushButton("Export .mcwpack"), "icon.action.export")
+        self.manage_mods_button = set_theme_icon(QPushButton("Manage mods"), "icon.action.mods")
         self.manage_mods_button.setObjectName("PrimaryButton")
         self.manage_mods_button.setEnabled(False)
         rename_button.clicked.connect(lambda: self.rename_requested.emit(self.current_instance_name(), self.target_name_input.text()))

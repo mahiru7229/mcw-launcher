@@ -7,7 +7,7 @@ from src.gui.widget.card_widget import CardWidget
 
 class AboutPage(BasePage):
     def __init__(self) -> None:
-        super().__init__("About", "Project information and the responsibilities of this GUI layer.")
+        super().__init__("About", "Project information and the responsibilities of this GUI layer.", "about")
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -32,6 +32,6 @@ class AboutPage(BasePage):
         architecture_card.layout.addWidget(architecture_text)
         self.root_layout.addWidget(architecture_card)
 
-        asset_card = CardWidget("Assets", "No icon dependency is baked into the code. Buttons remain text-first until custom assets are added.")
+        asset_card = CardWidget("Theme assets", "PNG themes are loaded from the themes folder. Every asset is optional, so missing or invalid files safely fall back to the built-in CSS interface.")
         self.root_layout.addWidget(asset_card)
         self.root_layout.addStretch()

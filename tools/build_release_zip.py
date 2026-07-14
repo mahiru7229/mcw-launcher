@@ -10,7 +10,7 @@ import zipfile
 
 
 DEFAULT_FILES = ("README.md", "LICENSE")
-DEFAULT_DIRECTORIES = ("lang",)
+DEFAULT_DIRECTORIES = ("lang", "themes", "docs")
 
 
 def copy_payload(project_root: Path, payload_root: Path, executable: Path) -> None:

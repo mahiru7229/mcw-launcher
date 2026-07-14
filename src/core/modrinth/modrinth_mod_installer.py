@@ -19,7 +19,7 @@ class ModrinthModInstaller:
     MAX_DEPENDENCIES = 64
 
     @staticmethod
-    def install(instance: Instance, version_id: str, install_dependencies: bool = True) -> ModrinthModInstallResult:
+    def install(instance: Instance, version_id: str, install_dependencies: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None) -> ModrinthModInstallResult:
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         if loader_name != ModLoaderManager.FABRIC:
             raise RuntimeError("Modrinth mod installation currently requires a Fabric instance.")
@@ -27,7 +27,10 @@ class ModrinthModInstaller:
             raise RuntimeError("Close Minecraft before installing or updating mods.")
 
         root_version = ModrinthClient.get_version(version_id)
-        plan, projects, warnings = ModrinthModInstaller._build_plan(root_version, instance.version_id, install_dependencies)
+        allowed_types = ModrinthClient.normalize_version_types(allowed_version_types)
+        if root_version.version_type not in allowed_types:
+            raise RuntimeError(f"Modrinth version '{root_version.version_number}' uses the disabled {root_version.version_type} channel.")
+        plan, projects, warnings = ModrinthModInstaller._build_plan(root_version, instance.version_id, install_dependencies, allowed_types)
         registry = ModrinthRegistry.load(instance)
         registry_mods = registry.setdefault("mods", {})
         installed_projects: list[str] = []
@@ -66,7 +69,7 @@ class ModrinthModInstaller:
         return ModrinthModInstallResult(installed_projects=tuple(installed_projects), installed_files=tuple(installed_files), warnings=tuple(warnings))
 
     @staticmethod
-    def _build_plan(root_version: ModrinthVersion, game_version: str, install_dependencies: bool) -> tuple[list[ModrinthVersion], dict[str, ModrinthProject], list[str]]:
+    def _build_plan(root_version: ModrinthVersion, game_version: str, install_dependencies: bool, allowed_version_types: tuple[str, ...] = ("release", "beta", "alpha")) -> tuple[list[ModrinthVersion], dict[str, ModrinthProject], list[str]]:
         plan: list[ModrinthVersion] = []
         projects: dict[str, ModrinthProject] = {}
         warnings: list[str] = []
@@ -79,6 +82,8 @@ class ModrinthModInstaller:
                 return
             if len(visited_versions) >= ModrinthModInstaller.MAX_DEPENDENCIES:
                 raise RuntimeError("The Modrinth dependency graph is too large to install safely.")
+            if version.version_type not in allowed_version_types:
+                raise RuntimeError(f"Required Modrinth version '{version.version_number}' uses the disabled {version.version_type} channel.")
             ModrinthModInstaller._validate_version(version, game_version)
             selected_version = selected_projects.get(version.project_id)
             if selected_version is not None and selected_version != version.version_id:
@@ -103,7 +108,7 @@ class ModrinthModInstaller:
                     for dependency in version.dependencies:
                         if dependency.dependency_type != "required":
                             continue
-                        dependency_version = ModrinthModInstaller._resolve_dependency(dependency.version_id, dependency.project_id, game_version)
+                        dependency_version = ModrinthModInstaller._resolve_dependency(dependency.version_id, dependency.project_id, game_version, allowed_version_types)
                         if dependency_version is None:
                             label = dependency.file_name or dependency.project_id or dependency.version_id or "unknown dependency"
                             warnings.append(f"Required external dependency could not be installed automatically: {label}")
@@ -119,11 +124,11 @@ class ModrinthModInstaller:
         return plan, projects, warnings
 
     @staticmethod
-    def _resolve_dependency(version_id: str, project_id: str, game_version: str) -> ModrinthVersion | None:
+    def _resolve_dependency(version_id: str, project_id: str, game_version: str, allowed_version_types: tuple[str, ...] = ("release", "beta", "alpha")) -> ModrinthVersion | None:
         if version_id:
             return ModrinthClient.get_version(version_id)
         if project_id:
-            return ModrinthClient.select_version(project_id, game_version=game_version, loader="fabric")
+            return ModrinthClient.select_version(project_id, game_version=game_version, loader="fabric", version_types=allowed_version_types)
         return None
 
     @staticmethod

@@ -38,6 +38,8 @@ from src.gui.pages.launcher_settings_page import LauncherSettingsPage
 from src.gui.pages.logs_page import LogsPage
 from src.gui.style import APP_STYLE
 from src.gui.task_runner import TaskRunner
+from src.gui.theme.runtime import ThemeRuntime
+from src.gui.widget.launch_control_style import LAUNCH_CONTROL_STYLE
 from src.gui.widget.launch_control_widget import LaunchControlWidget
 from src.gui.widget.right_panel_widget import RightPanelWidget
 from src.gui.widget.sidebar_widget import SidebarWidget
@@ -62,6 +64,7 @@ class MainWindow(QMainWindow):
         self.instance_settings_controller = InstanceSettingsController()
         self.gui_settings_controller = GuiSettingsController()
         self._startup_settings = self.gui_settings_controller.load()
+        self.theme_runtime = ThemeRuntime()
         language_manager.reload()
         language_manager.set_language(self._startup_settings.get("language", "en-US"), notify=False)
         self.launch_controller = LaunchController(self.task_runner)
@@ -75,7 +78,7 @@ class MainWindow(QMainWindow):
         retranslate_widget_tree(self)
         self._connect_signals()
 
-        self.setStyleSheet(APP_STYLE)
+        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(self._startup_settings.get("theme", "mcw-default")))
         self._initialize_data()
 
     def _build_ui(self) -> None:
@@ -175,6 +178,7 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.reset_requested.connect(self.gui_settings_controller.reset)
         self.launcher_settings_page.language_changed.connect(self._preview_language)
         self.launcher_settings_page.check_updates_requested.connect(lambda: self.update_controller.check(manual=True))
+        self.launcher_settings_page.reload_theme_requested.connect(self._preview_theme)
         self.logs_page.export_diagnostics_requested.connect(self._export_diagnostics)
         self.logs_page.open_logs_folder_requested.connect(self._open_logs_folder)
 
@@ -210,6 +214,8 @@ class MainWindow(QMainWindow):
         self.modrinth_modpack_dialog.versions_requested.connect(self.modrinth_controller.load_versions)
         self.modrinth_mod_dialog.install_mod_requested.connect(self._install_modrinth_mod)
         self.modrinth_modpack_dialog.install_modpack_requested.connect(self.modrinth_controller.install_modpack)
+        self.modrinth_mod_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
+        self.modrinth_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.modrinth_controller.search_results_changed.connect(self._set_modrinth_results)
         self.modrinth_controller.versions_changed.connect(self._set_modrinth_versions)
         self.modrinth_controller.mod_installed.connect(self._modrinth_mod_installed)
@@ -327,7 +333,7 @@ class MainWindow(QMainWindow):
         if instance is None:
             QMessageBox.information(self, tr("modrinth.title"), tr("modrinth.mod.no_instance"))
             return
-        self.modrinth_controller.install_mod(instance.name, version_id)
+        self.modrinth_controller.install_mod(instance.name, version_id, self.modrinth_mod_dialog.allowed_version_types)
 
     def _set_modrinth_results(self, project_type: str, result: object) -> None:
         dialog = self.modrinth_mod_dialog if project_type == "mod" else self.modrinth_modpack_dialog
@@ -441,6 +447,21 @@ class MainWindow(QMainWindow):
         self.instances_page.set_show_snapshots(bool(settings.get("show_snapshots", False)))
         self.launch_controller.set_debug_mode(bool(settings.get("debug_mode", False)))
         self.update_controller.set_channel(str(settings.get("update_channel", "beta")))
+        include_beta = bool(settings.get("modrinth_include_beta", False))
+        include_alpha = bool(settings.get("modrinth_include_alpha", False))
+        self.modrinth_mod_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.modrinth_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")))
+
+
+    def _preview_theme(self, theme_id: str) -> None:
+        selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id)
+        self.logs_page.append(f"Theme preview: {selected}")
+
+    def _set_modrinth_channel_preferences(self, include_beta: bool, include_alpha: bool) -> None:
+        self.modrinth_mod_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.modrinth_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.gui_settings_controller.set_modrinth_channels(include_beta, include_alpha)
 
     def _preview_language(self, locale: str) -> None:
         if language_manager.set_language(locale, notify=False):

@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QFrame
 
 from src.gui.config import DEVELOPER_NAME, LAUNCHER_NAME, NAVIGATION_ITEMS
 from src.gui.widget.separator import Separator
+from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap
 
 
 class SidebarWidget(QFrame):
@@ -21,6 +22,9 @@ class SidebarWidget(QFrame):
         layout.setContentsMargins(14, 22, 14, 18)
         layout.setSpacing(8)
 
+        logo = set_theme_pixmap(QLabel(), "logo.sidebar", 192, 72)
+        layout.addWidget(logo)
+
         brand = QLabel("MCW LAUNCHER")
         brand.setObjectName("BrandLabel")
         version = QLabel(LAUNCHER_NAME.replace("MCW LAUNCHER ", ""))
@@ -36,7 +40,7 @@ class SidebarWidget(QFrame):
                 layout.addSpacing(2)
                 layout.addWidget(Separator("#2f352a", 2))
                 layout.addSpacing(2)
-            button = QPushButton(label)
+            button = set_theme_icon(QPushButton(label), f"icon.nav.{page_id}", 28)
             button.setObjectName("NavButton")
             button.setCheckable(True)
             button.setFixedHeight(46)
@@ -45,7 +49,7 @@ class SidebarWidget(QFrame):
             layout.addWidget(button)
 
         layout.addStretch()
-        footer = QLabel(f"Dev by {DEVELOPER_NAME}\nUI assets can be replaced later.")
+        footer = QLabel(f"Dev by {DEVELOPER_NAME}\nPNG theme assets fall back safely when missing.")
         footer.setObjectName("TinyLabel")
         footer.setWordWrap(True)
         layout.addWidget(Separator())

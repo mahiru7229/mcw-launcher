@@ -74,3 +74,30 @@ def test_versions_are_sorted_featured_release_first(monkeypatch):
 def test_user_agent_identifies_launcher():
     assert "mcw-launcher" in ModrinthClient.USER_AGENT
     assert "mahiru7229" in ModrinthClient.USER_AGENT
+
+
+def test_project_versions_filter_release_channels(monkeypatch):
+    def version(version_id: str, version_type: str):
+        return {
+            "id": version_id,
+            "project_id": "project",
+            "name": version_id,
+            "version_number": version_id,
+            "version_type": version_type,
+            "game_versions": ["1.20.1"],
+            "loaders": ["fabric"],
+            "featured": False,
+            "date_published": f"2026-07-{10 + len(version_id):02d}T00:00:00Z",
+            "files": [{"url": f"https://cdn.modrinth.com/{version_id}.jar", "filename": f"{version_id}.jar", "hashes": {"sha1": "a", "sha512": "b"}, "size": 1, "primary": True}],
+        }
+
+    monkeypatch.setattr(ModrinthClient, "_get_json", lambda *args, **kwargs: [version("release", "release"), version("beta", "beta"), version("alpha", "alpha")])
+
+    releases = ModrinthClient.list_project_versions("project", version_types=("release",))
+    beta_enabled = ModrinthClient.list_project_versions("project", version_types=("release", "beta"))
+    all_channels = ModrinthClient.list_project_versions("project", version_types=("release", "beta", "alpha"))
+
+    assert {item.version_type for item in releases} == {"release"}
+    assert {item.version_type for item in beta_enabled} == {"release", "beta"}
+    assert {item.version_type for item in all_channels} == {"release", "beta", "alpha"}
+    assert ModrinthClient.normalize_version_types(()) == ("release",)

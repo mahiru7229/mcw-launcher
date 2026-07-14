@@ -4,8 +4,10 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QPushButton
 
 from src.core.language.language_manager import language_manager
+from src.core.theme.theme_manager import theme_manager
 from src.gui.config import NAVIGATION_ITEMS, VERSION
 from src.gui.pages.base_page import BasePage
+from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
 
 
@@ -14,9 +16,10 @@ class LauncherSettingsPage(BasePage):
     reset_requested = Signal()
     language_changed = Signal(str)
     check_updates_requested = Signal()
+    reload_theme_requested = Signal(str)
 
     def __init__(self) -> None:
-        super().__init__("Launcher Settings", "Preferences here belong to the GUI, not to an individual Minecraft instance.")
+        super().__init__("Launcher Settings", "Preferences here belong to the GUI, not to an individual Minecraft instance.", "launcher_settings")
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -38,12 +41,19 @@ class LauncherSettingsPage(BasePage):
         self.language_combo = QComboBox()
         self.reload_languages()
         self.language_combo.currentIndexChanged.connect(self._emit_language_changed)
-        reload_languages_button = QPushButton("Reload language packs")
+        reload_languages_button = set_theme_icon(QPushButton("Reload language packs"), "icon.action.language")
         reload_languages_button.clicked.connect(self.reload_languages)
         language_card.layout.addWidget(QLabel("Launcher language"))
         language_card.layout.addWidget(self.language_combo)
         language_card.layout.addWidget(reload_languages_button)
         self.root_layout.addWidget(language_card)
+
+        modrinth_card = CardWidget("Modrinth release channels", "Release versions are always shown. Enable Beta or Alpha only when you accept less stable project versions.")
+        self.modrinth_include_beta = QCheckBox("Include Beta mod and modpack versions")
+        self.modrinth_include_alpha = QCheckBox("Include Alpha mod and modpack versions")
+        modrinth_card.layout.addWidget(self.modrinth_include_beta)
+        modrinth_card.layout.addWidget(self.modrinth_include_alpha)
+        self.root_layout.addWidget(modrinth_card)
 
         update_card = CardWidget("Launcher updates", "MCW Launcher can check GitHub Releases and install ZIP updates after asking for confirmation.")
         current_version_label = QLabel(f"Current version: {VERSION}")
@@ -55,7 +65,7 @@ class LauncherSettingsPage(BasePage):
         self.update_status_label = QLabel("Update status: Not checked")
         self.update_status_label.setObjectName("ValueLabel")
         self.update_status_label.setWordWrap(True)
-        self.check_updates_button = QPushButton("Check for updates")
+        self.check_updates_button = set_theme_icon(QPushButton("Check for updates"), "icon.action.update")
         self.check_updates_button.clicked.connect(self.check_updates_requested.emit)
         update_card.layout.addWidget(current_version_label)
         update_card.layout.addWidget(self.auto_check_updates)
@@ -65,16 +75,20 @@ class LauncherSettingsPage(BasePage):
         update_card.layout.addWidget(self.check_updates_button)
         self.root_layout.addWidget(update_card)
 
-        appearance_card = CardWidget("Appearance", "The current stylesheet is intentionally text-only so custom icons and pixel assets can be added later.")
-        theme_value = QLabel("Theme: MCW Dark Block")
-        theme_value.setObjectName("ValueLabel")
-        appearance_card.layout.addWidget(theme_value)
+        appearance_card = CardWidget("Appearance", "PNG theme files are optional. Missing or invalid files automatically fall back to the built-in CSS interface.")
+        self.theme_combo = QComboBox()
+        self.reload_themes()
+        reload_theme_button = set_theme_icon(QPushButton("Reload and preview theme"), "icon.action.theme")
+        reload_theme_button.clicked.connect(lambda: self.reload_theme_requested.emit(str(self.theme_combo.currentData() or "mcw-default")))
+        appearance_card.layout.addWidget(QLabel("Launcher theme"))
+        appearance_card.layout.addWidget(self.theme_combo)
+        appearance_card.layout.addWidget(reload_theme_button)
         self.root_layout.addWidget(appearance_card)
 
-        save_button = QPushButton("Save launcher settings")
+        save_button = set_theme_icon(QPushButton("Save launcher settings"), "icon.action.save")
         save_button.setObjectName("PrimaryButton")
         save_button.clicked.connect(lambda: self.save_requested.emit(self.form_data()))
-        reset_button = QPushButton("Reset to defaults")
+        reset_button = set_theme_icon(QPushButton("Reset to defaults"), "icon.action.reset")
         reset_button.clicked.connect(self.reset_requested.emit)
         self.root_layout.addWidget(save_button)
         self.root_layout.addWidget(reset_button)
@@ -92,6 +106,21 @@ class LauncherSettingsPage(BasePage):
         self.language_combo.setCurrentIndex(max(0, index))
         self.language_combo.blockSignals(False)
 
+    def reload_themes(self) -> None:
+        current_theme = self.theme_combo.currentData() if hasattr(self, "theme_combo") else None
+        themes = theme_manager.reload()
+        self.theme_combo.blockSignals(True)
+        self.theme_combo.clear()
+        for theme in themes:
+            label = f"{theme.name} — {theme.author}"
+            if theme.issues:
+                label += f" ({len(theme.issues)} fallback asset(s))"
+            self.theme_combo.addItem(label, theme.theme_id)
+        selected = str(current_theme or theme_manager.current.theme_id or "mcw-default")
+        index = self.theme_combo.findData(selected)
+        self.theme_combo.setCurrentIndex(max(0, index))
+        self.theme_combo.blockSignals(False)
+
     def _emit_language_changed(self, _index: int) -> None:
         locale = self.language_combo.currentData()
         if locale:
@@ -104,6 +133,8 @@ class LauncherSettingsPage(BasePage):
         self.debug_mode.setChecked(bool(settings.get("debug_mode", False)))
         self.remember_window_size.setChecked(bool(settings.get("remember_window_size", True)))
         self.auto_check_updates.setChecked(bool(settings.get("auto_check_updates", True)))
+        self.modrinth_include_beta.setChecked(bool(settings.get("modrinth_include_beta", False)))
+        self.modrinth_include_alpha.setChecked(bool(settings.get("modrinth_include_alpha", False)))
         channel_index = self.update_channel_combo.findData(settings.get("update_channel", "beta"))
         self.update_channel_combo.setCurrentIndex(max(0, channel_index))
         self.reload_languages()
@@ -111,6 +142,9 @@ class LauncherSettingsPage(BasePage):
         self.language_combo.blockSignals(True)
         self.language_combo.setCurrentIndex(max(0, language_index))
         self.language_combo.blockSignals(False)
+        self.reload_themes()
+        theme_index = self.theme_combo.findData(settings.get("theme", "mcw-default"))
+        self.theme_combo.setCurrentIndex(max(0, theme_index))
 
     def form_data(self) -> dict:
         return {
@@ -121,6 +155,9 @@ class LauncherSettingsPage(BasePage):
             "language": self.language_combo.currentData() or "en-US",
             "auto_check_updates": self.auto_check_updates.isChecked(),
             "update_channel": self.update_channel_combo.currentData() or "beta",
+            "theme": self.theme_combo.currentData() or "mcw-default",
+            "modrinth_include_beta": self.modrinth_include_beta.isChecked(),
+            "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
         }
 
     def set_update_status(self, message: str) -> None:
