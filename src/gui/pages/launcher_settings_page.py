@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QPushButton
 
+from src.core.language.language_manager import language_manager
 from src.gui.config import NAVIGATION_ITEMS
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
@@ -11,6 +12,7 @@ from src.gui.widget.card_widget import CardWidget
 class LauncherSettingsPage(BasePage):
     save_requested = Signal(dict)
     reset_requested = Signal()
+    language_changed = Signal(str)
 
     def __init__(self) -> None:
         super().__init__("Launcher Settings", "Preferences here belong to the GUI, not to an individual Minecraft instance.")
@@ -31,6 +33,17 @@ class LauncherSettingsPage(BasePage):
         behavior_card.layout.addWidget(self.debug_mode)
         self.root_layout.addWidget(behavior_card)
 
+        language_card = CardWidget("Language", "Add another language by placing a compatible JSON file in the lang folder.")
+        self.language_combo = QComboBox()
+        self.reload_languages()
+        self.language_combo.currentIndexChanged.connect(self._emit_language_changed)
+        reload_languages_button = QPushButton("Reload language packs")
+        reload_languages_button.clicked.connect(self.reload_languages)
+        language_card.layout.addWidget(QLabel("Launcher language"))
+        language_card.layout.addWidget(self.language_combo)
+        language_card.layout.addWidget(reload_languages_button)
+        self.root_layout.addWidget(language_card)
+
         appearance_card = CardWidget("Appearance", "The current stylesheet is intentionally text-only so custom icons and pixel assets can be added later.")
         theme_value = QLabel("Theme: MCW Dark Block")
         theme_value.setObjectName("ValueLabel")
@@ -46,12 +59,34 @@ class LauncherSettingsPage(BasePage):
         self.root_layout.addWidget(reset_button)
         self.root_layout.addStretch()
 
+    def reload_languages(self) -> None:
+        current_locale = self.language_combo.currentData() if hasattr(self, "language_combo") else None
+        language_manager.reload()
+        self.language_combo.blockSignals(True)
+        self.language_combo.clear()
+        for language in language_manager.available_languages():
+            self.language_combo.addItem(language.name, language.locale)
+        locale = current_locale or language_manager.current_locale
+        index = self.language_combo.findData(locale)
+        self.language_combo.setCurrentIndex(max(0, index))
+        self.language_combo.blockSignals(False)
+
+    def _emit_language_changed(self, _index: int) -> None:
+        locale = self.language_combo.currentData()
+        if locale:
+            self.language_changed.emit(str(locale))
+
     def set_settings(self, settings: dict) -> None:
         index = self.start_page_combo.findData(settings.get("start_page", "home"))
         self.start_page_combo.setCurrentIndex(max(0, index))
         self.show_snapshots.setChecked(bool(settings.get("show_snapshots", False)))
         self.debug_mode.setChecked(bool(settings.get("debug_mode", False)))
         self.remember_window_size.setChecked(bool(settings.get("remember_window_size", True)))
+        self.reload_languages()
+        language_index = self.language_combo.findData(settings.get("language", "en-US"))
+        self.language_combo.blockSignals(True)
+        self.language_combo.setCurrentIndex(max(0, language_index))
+        self.language_combo.blockSignals(False)
 
     def form_data(self) -> dict:
         return {
@@ -59,4 +94,5 @@ class LauncherSettingsPage(BasePage):
             "show_snapshots": self.show_snapshots.isChecked(),
             "debug_mode": self.debug_mode.isChecked(),
             "remember_window_size": self.remember_window_size.isChecked(),
+            "language": self.language_combo.currentData() or "en-US",
         }

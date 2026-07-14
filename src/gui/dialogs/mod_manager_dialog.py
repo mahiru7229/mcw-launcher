@@ -7,6 +7,7 @@ from PySide6.QtGui import QDragEnterEvent, QDropEvent, QDesktopServices
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import QAbstractItemView, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
+from src.core.language.language_manager import tr
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.models.instance.instance import Instance
 from src.models.mod.mod_info import ModInfo
@@ -97,18 +98,18 @@ class ModManagerDialog(QDialog):
         self.details.clear()
 
         if instance is None:
-            self.title_label.setText("No instance selected")
-            self.summary_label.setText("Choose a Fabric instance to manage its mods.")
+            self.title_label.setText(tr("No instance selected"))
+            self.summary_label.setText(tr("Choose a Fabric instance to manage its mods."))
             self._set_actions_enabled(False)
             return
 
         loader_name, loader_version = ModLoaderManager.normalize(instance.mod_loader)
-        self.title_label.setText(f"Mods — {instance.name}")
+        self.title_label.setText(tr("Mods — {name}", name=instance.name))
         if loader_name == ModLoaderManager.FABRIC:
-            self.summary_label.setText(f"Minecraft {instance.version_id} • Fabric Loader {loader_version} • Drop .jar files into this window to add them.")
+            self.summary_label.setText(tr("Minecraft {version} • Fabric Loader {loader_version} • Drop .jar files into this window to add them.", version=instance.version_id, loader_version=loader_version))
             self._set_actions_enabled(True)
         else:
-            self.summary_label.setText("This instance is Vanilla. Apply Fabric Loader from the Instances page before adding mods.")
+            self.summary_label.setText(tr("This instance is Vanilla. Apply Fabric Loader from the Instances page before adding mods."))
             self._set_actions_enabled(False)
 
     def set_mods(self, mods: list[ModInfo]) -> None:
@@ -117,7 +118,7 @@ class ModManagerDialog(QDialog):
         self.table.setRowCount(len(self._mods))
 
         for row, mod in enumerate(self._mods):
-            values = ["Enabled" if mod.enabled else "Disabled", mod.name, mod.version, mod.mod_id, mod.environment, mod.status, mod.file_name]
+            values = [tr("Enabled" if mod.enabled else "Disabled"), mod.name, mod.version, mod.mod_id, mod.environment, tr(mod.status), mod.file_name]
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
                 item.setData(Qt.ItemDataRole.UserRole, mod)
@@ -129,7 +130,7 @@ class ModManagerDialog(QDialog):
         self._apply_filter()
         enabled_count = sum(1 for mod in self._mods if mod.enabled)
         if self._instance is not None and self._is_fabric_instance():
-            self.summary_label.setText(f"{len(self._mods)} mod(s) found • {enabled_count} enabled • {self._instance.instance_dir / 'mods'}")
+            self.summary_label.setText(tr("{count} mod(s) found • {enabled_count} enabled • {path}", count=len(self._mods), enabled_count=enabled_count, path=self._instance.instance_dir / "mods"))
 
     def set_busy(self, busy: bool) -> None:
         enabled = not busy and self._is_fabric_instance()
@@ -151,7 +152,7 @@ class ModManagerDialog(QDialog):
             event.ignore()
 
     def _choose_add(self) -> None:
-        files, _ = QFileDialog.getOpenFileNames(self, "Add Fabric mods", "", "Fabric mods (*.jar)")
+        files, _ = QFileDialog.getOpenFileNames(self, tr("Add Fabric mods"), "", tr("Fabric mods (*.jar)"))
         if files:
             self._request_add([Path(file) for file in files])
 
@@ -161,7 +162,7 @@ class ModManagerDialog(QDialog):
         replace = False
 
         if conflicts:
-            answer = QMessageBox.question(self, "Replace mods", "The following files already exist:\n\n" + "\n".join(conflicts) + "\n\nReplace them?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            answer = QMessageBox.question(self, tr("Replace mods"), tr("The following files already exist:\n\n{files}\n\nReplace them?", files="\n".join(conflicts)), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if answer != QMessageBox.StandardButton.Yes:
                 return
             replace = True
@@ -172,7 +173,7 @@ class ModManagerDialog(QDialog):
         paths = self._selected_paths()
         if not paths:
             return
-        answer = QMessageBox.question(self, "Remove mods", f"Remove {len(paths)} selected mod file(s)?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        answer = QMessageBox.question(self, tr("Remove mods"), tr("Remove {count} selected mod file(s)?", count=len(paths)), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if answer == QMessageBox.StandardButton.Yes:
             self.remove_requested.emit(paths)
 
@@ -200,25 +201,25 @@ class ModManagerDialog(QDialog):
         if mod is None:
             return
 
-        dependencies = "\n".join(f"  {name}: {requirement}" for name, requirement in mod.dependencies.items()) or "  None declared"
-        authors = ", ".join(mod.authors) or "Unknown"
-        licenses = ", ".join(mod.licenses) or "Unknown"
+        dependencies = "\n".join(f"  {name}: {requirement}" for name, requirement in mod.dependencies.items()) or tr("  None declared")
+        authors = ", ".join(mod.authors) or tr("Unknown")
+        licenses = ", ".join(mod.licenses) or tr("Unknown")
         text = [
             f"{mod.name} ({mod.mod_id})",
-            f"Version: {mod.version}",
-            f"State: {'Enabled' if mod.enabled else 'Disabled'}",
-            f"Environment: {mod.environment}",
-            f"Authors: {authors}",
-            f"License: {licenses}",
-            f"Status: {mod.status}",
+            tr("Version: {version}", version=mod.version),
+            tr("State: {state}", state=tr("Enabled" if mod.enabled else "Disabled")),
+            tr("Environment: {environment}", environment=mod.environment),
+            tr("Authors: {authors}", authors=authors),
+            tr("License: {licenses}", licenses=licenses),
+            tr("Status: {status}", status=tr(mod.status)),
             "",
-            mod.description or "No description.",
+            mod.description or tr("No description."),
             "",
-            "Dependencies:",
+            tr("Dependencies:"),
             dependencies,
         ]
         if mod.error:
-            text.extend(["", "Warning:", mod.error])
+            text.extend(["", tr("Warning:"), mod.error])
         self.details.setPlainText("\n".join(text))
 
     def _apply_filter(self) -> None:
@@ -244,6 +245,14 @@ class ModManagerDialog(QDialog):
             return False
         loader_name, _ = ModLoaderManager.normalize(self._instance.mod_loader)
         return loader_name == ModLoaderManager.FABRIC
+
+    def retranslate_dynamic(self) -> None:
+        instance = self._instance
+        mods = list(self._mods)
+        self.set_instance(instance)
+        if instance is not None:
+            self.set_mods(mods)
+        self._render_details()
 
     @staticmethod
     def _jar_paths_from_urls(urls: list[QUrl]) -> list[Path]:

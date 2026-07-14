@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QComboBox, QGridLayout, QLabel, QLineEdit, QMessageBox, QPushButton
 
+from src.core.language.language_manager import tr
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
 
@@ -88,21 +89,24 @@ class AccountPage(BasePage):
     def _update_details(self) -> None:
         account = self._accounts.get(self.current_account_id())
         if account is None:
-            self.username_value.setText("Username: -")
-            self.type_value.setText("Type: -")
-            self.uuid_value.setText("UUID: -")
+            self.username_value.setText(tr("Username: -"))
+            self.type_value.setText(tr("Type: -"))
+            self.uuid_value.setText(tr("UUID: -"))
             return
         account_type = getattr(getattr(account, "account_type", None), "value", "unknown")
-        self.username_value.setText(f"Username: {account.username}")
-        self.type_value.setText(f"Type: {account_type.upper()}")
-        self.uuid_value.setText(f"UUID: {account.uuid}")
+        self.username_value.setText(tr("Username: {username}", username=account.username))
+        self.type_value.setText(tr("Type: {account_type}", account_type=account_type.upper()))
+        self.uuid_value.setText(tr("UUID: {uuid}", uuid=account.uuid))
 
     def _confirm_remove(self) -> None:
         account_id = self.current_account_id()
         if not account_id:
             return
         account = self._accounts.get(account_id)
-        username = getattr(account, "username", "this account")
-        answer = QMessageBox.question(self, "Remove account", f"Remove '{username}' from the launcher?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        username = getattr(account, "username", tr("this account"))
+        answer = QMessageBox.question(self, tr("Remove account"), tr("Remove '{username}' from the launcher?", username=username), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if answer == QMessageBox.StandardButton.Yes:
             self.remove_requested.emit(account_id)
+
+    def retranslate_dynamic(self) -> None:
+        self._update_details()

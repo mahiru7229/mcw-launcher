@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QByteArray, QSettings, Signal
 
+from src.core.language.language_manager import tr
 from src.gui.controllers.base_controller import BaseController
 
 
@@ -13,6 +14,7 @@ class GuiSettingsController(BaseController):
         "show_snapshots": False,
         "debug_mode": False,
         "remember_window_size": True,
+        "language": "en-US",
     }
 
     def __init__(self) -> None:
@@ -30,6 +32,7 @@ class GuiSettingsController(BaseController):
             "show_snapshots": self._settings.value("gui/show_snapshots", self.DEFAULTS["show_snapshots"], type=bool),
             "debug_mode": self._settings.value("launch/debug_mode", self.DEFAULTS["debug_mode"], type=bool),
             "remember_window_size": self._settings.value("gui/remember_window_size", self.DEFAULTS["remember_window_size"], type=bool),
+            "language": self._settings.value("gui/language", self.DEFAULTS["language"], type=str),
         }
         self.settings_changed.emit(dict(self._current))
         return dict(self._current)
@@ -40,15 +43,17 @@ class GuiSettingsController(BaseController):
             "show_snapshots": bool(data.get("show_snapshots", False)),
             "debug_mode": bool(data.get("debug_mode", False)),
             "remember_window_size": bool(data.get("remember_window_size", True)),
+            "language": str(data.get("language", self.DEFAULTS["language"])),
         }
         self._settings.setValue("gui/start_page", self._current["start_page"])
         self._settings.setValue("gui/show_snapshots", self._current["show_snapshots"])
         self._settings.setValue("launch/debug_mode", self._current["debug_mode"])
         self._settings.setValue("gui/remember_window_size", self._current["remember_window_size"])
+        self._settings.setValue("gui/language", self._current["language"])
         self._settings.sync()
         self.settings_changed.emit(dict(self._current))
-        self.status_changed.emit("Launcher settings saved")
-        self.log_created.emit("GUI preferences saved")
+        self.status_changed.emit(tr("Launcher settings saved"))
+        self.log_created.emit(tr("GUI preferences saved"))
 
     def reset(self) -> None:
         self.save(dict(self.DEFAULTS))

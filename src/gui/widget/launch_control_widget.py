@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout
 
+from src.core.language.language_manager import tr
 from src.gui.presenters.progress_presenter import ProgressPresenter
 from src.gui.widget.launch_control_style import LAUNCH_CONTROL_STYLE
 
@@ -15,6 +16,12 @@ class LaunchControlWidget(QFrame):
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("LaunchControl")
+        self._mode = "idle"
+        self._last_event: object | None = None
+        self._last_result: dict | None = None
+        self._last_error = ""
+        self._status_message = "Ready"
+        self._detail_message = "Select an account and an instance, then launch."
         self._build_ui()
         self.setStyleSheet(LAUNCH_CONTROL_STYLE)
 
@@ -66,12 +73,16 @@ class LaunchControlWidget(QFrame):
         self._keep_launch_button_text()
 
     def set_status(self, message: str, detail: str | None = None) -> None:
-        self.status_label.setText(message)
+        self._status_message = message
+        self.status_label.setText(tr(message))
 
         if detail is not None:
-            self.detail_label.setText(detail)
+            self._detail_message = detail
+            self.detail_label.setText(tr(detail))
 
     def set_progress_event(self, event: object) -> None:
+        self._mode = "progress"
+        self._last_event = event
         view = ProgressPresenter.present(event)
 
         self.status_label.setText(view.title)
@@ -90,25 +101,29 @@ class LaunchControlWidget(QFrame):
         self.progress_bar.setFormat(f"{view.percentage}%")
 
     def set_result(self, result: dict) -> None:
+        self._mode = "result"
+        self._last_result = dict(result)
         version = result.get("minecraftVersion", "unknown")
         java_path = result.get("javaPath", "unknown")
 
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100)
         self.progress_bar.setFormat("100%")
-        self.status_label.setText(f"Minecraft {version} launched")
-        self.detail_label.setText(f"Java: {java_path}")
-        self.stage_label.setText("RUNNING")
+        self.status_label.setText(tr("Minecraft {version} launched", version=version))
+        self.detail_label.setText(tr("Java: {path}", path=java_path))
+        self.stage_label.setText(tr("RUNNING"))
         self._set_stage_state("success")
         self._keep_launch_button_text()
 
     def set_failed(self, message: str) -> None:
+        self._mode = "failed"
+        self._last_error = message
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("FAILED")
-        self.status_label.setText("Launch failed")
-        self.detail_label.setText(message or "Minecraft could not be started.")
-        self.stage_label.setText("FAILED")
+        self.progress_bar.setFormat(tr("FAILED"))
+        self.status_label.setText(tr("Launch failed"))
+        self.detail_label.setText(message or tr("Minecraft could not be started."))
+        self.stage_label.setText(tr("FAILED"))
         self._set_stage_state("error")
         self._keep_launch_button_text()
 
@@ -117,18 +132,34 @@ class LaunchControlWidget(QFrame):
         self._keep_launch_button_text()
 
     def reset_progress(self) -> None:
+        self._mode = "idle"
+        self._status_message = "Ready"
+        self._detail_message = "Select an account and an instance, then launch."
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat("%p%")
-        self.status_label.setText("Ready")
-        self.detail_label.setText("Select an account and an instance, then launch.")
-        self.stage_label.setText("READY")
+        self.status_label.setText(tr("Ready"))
+        self.detail_label.setText(tr("Select an account and an instance, then launch."))
+        self.stage_label.setText(tr("READY"))
         self._set_stage_state("success")
         self._keep_launch_button_text()
 
     def _keep_launch_button_text(self) -> None:
         if self.launch_button.text() != self.BUTTON_TEXT:
             self.launch_button.setText(self.BUTTON_TEXT)
+
+    def retranslate_dynamic(self) -> None:
+        if self._mode == "progress" and self._last_event is not None:
+            self.set_progress_event(self._last_event)
+        elif self._mode == "result" and self._last_result is not None:
+            self.set_result(self._last_result)
+        elif self._mode == "failed":
+            self.set_failed(self._last_error)
+        else:
+            self.status_label.setText(tr(self._status_message))
+            self.detail_label.setText(tr(self._detail_message))
+            self.stage_label.setText(tr("READY"))
+            self._keep_launch_button_text()
 
     def _set_stage_state(self, state: str) -> None:
         self.stage_label.setProperty("state", state)

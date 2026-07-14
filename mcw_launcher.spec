@@ -53,7 +53,7 @@ a = Analysis(
     ["launcher.py"],
     pathex=[str(PROJECT_ROOT)],
     binaries=[],
-    datas=[],
+    datas=[(str(PROJECT_ROOT / "lang"), "lang")],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

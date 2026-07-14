@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QGridLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from src.core.language.language_manager import tr
 from src.gui.config import MAIN_LOGO_PATH, VERSION
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
@@ -16,6 +17,10 @@ class HomePage(BasePage):
 
     def __init__(self) -> None:
         super().__init__("Home", "Your launch deck: current account, active instance, and core status in one place.")
+        self._account: object | None = None
+        self._instance: object | None = None
+        self._manifest_count: int | None = None
+        self._status_message = "Ready"
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -89,24 +94,37 @@ class HomePage(BasePage):
         self.root_layout.addStretch()
 
     def set_account(self, account: object | None) -> None:
+        self._account = account
         if account is None:
-            self.account_value.setText("No account selected")
-            self.account_detail.setText("Open Accounts to create an offline account.")
+            self.account_value.setText(tr("No account selected"))
+            self.account_detail.setText(tr("Open Accounts to create an offline account."))
             return
         account_type = getattr(getattr(account, "account_type", None), "value", "unknown")
         self.account_value.setText(account.username)
         self.account_detail.setText(account_type.upper())
 
     def set_instance(self, instance: object | None) -> None:
+        self._instance = instance
         if instance is None:
-            self.instance_value.setText("No instance selected")
-            self.instance_detail.setText("Open Instances to create or choose one.")
+            self.instance_value.setText(tr("No instance selected"))
+            self.instance_detail.setText(tr("Open Instances to create or choose one."))
             return
         self.instance_value.setText(instance.name)
-        self.instance_detail.setText(f"Minecraft {instance.version_id}")
+        self.instance_detail.setText(tr("Minecraft {version}", version=instance.version_id))
 
     def set_manifest_count(self, count: int) -> None:
-        self.manifest_value.setText(f"{count} versions available")
+        self._manifest_count = count
+        self.manifest_value.setText(tr("{count} versions available", count=count))
 
     def set_status(self, message: str) -> None:
-        self.last_status.setText(message)
+        self._status_message = message
+        self.last_status.setText(tr(message))
+
+    def retranslate_dynamic(self) -> None:
+        self.set_account(self._account)
+        self.set_instance(self._instance)
+        if self._manifest_count is None:
+            self.manifest_value.setText(tr("Manifest not loaded"))
+        else:
+            self.set_manifest_count(self._manifest_count)
+        self.last_status.setText(tr(self._status_message))

@@ -6,6 +6,7 @@ from PySide6.QtCore import Signal, Slot
 
 from src.core.auth.offline_auth import OfflineAuthentication
 from src.core.instance.instance_manager import InstanceManager
+from src.core.language.language_manager import tr
 from src.core.minecraft.minecraft_executor import MinecraftExecutor
 from src.gui.controllers.base_controller import BaseController
 from src.gui.presenters.launch_error_presenter import LaunchErrorPresenter
@@ -41,11 +42,11 @@ class LaunchController(BaseController):
 
     def launch(self) -> None:
         if self._selected_instance is None:
-            self._emit_error("Launch Minecraft", "Select an instance first.")
+            self._emit_error(tr("Launch Minecraft"), tr("Select an instance first."))
             return
 
         if self._selected_account is None:
-            self._emit_error("Launch Minecraft", "Create or select an account first.")
+            self._emit_error(tr("Launch Minecraft"), tr("Create or select an account first."))
             return
 
         instance_name = self._selected_instance.name
@@ -64,7 +65,7 @@ class LaunchController(BaseController):
                 on_progress=self._on_progress,
             )
 
-        self._task_runner.run(self.TASK_ID, task, f"Launching '{instance_name}'...")
+        self._task_runner.run(self.TASK_ID, task, tr("Launching '{name}'...", name=instance_name))
 
     def _on_progress(self, event: ProgressEvent) -> None:
         self.progress_received.emit(event)
@@ -78,8 +79,8 @@ class LaunchController(BaseController):
         self.launch_finished.emit(result)
 
         version = result.get("minecraftVersion", "unknown")
-        self.status_changed.emit(f"Minecraft {version} launched")
-        self.log_created.emit(f"Minecraft process created successfully: {version}")
+        self.status_changed.emit(tr("Minecraft {version} launched", version=version))
+        self.log_created.emit(tr("Minecraft process created successfully: {version}", version=version))
 
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:

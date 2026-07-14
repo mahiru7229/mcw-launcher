@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.core.language.language_manager import tr
 from src.core.instance.errors import InstanceAlreadyRunningError
 
 
@@ -76,7 +77,7 @@ class LaunchErrorPresenter:
     @staticmethod
     def _build(title: str, summary: str, status: str, technical_message: str) -> LaunchErrorView:
         return LaunchErrorView(
-            title=title,
-            message=f"{summary}\n\nDetails:\n{technical_message}",
-            status=status,
+            title=tr(title),
+            message=f"{tr(summary)}\n\n{tr('Details:\n{details}', details=technical_message)}",
+            status=tr(status),
         )

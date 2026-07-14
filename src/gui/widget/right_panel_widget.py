@@ -5,6 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
+from src.core.language.language_manager import tr
 from src.gui.widget.card_widget import CardWidget
 
 
@@ -20,6 +21,11 @@ class RightPanelWidget(QFrame):
         super().__init__()
         self.setObjectName("RightPanel")
         self._instance_name = ""
+        self._account: object | None = None
+        self._instance: object | None = None
+        self._running_instances: list[object] = []
+        self._busy = False
+        self._status_message = "Waiting for a task."
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -95,25 +101,27 @@ class RightPanelWidget(QFrame):
         layout.addStretch()
 
     def set_account(self, account: object | None) -> None:
+        self._account = account
         if account is None:
-            self.account_name.setText("No account selected")
-            self.account_type.setText("Create an offline account to continue.")
-            self.account_uuid.setText("UUID: -")
+            self.account_name.setText(tr("No account selected"))
+            self.account_type.setText(tr("Create an offline account to continue."))
+            self.account_uuid.setText(tr("UUID: -"))
             return
         account_type = getattr(getattr(account, "account_type", None), "value", "unknown")
         self.account_name.setText(account.username)
         self.account_type.setText(account_type.upper())
-        self.account_uuid.setText(f"UUID: {account.uuid}")
+        self.account_uuid.setText(tr("UUID: {uuid}", uuid=account.uuid))
 
     def set_instance(self, instance: object | None) -> None:
+        self._instance = instance
         if instance is None:
             self._instance_name = ""
             self.manage_mods_button.setEnabled(False)
-            self.manage_mods_button.setToolTip("Select a Fabric instance first.")
-            self.instance_name.setText("No instance selected")
-            self.instance_version.setText("Minecraft: -")
-            self.instance_loader.setText("Loader: -")
-            self.instance_path.setText("Path: -")
+            self.manage_mods_button.setToolTip(tr("Select a Fabric instance first."))
+            self.instance_name.setText(tr("No instance selected"))
+            self.instance_version.setText(tr("Minecraft: -"))
+            self.instance_loader.setText(tr("Loader: -"))
+            self.instance_path.setText(tr("Path: -"))
             return
         self._instance_name = str(instance.name)
         loader = getattr(instance, "mod_loader", ("vanilla", "-1"))
@@ -122,40 +130,51 @@ class RightPanelWidget(QFrame):
         loader_text = loader_name if loader_version in {"", "-1"} else f"{loader_name} {loader_version}"
         is_fabric = str(loader_name).casefold() == "fabric"
         self.manage_mods_button.setEnabled(is_fabric)
-        self.manage_mods_button.setToolTip("" if is_fabric else "Apply Fabric Loader to manage mods.")
+        self.manage_mods_button.setToolTip("" if is_fabric else tr("Apply Fabric Loader to manage mods."))
         self.instance_name.setText(instance.name)
-        self.instance_version.setText(f"Minecraft: {instance.version_id}")
-        self.instance_loader.setText(f"Loader: {loader_text}")
-        self.instance_path.setText(f"Path: {Path(instance.instance_dir)}")
+        self.instance_version.setText(tr("Minecraft: {version}", version=instance.version_id))
+        self.instance_loader.setText(tr("Loader: {loader}", loader=loader_text))
+        self.instance_path.setText(tr("Path: {path}", path=Path(instance.instance_dir)))
 
     def set_running_instances(self, running_instances: list[object]) -> None:
+        self._running_instances = list(running_instances)
         count = len(running_instances)
 
         if count == 0:
-            self.running_count.setText("No instances running")
-            self.running_list.setText("Minecraft sessions will appear here.")
+            self.running_count.setText(tr("No instances running"))
+            self.running_list.setText(tr("Minecraft sessions will appear here."))
             return
 
-        noun = "instance" if count == 1 else "instances"
-        self.running_count.setText(f"{count} {noun} running")
+        count_key = "{count} instance running" if count == 1 else "{count} instances running"
+        self.running_count.setText(tr(count_key, count=count))
 
         lines = []
         for running_instance in running_instances[:self.MAX_RUNNING_INSTANCES]:
-            name = str(getattr(running_instance, "name", "Unknown instance"))
-            state = str(getattr(running_instance, "state", "running")).replace("_", " ").title()
+            name = str(getattr(running_instance, "name", tr("Unknown instance")))
+            state_key = str(getattr(running_instance, "state", "running")).replace("_", " ")
+            state = tr(state_key).title()
             lines.append(f"• {name} — {state}")
 
         hidden_count = count - self.MAX_RUNNING_INSTANCES
         if hidden_count > 0:
-            lines.append(f"+ {hidden_count} more")
+            lines.append(tr("+ {count} more", count=hidden_count))
 
         self.running_list.setText("\n".join(lines))
 
     def set_busy(self, busy: bool) -> None:
-        self.status_badge.setText("BUSY" if busy else "READY")
+        self._busy = busy
+        self.status_badge.setText(tr("BUSY" if busy else "READY"))
         self.status_badge.setObjectName("WarningBadge" if busy else "StatusBadge")
         self.status_badge.style().unpolish(self.status_badge)
         self.status_badge.style().polish(self.status_badge)
 
     def set_status(self, message: str) -> None:
-        self.status_text.setText(message)
+        self._status_message = message
+        self.status_text.setText(tr(message))
+
+    def retranslate_dynamic(self) -> None:
+        self.set_account(self._account)
+        self.set_instance(self._instance)
+        self.set_running_instances(self._running_instances)
+        self.set_busy(self._busy)
+        self.status_text.setText(tr(self._status_message))

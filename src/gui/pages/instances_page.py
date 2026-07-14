@@ -5,6 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QLabel, QLineEdit, QMessageBox, QPushButton
 
+from src.core.language.language_manager import tr
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
 
@@ -51,7 +52,8 @@ class InstancesPage(BasePage):
         self.snapshot_checkbox = QCheckBox("Show snapshots, old alpha, and old beta")
         self.snapshot_checkbox.toggled.connect(self._apply_version_filter)
         self.create_loader_combo = QComboBox()
-        self.create_loader_combo.addItems(["Vanilla", "Fabric"])
+        self.create_loader_combo.addItem("Vanilla", "vanilla")
+        self.create_loader_combo.addItem("Fabric", "fabric")
         self.create_loader_status = QLabel("Fabric Loader versions can be changed later under Manage selected instance.")
         self.create_loader_status.setObjectName("MutedLabel")
         self.create_loader_status.setWordWrap(True)
@@ -71,7 +73,8 @@ class InstancesPage(BasePage):
 
         manage_card = CardWidget("Manage selected instance", "Change the selected instance's Fabric Loader version without recreating it.")
         self.manage_loader_combo = QComboBox()
-        self.manage_loader_combo.addItems(["Vanilla", "Fabric"])
+        self.manage_loader_combo.addItem("Vanilla", "vanilla")
+        self.manage_loader_combo.addItem("Fabric", "fabric")
         self.manage_loader_combo.currentTextChanged.connect(self._manage_loader_selected)
         self.manage_loader_version_combo = QComboBox()
         self.manage_loader_version_combo.setEnabled(False)
@@ -131,7 +134,7 @@ class InstancesPage(BasePage):
 
         if instance is None or instance.version_id != game_version:
             return
-        if self.manage_loader_combo.currentText().casefold() != "fabric":
+        if self.manage_loader_combo.currentData() != "fabric":
             return
 
         self._populate_manage_fabric_versions(instance, versions)
@@ -155,10 +158,10 @@ class InstancesPage(BasePage):
         return self.instance_combo.currentText().strip()
 
     def selected_create_loader(self) -> str:
-        return self.create_loader_combo.currentText().strip().lower()
+        return str(self.create_loader_combo.currentData() or "vanilla")
 
     def selected_manage_loader(self) -> tuple[str, str]:
-        loader_name = self.manage_loader_combo.currentText().strip().lower()
+        loader_name = str(self.manage_loader_combo.currentData() or "vanilla")
         loader_version = str(self.manage_loader_version_combo.currentData() or "").strip() if loader_name == "fabric" else "-1"
         return loader_name, loader_version
 
@@ -185,25 +188,25 @@ class InstancesPage(BasePage):
     def _render_instance(self, name: str) -> None:
         instance = self._instances.get(name)
         if instance is None:
-            self.instance_info.setText("No instance selected")
+            self.instance_info.setText(tr("No instance selected"))
             self.target_name_input.clear()
             self._set_manage_loader_available(False)
-            self.manage_loader_status.setText("Select an instance to manage its mod loader.")
+            self.manage_loader_status.setText(tr("Select an instance to manage its mod loader."))
             self.manage_mods_button.setEnabled(False)
             return
 
         loader_name, loader_version = self._instance_loader(instance)
         loader_text = loader_name if loader_name == "vanilla" else f"{loader_name} {loader_version}"
-        self.instance_info.setText(f"Minecraft {instance.version_id} • {loader_text} • {instance.instance_dir}")
+        self.instance_info.setText(f"{tr('Minecraft {version}', version=instance.version_id)} • {loader_text} • {instance.instance_dir}")
         self.target_name_input.setText(instance.name)
         self._set_manage_loader_available(True)
         self._pending_manage_loader_version = loader_version if loader_name == "fabric" else ""
 
         self.manage_loader_combo.blockSignals(True)
-        self.manage_loader_combo.setCurrentText("Fabric" if loader_name == "fabric" else "Vanilla")
+        self.manage_loader_combo.setCurrentIndex(max(0, self.manage_loader_combo.findData(loader_name)))
         self.manage_loader_combo.blockSignals(False)
         self.manage_mods_button.setEnabled(loader_name == "fabric")
-        self._manage_loader_selected(self.manage_loader_combo.currentText())
+        self._manage_loader_selected()
 
     def _set_manage_loader_available(self, available: bool) -> None:
         self.manage_loader_combo.setEnabled(available)
@@ -211,19 +214,19 @@ class InstancesPage(BasePage):
         self.manage_loader_version_combo.clear()
         self.apply_loader_button.setEnabled(available)
 
-    def _manage_loader_selected(self, loader_name: str) -> None:
+    def _manage_loader_selected(self, _loader_text: str = "") -> None:
         instance = self._instances.get(self.current_instance_name())
         if instance is None:
             self._set_manage_loader_available(False)
             return
 
-        is_fabric = loader_name.casefold() == "fabric"
+        is_fabric = self.manage_loader_combo.currentData() == "fabric"
         self.manage_loader_version_combo.clear()
         self.manage_loader_version_combo.setEnabled(is_fabric)
         self.manage_mods_button.setEnabled(self._instance_loader(instance)[0] == "fabric")
 
         if not is_fabric:
-            self.manage_loader_status.setText("Apply Vanilla to remove Fabric Loader from this instance. Mod files are kept in its mods folder.")
+            self.manage_loader_status.setText(tr("Apply Vanilla to remove Fabric Loader from this instance. Mod files are kept in its mods folder."))
             self.apply_loader_button.setEnabled(True)
             return
 
@@ -231,7 +234,7 @@ class InstancesPage(BasePage):
         self._pending_manage_loader_version = current_loader_version if current_loader_name == "fabric" else ""
         versions = self._fabric_versions.get(instance.version_id)
         if versions is None:
-            self.manage_loader_status.setText("Loading compatible Fabric Loader versions...")
+            self.manage_loader_status.setText(tr("Loading compatible Fabric Loader versions..."))
             self.apply_loader_button.setEnabled(False)
             self.fabric_versions_requested.emit(instance.version_id)
             return
@@ -246,13 +249,13 @@ class InstancesPage(BasePage):
         self.manage_loader_version_combo.blockSignals(True)
         self.manage_loader_version_combo.clear()
         for version in versions:
-            label = version.version + (" (stable)" if getattr(version, "stable", False) else "")
+            label = version.version + (tr(" (stable)") if getattr(version, "stable", False) else "")
             self.manage_loader_version_combo.addItem(label, version.version)
 
         selected_version = preferred or (current_loader_version if current_loader_name == "fabric" else "")
         selected_index = self.manage_loader_version_combo.findData(selected_version) if selected_version else -1
         if selected_version and selected_index < 0:
-            self.manage_loader_version_combo.insertItem(0, f"{selected_version} (current)", selected_version)
+            self.manage_loader_version_combo.insertItem(0, f"{selected_version}{tr(' (current)')}", selected_version)
             selected_index = 0
         if selected_index >= 0:
             self.manage_loader_version_combo.setCurrentIndex(selected_index)
@@ -267,12 +270,12 @@ class InstancesPage(BasePage):
 
         if versions:
             selected = str(self.manage_loader_version_combo.currentData() or "")
-            current_text = f" Current: {current_loader_version}." if current_loader_name == "fabric" else ""
-            self.manage_loader_status.setText(f"{len(versions)} compatible Fabric Loader version(s) found.{current_text} Selected: {selected}.")
+            current_text = tr(" Current: {version}.", version=current_loader_version) if current_loader_name == "fabric" else ""
+            self.manage_loader_status.setText(tr("{count} compatible Fabric Loader version(s) found.{current} Selected: {selected}.", count=len(versions), current=current_text, selected=selected))
         elif current_loader_name == "fabric" and current_loader_version:
-            self.manage_loader_status.setText(f"Compatible versions could not be loaded. The current Loader {current_loader_version} remains available.")
+            self.manage_loader_status.setText(tr("Compatible versions could not be loaded. The current Loader {version} remains available.", version=current_loader_version))
         else:
-            self.manage_loader_status.setText("Fabric Loader is unavailable for this Minecraft version, or Fabric Meta could not be reached.")
+            self.manage_loader_status.setText(tr("Fabric Loader is unavailable for this Minecraft version, or Fabric Meta could not be reached."))
 
     @staticmethod
     def _instance_loader(instance: object) -> tuple[str, str]:
@@ -292,7 +295,7 @@ class InstancesPage(BasePage):
             return
         loader_name, loader_version = self.selected_manage_loader()
         if loader_name == "fabric" and not loader_version:
-            QMessageBox.information(self, "Fabric Loader", "Select a Fabric Loader version first.")
+            QMessageBox.information(self, tr("Fabric Loader"), tr("Select a Fabric Loader version first."))
             return
         self.loader_change_requested.emit(name, loader_name, loader_version)
 
@@ -300,12 +303,12 @@ class InstancesPage(BasePage):
         name = self.current_instance_name()
         if not name:
             return
-        answer = QMessageBox.question(self, "Delete instance", f"Delete '{name}' and its entire folder?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        answer = QMessageBox.question(self, tr("Delete instance"), tr("Delete '{name}' and its entire folder?", name=name), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if answer == QMessageBox.StandardButton.Yes:
             self.delete_requested.emit(name)
 
     def _choose_import(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Import MCW instance", "", "MCW Package (*.mcwpack *.zip)")
+        path, _ = QFileDialog.getOpenFileName(self, tr("Import MCW instance"), "", tr("MCW Package (*.mcwpack *.zip)"))
         if path:
             self.import_requested.emit(Path(path))
 
@@ -313,9 +316,12 @@ class InstancesPage(BasePage):
         name = self.current_instance_name()
         if not name:
             return
-        path, _ = QFileDialog.getSaveFileName(self, "Export MCW instance", f"{name}.mcwpack", "MCW Package (*.mcwpack)")
+        path, _ = QFileDialog.getSaveFileName(self, tr("Export MCW instance"), f"{name}.mcwpack", tr("MCW Package (*.mcwpack)"))
         if path:
             output_path = Path(path)
             if output_path.suffix.lower() != ".mcwpack":
                 output_path = output_path.with_suffix(".mcwpack")
             self.export_requested.emit(name, output_path, self.include_saves_checkbox.isChecked())
+
+    def retranslate_dynamic(self) -> None:
+        self._render_instance(self.current_instance_name())

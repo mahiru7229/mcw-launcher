@@ -4,6 +4,7 @@ from typing import Any
 
 from PySide6.QtCore import Signal, Slot
 
+from src.core.language.language_manager import tr
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
@@ -21,13 +22,13 @@ class VersionController(BaseController):
         self._task_runner.task_failed.connect(self._on_task_failed)
 
     def refresh(self) -> None:
-        self._task_runner.run(self.TASK_ID, self._load_versions, "Loading Minecraft version manifest...", blocking=False)
+        self._task_runner.run(self.TASK_ID, self._load_versions, tr("Loading Minecraft version manifest..."), blocking=False)
 
     @staticmethod
     def _load_versions() -> list[Any]:
         versions = VersionManifestManager.get()
         if not versions:
-            raise RuntimeError("Minecraft version manifest is unavailable.")
+            raise RuntimeError(tr("Minecraft version manifest is unavailable."))
         return versions
 
     @Slot(str, object)
@@ -37,10 +38,10 @@ class VersionController(BaseController):
         versions = list(result)
         self.versions_changed.emit(versions)
         if not self._task_runner.is_busy:
-            self.status_changed.emit(f"Loaded {len(versions)} Minecraft versions")
-        self.log_created.emit(f"Version manifest loaded: {len(versions)} entries")
+            self.status_changed.emit(tr("Loaded {count} Minecraft versions", count=len(versions)))
+        self.log_created.emit(tr("Version manifest loaded: {count} entries", count=len(versions)))
 
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if task_id == self.TASK_ID:
-            self._emit_error("Version manifest", error)
+            self._emit_error(tr("Version manifest"), error)

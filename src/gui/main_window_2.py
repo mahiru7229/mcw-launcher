@@ -8,6 +8,7 @@ from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget
 
 from src.core.instance.instance_manager import InstanceManager
+from src.core.language.language_manager import language_manager, tr
 from src.gui.config import LAUNCHER_NAME, MINIMUM_HEIGHT, MINIMUM_WIDTH, RIGHT_PANEL_WIDTH, SIDEBAR_WIDTH, WINDOW_HEIGHT, WINDOW_WIDTH
 from src.gui.controllers.account_controller import AccountController
 from src.gui.controllers.gui_settings_controller import GuiSettingsController
@@ -18,6 +19,7 @@ from src.gui.controllers.mod_loader_controller import ModLoaderController
 from src.gui.controllers.settings_controller import InstanceSettingsController
 from src.gui.controllers.version_controller import VersionController
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
+from src.gui.localization import retranslate_widget_tree
 from src.gui.pages.about_page import AboutPage
 from src.gui.pages.account_page import AccountPage
 from src.gui.pages.home_page import HomePage
@@ -48,11 +50,15 @@ class MainWindow(QMainWindow):
         self.mod_controller = ModController(self.task_runner)
         self.instance_settings_controller = InstanceSettingsController()
         self.gui_settings_controller = GuiSettingsController()
+        self._startup_settings = self.gui_settings_controller.load()
+        language_manager.reload()
+        language_manager.set_language(self._startup_settings.get("language", "en-US"), notify=False)
         self.launch_controller = LaunchController(self.task_runner)
         self.running_instances_timer = QTimer(self)
         self.running_instances_timer.setInterval(1000)
 
         self._build_ui()
+        retranslate_widget_tree(self)
         self._connect_signals()
 
         self.setStyleSheet(APP_STYLE)
@@ -149,6 +155,7 @@ class MainWindow(QMainWindow):
 
         self.launcher_settings_page.save_requested.connect(self.gui_settings_controller.save)
         self.launcher_settings_page.reset_requested.connect(self.gui_settings_controller.reset)
+        self.launcher_settings_page.language_changed.connect(self._preview_language)
 
         self.launch_control.launch_clicked.connect(self.launch_controller.launch)
 
@@ -183,7 +190,7 @@ class MainWindow(QMainWindow):
         self.task_runner.task_failed.connect(self._on_task_failed)
         self.task_runner.busy_changed.connect(self._set_busy)
         self.task_runner.busy_changed.connect(self.mod_manager_dialog.set_busy)
-        self.task_runner.task_rejected.connect(lambda message: QMessageBox.information(self, "MCW Launcher", message))
+        self.task_runner.task_rejected.connect(lambda message: QMessageBox.information(self, tr("MCW Launcher"), tr(message)))
 
         controllers = (
             self.version_controller,
@@ -202,7 +209,8 @@ class MainWindow(QMainWindow):
             controller.error_created.connect(self._show_error)
 
     def _initialize_data(self) -> None:
-        settings = self.gui_settings_controller.load()
+        settings = dict(self._startup_settings)
+        self._apply_gui_settings(settings)
 
         if settings.get("remember_window_size", True):
             geometry = self.gui_settings_controller.saved_geometry()
@@ -216,7 +224,7 @@ class MainWindow(QMainWindow):
         self.instance_controller.refresh_running(force=True)
         self.running_instances_timer.start()
         self.version_controller.refresh()
-        self.logs_page.append(f"Started {LAUNCHER_NAME}")
+        self.logs_page.append(tr("Started {launcher_name}", launcher_name=LAUNCHER_NAME))
 
     def _refresh_all(self) -> None:
         self.account_controller.refresh()
@@ -234,12 +242,12 @@ class MainWindow(QMainWindow):
     def _open_mod_manager(self, instance_name: str) -> None:
         instance_name = instance_name.strip()
         if not instance_name:
-            QMessageBox.information(self, "Mod Manager", "Select an instance first.")
+            QMessageBox.information(self, tr("Mod Manager"), tr("Select an instance first."))
             return
         try:
             instance = InstanceManager.load(instance_name)
         except Exception as error:
-            self._show_error("Mod Manager", str(error))
+            self._show_error(tr("Mod Manager"), str(error))
             return
         self.mod_controller.set_instance(instance)
         self.mod_manager_dialog.show()
@@ -262,9 +270,35 @@ class MainWindow(QMainWindow):
             self.instance_settings_controller.load(instance.name)
 
     def _apply_gui_settings(self, settings: dict) -> None:
+        requested_locale = str(settings.get("language", "en-US"))
+        previous_locale = language_manager.current_locale
+        language_manager.reload()
+        language_manager.set_language(requested_locale, notify=False)
+        if language_manager.current_locale != previous_locale:
+            self._retranslate_ui()
         self.launcher_settings_page.set_settings(settings)
         self.instances_page.set_show_snapshots(bool(settings.get("show_snapshots", False)))
         self.launch_controller.set_debug_mode(bool(settings.get("debug_mode", False)))
+
+    def _preview_language(self, locale: str) -> None:
+        if language_manager.set_language(locale, notify=False):
+            self._retranslate_ui()
+
+    def _retranslate_ui(self) -> None:
+        retranslate_widget_tree(self)
+        self.setWindowTitle(tr(LAUNCHER_NAME))
+
+        for widget in (
+            self.home_page,
+            self.account_page,
+            self.instances_page,
+            self.launch_control,
+            self.right_panel,
+            self.mod_manager_dialog,
+        ):
+            retranslate_dynamic = getattr(widget, "retranslate_dynamic", None)
+            if callable(retranslate_dynamic):
+                retranslate_dynamic()
 
     def _on_task_started(self, _task_id: str, message: str, blocking: bool) -> None:
         if blocking or not self.task_runner.is_busy:
@@ -282,7 +316,7 @@ class MainWindow(QMainWindow):
     def _on_progress(self, event: object) -> None:
         self.launch_control.set_progress_event(event)
 
-        message = getattr(event, "message", "Working...")
+        message = str(getattr(event, "message", "Working..."))
         self.home_page.set_status(message)
         self.right_panel.set_status(message)
 
@@ -302,14 +336,14 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, title, message)
 
     def _show_export_finished(self, path: Path) -> None:
-        QMessageBox.information(self, "Export complete", f"Saved to:\n{path}")
+        QMessageBox.information(self, tr("Export complete"), tr("Saved to:\n{path}", path=path))
 
     def closeEvent(self, event: QCloseEvent) -> None:
         if self.task_runner.has_active_tasks:
             QMessageBox.information(
                 self,
-                "MCW Launcher",
-                "A launcher task is still running.\nClose the window after it finishes.",
+                tr("MCW Launcher"),
+                tr("A launcher task is still running.\nClose the window after it finishes."),
             )
             event.ignore()
             return

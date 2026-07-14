@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.core.language.language_manager import tr
+
 
 @dataclass(frozen=True, slots=True)
 class ProgressView:
@@ -48,11 +50,12 @@ class ProgressPresenter:
     @classmethod
     def present(cls, event: object) -> ProgressView:
         stage_value = cls._stage_value(event)
-        stage_text = cls._STAGE_LABELS.get(stage_value, stage_value.replace("_", " ").upper())
-        title = str(getattr(event, "message", "") or stage_text.title())
+        stage_text = tr(cls._STAGE_LABELS.get(stage_value, stage_value.replace("_", " ").upper()))
+        raw_title = str(getattr(event, "message", "") or stage_text.title())
+        title = tr(raw_title)
         percentage = cls._percentage(event)
         detail = cls._detail(event, stage_text, percentage)
-        button_text = cls._BUTTON_TEXTS.get(stage_value, "WORKING...")
+        button_text = tr(cls._BUTTON_TEXTS.get(stage_value, "WORKING..."))
 
         return ProgressView(
             title=title,
@@ -98,10 +101,10 @@ class ProgressPresenter:
             return f"{cls._format_bytes(current)} / {cls._format_bytes(total)}"
 
         if unit == "files":
-            return f"{current:,} / {total:,} files"
+            return tr("{current} / {total} files", current=f"{current:,}", total=f"{total:,}")
 
         if unit == "steps":
-            return f"{current:,} / {total:,} steps"
+            return tr("{current} / {total} steps", current=f"{current:,}", total=f"{total:,}")
 
         return f"{current:,} / {total:,}"
 
