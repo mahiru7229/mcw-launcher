@@ -15,7 +15,20 @@ class Paths:
     INSTANCES_ROOT = PROJECT_ROOT / "instances"
     ACCOUNTS_ROOT = PROJECT_ROOT / "accounts"
     CONFIG_ROOT = PROJECT_ROOT / "config"
+    THEME_ROOT = PROJECT_ROOT / "themes" 
 
+    @staticmethod
+    def theme_asset(theme: str, *paths: str) -> Path:
+        return Paths.theme_dir(theme).joinpath(*paths)
+
+    @staticmethod
+    def theme_dir(name:str) -> Path:
+        directory  = Path(Paths.THEME_ROOT / name)
+        directory.mkdir(parents=True, exist_ok=True)
+        """
+        Choosing theme pack.
+        """
+        return directory
     @staticmethod
     def root() -> Path:
         if getattr(sys, "frozen", False):

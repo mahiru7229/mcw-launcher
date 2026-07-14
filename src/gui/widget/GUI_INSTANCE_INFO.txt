@@ -1,0 +1,20 @@
+InstanceInfoWidget
+└── QVBoxLayout
+    ├── Title: Current Instance
+    ├── Instance Summary
+    │   ├── Instance Name
+    │   ├── Minecraft Version
+    │   └── Mod Loader
+    ├── Java
+    │   ├── Java Version
+    │   └── Java Path
+    ├── Memory
+    │   ├── Min RAM
+    │   └── Max RAM
+    ├── Display
+    │   ├── Resolution
+    │   └── Fullscreen
+    ├── Account
+    │   ├── Username
+    │   └── Account Type
+    └── Stretch

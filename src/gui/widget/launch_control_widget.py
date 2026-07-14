@@ -1,5 +1,8 @@
 from __future__ import annotations
-
+from pathlib import Path
+from src.core.fs.paths import Paths
+from PySide6.QtCore import QSize
+from PySide6.QtGui import QIcon
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget
 
@@ -7,9 +10,9 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QPushButton, QV
 class LaunchControlWidget(QWidget):
     launch_clicked = Signal()
 
-    def __init__(self) -> None:
+    def __init__(self, theme_name:str) -> None:
         super().__init__()
-
+        self.THEME_NAME = theme_name
         self._build_ui()
         self._connect_signals()
 
@@ -31,8 +34,31 @@ class LaunchControlWidget(QWidget):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
 
-        self.launch_button = QPushButton("Launch")
-        self.launch_button.setFixedSize(200, 70)
+
+        #========================================
+        # Launch Button
+        #========================================
+        self.launch_button = QPushButton()
+        self.launch_button.setIcon(QIcon(str(Paths.theme_asset(self.THEME_NAME,"images", "launch_control","button","launch_button.png"))))
+        self.launch_button.setIconSize(QSize(180, 60))
+        self.launch_button.setFixedSize(200, 80)
+        self.launch_button.setStyleSheet("""
+        QPushButton {
+            background: transparent;
+            border: none;
+        }
+
+        QPushButton:hover {
+            background: transparent;
+        }
+
+        QPushButton:pressed {
+            background: transparent;
+        }
+        """)
+
+
+
 
         self.progress_layout.addWidget(self.status_label)
         self.progress_layout.addWidget(self.progress_bar)
