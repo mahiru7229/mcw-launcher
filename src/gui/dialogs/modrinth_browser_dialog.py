@@ -172,27 +172,39 @@ class ModrinthBrowserDialog(QDialog):
         self._result = result
         self._projects = list(result.projects)
         self._offset = result.offset
-        self.results_table.setRowCount(len(self._projects))
-        headers = [tr("modrinth.column.name"), tr("modrinth.column.author"), tr("modrinth.column.downloads"), tr("modrinth.column.updated"), tr("modrinth.column.description")]
-        self.results_table.setHorizontalHeaderLabels(headers)
-        for row, project in enumerate(self._projects):
-            values = [project.title, project.author or tr("common.unknown"), f"{project.downloads:,}", project.date_modified[:10], project.description]
-            for column, value in enumerate(values):
-                item = QTableWidgetItem(value)
-                item.setData(Qt.ItemDataRole.UserRole, project)
-                self.results_table.setItem(row, column, item)
+
+        # QTableWidget may preserve row 0 as the current selection while its
+        # contents are replaced. In that case selectRow(0) does not emit
+        # itemSelectionChanged, leaving versions and the suggested pack name
+        # stale until the user clicks the row again. Rebuild the table with
+        # signals blocked, then activate the first result explicitly once.
+        signals_were_blocked = self.results_table.blockSignals(True)
+        try:
+            self.results_table.clearSelection()
+            self.results_table.clearContents()
+            self.results_table.setRowCount(len(self._projects))
+            headers = [tr("modrinth.column.name"), tr("modrinth.column.author"), tr("modrinth.column.downloads"), tr("modrinth.column.updated"), tr("modrinth.column.description")]
+            self.results_table.setHorizontalHeaderLabels(headers)
+            for row, project in enumerate(self._projects):
+                values = [project.title, project.author or tr("common.unknown"), f"{project.downloads:,}", project.date_modified[:10], project.description]
+                for column, value in enumerate(values):
+                    item = QTableWidgetItem(value)
+                    item.setData(Qt.ItemDataRole.UserRole, project)
+                    self.results_table.setItem(row, column, item)
+            if self._projects:
+                self.results_table.selectRow(0)
+        finally:
+            self.results_table.blockSignals(signals_were_blocked)
+
         start = result.offset + 1 if result.projects else 0
         end = result.offset + len(result.projects)
         self.result_count_label.setText(tr("modrinth.results.range", start=start, end=end, total=result.total_hits))
         self.previous_button.setEnabled(result.offset > 0)
         self.next_button.setEnabled(result.offset + result.limit < result.total_hits)
         if self._projects:
-            self.results_table.selectRow(0)
+            self._select_project(self._projects[0])
         else:
-            self._selected_project = None
-            self.version_combo.clear()
-            self.install_button.setEnabled(False)
-            self.details_label.setText(tr("modrinth.results.empty"))
+            self._clear_project_selection(tr("modrinth.results.empty"))
 
     def set_versions(self, project_id: str, versions: list[ModrinthVersion]) -> None:
         if self._selected_project is None or self._selected_project.project_id != project_id:
@@ -260,8 +272,10 @@ class ModrinthBrowserDialog(QDialog):
             return
         item = self.results_table.item(rows[0].row(), 0)
         project = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
-        if not isinstance(project, ModrinthProject):
-            return
+        if isinstance(project, ModrinthProject):
+            self._select_project(project)
+
+    def _select_project(self, project: ModrinthProject) -> None:
         self._selected_project = project
         self._all_versions = []
         self._versions = []
@@ -274,6 +288,17 @@ class ModrinthBrowserDialog(QDialog):
         game_version = self._instance.version_id if self.project_type == "mod" and self._instance is not None else ""
         self.details_label.setText(tr("modrinth.project.loading_versions", title=project.title))
         self.versions_requested.emit(self.project_type, project.project_id, game_version)
+
+    def _clear_project_selection(self, message: str) -> None:
+        self._selected_project = None
+        self._all_versions = []
+        self._versions = []
+        self.version_combo.clear()
+        self.install_button.setEnabled(False)
+        if self.project_type == "modpack" and not self._instance_name_customized:
+            self._suggested_instance_name = ""
+            self.instance_name_input.clear()
+        self.details_label.setText(message)
 
     def _version_selected(self) -> None:
         version = self._selected_version()
