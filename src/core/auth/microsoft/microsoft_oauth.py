@@ -3,6 +3,7 @@ import httpx
 from src.models.auth.microsoft.microsoft_oauth_token import MicrosoftOAuthToken
 import secrets
 import webbrowser
+from threading import Event
 from src.core.auth.microsoft.oauth_callback_server import OAuthCallbackServer
 from src.core.auth.microsoft.microsoft_auth_config import MicrosoftAuthConfig
 from src.core.auth.microsoft.pkce import PKCE
@@ -13,10 +14,8 @@ class MicrosoftOAuth:
 
 
     @staticmethod
-    def authenticate() -> MicrosoftOAuthToken:
-        authorization_code, code_verifier = (
-            MicrosoftOAuth.request_authorization_code()
-        )
+    def authenticate(prompt: str = "select_account", cancel_event: Event | None = None) -> MicrosoftOAuthToken:
+        authorization_code, code_verifier = MicrosoftOAuth.request_authorization_code(prompt=prompt, cancel_event=cancel_event)
 
         return MicrosoftOAuth.exchange_code(
             authorization_code,
@@ -88,8 +87,8 @@ class MicrosoftOAuth:
         return MicrosoftOAuthToken.from_dict(response.json())
 
     @staticmethod
-    def request_authorization_code() -> tuple[str, str]:
-        session = MicrosoftOAuth.create_session()
+    def request_authorization_code(prompt: str = "select_account", cancel_event: Event | None = None) -> tuple[str, str]:
+        session = MicrosoftOAuth.create_session(prompt=prompt)
 
         opened = MicrosoftOAuth.open_browser(session)
 
@@ -98,9 +97,7 @@ class MicrosoftOAuth:
                 "Could not open the default browser."
             )
 
-        authorization_code, returned_state = (
-            OAuthCallbackServer.wait_for_callback()
-        )
+        authorization_code, returned_state = OAuthCallbackServer.wait_for_callback(cancel_event=cancel_event)
 
         if not secrets.compare_digest(
             returned_state,
@@ -113,10 +110,15 @@ class MicrosoftOAuth:
         return authorization_code, session.code_verifier
 
     @staticmethod
-    def create_session() -> OAuthSession:
+    def create_session(prompt: str = "select_account") -> OAuthSession:
         code_verifier = PKCE.generate_verifier()
         code_challenge = PKCE.create_challenge(code_verifier)
         state = secrets.token_urlsafe(32)
+
+        normalized_prompt = str(prompt or "select_account").strip().lower()
+        allowed_prompts = {"login", "none", "consent", "select_account"}
+        if normalized_prompt not in allowed_prompts:
+            raise ValueError(f"Unsupported Microsoft OAuth prompt: {prompt}")
 
         parameters = {
             "client_id": MicrosoftAuthConfig.CLIENT_ID,
@@ -127,6 +129,7 @@ class MicrosoftOAuth:
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
             "state": state,
+            "prompt": normalized_prompt,
         }
 
         authorization_url = (

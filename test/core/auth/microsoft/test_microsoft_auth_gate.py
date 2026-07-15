@@ -21,3 +21,14 @@ def test_microsoft_auth_is_locked_without_opening_oauth(monkeypatch: pytest.Monk
     availability = MicrosoftAuthenticationGate.availability()
     assert availability.enabled is False
     assert availability.status == "pending_mojang_approval"
+
+
+def test_microsoft_auth_is_available_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(microsoft_auth_gate, "MICROSOFT_AUTH_ENABLED", True)
+    monkeypatch.setattr(microsoft_auth_gate, "MICROSOFT_AUTH_STATUS", "available")
+
+    availability = MicrosoftAuthenticationGate.availability()
+
+    assert availability.enabled is True
+    assert availability.status == "available"
+    assert "available" in availability.message.lower()

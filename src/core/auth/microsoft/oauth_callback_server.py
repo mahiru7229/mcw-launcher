@@ -1,5 +1,13 @@
+from __future__ import annotations
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Event
+from time import monotonic
 from urllib.parse import parse_qs, urlparse
+
+
+class MicrosoftAuthorizationCancelledError(RuntimeError):
+    pass
 
 
 class OAuthCallbackHandler(BaseHTTPRequestHandler):
@@ -14,17 +22,14 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         OAuthCallbackHandler.authorization_code = query.get("code", [None])[0]
         OAuthCallbackHandler.returned_state = query.get("state", [None])[0]
         OAuthCallbackHandler.error = query.get("error", [None])[0]
-        OAuthCallbackHandler.error_description = query.get(
-            "error_description",
-            [None]
-        )[0]
+        OAuthCallbackHandler.error_description = query.get("error_description", [None])[0]
 
         if OAuthCallbackHandler.authorization_code:
             message = """
             <html>
                 <head>
                     <meta charset="UTF-8">
-                    <title>Zen Launcher</title>
+                    <title>MCW Launcher</title>
                 </head>
                 <body>
                     <h2>Microsoft login completed.</h2>
@@ -38,7 +43,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
             <html>
                 <head>
                     <meta charset="UTF-8">
-                    <title>Zen Launcher</title>
+                    <title>MCW Launcher</title>
                 </head>
                 <body>
                     <h2>Microsoft login failed.</h2>
@@ -60,44 +65,49 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         pass
 
 
+class ReusableOAuthHTTPServer(HTTPServer):
+    allow_reuse_address = True
+
+
 class OAuthCallbackServer:
+    POLL_INTERVAL_SECONDS = 0.25
 
     @staticmethod
-    def wait_for_callback(timeout: float = 180.0) -> tuple[str, str]:
+    def wait_for_callback(timeout: float = 180.0, cancel_event: Event | None = None) -> tuple[str, str]:
         OAuthCallbackHandler.authorization_code = None
         OAuthCallbackHandler.returned_state = None
         OAuthCallbackHandler.error = None
         OAuthCallbackHandler.error_description = None
 
-        server = HTTPServer(("localhost", 8400), OAuthCallbackHandler)
-        server.timeout = timeout
+        server = ReusableOAuthHTTPServer(("localhost", 8400), OAuthCallbackHandler)
+        server.timeout = OAuthCallbackServer.POLL_INTERVAL_SECONDS
+        deadline = monotonic() + max(0.0, float(timeout))
 
         try:
-            server.handle_request()
+            while True:
+                if cancel_event is not None and cancel_event.is_set():
+                    raise MicrosoftAuthorizationCancelledError("Microsoft sign-in was cancelled.")
+
+                if monotonic() >= deadline:
+                    raise TimeoutError("Microsoft authorization callback was not received.")
+
+                server.handle_request()
+
+                if OAuthCallbackHandler.authorization_code or OAuthCallbackHandler.error:
+                    break
         finally:
             server.server_close()
 
         if OAuthCallbackHandler.error:
-            description = (
-                OAuthCallbackHandler.error_description
-                or OAuthCallbackHandler.error
-            )
-
-            raise RuntimeError(
-                f"Microsoft authorization failed: {description}"
-            )
+            description = OAuthCallbackHandler.error_description or OAuthCallbackHandler.error
+            if OAuthCallbackHandler.error == "access_denied":
+                raise MicrosoftAuthorizationCancelledError(description or "Microsoft sign-in was cancelled.")
+            raise RuntimeError(f"Microsoft authorization failed: {description}")
 
         if not OAuthCallbackHandler.authorization_code:
-            raise TimeoutError(
-                "Microsoft authorization callback was not received."
-            )
+            raise TimeoutError("Microsoft authorization callback was not received.")
 
         if not OAuthCallbackHandler.returned_state:
-            raise RuntimeError(
-                "Microsoft authorization callback did not contain state."
-            )
+            raise RuntimeError("Microsoft authorization callback did not contain state.")
 
-        return (
-            OAuthCallbackHandler.authorization_code,
-            OAuthCallbackHandler.returned_state
-        )
+        return OAuthCallbackHandler.authorization_code, OAuthCallbackHandler.returned_state

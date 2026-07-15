@@ -97,9 +97,9 @@ See [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) for every filename,
 - Offline account support.
 - SQLite account storage.
 - Windows DPAPI protection for stored authentication tokens.
-- Prepared Microsoft OAuth, Xbox Live, XSTS, Minecraft Services, entitlement, profile, and token-refresh pipeline.
-- Microsoft sign-in remains locked behind an approval gate until the launcher application is accepted by Mojang/Microsoft.
-- The Microsoft account button remains visible and explains the approval status, but it does not open a browser, send OAuth requests, or save an account while locked.
+- Microsoft OAuth PKCE, Xbox Live, XSTS, Minecraft Services, entitlement verification, profile retrieval, and token refresh.
+- Add and store multiple Microsoft accounts, identified by Minecraft UUID.
+- Microsoft sign-in runs in a background task and can be cancelled from the Accounts page without freezing the launcher.
 
 ### Java diagnostics
 
@@ -290,7 +290,7 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md) | Building updater-compatible release ZIPs |
 | [`docs/BETA7_RUNTIME_REPAIR.md`](docs/BETA7_RUNTIME_REPAIR.md) | Runtime monitoring, crash detection, and full instance repair |
 | [`docs/BETA8_MOD_MANAGEMENT.md`](docs/BETA8_MOD_MANAGEMENT.md) | Mod updates, version locks, compatibility analysis, and managed modpack files |
-| [`docs/BETA9_ACCOUNTS_JAVA_MODPACK_BACKUP.md`](docs/BETA9_ACCOUNTS_JAVA_MODPACK_BACKUP.md) | Microsoft approval gate, Java diagnostics, backups, and safe modpack updates |
+| [`docs/BETA9_ACCOUNTS_JAVA_MODPACK_BACKUP.md`](docs/BETA9_ACCOUNTS_JAVA_MODPACK_BACKUP.md) | Microsoft authentication, Java diagnostics, backups, and safe modpack updates |
 | [`docs/gui-api.en.md`](docs/gui-api.en.md) | GUI integration API in English |
 | [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API in Vietnamese |
 
@@ -311,7 +311,7 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | Modrinth mods and Fabric modpacks | Beta — safe pack update and conflict preservation available |
 | Release/Beta/Alpha Modrinth channels | Available |
 | English and Vietnamese language packs | Available |
-| Microsoft authentication | Prepared but locked pending application approval |
+| Microsoft authentication | Beta — available with multi-account support and cancellable sign-in |
 | Forge / NeoForge / Quilt | Not currently supported |
 | Optional PNG theme system | Beta |
 | Game lifecycle and crash detection | Beta |
@@ -324,7 +324,7 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 
 Near-term priorities:
 
-- Keep Microsoft authentication locked until application approval is granted, then complete live end-to-end verification.
+- Harden Microsoft token storage, revocation, session lifecycle, and account security for Beta 10.
 - Add interactive per-file conflict resolution for modpack updates.
 - Add backup retention rules, backup size previews, and a dedicated backup browser.
 - Improve crash diagnostics and runtime history presentation.

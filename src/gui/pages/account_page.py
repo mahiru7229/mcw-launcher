@@ -5,40 +5,43 @@ from PySide6.QtWidgets import QComboBox, QGridLayout, QLabel, QLineEdit, QMessag
 
 from src.core.language.language_manager import tr
 from src.gui.pages.base_page import BasePage
-from src.gui.widget.card_widget import CardWidget
 from src.gui.theme.runtime import set_theme_icon
+from src.gui.widget.card_widget import CardWidget
 
 
 class AccountPage(BasePage):
     create_offline_requested = Signal(str)
     create_microsoft_requested = Signal()
+    cancel_microsoft_requested = Signal()
     select_requested = Signal(str)
     remove_requested = Signal(str)
     refresh_requested = Signal()
 
     def __init__(self) -> None:
-        super().__init__("Accounts", "Manage offline accounts. Microsoft sign-in is prepared but remains locked until application approval is granted.", "accounts")
+        super().__init__(tr("Accounts"), tr("account.page.subtitle"), "accounts")
         self._accounts: dict[str, object] = {}
+        self._microsoft_auth_active = False
+        self._microsoft_status_override = ""
         self._build_ui()
 
     def _build_ui(self) -> None:
-        selected_card = CardWidget("Saved accounts")
+        selected_card = CardWidget(tr("Saved accounts"))
         self.account_combo = QComboBox()
         self.account_combo.currentIndexChanged.connect(self._update_details)
-        self.username_value = QLabel("Username: -")
+        self.username_value = QLabel(tr("Username: -"))
         self.username_value.setObjectName("ValueLabel")
-        self.type_value = QLabel("Type: -")
+        self.type_value = QLabel(tr("Type: -"))
         self.type_value.setObjectName("MutedLabel")
-        self.uuid_value = QLabel("UUID: -")
+        self.uuid_value = QLabel(tr("UUID: -"))
         self.uuid_value.setObjectName("TinyLabel")
         self.uuid_value.setWordWrap(True)
 
         action_grid = QGridLayout()
-        select_button = set_theme_icon(QPushButton("Use selected account"), "icon.action.account")
+        select_button = set_theme_icon(QPushButton(tr("Use selected account")), "icon.action.account")
         select_button.setObjectName("PrimaryButton")
-        remove_button = set_theme_icon(QPushButton("Remove"), "icon.action.remove")
+        remove_button = set_theme_icon(QPushButton(tr("Remove")), "icon.action.remove")
         remove_button.setObjectName("DangerButton")
-        refresh_button = set_theme_icon(QPushButton("Refresh"), "icon.action.refresh")
+        refresh_button = set_theme_icon(QPushButton(tr("Refresh")), "icon.action.refresh")
         select_button.clicked.connect(lambda: self.select_requested.emit(self.current_account_id()))
         remove_button.clicked.connect(self._confirm_remove)
         refresh_button.clicked.connect(self.refresh_requested.emit)
@@ -53,23 +56,32 @@ class AccountPage(BasePage):
         selected_card.layout.addLayout(action_grid)
         self.root_layout.addWidget(selected_card)
 
-        create_card = CardWidget("Create offline account", "Minecraft usernames use 3-16 letters, numbers, or underscores.")
+        create_card = CardWidget(tr("account.create.title"), tr("account.create.description"))
         create_card.setProperty("themeRole", "microsoft")
         self.username_input = QLineEdit()
-        self.username_input.setPlaceholderText("Example: Steve")
-        create_button = set_theme_icon(QPushButton("Create and select"), "icon.action.add")
+        self.username_input.setPlaceholderText(tr("Example: Steve"))
+        create_button = set_theme_icon(QPushButton(tr("Create and select")), "icon.action.add")
         create_button.setObjectName("PrimaryButton")
         create_button.clicked.connect(lambda: self.create_offline_requested.emit(self.username_input.text()))
-        self.microsoft_button = set_theme_icon(QPushButton("Add Microsoft account — approval pending"), "icon.action.microsoft")
-        self.microsoft_button.setToolTip("The authentication pipeline is prepared, but sign-in is locked until Mojang/Microsoft approves the launcher application.")
+
+        self.microsoft_button = set_theme_icon(QPushButton(tr("account.microsoft.add")), "icon.action.microsoft")
+        self.microsoft_button.setToolTip(tr("account.microsoft.tooltip"))
         self.microsoft_button.clicked.connect(self.create_microsoft_requested.emit)
-        self.microsoft_status = QLabel("Microsoft authentication status: Pending application approval")
-        self.microsoft_status.setObjectName("LockedBadge")
+
+        self.microsoft_cancel_button = set_theme_icon(QPushButton(tr("account.microsoft.cancel")), "icon.action.remove")
+        self.microsoft_cancel_button.setObjectName("DangerButton")
+        self.microsoft_cancel_button.clicked.connect(self.cancel_microsoft_requested.emit)
+        self.microsoft_cancel_button.setVisible(False)
+
+        self.microsoft_status = QLabel(tr("account.microsoft.status_available"))
+        self.microsoft_status.setObjectName("StatusBadge")
         self.microsoft_status.setWordWrap(True)
-        create_card.layout.addWidget(QLabel("Username"))
+
+        create_card.layout.addWidget(QLabel(tr("Username")))
         create_card.layout.addWidget(self.username_input)
         create_card.layout.addWidget(create_button)
         create_card.layout.addWidget(self.microsoft_button)
+        create_card.layout.addWidget(self.microsoft_cancel_button)
         create_card.layout.addWidget(self.microsoft_status)
         self.root_layout.addWidget(create_card)
         self.root_layout.addStretch()
@@ -94,6 +106,17 @@ class AccountPage(BasePage):
     def set_busy(self, busy: bool) -> None:
         self.setEnabled(not busy)
 
+    def set_microsoft_auth_state(self, active: bool, message: str = "") -> None:
+        self._microsoft_auth_active = bool(active)
+        self._microsoft_status_override = str(message or "")
+        self.microsoft_button.setEnabled(not active)
+        self.microsoft_cancel_button.setVisible(active)
+        self.microsoft_cancel_button.setEnabled(active and message != tr("account.microsoft.cancelling"))
+        self.microsoft_status.setObjectName("WarningBadge" if active else "StatusBadge")
+        self.microsoft_status.setText(self._microsoft_status_override or tr("account.microsoft.status_available"))
+        self.microsoft_status.style().unpolish(self.microsoft_status)
+        self.microsoft_status.style().polish(self.microsoft_status)
+
     def _update_details(self) -> None:
         account = self._accounts.get(self.current_account_id())
         if account is None:
@@ -117,4 +140,10 @@ class AccountPage(BasePage):
             self.remove_requested.emit(account_id)
 
     def retranslate_dynamic(self) -> None:
+        self.microsoft_button.setText(tr("account.microsoft.add"))
+        self.microsoft_button.setToolTip(tr("account.microsoft.tooltip"))
+        self.microsoft_cancel_button.setText(tr("account.microsoft.cancel"))
+        if not self._microsoft_auth_active:
+            self._microsoft_status_override = ""
+        self.set_microsoft_auth_state(self._microsoft_auth_active, self._microsoft_status_override)
         self._update_details()

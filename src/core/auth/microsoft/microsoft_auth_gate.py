@@ -22,7 +22,8 @@ class MicrosoftAuthenticationGate:
         enabled = bool(MICROSOFT_AUTH_ENABLED)
         status = str(MICROSOFT_AUTH_STATUS or "disabled")
         if enabled:
-            message = "Microsoft authentication is enabled."
+            status = "available"
+            message = "Microsoft authentication is available."
         elif status == "pending_mojang_approval":
             message = "Microsoft account sign-in is prepared but locked while MCW Launcher waits for Mojang/Microsoft application approval."
         else:

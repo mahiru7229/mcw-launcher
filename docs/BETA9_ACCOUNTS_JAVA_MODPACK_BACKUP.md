@@ -2,9 +2,9 @@
 
 Beta 9 gộp scope dự kiến của Beta 9 và Beta 10 thành một release lớn.
 
-## Microsoft Authentication approval gate
+## Microsoft Authentication
 
-Luồng Microsoft Authentication đã được chuẩn bị đầy đủ phía sau một feature gate:
+Microsoft Authentication is available in Beta 9:
 
 ```text
 OAuth PKCE
@@ -16,14 +16,9 @@ OAuth PKCE
 → account repository
 ```
 
-Tuy nhiên `MICROSOFT_AUTH_ENABLED` mặc định là `False`. Nút thêm Microsoft account vẫn xuất hiện để thể hiện trạng thái tính năng, nhưng click sẽ dừng ngay tại gate:
+Launcher supports multiple Microsoft accounts and identifies an existing account by Minecraft UUID instead of username. Adding an account opens the Microsoft account picker, while selecting the same profile refreshes its tokens without creating a duplicate.
 
-- không mở browser;
-- không gửi OAuth request;
-- không lưu account;
-- hiển thị thông báo đang chờ Mojang/Microsoft phê duyệt ứng dụng.
-
-Khi được chấp thuận, bật flag trong `src/config.py`, cung cấp `client_id` hợp lệ và kiểm thử lại toàn bộ flow trước khi phát hành.
+The sign-in flow runs outside the GUI thread. While waiting for the browser callback, the Accounts page shows a **Cancel Microsoft sign-in** button. Closing the browser no longer freezes the launcher; the user can cancel immediately and retry.
 
 ## Java diagnostics
 

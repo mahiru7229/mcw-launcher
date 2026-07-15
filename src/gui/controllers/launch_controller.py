@@ -4,7 +4,7 @@ from typing import Any
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.auth.offline_auth import OfflineAuthentication
+from src.core.auth.account_authentication import AccountAuthentication
 from src.core.instance.instance_manager import InstanceManager
 from src.core.language.language_manager import tr
 from src.core.minecraft.minecraft_executor import MinecraftExecutor
@@ -56,7 +56,7 @@ class LaunchController(BaseController):
 
         def task() -> dict[str, Any]:
             instance = InstanceManager.load(instance_name)
-            authentication = OfflineAuthentication.authenticate(account)
+            authentication = AccountAuthentication.authenticate(account)
 
             return MinecraftExecutor.run(
                 instance=instance,

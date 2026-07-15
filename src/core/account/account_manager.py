@@ -1,3 +1,4 @@
+from threading import Event
 import uuid
 
 from src.core.auth.offline_auth import OfflineAuthentication
@@ -34,13 +35,41 @@ class AccountManager:
         return account
 
     @staticmethod
-    def create_microsoft_account() -> Account:
-        account = MicrosoftAccountAuthenticator.authenticate()
-        if AccountManager.is_account_exist(account.username):
-            raise RuntimeError(f"Account '{account.username}' already exists.")
+    def create_microsoft_account(cancel_event: Event | None = None) -> Account:
+        authenticated_account = MicrosoftAccountAuthenticator.authenticate() if cancel_event is None else MicrosoftAccountAuthenticator.authenticate(cancel_event=cancel_event)
+        existing_account = AccountManager._find_microsoft_account_by_uuid(authenticated_account.uuid)
+
+        if existing_account is not None:
+            existing_account.username = authenticated_account.username
+            existing_account.uuid = authenticated_account.uuid
+            existing_account.access_token = authenticated_account.access_token
+            existing_account.refresh_token = authenticated_account.refresh_token
+            existing_account.token_expires_at = authenticated_account.token_expires_at
+            account = existing_account
+        else:
+            account = authenticated_account
+
         AccountRepository.save(account)
         AccountRepository.set_selected_account(account.account_id)
         return account
+
+    @staticmethod
+    def _find_microsoft_account_by_uuid(profile_uuid: str) -> Account | None:
+        normalized_uuid = AccountManager._normalize_uuid(profile_uuid)
+        if not normalized_uuid:
+            return None
+
+        for account in AccountRepository.list_accounts():
+            if account.account_type is not AccountSource.MICROSOFT:
+                continue
+            if AccountManager._normalize_uuid(account.uuid) == normalized_uuid:
+                return account
+
+        return None
+
+    @staticmethod
+    def _normalize_uuid(value: str | None) -> str:
+        return str(value or "").replace("-", "").strip().casefold()
 
     @staticmethod
     def list_accounts() -> list[Account]:

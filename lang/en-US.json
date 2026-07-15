@@ -503,7 +503,17 @@
     "modpack.lifecycle.updated_log": "Modrinth modpack updated to {version}",
     "modpack.lifecycle.updated_message": "Updated '{name}' to modpack version {version}.",
     "modpack.lifecycle.preserved_message": "\n{count} user-modified file(s) were preserved.",
-    "modpack.lifecycle.title": "Modrinth modpack"
+    "modpack.lifecycle.title": "Modrinth modpack",
+    "account.page.subtitle": "Manage offline and Microsoft accounts.",
+    "account.create.title": "Add account",
+    "account.create.description": "Create an offline account or sign in with Microsoft.",
+    "account.microsoft.add": "Add Microsoft account",
+    "account.microsoft.tooltip": "Sign in through Microsoft to use an authenticated Minecraft account.",
+    "account.microsoft.status_available": "Microsoft authentication status: Available",
+    "account.microsoft.waiting": "Waiting for Microsoft sign-in… Close the browser window and press Cancel here to stop.",
+    "account.microsoft.cancelling": "Cancelling Microsoft sign-in…",
+    "account.microsoft.cancel": "Cancel Microsoft sign-in",
+    "account.microsoft.cancelled": "Microsoft sign-in cancelled."
   },
   "aliases": {
     "MCW Launcher": "app.name",

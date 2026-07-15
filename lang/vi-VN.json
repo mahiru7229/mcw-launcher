@@ -503,7 +503,17 @@
     "modpack.lifecycle.updated_log": "Đã cập nhật modpack Modrinth lên {version}",
     "modpack.lifecycle.updated_message": "Đã cập nhật '{name}' lên modpack phiên bản {version}.",
     "modpack.lifecycle.preserved_message": "\nĐã giữ lại {count} file người dùng chỉnh sửa.",
-    "modpack.lifecycle.title": "Modpack Modrinth"
+    "modpack.lifecycle.title": "Modpack Modrinth",
+    "account.page.subtitle": "Quản lý tài khoản Offline và Microsoft.",
+    "account.create.title": "Thêm tài khoản",
+    "account.create.description": "Tạo tài khoản Offline hoặc đăng nhập bằng Microsoft.",
+    "account.microsoft.add": "Thêm tài khoản Microsoft",
+    "account.microsoft.tooltip": "Đăng nhập qua Microsoft để sử dụng tài khoản Minecraft đã xác thực.",
+    "account.microsoft.status_available": "Trạng thái xác thực Microsoft: Khả dụng",
+    "account.microsoft.waiting": "Đang chờ đăng nhập Microsoft… Nếu đã đóng cửa sổ trình duyệt, hãy nhấn Hủy tại đây.",
+    "account.microsoft.cancelling": "Đang hủy đăng nhập Microsoft…",
+    "account.microsoft.cancel": "Hủy đăng nhập Microsoft",
+    "account.microsoft.cancelled": "Đã hủy đăng nhập Microsoft."
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

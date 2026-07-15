@@ -1,20 +1,33 @@
 from __future__ import annotations
 
 import re
+from threading import Event
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, Slot
 
 from src.core.account.account_manager import AccountManager
 from src.core.auth.microsoft.microsoft_auth_gate import MicrosoftAuthenticationLockedError
+from src.core.auth.microsoft.oauth_callback_server import MicrosoftAuthorizationCancelledError
 from src.core.language.language_manager import tr
 from src.gui.controllers.base_controller import BaseController
+from src.gui.task_runner import TaskRunner
 
 
 class AccountController(BaseController):
+    MICROSOFT_TASK_ID = "account.microsoft.create"
+
     accounts_changed = Signal(list, str)
     selected_account_changed = Signal(object)
+    microsoft_auth_state_changed = Signal(bool, str)
 
     USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_]{3,16}$")
+
+    def __init__(self, task_runner: TaskRunner) -> None:
+        super().__init__()
+        self._task_runner = task_runner
+        self._microsoft_cancel_event = Event()
+        self._task_runner.task_succeeded.connect(self._on_task_succeeded)
+        self._task_runner.task_failed.connect(self._on_task_failed)
 
     def refresh(self) -> None:
         try:
@@ -45,17 +58,25 @@ class AccountController(BaseController):
         self.refresh()
 
     def create_microsoft(self) -> None:
-        try:
-            account = AccountManager.create_microsoft_account()
-        except MicrosoftAuthenticationLockedError:
-            self._emit_error(tr("Microsoft account"), RuntimeError(tr("Microsoft account sign-in is prepared but locked while MCW Launcher waits for Mojang/Microsoft application approval.")))
+        if self._task_runner.is_task_active(self.MICROSOFT_TASK_ID):
             return
-        except Exception as error:
-            self._emit_error(tr("Microsoft account"), error)
+
+        self._microsoft_cancel_event.clear()
+        self.microsoft_auth_state_changed.emit(True, tr("account.microsoft.waiting"))
+        started = self._task_runner.run(
+            self.MICROSOFT_TASK_ID,
+            lambda: AccountManager.create_microsoft_account(cancel_event=self._microsoft_cancel_event),
+            tr("account.microsoft.waiting"),
+            blocking=False,
+        )
+        if not started:
+            self.microsoft_auth_state_changed.emit(False, tr("account.microsoft.status_available"))
+
+    def cancel_microsoft(self) -> None:
+        if not self._task_runner.is_task_active(self.MICROSOFT_TASK_ID):
             return
-        self.status_changed.emit(tr("Microsoft account added: {username}", username=account.username))
-        self.log_created.emit(tr("Microsoft account added: {username}", username=account.username))
-        self.refresh()
+        self._microsoft_cancel_event.set()
+        self.microsoft_auth_state_changed.emit(True, tr("account.microsoft.cancelling"))
 
     def select(self, account_id: str) -> None:
         if not account_id:
@@ -83,3 +104,35 @@ class AccountController(BaseController):
         self.status_changed.emit(tr("Account removed"))
         self.log_created.emit(tr("Account removed: {account_id}", account_id=account_id))
         self.refresh()
+
+    @Slot(str, object)
+    def _on_task_succeeded(self, task_id: str, result: object) -> None:
+        if task_id != self.MICROSOFT_TASK_ID:
+            return
+
+        self._microsoft_cancel_event.clear()
+        self.microsoft_auth_state_changed.emit(False, tr("account.microsoft.status_available"))
+        account = result
+        username = str(getattr(account, "username", ""))
+        self.status_changed.emit(tr("account.microsoft.added", username=username))
+        self.log_created.emit(tr("account.microsoft.added", username=username))
+        self.refresh()
+
+    @Slot(str, object)
+    def _on_task_failed(self, task_id: str, error: Exception) -> None:
+        if task_id != self.MICROSOFT_TASK_ID:
+            return
+
+        self._microsoft_cancel_event.clear()
+        self.microsoft_auth_state_changed.emit(False, tr("account.microsoft.status_available"))
+
+        if isinstance(error, MicrosoftAuthorizationCancelledError):
+            self.status_changed.emit(tr("account.microsoft.cancelled"))
+            self.log_created.emit(tr("account.microsoft.cancelled"))
+            return
+
+        if isinstance(error, MicrosoftAuthenticationLockedError):
+            self._emit_error(tr("account.microsoft.title"), error)
+            return
+
+        self._emit_error(tr("account.microsoft.title"), error)

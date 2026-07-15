@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from threading import Event
 from time import time
 from uuid import uuid4
 
@@ -16,11 +17,11 @@ from src.models.account.account_source import AccountSource
 
 class MicrosoftAccountAuthenticator:
     @staticmethod
-    def authenticate() -> Account:
+    def authenticate(cancel_event: Event | None = None) -> Account:
         MicrosoftAuthenticationGate.require_enabled()
         if not str(MicrosoftAuthConfig.CLIENT_ID).strip():
             raise RuntimeError("Microsoft authentication is enabled but no client_id is configured.")
-        oauth_token = MicrosoftOAuth.authenticate()
+        oauth_token = MicrosoftOAuth.authenticate() if cancel_event is None else MicrosoftOAuth.authenticate(cancel_event=cancel_event)
         xbox_token = XboxLiveAuthentication.authenticate(oauth_token.access_token)
         xsts_token = XSTSAuthentication.authenticate(xbox_token)
         minecraft_token = MinecraftServicesAuthentication.authenticate(xsts_token)

@@ -61,7 +61,7 @@ class MainWindow(QMainWindow):
 
         self.task_runner = TaskRunner(self)
         self.version_controller = VersionController(self.task_runner)
-        self.account_controller = AccountController()
+        self.account_controller = AccountController(self.task_runner)
         self.backup_controller = BackupController(self.task_runner)
         self.java_controller = JavaController(self.task_runner)
         self.modpack_lifecycle_controller = ModpackLifecycleController(self.task_runner)
@@ -163,6 +163,7 @@ class MainWindow(QMainWindow):
 
         self.account_page.create_offline_requested.connect(self.account_controller.create_offline)
         self.account_page.create_microsoft_requested.connect(self.account_controller.create_microsoft)
+        self.account_page.cancel_microsoft_requested.connect(self.account_controller.cancel_microsoft)
         self.account_page.select_requested.connect(self.account_controller.select)
         self.account_page.remove_requested.connect(self.account_controller.remove)
         self.account_page.refresh_requested.connect(self.account_controller.refresh)
@@ -211,6 +212,7 @@ class MainWindow(QMainWindow):
 
         self.account_controller.accounts_changed.connect(self.account_page.set_accounts)
         self.account_controller.selected_account_changed.connect(self._account_selected)
+        self.account_controller.microsoft_auth_state_changed.connect(self.account_page.set_microsoft_auth_state)
         self.java_controller.installations_changed.connect(self.launcher_settings_page.set_java_installations)
         self.backup_controller.backup_created.connect(self._on_backup_created)
         self.backup_controller.restore_finished.connect(self._on_backup_restored)
