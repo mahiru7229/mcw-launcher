@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from datetime import datetime, timezone
+
 from src.core.fs.paths import Paths
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.instance.settings_manager import SettingsManager
@@ -11,16 +16,18 @@ from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
 from src.core.progress.progress_reporter import ProgressReporter
+from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.models.account.account import Account
 from src.models.auth.authentication import Authentication
 from src.models.instance.instance import Instance
 from src.models.progress.progress_callback import ProgressCallback
 from src.models.progress.progress_stage import ProgressStage
+from src.models.runtime.game_exit_result import GameExitResult
 
 
 class MinecraftExecutor:
     @staticmethod
-    def run(instance: Instance, authentication: Authentication, account: Account, debug_mode: bool = False, on_progress: ProgressCallback | None = None) -> dict:
+    def run(instance: Instance, authentication: Authentication, account: Account, debug_mode: bool = False, on_progress: ProgressCallback | None = None, on_exit: Callable[[GameExitResult], None] | None = None) -> dict:
         run_lock = InstanceRunLock.acquire(instance)
         process_started = False
 
@@ -53,9 +60,11 @@ class MinecraftExecutor:
             java = JavaResolver.resolve(java_major, reporter)
 
             reporter.status(stage=ProgressStage.LAUNCHING, message=f"Launching Minecraft {version.id}...")
+            started_at = datetime.now(timezone.utc)
             process = JavaRuntime.run(java, command, instance)
             process_started = True
             run_lock.track_process(process)
+            GameRuntimeManager.watch(process, instance, version.id, started_at, on_exit)
             reporter.status(stage=ProgressStage.FINISHED, message=f"Minecraft {version.id} launched successfully.")
 
             if debug_mode:
@@ -65,7 +74,11 @@ class MinecraftExecutor:
                 if native_dir.exists():
                     print("Native files:", list(native_dir.rglob("*")))
 
-            return {"javaPath": java, "minecraftJavaMajorVersion": java_major, "minecraftVersion": version.id}
+            return {
+                "javaPath": java,
+                "minecraftJavaMajorVersion": java_major,
+                "minecraftVersion": version.id,
+            }
         except Exception:
             if not process_started:
                 run_lock.release()

@@ -20,6 +20,7 @@ class LaunchControlWidget(QFrame):
         self._last_event: object | None = None
         self._last_result: dict | None = None
         self._last_error = ""
+        self._last_exit_result: object | None = None
         self._status_message = "Ready"
         self._detail_message = "Select an account and an instance, then launch."
         self._build_ui()
@@ -119,6 +120,31 @@ class LaunchControlWidget(QFrame):
         self._set_stage_state("success")
         self._keep_launch_button_text()
 
+
+    def set_exit_result(self, result: object) -> None:
+        self._mode = "exit"
+        self._last_exit_result = result
+        crashed = bool(getattr(result, "crashed", False))
+        instance_name = str(getattr(result, "instance_name", "Minecraft"))
+        exit_code = int(getattr(result, "exit_code", -1))
+        duration_seconds = max(0, int(getattr(result, "duration_seconds", 0)))
+        minutes, seconds = divmod(duration_seconds, 60)
+        duration = tr("{minutes}m {seconds}s", minutes=minutes, seconds=seconds)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0 if crashed else 100)
+        self.progress_bar.setFormat(tr("CRASHED") if crashed else tr("FINISHED"))
+        if crashed:
+            self.status_label.setText(tr("Minecraft crashed: {name}", name=instance_name))
+            self.detail_label.setText(tr("Exit code: {code} • Play time: {duration}", code=exit_code, duration=duration))
+            self.stage_label.setText(tr("CRASHED"))
+            self._set_stage_state("error")
+        else:
+            self.status_label.setText(tr("Minecraft closed normally: {name}", name=instance_name))
+            self.detail_label.setText(tr("Play time: {duration}", duration=duration))
+            self.stage_label.setText(tr("FINISHED"))
+            self._set_stage_state("success")
+        self._keep_launch_button_text()
+
     def set_failed(self, message: str) -> None:
         self._mode = "failed"
         self._last_error = message
@@ -165,6 +191,8 @@ class LaunchControlWidget(QFrame):
             self.set_result(self._last_result)
         elif self._mode == "failed":
             self.set_failed(self._last_error)
+        elif self._mode == "exit" and self._last_exit_result is not None:
+            self.set_exit_result(self._last_exit_result)
         else:
             self.status_label.setText(tr(self._status_message))
             self.detail_label.setText(tr(self._detail_message))

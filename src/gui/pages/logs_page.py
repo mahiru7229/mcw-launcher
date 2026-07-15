@@ -14,6 +14,8 @@ from src.gui.theme.runtime import set_theme_icon
 class LogsPage(BasePage):
     export_diagnostics_requested = Signal()
     open_logs_folder_requested = Signal()
+    open_latest_game_log_requested = Signal()
+    open_latest_crash_report_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__("Logs", "Frontend activity and structured progress events appear here.", "logs")
@@ -29,13 +31,19 @@ class LogsPage(BasePage):
         clear_button = set_theme_icon(QPushButton("Clear"), "icon.action.clear")
         export_button = set_theme_icon(QPushButton("Export diagnostics"), "icon.action.export")
         open_folder_button = set_theme_icon(QPushButton("Open logs folder"), "icon.action.folder")
+        open_game_log_button = set_theme_icon(QPushButton("Open latest game log"), "icon.action.folder")
+        open_crash_report_button = set_theme_icon(QPushButton("Open latest crash report"), "icon.state.error")
         copy_button.clicked.connect(lambda: QGuiApplication.clipboard().setText(self.output.toPlainText()))
         clear_button.clicked.connect(self.output.clear)
         export_button.clicked.connect(self.export_diagnostics_requested.emit)
         open_folder_button.clicked.connect(self.open_logs_folder_requested.emit)
+        open_game_log_button.clicked.connect(self.open_latest_game_log_requested.emit)
+        open_crash_report_button.clicked.connect(self.open_latest_crash_report_requested.emit)
         buttons.addWidget(copy_button)
         buttons.addWidget(clear_button)
         buttons.addStretch()
+        buttons.addWidget(open_game_log_button)
+        buttons.addWidget(open_crash_report_button)
         buttons.addWidget(open_folder_button)
         buttons.addWidget(export_button)
         card.layout.addWidget(self.output, 1)

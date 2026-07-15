@@ -23,6 +23,7 @@ class InstancesPage(BasePage):
     fabric_versions_requested = Signal(str)
     loader_change_requested = Signal(str, str, str)
     repair_loader_requested = Signal(str)
+    repair_instance_requested = Signal(str)
     manage_mods_requested = Signal(str)
     browse_modpacks_requested = Signal()
 
@@ -94,6 +95,10 @@ class InstancesPage(BasePage):
         self.repair_loader_button.setToolTip("Rebuild Fabric metadata and verify Loader libraries without changing mods or saves.")
         self.repair_loader_button.clicked.connect(self._request_loader_repair)
         self.repair_loader_button.setEnabled(False)
+        self.repair_instance_button = set_theme_icon(QPushButton("Repair instance"), "icon.action.repair")
+        self.repair_instance_button.setToolTip("Verify the client, libraries, assets, natives, mod loader, and Java without changing worlds or mods.")
+        self.repair_instance_button.clicked.connect(self._request_instance_repair)
+        self.repair_instance_button.setEnabled(False)
 
         self.target_name_input = QLineEdit()
         self.target_name_input.setPlaceholderText("New name or clone name")
@@ -120,6 +125,7 @@ class InstancesPage(BasePage):
         action_grid.addWidget(import_button, 1, 0)
         action_grid.addWidget(export_button, 1, 1)
         action_grid.addWidget(self.manage_mods_button, 1, 2)
+        action_grid.addWidget(self.repair_instance_button, 2, 0, 1, 3)
 
         manage_card.layout.addWidget(QLabel("Mod loader"))
         manage_card.layout.addWidget(self.manage_loader_combo)
@@ -205,6 +211,7 @@ class InstancesPage(BasePage):
             self.manage_loader_status.setText(tr("Select an instance to manage its mod loader."))
             self.manage_mods_button.setEnabled(False)
             self.repair_loader_button.setEnabled(False)
+            self.repair_instance_button.setEnabled(False)
             return
 
         loader_name, loader_version = self._instance_loader(instance)
@@ -219,6 +226,7 @@ class InstancesPage(BasePage):
         self.manage_loader_combo.blockSignals(False)
         self.manage_mods_button.setEnabled(loader_name == "fabric")
         self.repair_loader_button.setEnabled(loader_name == "fabric")
+        self.repair_instance_button.setEnabled(True)
         self._manage_loader_selected()
 
     def _set_manage_loader_available(self, available: bool) -> None:
@@ -228,6 +236,7 @@ class InstancesPage(BasePage):
         self.apply_loader_button.setEnabled(available)
         if not available:
             self.repair_loader_button.setEnabled(False)
+            self.repair_instance_button.setEnabled(False)
 
     def _manage_loader_selected(self, _loader_text: str = "") -> None:
         instance = self._instances.get(self.current_instance_name())
@@ -322,6 +331,15 @@ class InstancesPage(BasePage):
         if instance is None or self._instance_loader(instance)[0] != "fabric":
             return
         self.repair_loader_requested.emit(name)
+
+
+    def _request_instance_repair(self) -> None:
+        name = self.current_instance_name()
+        if not name:
+            return
+        answer = QMessageBox.question(self, tr("Repair instance"), tr("Fully verify and repair '{name}'? Worlds, mods, resource packs, and settings will be kept.", name=name), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if answer == QMessageBox.StandardButton.Yes:
+            self.repair_instance_requested.emit(name)
 
     def _confirm_delete(self) -> None:
         name = self.current_instance_name()

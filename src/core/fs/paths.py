@@ -220,6 +220,27 @@ class Paths:
         loader = quote(loader_version, safe="") or "unknown"
         return Paths.fabric_metadata_root() / "profiles" / game / f"{loader}.json"
 
+
+    @staticmethod
+    def instance_logs_dir(instance: Instance) -> Path:
+        directory = Paths.load_instance_dir(instance.name) / "logs"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def instance_crash_reports_dir(instance: Instance) -> Path:
+        directory = Paths.load_instance_dir(instance.name) / "crash-reports"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def instance_runtime_history(instance: Instance) -> Path:
+        return Paths.load_instance_dir(instance.name) / ".mcw" / "runtime-history.json"
+
+    @staticmethod
+    def instance_repair_report(instance: Instance) -> Path:
+        return Paths.load_instance_dir(instance.name) / ".mcw" / "last-repair.json"
+
     @staticmethod
     def instance_mods_dir(instance: Instance) -> Path:
         directory = Path(instance.instance_dir) / "mods"

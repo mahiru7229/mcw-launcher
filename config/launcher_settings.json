@@ -10,7 +10,7 @@
         "debug_mode": false
     },
     "window": {
-        "geometry": "AdnQywADAAAAAACEAAABGgAABsMAAAS8AAAAhAAAATkAAAbDAAAEvAAAAAAAAAAAB4AAAACEAAABOQAABsMAAAS8"
+        "geometry": "AdnQywADAAAAAACbAAAAOAAABtoAAAPaAAAAmwAAAFcAAAbaAAAD2gAAAAAAAAAAB4AAAACbAAAAVwAABtoAAAPa"
     },
     "appearance": {
         "theme": "mcw-legacy-assets",
@@ -23,6 +23,6 @@
     "updates": {
         "auto_check": true,
         "channel": "beta",
-        "last_checked_at": "2026-07-15T07:15:29.272316+00:00"
+        "last_checked_at": "2026-07-15T07:58:16.038391+00:00"
     }
 }

@@ -36,6 +36,7 @@ The project is currently developed primarily for Windows and uses PySide6 for it
 - Select a compatible Java runtime automatically.
 - Download and manage compatible Java runtimes when required.
 - Display structured progress while preparing and launching the game.
+- Track the Minecraft process until exit, including PID, exit code, session duration, latest game log, and crash report detection.
 
 ### Instance management
 
@@ -47,6 +48,8 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 - Configure memory, resolution, fullscreen mode, Java path, JVM arguments, and game arguments per instance.
 - Prevent the same instance from being launched more than once at the same time.
 - Show instances that are currently preparing or running.
+- Fully repair an instance without touching worlds, mods, resource packs, screenshots, or instance settings.
+- Record `last_played`, accumulated play time, last exit code, and crash state in instance metadata.
 
 ### Fabric and mods
 
@@ -138,6 +141,7 @@ mcw-launcher/
 │   │   ├── mod/
 │   │   ├── modloader/
 │   │   ├── modrinth/
+│   │   ├── runtime/
 │   │   ├── theme/
 │   │   ├── network/
 │   │   └── package/
@@ -254,6 +258,7 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | [`docs/LANGUAGE_PACKS.md`](docs/LANGUAGE_PACKS.md) | Creating language packs |
 | [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) | PNG theme filenames, paths, and canvas sizes |
 | [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md) | Building updater-compatible release ZIPs |
+| [`docs/BETA7_RUNTIME_REPAIR.md`](docs/BETA7_RUNTIME_REPAIR.md) | Runtime monitoring, crash detection, and full instance repair |
 | [`docs/gui-api.en.md`](docs/gui-api.en.md) | GUI integration API in English |
 | [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API in Vietnamese |
 
@@ -276,6 +281,8 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | Microsoft authentication | In development |
 | Forge / NeoForge / Quilt | Not currently supported |
 | Optional PNG theme system | Beta |
+| Game lifecycle and crash detection | Beta |
+| Full instance repair | Beta |
 
 ---
 
@@ -283,7 +290,7 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 
 Near-term priorities:
 
-- Improve Fabric compatibility and diagnostics.
+- Improve crash diagnostics and runtime history presentation.
 - Improve mod dependency warnings.
 - Continue replacing hard-coded GUI text with semantic translation keys.
 - Complete Microsoft authentication.

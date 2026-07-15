@@ -11,6 +11,7 @@ from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.runtime.instance_repair_manager import InstanceRepairManager
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 
@@ -20,7 +21,10 @@ class InstanceController(BaseController):
     running_instances_changed = Signal(list)
     selected_instance_changed = Signal(object)
     export_finished = Signal(object)
+    repair_progress = Signal(object)
+    repair_finished = Signal(object)
 
+    REPAIR_TASK_ID = "instance.repair.full"
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
 
     def __init__(self, task_runner: TaskRunner) -> None:
@@ -121,6 +125,24 @@ class InstanceController(BaseController):
 
         self._task_runner.run("instance.loader.repair", task, f"Repairing Fabric for '{name}'...")
 
+
+    def repair_instance(self, name: str) -> None:
+        name = name.strip()
+        if not name:
+            return
+
+        def task() -> Any:
+            instance = InstanceManager.load(name)
+            return InstanceRepairManager.repair(instance, on_progress=self._on_repair_progress)
+
+        self._task_runner.run(self.REPAIR_TASK_ID, task, f"Repairing '{name}'...")
+
+    def _on_repair_progress(self, event: object) -> None:
+        self.repair_progress.emit(event)
+        stage = getattr(getattr(event, "stage", None), "value", "repair")
+        message = str(getattr(event, "message", "Repairing instance..."))
+        self.log_created.emit(f"[{stage}] {message}")
+
     def rename(self, source_name: str, target_name: str) -> None:
         source_name = source_name.strip()
         target_name = self._validated_name(target_name)
@@ -188,6 +210,10 @@ class InstanceController(BaseController):
         elif task_id == "instance.loader.repair":
             selected_name = result.name
             self.status_changed.emit(f"Repaired Fabric for '{selected_name}'")
+        elif task_id == self.REPAIR_TASK_ID:
+            selected_name = result.instance_name
+            self.repair_finished.emit(result)
+            self.status_changed.emit(f"Repaired instance '{selected_name}'")
         elif task_id == "instance.export":
             self.export_finished.emit(result)
             self.status_changed.emit("Instance export completed")

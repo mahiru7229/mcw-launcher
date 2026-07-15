@@ -2,9 +2,12 @@ from src.models.minecraft.version import Version
 from src.models.instance.instance import Instance
 from src.core.fs.paths import Paths
 from src.core.package.package_manager import PackageManager
+from src.config import VERSION_TAG
 
 from pathlib import Path
+from datetime import datetime, timezone
 import json
+import os
 import shutil
 import uuid
 
@@ -15,36 +18,39 @@ class InstanceManager:
     def _save_instance_metadata(instance: Instance) -> None:
         instance_dir = Path(instance.instance_dir)
         path = instance_dir / "instance.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
 
-        path.parent.mkdir(
-            parents=True,
-            exist_ok=True
-        )
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        except (OSError, json.JSONDecodeError, ValueError):
+            existing = {}
+        if not isinstance(existing, dict):
+            existing = {}
 
-        path.write_text(
-            json.dumps(
-                {
-                    "id": instance.instance_id,
-                    "name": instance.name,
-                    "version_id": instance.version_id,
-                    "mod_loader": instance.mod_loader,
-                    "instance_dir": str(instance_dir),
+        now = datetime.now(timezone.utc).isoformat()
+        created_at = str(existing.get("created_at") or now)
+        data = dict(existing)
+        data.update({
+            "id": instance.instance_id,
+            "name": instance.name,
+            "version_id": instance.version_id,
+            "mod_loader": instance.mod_loader,
+            "instance_dir": str(instance_dir),
+            "created_at": created_at,
+            "updated_at": now,
+            "last_played": str(existing.get("last_played") or ""),
+            "icon": str(existing.get("icon") or "grass_block"),
+            "notes": str(existing.get("notes") or ""),
+            "launcher_version": VERSION_TAG,
+            "metadata_version": 2,
+        })
 
-                    "created_at": "",
-                    "updated_at": "",
-                    "last_played": "",
-
-                    "icon": "grass_block",
-                    "notes": "",
-
-                    "launcher_version": "",
-                    "metadata_version": 1
-                },
-                indent=4,
-                ensure_ascii=False
-            ),
-            encoding="utf-8"
-        )
+        temporary = path.with_name(f"{path.name}.tmp")
+        with temporary.open("w", encoding="utf-8", newline="\n") as file:
+            file.write(json.dumps(data, indent=4, ensure_ascii=False) + "\n")
+            file.flush()
+            os.fsync(file.fileno())
+        temporary.replace(path)
 
     @staticmethod
     def _load_instance_metadata(path: Path) -> Instance:
@@ -114,6 +120,7 @@ class InstanceManager:
             ignore=ignore
         )
 
+        InstanceManager._reset_cloned_runtime_data(target_dir)
         instance = InstanceManager.load(new_name)
 
         instance.instance_id = str(uuid.uuid4())
@@ -129,6 +136,33 @@ class InstanceManager:
         InstanceManager._save_instances(instances_data)
 
         return instance
+
+
+    @staticmethod
+    def _reset_cloned_runtime_data(instance_dir: Path) -> None:
+        metadata_path = instance_dir / "instance.json"
+        try:
+            data = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, ValueError):
+            data = {}
+        if isinstance(data, dict):
+            data.update({
+                "last_played": "",
+                "total_play_time_seconds": 0,
+                "last_exit_code": None,
+                "last_launch_crashed": False,
+                "last_game_log": "",
+                "last_crash_report": "",
+            })
+            temporary = metadata_path.with_name(f"{metadata_path.name}.tmp")
+            temporary.write_text(json.dumps(data, indent=4, ensure_ascii=False) + "\n", encoding="utf-8")
+            temporary.replace(metadata_path)
+        mcw_dir = instance_dir / ".mcw"
+        for filename in ("runtime-history.json", "last-repair.json"):
+            try:
+                (mcw_dir / filename).unlink(missing_ok=True)
+            except OSError:
+                pass
 
     @staticmethod
     def export(

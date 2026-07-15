@@ -12,6 +12,7 @@ from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.language.language_manager import language_manager, tr
+from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.core.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
 from src.gui.config import LAUNCHER_NAME, MINIMUM_HEIGHT, MINIMUM_WIDTH, RIGHT_PANEL_WIDTH, SIDEBAR_WIDTH, VERSION_ID, WINDOW_HEIGHT, WINDOW_WIDTH
 from src.gui.controllers.account_controller import AccountController
@@ -72,6 +73,7 @@ class MainWindow(QMainWindow):
         self.running_instances_timer = QTimer(self)
         self._modrinth_tasks: set[str] = set()
         self._prompted_update_versions: set[str] = set()
+        self._selected_instance: object | None = None
         self.running_instances_timer.setInterval(1000)
 
         self._build_ui()
@@ -163,6 +165,7 @@ class MainWindow(QMainWindow):
         self.instances_page.fabric_versions_requested.connect(self.mod_loader_controller.load_fabric_versions)
         self.instances_page.loader_change_requested.connect(self.instance_controller.change_loader)
         self.instances_page.repair_loader_requested.connect(self.instance_controller.repair_loader)
+        self.instances_page.repair_instance_requested.connect(self.instance_controller.repair_instance)
         self.instances_page.manage_mods_requested.connect(self._open_mod_manager)
         self.instances_page.browse_modpacks_requested.connect(self._open_modrinth_modpacks)
         self.instances_page.rename_requested.connect(self.instance_controller.rename)
@@ -181,6 +184,8 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.reload_theme_requested.connect(self._preview_theme)
         self.logs_page.export_diagnostics_requested.connect(self._export_diagnostics)
         self.logs_page.open_logs_folder_requested.connect(self._open_logs_folder)
+        self.logs_page.open_latest_game_log_requested.connect(self._open_latest_game_log)
+        self.logs_page.open_latest_crash_report_requested.connect(self._open_latest_crash_report)
 
         self.launch_control.launch_clicked.connect(self.launch_controller.launch)
 
@@ -224,6 +229,9 @@ class MainWindow(QMainWindow):
         self.launch_controller.progress_received.connect(self._on_progress)
         self.launch_controller.launch_finished.connect(self.launch_control.set_result)
         self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
+        self.launch_controller.game_exited.connect(self._on_game_exited)
+        self.instance_controller.repair_progress.connect(self._on_progress)
+        self.instance_controller.repair_finished.connect(self._on_repair_finished)
 
         self.update_controller.update_available.connect(self._on_update_available)
         self.update_controller.no_update_available.connect(self._on_no_update_available)
@@ -359,6 +367,38 @@ class MainWindow(QMainWindow):
         self.modrinth_modpack_dialog.close()
         QMessageBox.information(self, tr("modrinth.modpack.install"), tr("modrinth.modpack.installed", name=selected_name))
 
+
+    def _on_game_exited(self, result: object) -> None:
+        selected_name = str(getattr(self._selected_instance, "name", ""))
+        result_name = str(getattr(result, "instance_name", ""))
+        if not selected_name or selected_name == result_name:
+            self.launch_control.set_exit_result(result)
+        self.instance_controller.refresh_running(force=True)
+        crashed = bool(getattr(result, "crashed", False))
+        instance_name = str(getattr(result, "instance_name", "Minecraft"))
+        exit_code = int(getattr(result, "exit_code", -1))
+        duration = int(getattr(result, "duration_seconds", 0))
+        if crashed:
+            message = tr("Minecraft crashed: {name} (exit code {code})", name=instance_name, code=exit_code)
+            self.home_page.set_status(message)
+            self.right_panel.set_status(message)
+            self.logs_page.append(tr("Crash detected after {seconds} second(s).", seconds=duration))
+            crash_report = getattr(result, "crash_report_path", None)
+            if crash_report:
+                self.logs_page.append(tr("Crash report: {path}", path=crash_report))
+        else:
+            message = tr("Minecraft closed normally: {name}", name=instance_name)
+            self.home_page.set_status(message)
+            self.right_panel.set_status(message)
+            self.logs_page.append(tr("Game session completed in {seconds} second(s).", seconds=duration))
+
+    def _on_repair_finished(self, result: object) -> None:
+        instance_name = str(getattr(result, "instance_name", ""))
+        libraries = int(getattr(result, "libraries_checked", 0))
+        self.launch_control.reset_progress()
+        self.logs_page.append(tr("Repair completed for '{name}'. Libraries checked: {count}.", name=instance_name, count=libraries))
+        QMessageBox.information(self, tr("Repair instance"), tr("Repair completed for '{name}'. Client, libraries, assets, natives, mod loader, and Java were verified.", name=instance_name))
+
     def _on_update_available(self, info: UpdateInfo, manual: bool) -> None:
         if not manual and info.version in self._prompted_update_versions:
             return
@@ -427,6 +467,7 @@ class MainWindow(QMainWindow):
         self.launch_controller.set_account(account)
 
     def _instance_selected(self, instance: object | None) -> None:
+        self._selected_instance = instance
         self.home_page.set_instance(instance)
         self.right_panel.set_instance(instance)
         self.launch_control.set_selected_instance(instance)
@@ -507,13 +548,16 @@ class MainWindow(QMainWindow):
         self.modrinth_modpack_dialog.set_busy(busy)
 
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
-        if task_id != self.launch_controller.TASK_ID:
+        if task_id == self.launch_controller.TASK_ID:
+            self.launch_control.set_failed(str(error))
+            self.home_page.set_status("Launch failed")
+            self.right_panel.set_status("Launch failed")
+            self.instance_controller.refresh_running(force=True)
             return
-
-        self.launch_control.set_failed(str(error))
-        self.home_page.set_status("Launch failed")
-        self.right_panel.set_status("Launch failed")
-        self.instance_controller.refresh_running(force=True)
+        if task_id == self.instance_controller.REPAIR_TASK_ID:
+            self.launch_control.set_failed(str(error))
+            self.home_page.set_status(tr("Repair failed"))
+            self.right_panel.set_status(tr("Repair failed"))
 
     def _on_progress(self, event: object) -> None:
         self.launch_control.set_progress_event(event)
@@ -549,6 +593,29 @@ class MainWindow(QMainWindow):
 
     def _open_logs_folder(self) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(Paths.logs_root().resolve())))
+
+
+    def _open_latest_game_log(self) -> None:
+        instance = self._selected_instance
+        if instance is None:
+            QMessageBox.information(self, tr("Game log"), tr("Select an instance first."))
+            return
+        path = GameRuntimeManager.latest_game_log(instance)
+        if path is None:
+            QMessageBox.information(self, tr("Game log"), tr("No Minecraft log was found for this instance."))
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.resolve())))
+
+    def _open_latest_crash_report(self) -> None:
+        instance = self._selected_instance
+        if instance is None:
+            QMessageBox.information(self, tr("Crash report"), tr("Select an instance first."))
+            return
+        path = GameRuntimeManager.latest_crash_report(instance)
+        if path is None:
+            QMessageBox.information(self, tr("Crash report"), tr("No crash report was found for this instance."))
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.resolve())))
 
     def _show_error(self, title: str, message: str) -> None:
         QMessageBox.critical(self, title, message)

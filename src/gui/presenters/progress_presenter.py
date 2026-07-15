@@ -17,6 +17,7 @@ class ProgressView:
 class ProgressPresenter:
     _STAGE_LABELS = {
         "preparing": "PREPARING",
+        "repairing_instance": "REPAIR",
         "loading_version": "VERSION",
         "installing_mod_loader": "MOD LOADER",
         "selecting_java": "JAVA CHECK",
@@ -33,6 +34,7 @@ class ProgressPresenter:
     }
 
     _BUTTON_TEXTS = {
+        "repairing_instance": "REPAIRING...",
         "installing_mod_loader": "INSTALLING MOD LOADER...",
         "selecting_java": "CHECKING JAVA...",
         "downloading_java": "DOWNLOADING JAVA...",

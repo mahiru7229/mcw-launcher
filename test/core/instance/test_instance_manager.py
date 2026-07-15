@@ -184,3 +184,58 @@ def test_create_duplicate_instance_raises_error(
             name="Duplicate Test",
             version=fake_version
         )
+
+def test_save_metadata_preserves_runtime_and_custom_fields(temporary_paths: Path, fake_version) -> None:
+    instance = InstanceManager.create(name="Metadata Test", version=fake_version)
+    metadata_path = instance.instance_dir / "instance.json"
+    data = __import__("json").loads(metadata_path.read_text(encoding="utf-8"))
+    data.update({
+        "notes": "keep notes",
+        "icon": "custom-icon",
+        "last_played": "2026-07-15T10:00:00+00:00",
+        "total_play_time_seconds": 321,
+        "last_exit_code": 0,
+        "custom_extension": {"enabled": True},
+    })
+    metadata_path.write_text(__import__("json").dumps(data), encoding="utf-8")
+
+    InstanceManager.set_mod_loader("Metadata Test", ("fabric", "0.16.9"))
+
+    saved = __import__("json").loads(metadata_path.read_text(encoding="utf-8"))
+    assert saved["notes"] == "keep notes"
+    assert saved["icon"] == "custom-icon"
+    assert saved["last_played"] == "2026-07-15T10:00:00+00:00"
+    assert saved["total_play_time_seconds"] == 321
+    assert saved["last_exit_code"] == 0
+    assert saved["custom_extension"] == {"enabled": True}
+    assert saved["metadata_version"] == 2
+    assert saved["mod_loader"] == ["fabric", "0.16.9"]
+
+
+def test_clone_resets_runtime_history_and_play_time(temporary_paths: Path, fake_version) -> None:
+    source = InstanceManager.create(name="Runtime Source", version=fake_version)
+    metadata_path = source.instance_dir / "instance.json"
+    data = __import__("json").loads(metadata_path.read_text(encoding="utf-8"))
+    data.update({
+        "last_played": "2026-07-15T12:00:00+00:00",
+        "total_play_time_seconds": 999,
+        "last_exit_code": 1,
+        "last_launch_crashed": True,
+        "last_game_log": "old.log",
+        "last_crash_report": "crash.txt",
+    })
+    metadata_path.write_text(__import__("json").dumps(data), encoding="utf-8")
+    history_path = source.instance_dir / ".mcw" / "runtime-history.json"
+    history_path.parent.mkdir(parents=True)
+    history_path.write_text('{"records": [{"exit_code": 1}]}', encoding="utf-8")
+
+    cloned = InstanceManager.clone("Runtime Source", "Runtime Clone")
+
+    cloned_data = __import__("json").loads((cloned.instance_dir / "instance.json").read_text(encoding="utf-8"))
+    assert cloned_data["last_played"] == ""
+    assert cloned_data["total_play_time_seconds"] == 0
+    assert cloned_data["last_exit_code"] is None
+    assert cloned_data["last_launch_crashed"] is False
+    assert cloned_data["last_game_log"] == ""
+    assert cloned_data["last_crash_report"] == ""
+    assert not (cloned.instance_dir / ".mcw" / "runtime-history.json").exists()

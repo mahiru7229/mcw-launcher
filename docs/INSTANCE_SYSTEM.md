@@ -66,15 +66,20 @@ Example:
         "-1"
     ],
 
-    "created_at": "",
-    "updated_at": "",
-    "last_played": "",
+    "created_at": "2026-07-15T10:00:00+00:00",
+    "updated_at": "2026-07-15T12:00:00+00:00",
+    "last_played": "2026-07-15T12:00:00+00:00",
+    "total_play_time_seconds": 3600,
+    "last_exit_code": 0,
+    "last_launch_crashed": false,
+    "last_game_log": ".../logs/minecraft-2026-07-15_18-30-00.log",
+    "last_crash_report": "",
 
     "icon": "grass_block",
     "notes": "",
 
-    "launcher_version": "v0.2.3-alpha",
-    "metadata_version": 1
+    "launcher_version": "v0.5.0-beta.7",
+    "metadata_version": 2
 }
 ```
 
@@ -195,7 +200,8 @@ During cloning:
 - Generate a new UUID
 - Change instance name
 - Preserve runtime settings
-- Preserve metadata
+- Preserve descriptive metadata such as icon and notes
+- Reset play time, exit state, runtime history, and repair history
 - Optionally copy world saves
 
 ```python

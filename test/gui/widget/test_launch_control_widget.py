@@ -33,3 +33,15 @@ def test_launch_button_text_never_changes(app):
     widget.reset_progress()
 
     assert widget.launch_button.text() == "Launch"
+
+
+def test_exit_result_shows_instance_and_keeps_launch_button_text(app):
+    widget = LaunchControlWidget()
+    result = SimpleNamespace(instance_name="Runtime Test", crashed=True, exit_code=1, duration_seconds=75)
+
+    widget.set_exit_result(result)
+
+    assert "Runtime Test" in widget.status_label.text()
+    assert "1" in widget.detail_label.text()
+    assert widget.stage_label.text() == "CRASHED"
+    assert widget.launch_button.text() == "Launch"

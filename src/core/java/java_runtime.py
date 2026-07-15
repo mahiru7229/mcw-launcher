@@ -1,103 +1,66 @@
+from __future__ import annotations
+
 import os
 import subprocess
+import threading
 from datetime import datetime
 from pathlib import Path
+from typing import TextIO
+
 from src.core.fs.paths import Paths
 from src.models.instance.instance import Instance
-from src.models.java.java import JavaInstallation
 
 
 class JavaRuntime:
+    _process_logs: dict[int, tuple[Path, TextIO]] = {}
+    _process_logs_lock = threading.RLock()
 
-    @staticmethod
-    def run(
-        java: Path,
-        command: list[str],
-        instance: Instance,
-    ) -> subprocess.Popen:
-        creation_flags = 0
-
-        if os.name == "nt":
-            creation_flags = subprocess.CREATE_NO_WINDOW
-
-        log_dir = Paths.load_instance_dir(instance.name) / "logs"
-        log_dir.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        timestamp = datetime.now().strftime(
-            "%Y-%m-%d_%H-%M-%S"
-        )
-
+    @classmethod
+    def run(cls, java: Path, command: list[str], instance: Instance) -> subprocess.Popen:
+        creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        log_dir = Paths.instance_logs_dir(instance)
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         log_path = log_dir / f"minecraft-{timestamp}.log"
-
-        log_file = log_path.open(
-            "w",
-            encoding="utf-8",
-            errors="replace",
-        )
+        log_file = log_path.open("w", encoding="utf-8", errors="replace")
 
         try:
-            return subprocess.Popen(
-                [
-                    str(java),
-                    *command,
-                ],
+            process = subprocess.Popen(
+                [str(java), *command],
                 cwd=Paths.load_instance_dir(instance.name),
                 stdin=subprocess.DEVNULL,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
                 creationflags=creation_flags,
             )
-
         except Exception:
             log_file.close()
             raise
 
+        pid = getattr(process, "pid", None)
+        if isinstance(pid, int) and pid > 0:
+            with cls._process_logs_lock:
+                cls._process_logs[pid] = (log_path, log_file)
+        return process
 
-# import subprocess
-# import threading
-# from pathlib import Path
-# from src.models.instance.instance import Instance
-# from src.core.fs.paths import Paths
+    @classmethod
+    def log_path(cls, process: object) -> Path | None:
+        pid = getattr(process, "pid", None)
+        if not isinstance(pid, int) or pid <= 0:
+            return None
+        with cls._process_logs_lock:
+            record = cls._process_logs.get(pid)
+        return record[0] if record is not None else None
 
-# class JavaRuntime:
-
-#     @staticmethod
-#     def _stream(pipe):
-#         try:
-#             for line in pipe:
-#                 print(line.rstrip())
-#         except Exception:
-#             pass
-
-#     @staticmethod
-#     def run(java_path: Path, cmd: list[str], instance:Instance) -> subprocess.Popen:
-#         full_cmd = [str(java_path), *cmd]
-
-#         process = subprocess.Popen(
-#             full_cmd,
-#             cwd=str(Paths.load_instance_dir(instance.name)),
-#             stdout=subprocess.PIPE,
-#             stderr=subprocess.PIPE,
-#             text=True,
-#             bufsize=1,
-#             creationflags=subprocess.CREATE_NO_WINDOW
-#         )
-
-
-#         threading.Thread(
-#             target=JavaRuntime._stream,
-#             args=(process.stdout,),
-#             daemon=True
-#         ).start()
-
-
-#         threading.Thread(
-#             target=JavaRuntime._stream,
-#             args=(process.stderr,),
-#             daemon=True
-#         ).start()
-
-#         return process
+    @classmethod
+    def close_process_log(cls, process: object) -> None:
+        pid = getattr(process, "pid", None)
+        if not isinstance(pid, int) or pid <= 0:
+            return
+        with cls._process_logs_lock:
+            record = cls._process_logs.pop(pid, None)
+        if record is None:
+            return
+        try:
+            record[1].close()
+        except OSError:
+            pass

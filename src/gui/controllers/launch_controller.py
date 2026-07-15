@@ -17,6 +17,7 @@ from src.models.progress.progress_event import ProgressEvent
 class LaunchController(BaseController):
     progress_received = Signal(object)
     launch_finished = Signal(object)
+    game_exited = Signal(object)
 
     TASK_ID = "minecraft.launch"
 
@@ -63,6 +64,7 @@ class LaunchController(BaseController):
                 account=account,
                 debug_mode=debug_mode,
                 on_progress=self._on_progress,
+                on_exit=self._on_game_exit,
             )
 
         self._task_runner.run(self.TASK_ID, task, tr("Launching '{name}'...", name=instance_name))
@@ -70,6 +72,19 @@ class LaunchController(BaseController):
     def _on_progress(self, event: ProgressEvent) -> None:
         self.progress_received.emit(event)
         self.log_created.emit(self._format_progress(event))
+
+
+    def _on_game_exit(self, result: object) -> None:
+        self.game_exited.emit(result)
+        instance_name = str(getattr(result, "instance_name", "Minecraft"))
+        exit_code = int(getattr(result, "exit_code", -1))
+        crashed = bool(getattr(result, "crashed", exit_code != 0))
+        if crashed:
+            self.status_changed.emit(tr("Minecraft crashed: {name}", name=instance_name))
+            self.log_created.emit(tr("Minecraft exited with code {code}: {name}", code=exit_code, name=instance_name))
+        else:
+            self.status_changed.emit(tr("Minecraft closed normally: {name}", name=instance_name))
+            self.log_created.emit(tr("Minecraft exited normally: {name}", name=instance_name))
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
