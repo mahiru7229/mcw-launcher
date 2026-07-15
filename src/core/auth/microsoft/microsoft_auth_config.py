@@ -1,10 +1,8 @@
-from src.core.config.microsoft.microsoft_config_manager import MicrosoftConfigManager
-import os
+from src.config import MICROSOFT_CLIENT_ID
 
 
 class MicrosoftAuthConfig:
-    config = MicrosoftConfigManager.load()
-    CLIENT_ID = config.client_id
+    CLIENT_ID = str(MICROSOFT_CLIENT_ID or "").strip()
     TENANT = "consumers"
 
     AUTHORIZE_URL = f"https://login.microsoftonline.com/{TENANT}/oauth2/v2.0/authorize"

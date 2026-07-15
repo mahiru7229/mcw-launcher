@@ -13,3 +13,4 @@ MODRINTH_USER_AGENT = f"{DEVELOPER_NAME}/{LAUNCHER_SLUG}/{VERSION_ID} (https://g
 # Microsoft authentication is available in public builds.
 MICROSOFT_AUTH_ENABLED = True
 MICROSOFT_AUTH_STATUS = "available"
+MICROSOFT_CLIENT_ID = "cd379605-ee06-466a-a588-7a1f7c23b48a"
