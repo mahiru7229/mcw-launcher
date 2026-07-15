@@ -124,9 +124,13 @@ def _translate_text_property(widget: QLabel | QAbstractButton) -> None:
         widget.setProperty(_SOURCE_TEXT_PROPERTY, source)
     last = widget.property(_LAST_TEXT_PROPERTY)
     current = widget.text()
-    if source and _can_replace(current, str(source), last):
+    static_text_role = str(widget.property("themeStaticTextRole") or "").strip()
+    static_text_hidden = bool(widget.property("themeStaticTextHidden"))
+    if source and (_can_replace(current, str(source), last) or static_text_role):
         translated = tr(str(source))
-        widget.setText(translated)
+        if static_text_role:
+            widget.setProperty("themeStaticTextFallback", translated)
+        widget.setText("" if static_text_hidden else translated)
         widget.setProperty(_LAST_TEXT_PROPERTY, translated)
 
 

@@ -58,10 +58,10 @@ Canvas dưới đây là kích thước thiết kế khuyến nghị. Launcher c
 | `button.primary` | `themes/<theme-id>/controls/buttons/primary.png` | **260 × 72 px** | Button | Primary action and Launch button. |
 | `button.primary_hover` | `themes/<theme-id>/controls/buttons/primary_hover.png` | **260 × 72 px** | Button | Hovered primary action. |
 | `button.primary_pressed` | `themes/<theme-id>/controls/buttons/primary_pressed.png` | **260 × 72 px** | Button | Pressed primary action. |
-| `button.launch` | `themes/<theme-id>/controls/buttons/launch/default.png` | **461 × 133 px** | Launch button | Dedicated Launch button artwork; may contain baked pixel-art lettering. |
-| `button.launch_hover` | `themes/<theme-id>/controls/buttons/launch/hover.png` | **461 × 133 px** | Launch button | Hovered Launch button artwork. |
-| `button.launch_pressed` | `themes/<theme-id>/controls/buttons/launch/pressed.png` | **461 × 133 px** | Launch button | Pressed Launch button artwork. |
-| `button.launch_disabled` | `themes/<theme-id>/controls/buttons/launch/disabled.png` | **461 × 133 px** | Launch button | Disabled Launch button artwork. |
+| `button.launch` | `themes/<theme-id>/controls/buttons/launch/default.png` | **461 × 133 px** | Launch button | Dedicated Launch artwork; may contain baked text. |
+| `button.launch_hover` | `themes/<theme-id>/controls/buttons/launch/hover.png` | **461 × 133 px** | Launch button | Hovered Launch artwork. |
+| `button.launch_pressed` | `themes/<theme-id>/controls/buttons/launch/pressed.png` | **461 × 133 px** | Launch button | Pressed Launch artwork. |
+| `button.launch_disabled` | `themes/<theme-id>/controls/buttons/launch/disabled.png` | **461 × 133 px** | Launch button | Disabled Launch artwork. |
 | `button.danger` | `themes/<theme-id>/controls/buttons/danger.png` | **240 × 48 px** | Button | Destructive action. |
 | `button.danger_hover` | `themes/<theme-id>/controls/buttons/danger_hover.png` | **240 × 48 px** | Button | Hovered destructive action. |
 | `button.nav` | `themes/<theme-id>/controls/navigation/default.png` | **192 × 46 px** | Navigation | Normal sidebar navigation button. |
@@ -137,8 +137,35 @@ Canvas dưới đây là kích thước thiết kế khuyến nghị. Launcher c
 - Có thể bỏ qua bất kỳ file nào chưa thiết kế; launcher sẽ fallback riêng cho đúng thành phần đó.
 - Không dùng đường dẫn tuyệt đối, `..`, symlink hoặc file nằm ngoài `themes/<theme-id>/`.
 - Ảnh nền toàn cửa sổ nên vẽ theo canvas 1600 × 900 và giữ nội dung quan trọng trong vùng an toàn.
-- Button, card, input, badge và tab được kéo giãn; nút Launch có bộ asset riêng để ảnh chứa chữ không bị áp lên các nút Primary khác; tránh đặt chi tiết quan trọng sát trung tâm nếu muốn dùng cho nhiều kích thước.
+- Button, card, input, badge và tab được kéo giãn; tránh đặt chi tiết quan trọng sát trung tâm nếu muốn dùng cho nhiều kích thước.
 - Icon nên có khoảng trống 2–4 px quanh nội dung để không chạm mép khi Qt scale.
+
+## Hiển thị chữ tĩnh trên PNG
+
+Một số PNG có thể đã vẽ sẵn chữ cố định, ví dụ nút Launch cũ đã chứa chữ `LAUNCH`. Theme có thể khai báo semantic role và asset chứa chữ bằng `text_assets`:
+
+```json
+{
+  "text_assets": {
+    "control.launch": "button.launch"
+  }
+}
+```
+
+Trong **Launcher Settings → Appearance**, tùy chọn **Show static text over themed controls** quyết định có vẽ thêm chữ Qt lên trên PNG hay không.
+
+- Bật: launcher luôn hiển thị chữ như bình thường.
+- Tắt: launcher chỉ ẩn chữ của control đã được theme khai báo trong `text_assets`.
+- Nếu PNG được ánh xạ bị thiếu hoặc hỏng, chữ tự hiện lại để không tạo nút trống.
+- Nội dung động như tên instance, Minecraft version, tiến trình, trạng thái và thông báo lỗi không bị ẩn.
+
+Hiện role tích hợp sẵn là:
+
+| Static text role | Asset dùng để xác nhận PNG đã có chữ | Thành phần |
+|---|---|---|
+| `control.launch` | `button.launch` | Nút Launch cố định ở thanh dưới |
+
+Kiến trúc này có thể mở rộng cho các nút cố định khác mà không phải thay đổi định dạng settings.
 
 ## Theme manifest mẫu
 
@@ -151,8 +178,11 @@ Canvas dưới đây là kích thước thiết kế khuyến nghị. Launcher c
   "assets": {
     "background.window": "backgrounds/window.png",
     "logo.main": "logos/main.png",
-    "button.primary": "controls/buttons/primary.png",
+    "button.launch": "controls/buttons/launch/default.png",
     "icon.action.launch": "icons/actions/launch.png"
+  },
+  "text_assets": {
+    "control.launch": "button.launch"
   }
 }
 ```
@@ -184,7 +214,3 @@ Khi theme hoặc PNG không tải được:
 ## Ngoại lệ của hệ điều hành
 
 `QFileDialog` thường dùng file picker native của Windows. Phần cửa sổ native đó do Windows vẽ và không thể thay hoàn toàn bằng PNG theme của launcher. Mọi nút mở file/folder bên trong MCW Launcher vẫn dùng icon và button theme bình thường.
-
-## Compatibility theme
-
-Thư mục `themes/Default Theme/` chứa các PNG cũ của dự án và giờ có `theme.json` riêng với ID `mcw-legacy-assets`. Launcher có thể chọn theme này trực tiếp; các phần chưa có PNG vẫn fallback về CSS mặc định.

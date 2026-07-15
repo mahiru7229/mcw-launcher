@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QPushButton
 
-from src.core.language.language_manager import language_manager, tr
+from src.core.language.language_manager import language_manager
 from src.core.theme.theme_manager import theme_manager
 from src.gui.config import NAVIGATION_ITEMS, VERSION
 from src.gui.pages.base_page import BasePage
@@ -56,7 +56,7 @@ class LauncherSettingsPage(BasePage):
         self.root_layout.addWidget(modrinth_card)
 
         update_card = CardWidget("Launcher updates", "MCW Launcher can check GitHub Releases and install ZIP updates after asking for confirmation.")
-        current_version_label = QLabel(tr("launcher_settings.update.current_version", version=VERSION))
+        current_version_label = QLabel(f"Current version: {VERSION}")
         current_version_label.setObjectName("ValueLabel")
         self.auto_check_updates = QCheckBox("Automatically check for updates when the launcher starts")
         self.update_channel_combo = QComboBox()
@@ -78,10 +78,14 @@ class LauncherSettingsPage(BasePage):
         appearance_card = CardWidget("Appearance", "PNG theme files are optional. Missing or invalid files automatically fall back to the built-in CSS interface.")
         self.theme_combo = QComboBox()
         self.reload_themes()
+        self.show_static_text = QCheckBox("Show static text over themed controls")
+        self.show_static_text.setToolTip("Turn this off only when the selected theme PNG already contains its own fixed label, such as the word LAUNCH.")
         reload_theme_button = set_theme_icon(QPushButton("Reload and preview theme"), "icon.action.theme")
         reload_theme_button.clicked.connect(lambda: self.reload_theme_requested.emit(str(self.theme_combo.currentData() or "mcw-default")))
+        self.show_static_text.toggled.connect(lambda _checked: self.reload_theme_requested.emit(str(self.theme_combo.currentData() or "mcw-default")))
         appearance_card.layout.addWidget(QLabel("Launcher theme"))
         appearance_card.layout.addWidget(self.theme_combo)
+        appearance_card.layout.addWidget(self.show_static_text)
         appearance_card.layout.addWidget(reload_theme_button)
         self.root_layout.addWidget(appearance_card)
 
@@ -145,6 +149,9 @@ class LauncherSettingsPage(BasePage):
         self.reload_themes()
         theme_index = self.theme_combo.findData(settings.get("theme", "mcw-default"))
         self.theme_combo.setCurrentIndex(max(0, theme_index))
+        self.show_static_text.blockSignals(True)
+        self.show_static_text.setChecked(bool(settings.get("show_static_text", True)))
+        self.show_static_text.blockSignals(False)
 
     def form_data(self) -> dict:
         return {
@@ -156,6 +163,7 @@ class LauncherSettingsPage(BasePage):
             "auto_check_updates": self.auto_check_updates.isChecked(),
             "update_channel": self.update_channel_combo.currentData() or "beta",
             "theme": self.theme_combo.currentData() or "mcw-default",
+            "show_static_text": self.show_static_text.isChecked(),
             "modrinth_include_beta": self.modrinth_include_beta.isChecked(),
             "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
         }

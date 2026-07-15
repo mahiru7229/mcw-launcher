@@ -12,7 +12,7 @@ from src.core.fs.paths import Paths
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 3
+    SCHEMA_VERSION = 4
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
         "gui": {
@@ -29,6 +29,7 @@ class LauncherSettingsManager:
         },
         "appearance": {
             "theme": "mcw-default",
+            "show_static_text": True,
         },
         "modrinth": {
             "include_beta": False,
@@ -159,6 +160,7 @@ class LauncherSettingsManager:
 
         appearance = normalized.setdefault("appearance", {})
         appearance["theme"] = str(appearance.get("theme") or "mcw-default").strip() or "mcw-default"
+        appearance["show_static_text"] = self._as_bool(appearance.get("show_static_text"), True)
 
         modrinth = normalized.setdefault("modrinth", {})
         modrinth["include_beta"] = self._as_bool(modrinth.get("include_beta"), False)

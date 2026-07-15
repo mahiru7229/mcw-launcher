@@ -37,6 +37,16 @@ def set_theme_pixmap(label: QLabel, key: str, width: int, height: int, fallback_
     return label
 
 
+def set_theme_static_text(widget: QLabel | QPushButton, role: str, fallback_text: str | None = None) -> QLabel | QPushButton:
+    text = str(widget.text() if fallback_text is None else fallback_text)
+    widget.setProperty("themeStaticTextRole", str(role))
+    widget.setProperty("themeStaticTextFallback", text)
+    widget.setProperty("themeStaticTextHidden", False)
+    if widget.property("mcw_i18n_source_text") is None:
+        widget.setProperty("mcw_i18n_source_text", text)
+    return widget
+
+
 class ThemeRuntime:
     STYLE_ASSETS = {
         "background.window": ("QWidget#Root", 0),
@@ -111,9 +121,11 @@ class ThemeRuntime:
     def __init__(self, manager: ThemeManager | None = None) -> None:
         self.manager = manager or theme_manager
         self._base_stylesheet = ""
+        self._show_static_text = True
 
-    def apply(self, root: QWidget, base_stylesheet: str, theme_id: str) -> str:
+    def apply(self, root: QWidget, base_stylesheet: str, theme_id: str, show_static_text: bool = True) -> str:
         self._base_stylesheet = str(base_stylesheet)
+        self._show_static_text = bool(show_static_text)
         self.manager.reload()
         self.manager.select(theme_id)
         stylesheet = self.build_stylesheet(self._base_stylesheet)
@@ -150,11 +162,14 @@ class ThemeRuntime:
         for widget in widgets:
             if isinstance(widget, QPushButton):
                 self._apply_button_icon(widget)
+                self._apply_static_text(widget)
             elif isinstance(widget, QLabel):
                 self._apply_label_pixmap(widget)
+                self._apply_static_text(widget)
         icon_path = self.manager.resolve_asset("icon.app")
         window = root.window()
-        window.setWindowIcon(QIcon(str(icon_path)) if icon_path is not None else QIcon())
+        if icon_path is not None:
+            window.setWindowIcon(QIcon(str(icon_path)))
 
     def _apply_button_icon(self, button: QPushButton) -> None:
         key = str(button.property("themeIcon") or "").strip()
@@ -167,6 +182,15 @@ class ThemeRuntime:
         size = max(1, int(button.property("themeIconSize") or 24))
         button.setIcon(QIcon(str(path)))
         button.setIconSize(QSize(size, size))
+
+    def _apply_static_text(self, widget: QLabel | QPushButton) -> None:
+        role = str(widget.property("themeStaticTextRole") or "").strip()
+        if not role:
+            return
+        fallback_text = str(widget.property("themeStaticTextFallback") or "")
+        should_hide = not self._show_static_text and self.manager.resolve_text_asset(role) is not None
+        widget.setProperty("themeStaticTextHidden", should_hide)
+        widget.setText("" if should_hide else fallback_text)
 
     def _apply_label_pixmap(self, label: QLabel) -> None:
         key = str(label.property("themePixmap") or "").strip()

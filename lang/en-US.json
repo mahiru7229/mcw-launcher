@@ -331,7 +331,7 @@
     "modrinth.modpack.installed": "Modpack installed successfully as instance '{name}'.",
     "launcher_settings.update.title": "Launcher updates",
     "launcher_settings.update.subtitle": "MCW Launcher can check GitHub Releases and install ZIP updates after asking for confirmation.",
-    "launcher_settings.update.current_version": "Current version: {version}",
+    "launcher_settings.update.current_version": "Current version: v0.5.0 Beta 3",
     "launcher_settings.update.auto_check": "Automatically check for updates when the launcher starts",
     "launcher_settings.update.status.not_checked": "Update status: Not checked",
     "launcher_settings.update.check": "Check for updates",
@@ -379,7 +379,9 @@
     "launcher_settings.modrinth.subtitle": "Release versions are always shown. Beta and Alpha can be enabled for both mods and modpacks.",
     "launcher_settings.theme.title": "Appearance and PNG theme",
     "launcher_settings.theme.subtitle": "Missing or invalid PNG files safely fall back to the built-in CSS interface.",
-    "launcher_settings.theme.reload": "Reload and preview theme"
+    "launcher_settings.theme.reload": "Reload and preview theme",
+    "launcher_settings.theme.show_static_text": "Show static text over themed controls",
+    "launcher_settings.theme.show_static_text.tooltip": "Turn this off only when the selected theme PNG already contains its own fixed label, such as the word LAUNCH."
   },
   "aliases": {
     "MCW Launcher": "app.name",
@@ -682,6 +684,8 @@
     "Stable": "update.channel.stable",
     "Export diagnostics": "diagnostics.export.title",
     "Open logs folder": "diagnostics.open_logs",
-    "Current version: {version}": "launcher_settings.update.current_version"
+    "Current version: v0.5.0 Beta 3": "launcher_settings.update.current_version",
+    "Show static text over themed controls": "launcher_settings.theme.show_static_text",
+    "Turn this off only when the selected theme PNG already contains its own fixed label, such as the word LAUNCH.": "launcher_settings.theme.show_static_text.tooltip"
   }
 }

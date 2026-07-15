@@ -1,10 +1,10 @@
 {
-    "schema_version": 3,
+    "schema_version": 4,
     "gui": {
         "start_page": "home",
         "show_snapshots": false,
         "remember_window_size": true,
-        "language": "vi-VN"
+        "language": "en-US"
     },
     "launch": {
         "debug_mode": false
@@ -13,7 +13,8 @@
         "geometry": "AdnQywADAAAAAACgAAAAIwAABt8AAAPFAAAAoAAAAEIAAAbfAAADxQAAAAAAAAAAB4AAAACgAAAAQgAABt8AAAPF"
     },
     "appearance": {
-        "theme": "mcw-default"
+        "theme": "mcw-legacy-assets",
+        "show_static_text": false
     },
     "modrinth": {
         "include_beta": false,
@@ -22,6 +23,6 @@
     "updates": {
         "auto_check": true,
         "channel": "beta",
-        "last_checked_at": "2026-07-15T06:35:35.897376+00:00"
+        "last_checked_at": "2026-07-15T06:55:35.580943+00:00"
     }
 }

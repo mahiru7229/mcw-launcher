@@ -19,6 +19,7 @@ class GuiSettingsController(BaseController):
         "auto_check_updates": True,
         "update_channel": "beta",
         "theme": "mcw-default",
+        "show_static_text": True,
         "modrinth_include_beta": False,
         "modrinth_include_alpha": False,
     }
@@ -51,6 +52,7 @@ class GuiSettingsController(BaseController):
             "auto_check_updates": bool(updates.get("auto_check", self.DEFAULTS["auto_check_updates"])),
             "update_channel": str(updates.get("channel", self.DEFAULTS["update_channel"])),
             "theme": str(appearance.get("theme", self.DEFAULTS["theme"])),
+            "show_static_text": bool(appearance.get("show_static_text", self.DEFAULTS["show_static_text"])),
             "modrinth_include_beta": bool(modrinth.get("include_beta", self.DEFAULTS["modrinth_include_beta"])),
             "modrinth_include_alpha": bool(modrinth.get("include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
         }
@@ -67,6 +69,7 @@ class GuiSettingsController(BaseController):
             "auto_check_updates": bool(data.get("auto_check_updates", self.DEFAULTS["auto_check_updates"])),
             "update_channel": str(data.get("update_channel", self.DEFAULTS["update_channel"])),
             "theme": str(data.get("theme", self.DEFAULTS["theme"])),
+            "show_static_text": bool(data.get("show_static_text", self.DEFAULTS["show_static_text"])),
             "modrinth_include_beta": bool(data.get("modrinth_include_beta", self.DEFAULTS["modrinth_include_beta"])),
             "modrinth_include_alpha": bool(data.get("modrinth_include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
         }
@@ -82,7 +85,7 @@ class GuiSettingsController(BaseController):
                 "auto_check": self._current["auto_check_updates"],
                 "channel": self._current["update_channel"],
             },
-            "appearance": {"theme": self._current["theme"]},
+            "appearance": {"theme": self._current["theme"], "show_static_text": self._current["show_static_text"]},
             "modrinth": {
                 "include_beta": self._current["modrinth_include_beta"],
                 "include_alpha": self._current["modrinth_include_alpha"],

@@ -30,6 +30,7 @@ class ThemeDefinition:
     author: str
     root: Path | None
     assets: dict[str, str] = field(default_factory=dict)
+    text_assets: dict[str, str] = field(default_factory=dict)
     issues: tuple[str, ...] = ()
     builtin_fallback: bool = False
 
@@ -97,6 +98,13 @@ class ThemeManager:
         except ThemeAssetError:
             return None
 
+    def resolve_text_asset(self, role: str, theme: ThemeDefinition | None = None) -> Path | None:
+        selected = theme or self.current
+        asset_key = selected.text_assets.get(str(role))
+        if not asset_key:
+            return None
+        return self.resolve_asset(asset_key, selected)
+
     def asset_status(self, theme: ThemeDefinition | None = None) -> dict[str, bool]:
         selected = theme or self.current
         return {key: self.resolve_asset(key, selected) is not None for key in THEME_ASSET_BY_KEY}
@@ -122,8 +130,12 @@ class ThemeManager:
         raw_assets = payload.get("assets", {})
         if not isinstance(raw_assets, dict):
             raise ThemeManifestError("Theme assets must be an object.")
+        raw_text_assets = payload.get("text_assets", {})
+        if not isinstance(raw_text_assets, dict):
+            raise ThemeManifestError("Theme text_assets must be an object.")
 
         assets: dict[str, str] = {}
+        text_assets: dict[str, str] = {}
         issues: list[str] = []
         for key, value in raw_assets.items():
             normalized_key = str(key).strip()
@@ -143,7 +155,18 @@ class ThemeManager:
                 except ThemeAssetError as error:
                     issues.append(str(error))
 
-        return ThemeDefinition(theme_id=theme_id, name=name, author=author, root=directory.resolve(), assets=assets, issues=tuple(issues))
+        for role, asset_key in raw_text_assets.items():
+            normalized_role = str(role).strip()
+            normalized_asset_key = str(asset_key).strip()
+            if not normalized_role or any(character in normalized_role for character in "/\\:"):
+                issues.append(f"Invalid static text role: {normalized_role!r}")
+                continue
+            if normalized_asset_key not in THEME_ASSET_BY_KEY:
+                issues.append(f"Unknown text asset key for {normalized_role}: {normalized_asset_key}")
+                continue
+            text_assets[normalized_role] = normalized_asset_key
+
+        return ThemeDefinition(theme_id=theme_id, name=name, author=author, root=directory.resolve(), assets=assets, text_assets=text_assets, issues=tuple(issues))
 
     @staticmethod
     def _safe_asset_path(root: Path, relative: str) -> Path:

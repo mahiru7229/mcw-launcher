@@ -113,5 +113,8 @@
     "icon.state.success": "icons/states/success.png",
     "icon.state.warning": "icons/states/warning.png",
     "icon.state.error": "icons/states/error.png"
+  },
+  "text_assets": {
+    "control.launch": "button.launch"
   }
 }

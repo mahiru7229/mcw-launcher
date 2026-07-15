@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QPushBu
 
 from src.core.language.language_manager import tr
 from src.gui.presenters.progress_presenter import ProgressPresenter
-from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap
+from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap, set_theme_static_text
 
 
 class LaunchControlWidget(QFrame):
@@ -63,7 +63,8 @@ class LaunchControlWidget(QFrame):
         progress_layout.addWidget(self.detail_label)
         progress_layout.addWidget(self.progress_bar)
 
-        self.launch_button = set_theme_icon(QPushButton(self.BUTTON_TEXT), "icon.action.launch", 40)
+        self.launch_button = set_theme_icon(QPushButton(tr(self.BUTTON_TEXT)), "icon.action.launch", 40)
+        set_theme_static_text(self.launch_button, "control.launch", tr(self.BUTTON_TEXT))
         self.launch_button.setObjectName("PrimaryButton")
         self.launch_button.setProperty("themeRole", "launch")
         self.launch_button.setFixedSize(230, 72)
@@ -148,8 +149,14 @@ class LaunchControlWidget(QFrame):
         self._keep_launch_button_text()
 
     def _keep_launch_button_text(self) -> None:
-        if self.launch_button.text() != self.BUTTON_TEXT:
-            self.launch_button.setText(self.BUTTON_TEXT)
+        button_text = tr(self.BUTTON_TEXT)
+        self.launch_button.setProperty("themeStaticTextFallback", button_text)
+        if bool(self.launch_button.property("themeStaticTextHidden")):
+            if self.launch_button.text():
+                self.launch_button.setText("")
+            return
+        if self.launch_button.text() != button_text:
+            self.launch_button.setText(button_text)
 
     def retranslate_dynamic(self) -> None:
         if self._mode == "progress" and self._last_event is not None:

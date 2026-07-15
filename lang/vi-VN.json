@@ -331,7 +331,7 @@
     "modrinth.modpack.installed": "Đã cài modpack thành instance '{name}'.",
     "launcher_settings.update.title": "Cập nhật launcher",
     "launcher_settings.update.subtitle": "MCW Launcher có thể kiểm tra GitHub Releases và cài bản cập nhật ZIP sau khi hỏi xác nhận.",
-    "launcher_settings.update.current_version": "Phiên bản hiện tại: {version}",
+    "launcher_settings.update.current_version": "Phiên bản hiện tại: v0.5.0 Beta 3",
     "launcher_settings.update.auto_check": "Tự động kiểm tra cập nhật khi mở launcher",
     "launcher_settings.update.status.not_checked": "Trạng thái cập nhật: Chưa kiểm tra",
     "launcher_settings.update.check": "Kiểm tra cập nhật",
@@ -379,9 +379,12 @@
     "launcher_settings.modrinth.subtitle": "Phiên bản Release luôn được hiển thị. Có thể bật Beta và Alpha cho cả mod lẫn modpack.",
     "launcher_settings.theme.title": "Giao diện và theme PNG",
     "launcher_settings.theme.subtitle": "PNG bị thiếu hoặc lỗi sẽ tự quay về giao diện CSS mặc định.",
-    "launcher_settings.theme.reload": "Tải lại và xem trước theme"
+    "launcher_settings.theme.reload": "Tải lại và xem trước theme",
+    "launcher_settings.theme.show_static_text": "Hiển thị chữ tĩnh trên các thành phần dùng theme",
+    "launcher_settings.theme.show_static_text.tooltip": "Chỉ tắt khi PNG của theme đã chứa sẵn nội dung cố định, chẳng hạn chữ LAUNCH."
   },
   "aliases": {
-    "Current version: {version}": "launcher_settings.update.current_version"
+    "Show static text over themed controls": "launcher_settings.theme.show_static_text",
+    "Turn this off only when the selected theme PNG already contains its own fixed label, such as the word LAUNCH.": "launcher_settings.theme.show_static_text.tooltip"
   }
 }

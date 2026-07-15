@@ -3,10 +3,13 @@
   "id": "mcw-legacy-assets",
   "name": "MCW Legacy Assets",
   "author": "mahiru7229",
-  "description": "Compatibility theme for the original MCW PNG assets.",
+  "description": "Compatibility theme for the original MCW PNG assets. The Launch artwork already contains its fixed label.",
   "assets": {
     "logo.main": "images/logo/main_launcher_logo.png",
     "logo.sidebar": "images/logo/main_launcher_logo_ALT.png",
     "button.launch": "images/launch_control/button/launch_button.png"
+  },
+  "text_assets": {
+    "control.launch": "button.launch"
   }
 }

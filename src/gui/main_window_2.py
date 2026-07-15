@@ -451,11 +451,10 @@ class MainWindow(QMainWindow):
         include_alpha = bool(settings.get("modrinth_include_alpha", False))
         self.modrinth_mod_dialog.set_channel_preferences(include_beta, include_alpha)
         self.modrinth_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")))
-
+        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")), bool(settings.get("show_static_text", True)))
 
     def _preview_theme(self, theme_id: str) -> None:
-        selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id)
+        selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked())
         self.logs_page.append(f"Theme preview: {selected}")
 
     def _set_modrinth_channel_preferences(self, include_beta: bool, include_alpha: bool) -> None:
@@ -484,6 +483,7 @@ class MainWindow(QMainWindow):
             retranslate_dynamic = getattr(widget, "retranslate_dynamic", None)
             if callable(retranslate_dynamic):
                 retranslate_dynamic()
+        self.theme_runtime.reapply_assets(self)
 
     def _on_task_started(self, _task_id: str, message: str, blocking: bool) -> None:
         if _task_id.startswith("update."):

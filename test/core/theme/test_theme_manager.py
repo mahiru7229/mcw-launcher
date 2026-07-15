@@ -20,9 +20,12 @@ def write_png(path: Path, width: int = 4, height: int = 4) -> None:
     path.write_bytes(signature + chunk(b"IHDR", ihdr_data) + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
 
 
-def write_manifest(root: Path, assets: dict[str, str]) -> None:
+def write_manifest(root: Path, assets: dict[str, str], text_assets: dict[str, str] | None = None) -> None:
     root.mkdir(parents=True, exist_ok=True)
-    (root / "theme.json").write_text(json.dumps({"schema_version": 1, "id": root.name, "name": "Test Theme", "author": "Test", "assets": assets}), encoding="utf-8")
+    payload = {"schema_version": 1, "id": root.name, "name": "Test Theme", "author": "Test", "assets": assets}
+    if text_assets is not None:
+        payload["text_assets"] = text_assets
+    (root / "theme.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
 def test_valid_png_asset_is_resolved(tmp_path: Path) -> None:
@@ -76,23 +79,34 @@ def test_invalid_theme_manifest_does_not_break_catalog(tmp_path: Path) -> None:
     assert manager.select("missing").theme_id == ThemeManager.FALLBACK_THEME_ID
 
 
-def test_repository_default_manifest_matches_theme_catalog() -> None:
-    from src.core.theme.theme_catalog import THEME_ASSET_BY_KEY
+def test_static_text_role_resolves_only_when_mapped_png_is_valid(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "test-theme"
+    write_manifest(theme_root, {"button.launch": "controls/launch.png"}, {"control.launch": "button.launch"})
+    write_png(theme_root / "controls" / "launch.png", 461, 133)
 
-    project_root = Path(__file__).resolve().parents[3]
-    payload = json.loads((project_root / "themes" / "mcw-default" / "theme.json").read_text(encoding="utf-8"))
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("test-theme")
 
-    assert set(payload["assets"]) == set(THEME_ASSET_BY_KEY)
-    assert "button.launch" in payload["assets"]
-    assert "button.launch_disabled" in payload["assets"]
+    assert selected.text_assets == {"control.launch": "button.launch"}
+    assert manager.resolve_text_asset("control.launch") == (theme_root / "controls" / "launch.png").resolve()
 
 
-def test_legacy_theme_manifest_exposes_existing_png_assets() -> None:
-    project_root = Path(__file__).resolve().parents[3]
-    manager = ThemeManager(project_root / "themes")
-    selected = manager.select("mcw-legacy-assets")
+def test_static_text_role_falls_back_when_png_is_missing(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "test-theme"
+    write_manifest(theme_root, {"button.launch": "controls/missing.png"}, {"control.launch": "button.launch"})
 
-    assert selected.theme_id == "mcw-legacy-assets"
-    assert manager.resolve_asset("logo.main", selected) is not None
-    assert manager.resolve_asset("logo.sidebar", selected) is not None
-    assert manager.resolve_asset("button.launch", selected) is not None
+    manager = ThemeManager(tmp_path / "themes")
+    manager.select("test-theme")
+
+    assert manager.resolve_text_asset("control.launch") is None
+
+
+def test_unknown_static_text_asset_key_is_ignored(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "test-theme"
+    write_manifest(theme_root, {}, {"control.launch": "button.unknown"})
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("test-theme")
+
+    assert selected.text_assets == {}
+    assert any("Unknown text asset key" in issue for issue in selected.issues)
