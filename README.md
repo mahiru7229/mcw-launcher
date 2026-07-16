@@ -315,10 +315,10 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | Offline accounts | Available |
 | Automatic Java handling | Available |
 | Java diagnostics and multi-source scanning | Beta |
-| PySide6 GUI | Beta |
-| Fabric Loader | Beta |
+| PySide6 GUI | Stable in v0.5.1 |
+| Fabric Loader | Stable in v0.5.1 |
 | Fabric Mod Manager | Beta — update, lock, and compatibility analysis available |
-| Modrinth mods and Fabric modpacks | Beta — safe pack update and conflict preservation available |
+| Modrinth mods and Fabric modpacks | Stable in v0.5.1 — retry, resume, progress and safe pack handling available |
 | Release/Beta/Alpha Modrinth channels | Available |
 | English and Vietnamese language packs | Available |
 | Microsoft authentication | Beta — multi-account, cancellable sign-in, DPAPI v2 and integrity protection |
@@ -334,7 +334,8 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 
 Near-term priorities:
 
-- Complete packaged Windows testing for v0.5.1 RC 1 before the v0.5.1 stable release.
+- Maintain the v0.5.1 stable line with focused hotfixes when required.
+- Develop experimental v0.6.x builds through the opt-in tester program.
 - Add interactive per-file conflict resolution for modpack updates.
 - Add backup retention rules, backup size previews, and a dedicated backup browser.
 - Improve crash diagnostics and runtime history presentation.

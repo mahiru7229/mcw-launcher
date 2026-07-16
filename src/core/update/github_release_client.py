@@ -17,7 +17,7 @@ class GitHubReleaseClient:
     CACHE_SCHEMA_VERSION = 1
     CACHE_TTL_SECONDS = 15 * 60
 
-    def __init__(self, repository: str, current_version: str, channel: str = "beta", cache_path: Path | None = None) -> None:
+    def __init__(self, repository: str, current_version: str, channel: str = "stable", cache_path: Path | None = None) -> None:
         repository_name = str(repository).strip().strip("/")
         if repository_name.count("/") != 1:
             raise ValueError("GitHub repository must use the 'owner/name' format.")

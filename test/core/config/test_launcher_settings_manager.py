@@ -82,7 +82,7 @@ def test_update_settings_are_created_and_persisted(tmp_path: Path) -> None:
     assert updated["last_checked_at"] == "2026-07-15T12:00:00+00:00"
 
 
-def test_existing_beta_channel_is_migrated_to_stable_once(tmp_path: Path) -> None:
+def test_existing_beta_channel_is_migrated_to_stable_once_for_stable_release(tmp_path: Path) -> None:
     path = tmp_path / "launcher_settings.json"
     path.write_text(json.dumps({
         "schema_version": 5,
@@ -100,7 +100,7 @@ def test_existing_beta_channel_is_migrated_to_stable_once(tmp_path: Path) -> Non
     assert migrated["channel_policy_version"] == manager.UPDATE_CHANNEL_POLICY_VERSION
 
 
-def test_user_can_opt_back_into_beta_after_stable_migration(tmp_path: Path) -> None:
+def test_user_can_join_tester_program_after_stable_migration(tmp_path: Path) -> None:
     path = tmp_path / "launcher_settings.json"
     path.write_text(json.dumps({
         "schema_version": 5,
@@ -114,7 +114,7 @@ def test_user_can_opt_back_into_beta_after_stable_migration(tmp_path: Path) -> N
     assert manager.load()["updates"]["channel"] == "beta"
 
 
-def test_already_migrated_beta_opt_in_is_preserved(tmp_path: Path) -> None:
+def test_tester_opt_in_is_preserved_after_current_stable_policy(tmp_path: Path) -> None:
     path = tmp_path / "launcher_settings.json"
     path.write_text(json.dumps({
         "schema_version": 6,
@@ -157,3 +157,22 @@ def test_download_limit_is_unlimited_by_default_and_normalized(tmp_path: Path) -
 
     manager.update_section("network", {"download_limit_mbps": 5000})
     assert manager.load()["network"]["download_limit_mbps"] == 1024.0
+
+
+def test_rc_tester_channel_is_forced_to_stable_for_first_stable_release(tmp_path: Path) -> None:
+    path = tmp_path / "launcher_settings.json"
+    path.write_text(json.dumps({
+        "schema_version": 6,
+        "updates": {
+            "auto_check": True,
+            "channel": "beta",
+            "channel_policy_version": 1,
+            "last_checked_at": None,
+        },
+    }), encoding="utf-8")
+    manager = LauncherSettingsManager(path)
+
+    updates = manager.load()["updates"]
+
+    assert updates["channel"] == "stable"
+    assert updates["channel_policy_version"] == 2

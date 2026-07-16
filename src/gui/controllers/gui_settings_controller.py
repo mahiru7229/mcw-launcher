@@ -19,6 +19,7 @@ class GuiSettingsController(BaseController):
         "language": "en-US",
         "auto_check_updates": True,
         "update_channel": "stable",
+        "tester_mode": False,
         "theme": "mcw-default",
         "show_static_text": True,
         "modrinth_include_beta": False,
@@ -54,6 +55,7 @@ class GuiSettingsController(BaseController):
             "language": str(gui.get("language", self.DEFAULTS["language"])),
             "auto_check_updates": bool(updates.get("auto_check", self.DEFAULTS["auto_check_updates"])),
             "update_channel": str(updates.get("channel", self.DEFAULTS["update_channel"])),
+            "tester_mode": str(updates.get("channel", self.DEFAULTS["update_channel"])).strip().lower() == "beta",
             "theme": str(appearance.get("theme", self.DEFAULTS["theme"])),
             "show_static_text": bool(appearance.get("show_static_text", self.DEFAULTS["show_static_text"])),
             "modrinth_include_beta": bool(modrinth.get("include_beta", self.DEFAULTS["modrinth_include_beta"])),
@@ -66,6 +68,8 @@ class GuiSettingsController(BaseController):
 
     def save(self, data: dict) -> None:
         download_limit_mbps = download_bandwidth_limiter.configure_mbps(data.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]))
+        tester_mode = bool(data.get("tester_mode", self.DEFAULTS["tester_mode"]))
+        update_channel = "beta" if tester_mode else "stable"
         self._current = {
             "start_page": str(data.get("start_page", self.DEFAULTS["start_page"])),
             "show_snapshots": bool(data.get("show_snapshots", self.DEFAULTS["show_snapshots"])),
@@ -73,7 +77,8 @@ class GuiSettingsController(BaseController):
             "remember_window_size": bool(data.get("remember_window_size", self.DEFAULTS["remember_window_size"])),
             "language": str(data.get("language", self.DEFAULTS["language"])),
             "auto_check_updates": bool(data.get("auto_check_updates", self.DEFAULTS["auto_check_updates"])),
-            "update_channel": str(data.get("update_channel", self.DEFAULTS["update_channel"])),
+            "update_channel": update_channel,
+            "tester_mode": tester_mode,
             "theme": str(data.get("theme", self.DEFAULTS["theme"])),
             "show_static_text": bool(data.get("show_static_text", self.DEFAULTS["show_static_text"])),
             "modrinth_include_beta": bool(data.get("modrinth_include_beta", self.DEFAULTS["modrinth_include_beta"])),

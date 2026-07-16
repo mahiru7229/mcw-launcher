@@ -30,7 +30,7 @@ class UpdateManager:
     PACKAGE_MANIFEST_NAME = "mcw-update.json"
     PACKAGE_MANIFEST_SCHEMA_VERSION = 1
 
-    def __init__(self, repository: str, current_version: str, channel: str = "beta") -> None:
+    def __init__(self, repository: str, current_version: str, channel: str = "stable") -> None:
         self.client = GitHubReleaseClient(repository=repository, current_version=current_version, channel=channel)
 
     def check_for_update(self, force_refresh: bool = False) -> UpdateInfo | None:

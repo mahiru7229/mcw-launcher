@@ -14,7 +14,7 @@ from src.core.fs.paths import Paths
 
 class LauncherSettingsManager:
     SCHEMA_VERSION = 6
-    UPDATE_CHANNEL_POLICY_VERSION = 1
+    UPDATE_CHANNEL_POLICY_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
         "gui": {

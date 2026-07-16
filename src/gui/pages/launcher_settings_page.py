@@ -89,13 +89,16 @@ class LauncherSettingsPage(BasePage):
         java_card.layout.addWidget(self.open_java_button)
         self.root_layout.addWidget(java_card)
 
-        update_card = CardWidget("Launcher updates", "MCW Launcher can check GitHub Releases and install ZIP updates after asking for confirmation.")
+        update_card = CardWidget("Launcher updates", "Stable updates are used by default. Join the tester program only when you want to receive experimental builds.")
         current_version_label = QLabel(f"Current version: {VERSION}")
         current_version_label.setObjectName("ValueLabel")
         self.auto_check_updates = QCheckBox("Automatically check for updates when the launcher starts")
-        self.update_channel_combo = QComboBox()
-        self.update_channel_combo.addItem("Stable", "stable")
-        self.update_channel_combo.addItem("Beta", "beta")
+        self.join_tester_program = QCheckBox("Join tester program and receive experimental updates")
+        self.tester_warning_label = QLabel("Experimental updates may contain unfinished features, bugs, crashes, or compatibility issues. Back up important instances and worlds before joining.")
+        self.tester_warning_label.setObjectName("WarningLabel")
+        self.tester_warning_label.setWordWrap(True)
+        self.tester_warning_label.setVisible(False)
+        self.join_tester_program.toggled.connect(self.tester_warning_label.setVisible)
         self.update_status_label = QLabel("Update status: Not checked")
         self.update_status_label.setObjectName("ValueLabel")
         self.update_status_label.setWordWrap(True)
@@ -103,8 +106,8 @@ class LauncherSettingsPage(BasePage):
         self.check_updates_button.clicked.connect(self.check_updates_requested.emit)
         update_card.layout.addWidget(current_version_label)
         update_card.layout.addWidget(self.auto_check_updates)
-        update_card.layout.addWidget(QLabel("Update channel"))
-        update_card.layout.addWidget(self.update_channel_combo)
+        update_card.layout.addWidget(self.join_tester_program)
+        update_card.layout.addWidget(self.tester_warning_label)
         update_card.layout.addWidget(self.update_status_label)
         update_card.layout.addWidget(self.check_updates_button)
         self.root_layout.addWidget(update_card)
@@ -203,8 +206,9 @@ class LauncherSettingsPage(BasePage):
         self.limit_download_speed.setChecked(download_limit > 0)
         self.download_limit_mbps.setValue(download_limit if download_limit > 0 else 10.0)
         self.download_limit_mbps.setEnabled(download_limit > 0)
-        channel_index = self.update_channel_combo.findData(settings.get("update_channel", "stable"))
-        self.update_channel_combo.setCurrentIndex(max(0, channel_index))
+        tester_mode = bool(settings.get("tester_mode", str(settings.get("update_channel", "stable")).strip().lower() == "beta"))
+        self.join_tester_program.setChecked(tester_mode)
+        self.tester_warning_label.setVisible(tester_mode)
         self.reload_languages()
         language_index = self.language_combo.findData(settings.get("language", "en-US"))
         self.language_combo.blockSignals(True)
@@ -225,7 +229,7 @@ class LauncherSettingsPage(BasePage):
             "remember_window_size": self.remember_window_size.isChecked(),
             "language": self.language_combo.currentData() or "en-US",
             "auto_check_updates": self.auto_check_updates.isChecked(),
-            "update_channel": self.update_channel_combo.currentData() or "stable",
+            "tester_mode": self.join_tester_program.isChecked(),
             "theme": self.theme_combo.currentData() or "mcw-default",
             "show_static_text": self.show_static_text.isChecked(),
             "modrinth_include_beta": self.modrinth_include_beta.isChecked(),
