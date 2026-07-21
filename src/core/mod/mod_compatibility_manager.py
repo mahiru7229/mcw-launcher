@@ -29,9 +29,14 @@ class ModCompatibilityManager:
         installed_versions["minecraft"] = instance.version_id
         if loader_name == ModLoaderManager.FABRIC:
             installed_versions["fabricloader"] = loader_version
+        elif loader_name == ModLoaderManager.FORGE:
+            installed_versions["forge"] = loader_version
+            installed_versions["javafml"] = loader_version
+            installed_versions["fml"] = loader_version
 
         issues: list[ModIssue] = []
         ModCompatibilityManager._append_file_issues(mods, issues)
+        ModCompatibilityManager._append_loader_issues(loader_name, enabled, issues)
         ModCompatibilityManager._append_duplicate_issues(enabled_by_id, issues)
 
         for mod in enabled:
@@ -44,10 +49,24 @@ class ModCompatibilityManager:
     @staticmethod
     def _append_file_issues(mods: list[ModInfo], issues: list[ModIssue]) -> None:
         for mod in mods:
-            if mod.status in {"Broken JAR", "Broken metadata", "Not Fabric"}:
+            if mod.status in {"Broken JAR", "Broken metadata", "Not a mod"}:
                 issues.append(ModIssue(severity="error", code="invalid-mod", message=f"{mod.name}: {mod.error or mod.status}", mod_ids=(mod.mod_id,)))
             elif mod.enabled and mod.status == "Server only":
                 issues.append(ModIssue(severity="warning", code="server-only", message=f"{mod.name} is enabled but declares a server-only environment.", mod_ids=(mod.mod_id,)))
+
+    @staticmethod
+    def _append_loader_issues(loader_name: str, mods: list[ModInfo], issues: list[ModIssue]) -> None:
+        for mod in mods:
+            if mod.loader in {"unknown", "universal", loader_name}:
+                continue
+            issues.append(
+                ModIssue(
+                    severity="error",
+                    code="loader-mismatch",
+                    message=f"{mod.name} is a {mod.loader.title()} mod, but this instance uses {loader_name.title()}.",
+                    mod_ids=(mod.mod_id,),
+                )
+            )
 
     @staticmethod
     def _append_duplicate_issues(enabled_by_id: dict[str, list[ModInfo]], issues: list[ModIssue]) -> None:
@@ -99,7 +118,7 @@ class ModCompatibilityManager:
             results = [ModCompatibilityManager._matches_requirement(version, item) for item in requirement]
             if True in results:
                 return True
-            if all(result is False for result in results):
+            if results and all(result is False for result in results):
                 return False
             return None
         if not isinstance(requirement, str):
@@ -108,6 +127,8 @@ class ModCompatibilityManager:
         expression = requirement.strip()
         if not expression or expression == "*":
             return True
+        if expression.startswith(("[", "(")) and expression.endswith(("]", ")")):
+            return ModCompatibilityManager._match_maven_range(version, expression)
         if "||" in expression:
             return ModCompatibilityManager._matches_requirement(version, [part.strip() for part in expression.split("||")])
 
@@ -120,6 +141,39 @@ class ModCompatibilityManager:
         if all(result is True for result in results):
             return True
         return None
+
+    @staticmethod
+    def _match_maven_range(version: str, expression: str) -> bool | None:
+        body = expression[1:-1].strip()
+        if "," not in body:
+            expected = body.strip()
+            return ModCompatibilityManager._match_token(version, f"={expected}") if expected else None
+
+        lower_text, upper_text = (part.strip() for part in body.split(",", 1))
+        current = ModCompatibilityManager._version_key(version)
+        if current is None:
+            return None
+
+        if lower_text:
+            lower = ModCompatibilityManager._version_key(lower_text)
+            if lower is None:
+                return None
+            if expression.startswith("["):
+                if current < lower:
+                    return False
+            elif current <= lower:
+                return False
+
+        if upper_text:
+            upper = ModCompatibilityManager._version_key(upper_text)
+            if upper is None:
+                return None
+            if expression.endswith("]"):
+                if current > upper:
+                    return False
+            elif current >= upper:
+                return False
+        return True
 
     @staticmethod
     def _match_token(version: str, token: str) -> bool | None:
@@ -164,13 +218,15 @@ class ModCompatibilityManager:
         without_build = normalized.split("+", 1)[0]
         numeric, separator, prerelease = without_build.partition("-")
         parts = numeric.split(".")
-        if not 1 <= len(parts) <= 3 or any(not part.isdigit() for part in parts):
+        if not 1 <= len(parts) <= 4 or any(not part.isdigit() for part in parts):
             return None
-        numbers = [int(part) for part in parts]
+        numbers = [int(part) for part in parts[:3]]
         while len(numbers) < 3:
             numbers.append(0)
         release_rank = 0 if separator else 1
-        return numbers[0], numbers[1], numbers[2], release_rank, prerelease.casefold()
+        extra = ".".join(parts[3:])
+        suffix = prerelease.casefold() if separator else extra
+        return numbers[0], numbers[1], numbers[2], release_rank, suffix
 
     @staticmethod
     def _caret_upper(key: tuple[int, int, int, int, str]) -> tuple[int, int, int, int, str]:

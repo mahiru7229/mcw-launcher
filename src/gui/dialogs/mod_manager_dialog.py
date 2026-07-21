@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import QAbstractItemView, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
+from src.core.config.curseforge_config_manager import CurseForgeConfigManager
 from src.core.curseforge.curseforge_registry import CurseForgeRegistry
 from src.core.language.language_manager import tr
 from src.core.modloader.mod_loader_manager import ModLoaderManager
@@ -95,8 +96,8 @@ class ModManagerDialog(QDialog):
         search_row.addWidget(self.open_folder_button)
         root.addLayout(search_row)
 
-        self.table = QTableWidget(0, 10)
-        self.table.setHorizontalHeaderLabels(["State", "Name", "Version", "Source", "Update", "Lock", "Mod ID", "Environment", "Status", "File"])
+        self.table = QTableWidget(0, 11)
+        self.table.setHorizontalHeaderLabels(["State", "Name", "Version", "Loader", "Source", "Update", "Lock", "Mod ID", "Environment", "Status", "File"])
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -104,8 +105,8 @@ class ModManagerDialog(QDialog):
         self.table.setSortingEnabled(True)
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(9, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(10, QHeaderView.ResizeMode.Stretch)
         self.table.itemSelectionChanged.connect(self._selection_changed)
         root.addWidget(self.table, 1)
 
@@ -133,6 +134,7 @@ class ModManagerDialog(QDialog):
         self.add_button.setObjectName("PrimaryButton")
         self.modrinth_button = set_theme_icon(QPushButton("Browse Modrinth"), "icon.action.modrinth")
         self.curseforge_button = set_theme_icon(QPushButton("Browse CurseForge"), "icon.action.download")
+        self.curseforge_button.setVisible(CurseForgeConfigManager.is_configured())
         self.enable_button = set_theme_icon(QPushButton("Enable"), "icon.action.enable")
         self.disable_button = set_theme_icon(QPushButton("Disable"), "icon.action.disable")
         self.remove_button = set_theme_icon(QPushButton("Remove"), "icon.action.remove")
@@ -183,6 +185,8 @@ class ModManagerDialog(QDialog):
         if loader_name in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
             loader_title = "Fabric Loader" if loader_name == ModLoaderManager.FABRIC else "Minecraft Forge"
             self.summary_label.setText(tr("Minecraft {version} • {loader} {loader_version} • Drop .jar files into this window to add them.", version=instance.version_id, loader=loader_title, loader_version=loader_version))
+            for widget in (self.check_updates_button, self.update_selected_button, self.update_all_button, self.lock_button, self.unlock_button):
+                widget.setVisible(loader_name == ModLoaderManager.FABRIC)
             self._set_actions_enabled(not self._busy)
         else:
             self.summary_label.setText(tr("This instance is Vanilla. Apply Fabric or Forge from the Instances page before adding mods."))
@@ -272,7 +276,7 @@ class ModManagerDialog(QDialog):
                 errors = sum(1 for issue in mod_issues if issue.severity == "error")
                 warnings = sum(1 for issue in mod_issues if issue.severity == "warning")
                 status = f"{status} • {errors}E/{warnings}W"
-            values = [tr("Enabled" if mod.enabled else "Disabled"), mod.name, mod.version, source, update_text, lock_text, mod.mod_id, mod.environment, status, mod.file_name]
+            values = [tr("Enabled" if mod.enabled else "Disabled"), mod.name, mod.version, tr(f"mod_loader.{mod.loader}", default=mod.loader.title()), source, update_text, lock_text, mod.mod_id, mod.environment, status, mod.file_name]
             tooltip = "\n".join(issue.message for issue in mod_issues)
             if mod.error:
                 tooltip = "\n".join(item for item in (mod.error, tooltip) if item)
@@ -361,7 +365,7 @@ class ModManagerDialog(QDialog):
         self._update_action_state()
 
     def _choose_add(self) -> None:
-        files, _ = QFileDialog.getOpenFileNames(self, tr("Add Fabric mods"), "", tr("Fabric mods (*.jar)"))
+        files, _ = QFileDialog.getOpenFileNames(self, tr("mod_manager.add_dialog.title"), "", tr("mod_manager.add_dialog.filter"))
         if files:
             self._request_add([Path(file) for file in files])
 
@@ -439,9 +443,28 @@ class ModManagerDialog(QDialog):
         update = self._updates_by_file().get(mod.file_name.casefold())
         mod_issues = self._issues_by_mod_id().get(mod.mod_id.casefold(), ())
         dependencies = "\n".join(f"  {name}: {requirement}" for name, requirement in mod.dependencies.items()) or tr("  None declared")
+        recommends = "\n".join(f"  {name}: {requirement}" for name, requirement in mod.recommends.items()) or tr("  None declared")
         authors = ", ".join(mod.authors) or tr("Unknown")
         licenses = ", ".join(mod.licenses) or tr("Unknown")
-        text = [f"{mod.name} ({mod.mod_id})", tr("Version: {version}", version=mod.version), tr("State: {state}", state=tr("Enabled" if mod.enabled else "Disabled")), tr("Environment: {environment}", environment=mod.environment), tr("Authors: {authors}", authors=authors), tr("License: {licenses}", licenses=licenses), tr("Status: {status}", status=tr(mod.status)), "", mod.description or tr("No description."), "", tr("Dependencies:"), dependencies]
+        text = [
+            f"{mod.name} ({mod.mod_id})",
+            tr("Version: {version}", version=mod.version),
+            tr("mod_manager.details.loader", loader=tr(f"mod_loader.{mod.loader}", default=mod.loader.title())),
+            tr("mod_manager.details.metadata", metadata=mod.metadata_format),
+            tr("State: {state}", state=tr("Enabled" if mod.enabled else "Disabled")),
+            tr("Environment: {environment}", environment=mod.environment),
+            tr("Authors: {authors}", authors=authors),
+            tr("License: {licenses}", licenses=licenses),
+            tr("Status: {status}", status=tr(mod.status)),
+            "",
+            mod.description or tr("No description."),
+            "",
+            tr("Dependencies:"),
+            dependencies,
+            "",
+            tr("mod_manager.details.optional_dependencies"),
+            recommends,
+        ]
         if update is not None:
             text.extend(["", "Modrinth:", f"  Project: {update.title} ({update.project_id})", f"  Installed: {update.current_version_number}", f"  Latest allowed: {update.latest_version_number} ({update.latest_version_type})", f"  Version lock: {'On' if update.locked else 'Off'}", f"  Update state: {update.status}"])
             if update.warning:
@@ -469,7 +492,7 @@ class ModManagerDialog(QDialog):
         for button in (self.refresh_button, self.analyze_button, self.open_folder_button, self.add_button, self.enable_button, self.disable_button, self.remove_button):
             button.setEnabled(enabled)
         self.modrinth_button.setEnabled(enabled and self._is_fabric_instance())
-        self.curseforge_button.setEnabled(enabled and self._is_forge_instance())
+        self.curseforge_button.setEnabled(enabled and self._is_forge_instance() and CurseForgeConfigManager.is_configured())
         self.check_updates_button.setEnabled(enabled and not self._update_checking)
         self._update_action_state()
 

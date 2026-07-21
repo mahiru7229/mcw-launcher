@@ -610,7 +610,17 @@
     "curseforge.modpack.installed": "Đã tạo instance CurseForge '{name}'. Các file được quản lý sẽ được kiểm tra khi Launch.",
     "curseforge.modpack.browse": "Duyệt modpack CurseForge",
     "curseforge.modpack.instance_name": "Tên instance Forge mới",
-    "curseforge.modpack.optional_files": "Bao gồm file tùy chọn"
+    "curseforge.modpack.optional_files": "Bao gồm file tùy chọn",
+    "mod_loader.forge": "Forge",
+    "mod_loader.neoforge": "NeoForge",
+    "mod_loader.unknown": "Không xác định",
+    "mod_loader.universal": "Đa loader",
+    "mod_manager.column.loader": "Loader",
+    "mod_manager.add_dialog.title": "Thêm file mod Minecraft",
+    "mod_manager.add_dialog.filter": "Mod Minecraft (*.jar)",
+    "mod_manager.details.loader": "Loader: {loader}",
+    "mod_manager.details.metadata": "Metadata: {metadata}",
+    "mod_manager.details.optional_dependencies": "Dependency tùy chọn:"
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

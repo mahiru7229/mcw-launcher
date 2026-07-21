@@ -12,6 +12,8 @@ import subprocess
 
 from src.core.fs.paths import Paths
 from src.core.java.java_resolver import JavaResolver
+from src.core.minecraft.library_manager import DownloadLibraryManager
+from src.core.minecraft.library_rule_manager import LibraryRuleManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.forge.forge_metadata_client import ForgeMetadataClient
 from src.core.modloader.forge.legacy_forge_installer import LegacyForgeInstaller
@@ -76,8 +78,39 @@ class ForgeVersionManager:
 
     @staticmethod
     def repair(base_version: Version, forge_version: str, reporter: ProgressReporter | None = None) -> Version:
-        Paths.forge_version_json(base_version.id, forge_version).unlink(missing_ok=True)
-        return ForgeVersionManager.install(base_version, forge_version, reporter=reporter, force_refresh=True)
+        loader = str(forge_version).strip()
+        if not loader:
+            raise RuntimeError("Select a Minecraft Forge version.")
+        cache_path = Paths.forge_version_json(base_version.id, loader)
+        previous = cache_path.read_bytes() if cache_path.is_file() else None
+        repair_log = Paths.forge_root() / "logs" / f"forge-repair-{base_version.id}-{loader}.log"
+        repair_log.parent.mkdir(parents=True, exist_ok=True)
+        if reporter is not None:
+            reporter.status(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Repairing Minecraft Forge {loader}...")
+        try:
+            version = ForgeVersionManager.install(base_version, loader, reporter=reporter, force_refresh=True)
+            DownloadLibraryManager.load(version, reporter=reporter)
+            issues = ForgeVersionManager.validate_installation(version, base_version.id, loader, verify_files=True)
+            if issues:
+                raise RuntimeError("Forge repair validation failed:\n" + "\n".join(f"- {issue}" for issue in issues))
+            repair_log.write_text(
+                f"Forge repair completed successfully.\nMinecraft: {base_version.id}\nForge: {loader}\nProfile: {version.id}\n",
+                encoding="utf-8",
+            )
+            if reporter is not None:
+                reporter.status(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Forge {loader} repair completed.")
+            return version
+        except Exception as error:
+            if previous is None:
+                cache_path.unlink(missing_ok=True)
+            else:
+                ForgeVersionManager._write_bytes(cache_path, previous)
+            repair_log.write_text(
+                f"Forge repair failed and the previous cached profile was restored.\nMinecraft: {base_version.id}\nForge: {loader}\nError: {error}\n",
+                encoding="utf-8",
+                errors="replace",
+            )
+            raise
 
     @staticmethod
     def _download_installer(game_version: str, forge_version: str, reporter: ProgressReporter | None) -> Path:
@@ -170,7 +203,14 @@ class ForgeVersionManager:
             target = Paths.libraries() / path.relative_to(source)
             target.parent.mkdir(parents=True, exist_ok=True)
             if not target.is_file() or target.stat().st_size != path.stat().st_size:
-                shutil.copy2(path, target)
+                temporary = target.with_suffix(target.suffix + ".part")
+                try:
+                    shutil.copy2(path, temporary)
+                    if temporary.stat().st_size != path.stat().st_size:
+                        raise RuntimeError(f"Forge library copy was incomplete: {path.name}")
+                    temporary.replace(target)
+                finally:
+                    temporary.unlink(missing_ok=True)
             if reporter is not None:
                 reporter.files(stage=ProgressStage.INSTALLING_MOD_LOADER, message="Importing Forge libraries...", current=index, total=total)
 
@@ -286,6 +326,65 @@ class ForgeVersionManager:
             return None
         return data
 
+
+    @staticmethod
+    def validate_installation(version: Version, game_version: str, forge_version: str, verify_files: bool = True) -> list[str]:
+        issues: list[str] = []
+        raw = version.raw_json if isinstance(version.raw_json, dict) else {}
+        forge = raw.get("forge") if isinstance(raw.get("forge"), dict) else {}
+        if forge.get("gameVersion") != game_version:
+            issues.append("The Forge profile targets a different Minecraft version.")
+        if forge.get("loaderVersion") != forge_version:
+            issues.append("The Forge profile contains a different loader version.")
+        if not str(raw.get("mainClass") or "").strip():
+            issues.append("The Forge launch profile does not define a main class.")
+
+        libraries = raw.get("libraries") if isinstance(raw.get("libraries"), list) else []
+        if not ForgeVersionManager._has_forge_runtime(libraries, raw, forge_version):
+            issues.append("The Forge runtime is missing from the launch profile.")
+
+        if verify_files:
+            for item in libraries:
+                if not isinstance(item, dict) or not LibraryRuleManager.is_allowed(item):
+                    continue
+                downloads = item.get("downloads") if isinstance(item.get("downloads"), dict) else {}
+                artifact = downloads.get("artifact") if isinstance(downloads.get("artifact"), dict) else {}
+                relative = str(artifact.get("path") or "").strip()
+                if not relative:
+                    continue
+                path = Paths.libraries() / Path(relative)
+                if not path.is_file():
+                    issues.append(f"Missing required library: {relative}")
+                    continue
+                expected_size = int(artifact.get("size") or 0)
+                if expected_size > 0 and path.stat().st_size != expected_size:
+                    issues.append(f"Required library has the wrong size: {relative}")
+                    continue
+                expected_sha1 = str(artifact.get("sha1") or "").strip().lower()
+                if expected_sha1 and ForgeVersionManager._sha1(path) != expected_sha1:
+                    issues.append(f"Required library failed SHA-1 verification: {relative}")
+        return issues
+
+    @staticmethod
+    def _has_forge_runtime(libraries: list, raw: dict, forge_version: str) -> bool:
+        runtime_artifacts = {"forge", "fmlloader", "fmlcore", "javafmllanguage", "lowcodelanguage", "mclanguage"}
+        for item in libraries:
+            if not isinstance(item, dict):
+                continue
+            coordinate = str(item.get("name") or "").strip()
+            parts = coordinate.split(":")
+            if len(parts) >= 3 and parts[0] == "net.minecraftforge" and parts[1] in runtime_artifacts:
+                return True
+
+        arguments = raw.get("arguments") if isinstance(raw.get("arguments"), dict) else {}
+        game_arguments = arguments.get("game") if isinstance(arguments.get("game"), list) else []
+        for index, value in enumerate(game_arguments[:-1]):
+            if value == "--fml.forgeVersion" and str(game_arguments[index + 1]) == forge_version:
+                return True
+
+        legacy_arguments = str(raw.get("minecraftArguments") or "")
+        return "--fml.forgeVersion" in legacy_arguments and forge_version in legacy_arguments
+
     @staticmethod
     def _sha1(path: Path) -> str:
         digest = hashlib.sha1(usedforsecurity=False)
@@ -296,10 +395,17 @@ class ForgeVersionManager:
 
     @staticmethod
     def _write_json(path: Path, data: dict) -> None:
+        ForgeVersionManager._write_bytes(path, (json.dumps(data, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+
+    @staticmethod
+    def _write_bytes(path: Path, data: bytes) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         temp = path.with_suffix(path.suffix + ".tmp")
-        temp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        temp.replace(path)
+        try:
+            temp.write_bytes(data)
+            temp.replace(path)
+        finally:
+            temp.unlink(missing_ok=True)
 
     @staticmethod
     def _lock_for(key: str) -> Lock:

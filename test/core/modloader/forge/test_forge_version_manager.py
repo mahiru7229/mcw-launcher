@@ -124,3 +124,172 @@ def test_detects_unsupported_install_client_error() -> None:
     output = "joptsimple.UnrecognizedOptionException: 'installClient' is not a recognized option"
 
     assert ForgeVersionManager._is_unsupported_install_client(output) is True
+
+
+def test_repair_restores_previous_profile_when_reinstall_fails(monkeypatch, tmp_path: Path) -> None:
+    base = make_version(tmp_path)
+    cache = tmp_path / "forge-profile.json"
+    previous = b'{"old": true}\n'
+    cache.write_bytes(previous)
+    forge_root = tmp_path / "forge"
+    monkeypatch.setattr(Paths, "forge_version_json", staticmethod(lambda game, loader: cache))
+    monkeypatch.setattr(Paths, "forge_root", staticmethod(lambda: forge_root))
+    monkeypatch.setattr(ForgeVersionManager, "install", staticmethod(lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("installer failed"))))
+
+    import pytest
+    with pytest.raises(RuntimeError, match="installer failed"):
+        ForgeVersionManager.repair(base, "47.3.0")
+
+    assert cache.read_bytes() == previous
+    assert "previous cached profile was restored" in (forge_root / "logs" / "forge-repair-1.20.1-47.3.0.log").read_text(encoding="utf-8")
+
+
+def test_validate_installation_checks_profile_and_library_files(monkeypatch, tmp_path: Path) -> None:
+    import hashlib
+
+    libraries = tmp_path / "libraries"
+    artifact = libraries / "net/minecraftforge/forge/1.20.1-47.3.0/forge-1.20.1-47.3.0.jar"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_bytes(b"forge")
+    sha1 = hashlib.sha1(b"forge", usedforsecurity=False).hexdigest()
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: libraries))
+    raw = make_version(tmp_path).raw_json
+    raw = dict(raw)
+    raw["id"] = "forge-1.20.1-47.3.0"
+    raw["mainClass"] = "cpw.mods.bootstraplauncher.BootstrapLauncher"
+    raw["forge"] = {"schemaVersion": 1, "gameVersion": "1.20.1", "loaderVersion": "47.3.0"}
+    raw["libraries"] = [
+        {
+            "name": "net.minecraftforge:forge:1.20.1-47.3.0",
+            "downloads": {
+                "artifact": {
+                    "path": "net/minecraftforge/forge/1.20.1-47.3.0/forge-1.20.1-47.3.0.jar",
+                    "sha1": sha1,
+                    "size": 5,
+                }
+            },
+        }
+    ]
+    version = make_version(tmp_path)
+    version.raw_json = raw
+    version.main_class = raw["mainClass"]
+
+    assert ForgeVersionManager.validate_installation(version, "1.20.1", "47.3.0", verify_files=True) == []
+
+    artifact.write_bytes(b"broken")
+    issues = ForgeVersionManager.validate_installation(version, "1.20.1", "47.3.0", verify_files=True)
+    assert any("wrong size" in issue or "SHA-1" in issue for issue in issues)
+
+
+def test_validate_installation_accepts_modern_forge_runtime_components(tmp_path: Path) -> None:
+    raw = make_version(tmp_path).raw_json
+    raw = dict(raw)
+    raw["id"] = "forge-1.20.1-47.4.21"
+    raw["mainClass"] = "cpw.mods.bootstraplauncher.BootstrapLauncher"
+    raw["forge"] = {"schemaVersion": 1, "gameVersion": "1.20.1", "loaderVersion": "47.4.21"}
+    raw["libraries"] = [{"name": "net.minecraftforge:fmlloader:1.20.1-47.4.21"}]
+    version = make_version(tmp_path)
+    version.raw_json = raw
+    version.main_class = raw["mainClass"]
+
+    assert ForgeVersionManager.validate_installation(version, "1.20.1", "47.4.21", verify_files=False) == []
+
+
+def test_validate_installation_ignores_libraries_for_other_operating_systems(monkeypatch, tmp_path: Path) -> None:
+    libraries = tmp_path / "libraries"
+    forge_path = libraries / "net/minecraftforge/fmlloader/1.20.1-47.4.21/fmlloader-1.20.1-47.4.21.jar"
+    forge_path.parent.mkdir(parents=True)
+    forge_path.write_bytes(b"forge-runtime")
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: libraries))
+    monkeypatch.setattr(
+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_os",
+        staticmethod(lambda: "windows"),
+    )
+    monkeypatch.setattr(
+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_arch",
+        staticmethod(lambda: "x64"),
+    )
+
+    raw = make_version(tmp_path).raw_json
+    raw = dict(raw)
+    raw["id"] = "forge-1.20.1-47.4.21"
+    raw["mainClass"] = "cpw.mods.bootstraplauncher.BootstrapLauncher"
+    raw["forge"] = {"schemaVersion": 1, "gameVersion": "1.20.1", "loaderVersion": "47.4.21"}
+    raw["libraries"] = [
+        {
+            "name": "net.minecraftforge:fmlloader:1.20.1-47.4.21",
+            "downloads": {
+                "artifact": {
+                    "path": "net/minecraftforge/fmlloader/1.20.1-47.4.21/fmlloader-1.20.1-47.4.21.jar",
+                    "sha1": "",
+                    "size": len(b"forge-runtime"),
+                }
+            },
+        },
+        {
+            "name": "ca.weblite:java-objc-bridge:1.1",
+            "rules": [{"action": "allow", "os": {"name": "osx"}}],
+            "downloads": {
+                "artifact": {
+                    "path": "ca/weblite/java-objc-bridge/1.1/java-objc-bridge-1.1.jar",
+                    "sha1": "",
+                    "size": 1,
+                }
+            },
+        },
+        {
+            "name": "org.lwjgl:lwjgl-glfw:3.3.1:natives-linux",
+            "rules": [{"action": "allow", "os": {"name": "linux"}}],
+            "downloads": {
+                "artifact": {
+                    "path": "org/lwjgl/lwjgl-glfw/3.3.1/lwjgl-glfw-3.3.1-natives-linux.jar",
+                    "sha1": "",
+                    "size": 1,
+                }
+            },
+        },
+    ]
+    version = make_version(tmp_path)
+    version.raw_json = raw
+    version.main_class = raw["mainClass"]
+
+    assert ForgeVersionManager.validate_installation(version, "1.20.1", "47.4.21", verify_files=True) == []
+
+
+def test_validate_installation_still_reports_missing_current_os_library(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: tmp_path / "libraries"))
+    monkeypatch.setattr(
+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_os",
+        staticmethod(lambda: "windows"),
+    )
+    monkeypatch.setattr(
+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_arch",
+        staticmethod(lambda: "x64"),
+    )
+
+    raw = make_version(tmp_path).raw_json
+    raw = dict(raw)
+    raw["id"] = "forge-1.20.1-47.4.21"
+    raw["mainClass"] = "cpw.mods.bootstraplauncher.BootstrapLauncher"
+    raw["forge"] = {"schemaVersion": 1, "gameVersion": "1.20.1", "loaderVersion": "47.4.21"}
+    raw["libraries"] = [
+        {"name": "net.minecraftforge:fmlloader:1.20.1-47.4.21"},
+        {
+            "name": "com.example:windows-only:1.0",
+            "rules": [{"action": "allow", "os": {"name": "windows"}}],
+            "downloads": {
+                "artifact": {
+                    "path": "com/example/windows-only/1.0/windows-only-1.0.jar",
+                    "sha1": "",
+                    "size": 1,
+                }
+            },
+        },
+    ]
+    version = make_version(tmp_path)
+    version.raw_json = raw
+    version.main_class = raw["mainClass"]
+
+    issues = ForgeVersionManager.validate_installation(version, "1.20.1", "47.4.21", verify_files=True)
+
+    assert issues == ["Missing required library: com/example/windows-only/1.0/windows-only-1.0.jar"]

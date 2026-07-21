@@ -1,8 +1,8 @@
-# Forge and CurseForge — MCW Launcher v0.6.0 Beta 1
+# Forge and CurseForge — MCW Launcher v0.6.0 Beta 2
 
 ## Scope
 
-This beta adds Minecraft Forge as a first-class instance loader and adds CurseForge browsing for Forge mods and Forge modpacks. Vanilla, Fabric, and Modrinth behavior remain available.
+Beta 2 focuses on Forge repair and local Forge mod management. CurseForge groundwork remains present, but its actions are hidden unless an API key is configured. Vanilla, Fabric, and Modrinth behavior remain available.
 
 ## CurseForge API key
 
@@ -88,9 +88,10 @@ Some CurseForge files are not available to third-party launchers. When the API m
 
 The existing per-instance managed-file policy controls whether missing required files block Launch after all retry rounds.
 
-## Beta 1 limitations
+## Beta 2 scope and limitations
 
-- CurseForge browsing is Forge-focused.
+- CurseForge browsing remains unavailable until an API key is configured.
 - NeoForge modpacks are not supported in this beta.
-- CurseForge requires developer/user API-key configuration.
-- Forge installation must be manually verified on Windows before release because the CI/container environment cannot run the packaged Windows EXE.
+- Forge Repair verifies profile metadata and downloaded libraries, then restores the previous profile if repair fails.
+- Local Mod Manager supports Fabric, modern Forge, and legacy Forge metadata.
+- The packaged Windows EXE still requires manual validation on Windows before release.

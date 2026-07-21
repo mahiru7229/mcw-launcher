@@ -5,6 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QLabel, QLineEdit, QMessageBox, QPushButton
 
+from src.core.config.curseforge_config_manager import CurseForgeConfigManager
 from src.core.language.language_manager import tr
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
@@ -78,6 +79,7 @@ class InstancesPage(BasePage):
         self.browse_modpacks_button = set_theme_icon(QPushButton("Browse Modrinth modpacks"), "icon.action.modrinth")
         self.browse_modpacks_button.clicked.connect(self.browse_modpacks_requested.emit)
         self.browse_curseforge_modpacks_button = set_theme_icon(QPushButton("Browse CurseForge modpacks"), "icon.action.download")
+        self.browse_curseforge_modpacks_button.setVisible(CurseForgeConfigManager.is_configured())
         self.browse_curseforge_modpacks_button.clicked.connect(self.browse_curseforge_modpacks_requested.emit)
         create_card.layout.addWidget(QLabel("Name"))
         create_card.layout.addWidget(self.create_name_input)

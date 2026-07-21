@@ -61,11 +61,11 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 - Automatically select a recommended stable Fabric Loader version.
 - Change or repair the Fabric Loader version from instance management.
 - Cache Fabric metadata and reuse it when possible.
-- Manage Fabric mods in a dedicated window.
+- Manage Fabric and Forge mods in a dedicated window.
 - Add, remove, enable, or disable mod files.
-- Read metadata from `fabric.mod.json`.
+- Read metadata from `fabric.mod.json`, modern Forge `mods.toml`, and legacy Forge `mcmod.info`.
 - Drag and drop supported mod JAR files into the Mod Manager.
-- Analyze duplicate mod IDs, missing/disabled dependencies, version constraints, and declared Fabric conflicts.
+- Analyze loader mismatches, duplicate mod IDs, missing/disabled dependencies, Fabric constraints, and Forge Maven-style version ranges.
 - Check, install, and bulk-install compatible Modrinth mod updates.
 - Lock individual Modrinth mods to prevent automatic dependency or bulk updates.
 
@@ -80,7 +80,7 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 - Reuse the launcher-wide progress, pause/resume, bandwidth limit, SHA-1 verification, and concurrent download system.
 - CurseForge access requires an API key supplied through `MCW_CURSEFORGE_API_KEY` or local `config/curseforge.json`; the local credential file is ignored by Git.
 
-See [`docs/FORGE_CURSEFORGE.md`](docs/FORGE_CURSEFORGE.md) for setup and current Beta 1 limitations.
+See [`docs/FORGE_CURSEFORGE.md`](docs/FORGE_CURSEFORGE.md) for setup and current Beta 2 scope and limitations.
 
 ### Modrinth
 

@@ -28,6 +28,7 @@ class InstanceController(BaseController):
     repair_finished = Signal(object)
 
     REPAIR_TASK_ID = "instance.repair.full"
+    LOADER_REPAIR_TASK_ID = "instance.loader.repair"
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
 
     def __init__(self, task_runner: TaskRunner) -> None:
@@ -129,10 +130,12 @@ class InstanceController(BaseController):
             if InstanceRunLock.is_active(instance):
                 raise RuntimeError("Close Minecraft before repairing this instance's mod loader.")
             version = ModLoaderManager.repair(instance, reporter=reporter)
-            DownloadLibraryManager.load(version, reporter=reporter)
+            loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
+            if loader_name != ModLoaderManager.FORGE:
+                DownloadLibraryManager.load(version, reporter=reporter)
             return instance
 
-        self._task_runner.run("instance.loader.repair", task, f"Repairing mod loader for '{name}'...")
+        self._task_runner.run(self.LOADER_REPAIR_TASK_ID, task, f"Repairing mod loader for '{name}'...")
 
 
     def repair_instance(self, name: str) -> None:
@@ -228,9 +231,10 @@ class InstanceController(BaseController):
             loader_name, loader_version = ModLoaderManager.normalize(result.mod_loader)
             loader_text = loader_name if loader_name == "vanilla" else f"{loader_name} {loader_version}"
             self.status_changed.emit(f"Applied {loader_text} to '{selected_name}'")
-        elif task_id == "instance.loader.repair":
+        elif task_id == self.LOADER_REPAIR_TASK_ID:
             selected_name = result.name
-            self.status_changed.emit(f"Repaired Fabric for '{selected_name}'")
+            loader_name, _ = ModLoaderManager.normalize(result.mod_loader)
+            self.status_changed.emit(f"Repaired {loader_name.title()} for '{selected_name}'")
         elif task_id == self.REPAIR_TASK_ID:
             selected_name = result.instance_name
             self.repair_finished.emit(result)

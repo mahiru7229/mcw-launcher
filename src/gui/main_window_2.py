@@ -309,6 +309,7 @@ class MainWindow(QMainWindow):
         self.task_runner.task_started.connect(self._on_task_started)
         self.task_runner.task_failed.connect(self._on_task_failed)
         self.task_runner.task_succeeded.connect(self._on_task_completed)
+        self.task_runner.task_succeeded.connect(self._on_task_succeeded)
         self.task_runner.task_failed.connect(self._on_task_completed)
         self.task_runner.busy_changed.connect(self._set_busy)
         self.task_runner.busy_changed.connect(self.mod_manager_dialog.set_busy)
@@ -754,6 +755,12 @@ class MainWindow(QMainWindow):
         if blocking or not self.task_runner.is_busy:
             self._set_status(message)
 
+    def _on_task_succeeded(self, task_id: str, _result: object) -> None:
+        if task_id == self.instance_controller.LOADER_REPAIR_TASK_ID:
+            # Progress events are queued from the worker thread. Reset on the
+            # next GUI turn so any final Forge progress event is processed first.
+            QTimer.singleShot(0, self.launch_control.reset_progress)
+
     def _on_task_completed(self, task_id: str, _result: object) -> None:
         if task_id == self.launch_controller.TASK_ID:
             self._set_launch_active(False)
@@ -787,7 +794,7 @@ class MainWindow(QMainWindow):
             self.right_panel.set_status("Launch failed")
             self.instance_controller.refresh_running(force=True)
             return
-        if task_id == self.instance_controller.REPAIR_TASK_ID:
+        if task_id in {self.instance_controller.REPAIR_TASK_ID, self.instance_controller.LOADER_REPAIR_TASK_ID}:
             self.launch_control.set_failed(str(error))
             self.home_page.set_status(tr("Repair failed"))
             self.right_panel.set_status(tr("Repair failed"))

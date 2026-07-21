@@ -610,7 +610,17 @@
     "curseforge.modpack.installed": "Created CurseForge instance '{name}'. Managed files will be verified when you launch it.",
     "curseforge.modpack.browse": "Browse CurseForge modpacks",
     "curseforge.modpack.instance_name": "New Forge instance name",
-    "curseforge.modpack.optional_files": "Include optional files"
+    "curseforge.modpack.optional_files": "Include optional files",
+    "mod_loader.forge": "Forge",
+    "mod_loader.neoforge": "NeoForge",
+    "mod_loader.unknown": "Unknown",
+    "mod_loader.universal": "Universal",
+    "mod_manager.column.loader": "Loader",
+    "mod_manager.add_dialog.title": "Add Minecraft mod files",
+    "mod_manager.add_dialog.filter": "Minecraft mods (*.jar)",
+    "mod_manager.details.loader": "Loader: {loader}",
+    "mod_manager.details.metadata": "Metadata: {metadata}",
+    "mod_manager.details.optional_dependencies": "Optional dependencies:"
   },
   "aliases": {
     "MCW Launcher": "app.name",
@@ -1072,6 +1082,7 @@
     "Loading compatible Minecraft Forge versions...": "instances.manage.loading_forge",
     "{count} compatible {loader} version(s) found.{current} Selected: {selected}.": "instances.manage.loader_versions",
     "{loader} is unavailable for this Minecraft version, or its metadata service could not be reached.": "instances.manage.loader_unavailable",
-    "Select a mod loader version first.": "instances.manage.select_loader_version"
+    "Select a mod loader version first.": "instances.manage.select_loader_version",
+    "Loader": "mod_manager.column.loader"
   }
 }

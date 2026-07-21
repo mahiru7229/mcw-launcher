@@ -10,6 +10,8 @@ class ModInfo:
     mod_id: str
     name: str
     version: str
+    loader: str = "unknown"
+    metadata_format: str = "unknown"
     description: str = ""
     environment: str = "*"
     authors: tuple[str, ...] = ()
