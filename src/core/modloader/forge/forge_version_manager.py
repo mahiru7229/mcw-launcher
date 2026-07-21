@@ -14,6 +14,7 @@ from src.core.fs.paths import Paths
 from src.core.java.java_resolver import JavaResolver
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.forge.forge_metadata_client import ForgeMetadataClient
+from src.core.modloader.forge.legacy_forge_installer import LegacyForgeInstaller
 from src.core.network.httpx_downloader import HttpDownloader
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.minecraft.version import Version
@@ -104,18 +105,41 @@ class ForgeVersionManager:
 
     @staticmethod
     def _run_installer(base_version: Version, forge_version: str, installer: Path, staging: Path, reporter: ProgressReporter | None) -> None:
+        log_path = Paths.forge_root() / "logs" / f"forge-{base_version.id}-{forge_version}.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if LegacyForgeInstaller.supports(installer):
+            result = LegacyForgeInstaller.install(installer, staging, reporter)
+            log_path.write_text(
+                "Legacy Forge installer imported without opening the installer GUI.\n"
+                f"Profile: {result.profile_id}\n"
+                f"Embedded library: {result.embedded_library}\n",
+                encoding="utf-8",
+            )
+            return
+
         java_major = int((base_version.java_version or {}).get("majorVersion") or 8)
         java = JavaResolver.resolve(java_major, reporter)
         if reporter is not None:
             reporter.status(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Running Forge {forge_version} installer...")
         creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         result = subprocess.run([str(java), "-jar", str(installer), "--installClient", str(staging)], cwd=staging, capture_output=True, text=True, timeout=15 * 60, creationflags=creation_flags)
-        log_path = Paths.forge_root() / "logs" / f"forge-{base_version.id}-{forge_version}.log"
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_path.write_text((result.stdout or "") + ("\n" if result.stdout and result.stderr else "") + (result.stderr or ""), encoding="utf-8", errors="replace")
+        output = (result.stdout or "") + ("\n" if result.stdout and result.stderr else "") + (result.stderr or "")
+        log_path.write_text(output, encoding="utf-8", errors="replace")
         if result.returncode != 0:
+            if ForgeVersionManager._is_unsupported_install_client(output):
+                raise RuntimeError(
+                    "This Forge installer uses a legacy installation format that MCW could not import. "
+                    "Please send the Forge installer log so support for this legacy profile can be added.\n"
+                    + "\n".join(output.splitlines()[-12:])
+                )
             tail = "\n".join((result.stderr or result.stdout or "Forge installer failed.").splitlines()[-12:])
             raise RuntimeError(f"Forge installer exited with code {result.returncode}.\n{tail}")
+
+    @staticmethod
+    def _is_unsupported_install_client(output: str) -> bool:
+        text = str(output).casefold()
+        return "unrecognizedoptionexception" in text and "installclient" in text
 
     @staticmethod
     def _find_profile(staging: Path, forge_version: str) -> dict:
@@ -165,25 +189,51 @@ class ForgeVersionManager:
             coordinate = str(item.get("name") or "").strip()
             path = ForgeVersionManager._maven_path(coordinate)
             local = Paths.libraries() / path
-            if not local.is_file():
+            repository = ForgeVersionManager._library_repository(item, coordinate)
+            sha1 = ForgeVersionManager._sha1(local) if local.is_file() else ForgeVersionManager._legacy_library_sha1(item)
+            if not sha1:
                 output.append(item)
                 continue
-            repository = str(item.get("url") or "https://maven.minecraftforge.net/").rstrip("/") + "/"
-            item["downloads"] = {"artifact": {"path": path.as_posix(), "url": repository + path.as_posix(), "sha1": ForgeVersionManager._sha1(local), "size": local.stat().st_size}}
+            size = local.stat().st_size if local.is_file() else max(0, int(item.get("size") or 0))
+            item["downloads"] = {"artifact": {"path": path.as_posix(), "url": repository + path.as_posix(), "sha1": sha1, "size": size}}
             output.append(item)
         normalized["libraries"] = output
         return normalized
 
     @staticmethod
     def _maven_path(coordinate: str) -> Path:
-        parts = coordinate.split(":")
+        raw = str(coordinate).strip()
+        extension = "jar"
+        if "@" in raw:
+            raw, extension = raw.rsplit("@", 1)
+            extension = extension.strip() or "jar"
+        parts = raw.split(":")
         if len(parts) < 3:
             raise RuntimeError(f"Invalid Forge library coordinate: {coordinate}")
         group, artifact, version = parts[:3]
         classifier = parts[3] if len(parts) > 3 and parts[3] else ""
-        extension = parts[4] if len(parts) > 4 and parts[4] else "jar"
         filename = f"{artifact}-{version}{'-' + classifier if classifier else ''}.{extension}"
         return Path(*group.split("."), artifact, version, filename)
+
+    @staticmethod
+    def _legacy_library_sha1(item: dict) -> str:
+        values = item.get("checksums") if isinstance(item.get("checksums"), list) else []
+        for value in values:
+            checksum = str(value).strip().lower()
+            if len(checksum) == 40 and all(character in "0123456789abcdef" for character in checksum):
+                return checksum
+        return ""
+
+    @staticmethod
+    def _library_repository(item: dict, coordinate: str) -> str:
+        configured = str(item.get("url") or "").strip()
+        if configured:
+            if configured.startswith("http://files.minecraftforge.net/maven"):
+                configured = configured.replace("http://files.minecraftforge.net/maven", "https://maven.minecraftforge.net", 1)
+            return configured.rstrip("/") + "/"
+        if str(coordinate).startswith(("net.minecraftforge:", "de.oceanlabs.mcp:")):
+            return "https://maven.minecraftforge.net/"
+        return "https://libraries.minecraft.net/"
 
     @staticmethod
     def _merge_profiles(base: dict, profile: dict, game_version: str, forge_version: str) -> dict:
