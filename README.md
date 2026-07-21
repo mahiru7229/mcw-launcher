@@ -80,7 +80,7 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 - Reuse the launcher-wide progress, pause/resume, bandwidth limit, SHA-1 verification, and concurrent download system.
 - CurseForge access requires an API key supplied through `MCW_CURSEFORGE_API_KEY` or local `config/curseforge.json`; the local credential file is ignored by Git.
 
-See [`docs/FORGE_CURSEFORGE.md`](docs/FORGE_CURSEFORGE.md) for setup and current Beta 2 scope and limitations.
+See [`docs/FORGE_CURSEFORGE.md`](docs/FORGE_CURSEFORGE.md) for setup and current Beta 3 scope and limitations.
 
 ### Modrinth
 
@@ -334,7 +334,8 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | Release/Beta/Alpha Modrinth channels | Available |
 | English and Vietnamese language packs | Available |
 | Microsoft authentication | Beta — multi-account, cancellable sign-in, DPAPI v2 and integrity protection |
-| Forge / NeoForge / Quilt | Not currently supported |
+| Forge Loader | Beta in v0.6.x — legacy/modern installation, repair, rollback, pre-launch checks, diagnostics, and manual mod management |
+| NeoForge / Quilt | Not currently supported |
 | Optional PNG theme system | Beta |
 | Game lifecycle and crash detection | Beta |
 | Full instance repair | Beta |

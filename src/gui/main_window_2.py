@@ -185,6 +185,9 @@ class MainWindow(QMainWindow):
         self.instances_page.forge_versions_requested.connect(self.mod_loader_controller.load_forge_versions)
         self.instances_page.loader_change_requested.connect(self.instance_controller.change_loader)
         self.instances_page.repair_loader_requested.connect(self.instance_controller.repair_loader)
+        self.instances_page.restore_forge_requested.connect(self.instance_controller.restore_previous_forge)
+        self.instances_page.open_forge_logs_requested.connect(self._open_forge_logs)
+        self.instances_page.export_forge_diagnostics_requested.connect(self._export_forge_diagnostics)
         self.instances_page.repair_instance_requested.connect(self.instance_controller.repair_instance)
         self.instances_page.manage_mods_requested.connect(self._open_mod_manager)
         self.instances_page.browse_modpacks_requested.connect(self._open_modrinth_modpacks)
@@ -238,6 +241,7 @@ class MainWindow(QMainWindow):
         self.instance_controller.instances_changed.connect(self.instance_settings_page.set_instances)
         self.instance_controller.running_instances_changed.connect(self.right_panel.set_running_instances)
         self.instance_controller.selected_instance_changed.connect(self._instance_selected)
+        self.instance_controller.forge_diagnostics_finished.connect(self._forge_diagnostics_finished)
         self.instance_controller.export_finished.connect(self._show_export_finished)
 
         self.instance_settings_controller.settings_loaded.connect(self.instance_settings_page.set_settings)
@@ -756,7 +760,11 @@ class MainWindow(QMainWindow):
             self._set_status(message)
 
     def _on_task_succeeded(self, task_id: str, _result: object) -> None:
-        if task_id == self.instance_controller.LOADER_REPAIR_TASK_ID:
+        if task_id in {
+            self.instance_controller.LOADER_CHANGE_TASK_ID,
+            self.instance_controller.LOADER_REPAIR_TASK_ID,
+            self.instance_controller.FORGE_RESTORE_TASK_ID,
+        }:
             # Progress events are queued from the worker thread. Reset on the
             # next GUI turn so any final Forge progress event is processed first.
             QTimer.singleShot(0, self.launch_control.reset_progress)
@@ -794,7 +802,12 @@ class MainWindow(QMainWindow):
             self.right_panel.set_status("Launch failed")
             self.instance_controller.refresh_running(force=True)
             return
-        if task_id in {self.instance_controller.REPAIR_TASK_ID, self.instance_controller.LOADER_REPAIR_TASK_ID}:
+        if task_id in {
+            self.instance_controller.REPAIR_TASK_ID,
+            self.instance_controller.LOADER_CHANGE_TASK_ID,
+            self.instance_controller.LOADER_REPAIR_TASK_ID,
+            self.instance_controller.FORGE_RESTORE_TASK_ID,
+        }:
             self.launch_control.set_failed(str(error))
             self.home_page.set_status(tr("Repair failed"))
             self.right_panel.set_status(tr("Repair failed"))
@@ -840,6 +853,42 @@ class MainWindow(QMainWindow):
             return
         self.logs_page.append(tr("diagnostics.export.success", path=path))
         QMessageBox.information(self, tr("diagnostics.export.title"), tr("diagnostics.export.success", path=path))
+
+    def _open_forge_logs(self, name: str) -> None:
+        try:
+            instance = InstanceManager.load(name)
+        except Exception as error:
+            self._show_error(tr("Forge logs"), str(error))
+            return
+        instance_logs = Paths.forge_instance_root(instance) / "logs"
+        global_logs = Paths.forge_root() / "logs"
+        target = instance_logs if instance_logs.exists() and any(instance_logs.iterdir()) else global_logs
+        target.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(target.resolve())))
+
+    def _export_forge_diagnostics(self, name: str) -> None:
+        try:
+            instance = InstanceManager.load(name)
+        except Exception as error:
+            self._show_error(tr("Forge diagnostics"), str(error))
+            return
+        suggested = Paths.forge_diagnostics_default_path(instance)
+        selected, _ = QFileDialog.getSaveFileName(
+            self,
+            tr("forge.export_diagnostics"),
+            str(suggested),
+            tr("ZIP archive (*.zip)"),
+        )
+        if selected:
+            self.instance_controller.export_forge_diagnostics(name, Path(selected))
+
+    def _forge_diagnostics_finished(self, path: object) -> None:
+        self.logs_page.append(tr("Forge diagnostics exported to: {path}", path=path))
+        QMessageBox.information(
+            self,
+            tr("Forge diagnostics"),
+            tr("Forge diagnostics exported to: {path}", path=path),
+        )
 
     def _open_logs_folder(self) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(Paths.logs_root().resolve())))

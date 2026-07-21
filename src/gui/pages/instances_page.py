@@ -25,6 +25,9 @@ class InstancesPage(BasePage):
     forge_versions_requested = Signal(str)
     loader_change_requested = Signal(str, str, str)
     repair_loader_requested = Signal(str)
+    restore_forge_requested = Signal(str)
+    open_forge_logs_requested = Signal(str)
+    export_forge_diagnostics_requested = Signal(str)
     repair_instance_requested = Signal(str)
     manage_mods_requested = Signal(str)
     browse_modpacks_requested = Signal()
@@ -112,6 +115,17 @@ class InstancesPage(BasePage):
         self.repair_loader_button.setToolTip("Rebuild Fabric or Forge metadata and verify loader libraries without changing mods or saves.")
         self.repair_loader_button.clicked.connect(self._request_loader_repair)
         self.repair_loader_button.setEnabled(False)
+        self.restore_forge_button = set_theme_icon(QPushButton("Restore previous loader"), "icon.action.restore")
+        self.restore_forge_button.setToolTip("Restore the mod-loader installation recorded before the last Forge change.")
+        self.restore_forge_button.clicked.connect(self._request_restore_forge)
+        self.restore_forge_button.setEnabled(False)
+        self.open_forge_logs_button = set_theme_icon(QPushButton("Open Forge logs"), "icon.action.folder")
+        self.open_forge_logs_button.clicked.connect(lambda: self.open_forge_logs_requested.emit(self.current_instance_name()))
+        self.open_forge_logs_button.setEnabled(False)
+        self.export_forge_diagnostics_button = set_theme_icon(QPushButton("Export Forge diagnostics"), "icon.action.export")
+        self.export_forge_diagnostics_button.setToolTip("Export Forge profile, logs, mod metadata, and pre-launch results without accounts, tokens, worlds, or mod JAR contents.")
+        self.export_forge_diagnostics_button.clicked.connect(lambda: self.export_forge_diagnostics_requested.emit(self.current_instance_name()))
+        self.export_forge_diagnostics_button.setEnabled(False)
         self.repair_instance_button = set_theme_icon(QPushButton("Repair instance"), "icon.action.repair")
         self.repair_instance_button.setToolTip("Verify the client, libraries, assets, natives, mod loader, and Java without changing worlds or mods.")
         self.repair_instance_button.clicked.connect(self._request_instance_repair)
@@ -151,6 +165,9 @@ class InstancesPage(BasePage):
         manage_card.layout.addWidget(self.manage_loader_status)
         manage_card.layout.addWidget(self.apply_loader_button)
         manage_card.layout.addWidget(self.repair_loader_button)
+        manage_card.layout.addWidget(self.restore_forge_button)
+        manage_card.layout.addWidget(self.open_forge_logs_button)
+        manage_card.layout.addWidget(self.export_forge_diagnostics_button)
         manage_card.layout.addWidget(QLabel("Target name"))
         manage_card.layout.addWidget(self.target_name_input)
         manage_card.layout.addWidget(self.include_saves_checkbox)
@@ -270,6 +287,9 @@ class InstancesPage(BasePage):
             self.manage_loader_status.setText(tr("Select an instance to manage its mod loader."))
             self.manage_mods_button.setEnabled(False)
             self.repair_loader_button.setEnabled(False)
+            self.restore_forge_button.setEnabled(False)
+            self.open_forge_logs_button.setEnabled(False)
+            self.export_forge_diagnostics_button.setEnabled(False)
             self.repair_instance_button.setEnabled(False)
             self.create_backup_button.setEnabled(False)
             self.restore_backup_button.setEnabled(False)
@@ -292,6 +312,11 @@ class InstancesPage(BasePage):
         self.manage_loader_combo.blockSignals(False)
         self.manage_mods_button.setEnabled(loader_name in {"fabric", "forge"})
         self.repair_loader_button.setEnabled(loader_name in {"fabric", "forge"})
+        is_forge = loader_name == "forge"
+        rollback_path = Path(instance.instance_dir) / ".mcw" / "forge" / "previous-installation.json"
+        self.restore_forge_button.setEnabled(rollback_path.is_file())
+        self.open_forge_logs_button.setEnabled(is_forge)
+        self.export_forge_diagnostics_button.setEnabled(is_forge)
         self.repair_instance_button.setEnabled(True)
         self.create_backup_button.setEnabled(True)
         self.restore_backup_button.setEnabled(True)
@@ -315,6 +340,9 @@ class InstancesPage(BasePage):
         self.apply_loader_button.setEnabled(available)
         if not available:
             self.repair_loader_button.setEnabled(False)
+            self.restore_forge_button.setEnabled(False)
+            self.open_forge_logs_button.setEnabled(False)
+            self.export_forge_diagnostics_button.setEnabled(False)
             self.repair_instance_button.setEnabled(False)
 
     def _manage_loader_selected(self, _loader_text: str = "") -> None:
@@ -331,6 +359,11 @@ class InstancesPage(BasePage):
         self.manage_loader_version_combo.setEnabled(is_modded)
         self.manage_mods_button.setEnabled(current_is_modded)
         self.repair_loader_button.setEnabled(current_is_modded)
+        current_is_forge = current_loader_name == "forge"
+        rollback_path = Path(instance.instance_dir) / ".mcw" / "forge" / "previous-installation.json"
+        self.restore_forge_button.setEnabled(rollback_path.is_file())
+        self.open_forge_logs_button.setEnabled(current_is_forge)
+        self.export_forge_diagnostics_button.setEnabled(current_is_forge)
 
         if selected_loader == "vanilla":
             self.manage_loader_status.setText(tr("Apply Vanilla to remove the current mod loader. Mod files are kept in the instance mods folder."))
@@ -477,6 +510,24 @@ class InstancesPage(BasePage):
         self.repair_loader_requested.emit(name)
 
 
+    def _request_restore_forge(self) -> None:
+        name = self.current_instance_name()
+        instance = self._instances.get(name)
+        if instance is None:
+            return
+        rollback_path = Path(instance.instance_dir) / ".mcw" / "forge" / "previous-installation.json"
+        if not rollback_path.is_file():
+            return
+        answer = QMessageBox.question(
+            self,
+            tr("Restore previous loader"),
+            tr("Restore the previous mod-loader installation for '{name}'? Mods, config, saves, and settings will be kept.", name=name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.restore_forge_requested.emit(name)
+
+
     def _request_instance_repair(self) -> None:
         name = self.current_instance_name()
         if not name:
@@ -512,4 +563,9 @@ class InstancesPage(BasePage):
     def retranslate_dynamic(self) -> None:
         self.browse_modpacks_button.setText(tr("modrinth.modpack.browse"))
         self.browse_curseforge_modpacks_button.setText(tr("curseforge.modpack.browse"))
+        self.restore_forge_button.setText(tr("forge.restore_previous"))
+        self.restore_forge_button.setToolTip(tr("forge.restore.tooltip"))
+        self.open_forge_logs_button.setText(tr("forge.open_logs"))
+        self.export_forge_diagnostics_button.setText(tr("forge.export_diagnostics"))
+        self.export_forge_diagnostics_button.setToolTip(tr("forge.diagnostics.tooltip"))
         self._render_instance(self.current_instance_name())

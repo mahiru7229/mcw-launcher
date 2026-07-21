@@ -36,7 +36,9 @@ def _window_stub() -> SimpleNamespace:
     return SimpleNamespace(
         instance_controller=SimpleNamespace(
             REPAIR_TASK_ID="instance.repair.full",
+            LOADER_CHANGE_TASK_ID="instance.loader",
             LOADER_REPAIR_TASK_ID="instance.loader.repair",
+            FORGE_RESTORE_TASK_ID="instance.loader.restore",
         ),
         launch_controller=SimpleNamespace(TASK_ID="minecraft.launch"),
         launch_control=_LaunchControl(),

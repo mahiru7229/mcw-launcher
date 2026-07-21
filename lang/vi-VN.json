@@ -620,7 +620,17 @@
     "mod_manager.add_dialog.filter": "Mod Minecraft (*.jar)",
     "mod_manager.details.loader": "Loader: {loader}",
     "mod_manager.details.metadata": "Metadata: {metadata}",
-    "mod_manager.details.optional_dependencies": "Dependency tùy chọn:"
+    "mod_manager.details.optional_dependencies": "Dependency tùy chọn:",
+    "forge.restore_previous": "Khôi phục loader trước đó",
+    "forge.open_logs": "Mở log Forge",
+    "forge.export_diagnostics": "Xuất chẩn đoán Forge",
+    "forge.restore.confirm": "Khôi phục bản cài mod loader trước đó cho '{name}'? Mod, config, save và cài đặt sẽ được giữ nguyên.",
+    "forge.logs.title": "Log Forge",
+    "forge.diagnostics.title": "Chẩn đoán Forge",
+    "forge.diagnostics.filter": "Tệp ZIP (*.zip)",
+    "forge.diagnostics.success": "Đã xuất chẩn đoán Forge tới: {path}",
+    "forge.restore.tooltip": "Khôi phục bản cài mod loader được ghi lại trước lần thay đổi Forge gần nhất.",
+    "forge.diagnostics.tooltip": "Xuất profile Forge, log, metadata mod và kết quả kiểm tra trước khi chạy; không chứa tài khoản, token, world hoặc nội dung file mod JAR."
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

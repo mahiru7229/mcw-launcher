@@ -269,6 +269,30 @@ class Paths:
         return directory
 
     @staticmethod
+    def forge_instance_root(instance: Instance) -> Path:
+        directory = Path(instance.instance_dir) / ".mcw" / "forge"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def forge_rollback_path(instance: Instance) -> Path:
+        return Paths.forge_instance_root(instance) / "previous-installation.json"
+
+    @staticmethod
+    def forge_instance_log_path(instance: Instance) -> Path:
+        directory = Paths.forge_instance_root(instance) / "logs"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory / "forge-change.log"
+
+    @staticmethod
+    def forge_diagnostics_default_path(instance: Instance) -> Path:
+        from datetime import datetime
+
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        safe_name = "".join(character if character.isalnum() or character in {"-", "_"} else "-" for character in instance.name).strip("-") or "instance"
+        return Paths.logs_root() / f"MCW-Forge-Diagnostics-{safe_name}-{timestamp}.zip"
+
+    @staticmethod
     def curseforge_root() -> Path:
         directory = Paths.CACHE_ROOT / "content" / "curseforge"
         directory.mkdir(parents=True, exist_ok=True)

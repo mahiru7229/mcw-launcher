@@ -1,8 +1,8 @@
-# Forge and CurseForge — MCW Launcher v0.6.0 Beta 2
+# Forge and CurseForge — MCW Launcher v0.6.0 Beta 3
 
 ## Scope
 
-Beta 2 focuses on Forge repair and local Forge mod management. CurseForge groundwork remains present, but its actions are hidden unless an API key is configured. Vanilla, Fabric, and Modrinth behavior remain available.
+Beta 3 focuses on transactional Forge version switching, one-step rollback, pre-launch compatibility checks, and privacy-safe diagnostics. CurseForge groundwork remains present, but its actions are hidden unless an API key is configured. Vanilla, Fabric, and Modrinth behavior remain available.
 
 ## CurseForge API key
 
@@ -88,10 +88,37 @@ Some CurseForge files are not available to third-party launchers. When the API m
 
 The existing per-instance managed-file policy controls whether missing required files block Launch after all retry rounds.
 
-## Beta 2 scope and limitations
+## Beta 3 scope and limitations
 
 - CurseForge browsing remains unavailable until an API key is configured.
 - NeoForge modpacks are not supported in this beta.
 - Forge Repair verifies profile metadata and downloaded libraries, then restores the previous profile if repair fails.
 - Local Mod Manager supports Fabric, modern Forge, and legacy Forge metadata.
 - The packaged Windows EXE still requires manual validation on Windows before release.
+
+
+## Forge version switching and rollback
+
+When changing from one Forge version to another, MCW Launcher prepares and verifies the target profile and required libraries before updating `instance.json`. After a successful change, the previous loader is recorded at:
+
+```text
+instances/<instance>/.mcw/forge/previous-installation.json
+```
+
+The **Restore previous loader** action prepares the recorded loader, verifies Forge files when applicable, and only then updates the instance. A failed change or restore leaves the current loader untouched.
+
+## Forge pre-launch check
+
+Forge instances are checked before Minecraft starts. Errors block Launch; warnings are returned with the normal launch warnings.
+
+Blocking checks include:
+
+- invalid or missing Forge runtime metadata;
+- Fabric/NeoForge mods in a Forge instance;
+- duplicate enabled mod IDs;
+- missing, disabled, or incompatible required dependencies;
+- required Forge libraries that remain missing or invalid after the downloader runs.
+
+## Forge diagnostics
+
+**Export Forge diagnostics** creates a ZIP containing the cached Forge profile, Forge installer/change logs, sanitized instance settings, mod metadata, Minecraft logs, and pre-launch results. It never includes account databases, OAuth credentials, worlds, saves, or mod JAR contents.

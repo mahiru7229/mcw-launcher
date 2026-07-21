@@ -14,6 +14,7 @@ from src.core.minecraft.download_manager import DownloadClientManager
 from src.core.minecraft.launcher_manager import LauncherManager
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManager
 from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
@@ -52,6 +53,9 @@ class MinecraftExecutor:
             version = ModLoaderManager.load(instance, reporter)
             download_pause_controller.raise_if_requested()
 
+            forge_preflight = ForgePreflightManager.scan(instance, version, verify_files=False)
+            ForgePreflightManager.raise_for_errors(forge_preflight)
+
             reporter.status(stage=ProgressStage.DOWNLOADING_CLIENT, message="Checking Minecraft client...")
             DownloadClientManager.load(version=version, reporter=reporter)
             download_pause_controller.raise_if_requested()
@@ -59,6 +63,11 @@ class MinecraftExecutor:
             reporter.status(stage=ProgressStage.DOWNLOADING_LIBRARIES, message="Checking Minecraft libraries...")
             DownloadLibraryManager.load(version=version, reporter=reporter)
             download_pause_controller.raise_if_requested()
+
+            forge_runtime_issues = ForgePreflightManager.validate_runtime_files(instance, version)
+            if forge_runtime_issues:
+                details = "\n".join(f"- {issue}" for issue in forge_runtime_issues)
+                raise RuntimeError(f"Forge runtime verification failed:\n{details}")
 
             reporter.status(stage=ProgressStage.DOWNLOADING_ASSETS, message="Checking Minecraft assets...")
             AssetManager.load(version=version, reporter=reporter)
@@ -97,7 +106,8 @@ class MinecraftExecutor:
                 "minecraftJavaMajorVersion": java_major,
                 "minecraftVersion": version.id,
             }
-            warnings = tuple(modrinth_warnings) + tuple(curseforge_warnings)
+            forge_warnings = tuple(issue.message for issue in forge_preflight.warnings)
+            warnings = tuple(modrinth_warnings) + tuple(curseforge_warnings) + forge_warnings
             if warnings:
                 result["warnings"] = warnings
             return result

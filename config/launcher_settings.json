@@ -1,5 +1,5 @@
 {
-    "schema_version": 4,
+    "schema_version": 6,
     "gui": {
         "start_page": "home",
         "show_snapshots": false,
@@ -20,9 +20,13 @@
         "include_beta": true,
         "include_alpha": true
     },
+    "network": {
+        "download_limit_mbps": 0.0
+    },
     "updates": {
         "auto_check": true,
-        "channel": "beta",
-        "last_checked_at": "2026-07-15T07:58:16.038391+00:00"
+        "channel": "stable",
+        "channel_policy_version": 2,
+        "last_checked_at": "2026-07-21T08:47:56.811787+00:00"
     }
 }

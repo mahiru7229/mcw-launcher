@@ -36,7 +36,7 @@ class InstanceRepairManager:
 
         loader_name, loader_version = ModLoaderManager.normalize(instance.mod_loader)
         reporter.status(stage=ProgressStage.LOADING_VERSION, message=f"Refreshing Minecraft {instance.version_id} metadata...")
-        if loader_name == ModLoaderManager.FABRIC:
+        if loader_name in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
             version = ModLoaderManager.repair(instance, reporter)
         else:
             version = VersionManager.load(instance.version_id)

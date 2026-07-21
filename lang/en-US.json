@@ -620,7 +620,17 @@
     "mod_manager.add_dialog.filter": "Minecraft mods (*.jar)",
     "mod_manager.details.loader": "Loader: {loader}",
     "mod_manager.details.metadata": "Metadata: {metadata}",
-    "mod_manager.details.optional_dependencies": "Optional dependencies:"
+    "mod_manager.details.optional_dependencies": "Optional dependencies:",
+    "forge.restore_previous": "Restore previous loader",
+    "forge.open_logs": "Open Forge logs",
+    "forge.export_diagnostics": "Export Forge diagnostics",
+    "forge.restore.confirm": "Restore the previous mod-loader installation for '{name}'? Mods, config, saves, and settings will be kept.",
+    "forge.logs.title": "Forge logs",
+    "forge.diagnostics.title": "Forge diagnostics",
+    "forge.diagnostics.filter": "ZIP archive (*.zip)",
+    "forge.diagnostics.success": "Forge diagnostics exported to: {path}",
+    "forge.restore.tooltip": "Restore the mod-loader installation recorded before the last Forge change.",
+    "forge.diagnostics.tooltip": "Export Forge profile, logs, mod metadata, and pre-launch results without accounts, tokens, worlds, or mod JAR contents."
   },
   "aliases": {
     "MCW Launcher": "app.name",
@@ -1083,6 +1093,16 @@
     "{count} compatible {loader} version(s) found.{current} Selected: {selected}.": "instances.manage.loader_versions",
     "{loader} is unavailable for this Minecraft version, or its metadata service could not be reached.": "instances.manage.loader_unavailable",
     "Select a mod loader version first.": "instances.manage.select_loader_version",
-    "Loader": "mod_manager.column.loader"
+    "Loader": "mod_manager.column.loader",
+    "Open Forge logs": "forge.open_logs",
+    "Export Forge diagnostics": "forge.export_diagnostics",
+    "Restore the previous mod-loader installation for '{name}'? Mods, config, saves, and settings will be kept.": "forge.restore.confirm",
+    "Forge logs": "forge.logs.title",
+    "Forge diagnostics": "forge.diagnostics.title",
+    "ZIP archive (*.zip)": "forge.diagnostics.filter",
+    "Forge diagnostics exported to: {path}": "forge.diagnostics.success",
+    "Export Forge profile, logs, mod metadata, and pre-launch results without accounts, tokens, worlds, or mod JAR contents.": "forge.diagnostics.tooltip",
+    "Restore previous loader": "forge.restore_previous",
+    "Restore the mod-loader installation recorded before the last Forge change.": "forge.restore.tooltip"
   }
 }
