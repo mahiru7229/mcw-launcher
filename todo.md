@@ -1,8 +1,8 @@
-# Zen Launcher - UI Asset Checklist
+# MCW Launcher - UI Asset Checklist
 
 Mục tiêu:
 
-Danh sách toàn bộ asset cần thiết để hoàn thiện giao diện Zen Launcher.
+Danh sách toàn bộ asset cần thiết để hoàn thiện giao diện MCW Launcher.
 
 Thiết kế được tự do sáng tạo.
 
