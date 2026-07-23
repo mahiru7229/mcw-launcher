@@ -98,3 +98,16 @@ def test_failed_state_keeps_technical_error_out_of_progress_area(app):
     assert widget.detail_label.text() == "Open Logs to see the full error details."
     assert "broken mod" not in widget.detail_label.text()
     assert widget.stage_label.text() == "FAILED"
+
+
+def test_completed_operation_sets_terminal_ready_progress(app):
+    widget = LaunchControlWidget()
+
+    widget.set_operation_completed("loader.progress.ready", "loader.progress.ready_detail")
+
+    assert widget.progress_bar.value() == 100
+    assert widget.progress_bar.format() == "100%"
+    assert widget.stage_label.text() == "READY"
+    assert widget.stage_label.property("state") == "success"
+    assert widget.status_label.text() == "Mod loader ready"
+    assert "instance is ready" in widget.detail_label.text()

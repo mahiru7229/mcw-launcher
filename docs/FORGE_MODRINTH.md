@@ -1,6 +1,6 @@
 # Forge + Modrinth workflow
 
-MCW Launcher `v0.6.0-beta.5` supports Modrinth mods and `.mrpack` modpacks for both Fabric and Forge.
+MCW Launcher `v0.6.0-rc.1` supports Modrinth mods and `.mrpack` modpacks for both Fabric and Forge.
 
 ## Browse Mods
 
@@ -69,7 +69,7 @@ Mod and modpack updates use the loader saved in the instance/registry. A managed
 
 The updater creates a full safety backup, preserves user-modified conflicts, removes obsolete unmodified managed files, and rolls back the instance when applying the target version fails.
 
-Beta 5 avoids downloading or copying files that already match the target manifest. Preserved files remain in the managed registry so later scans and repairs can still explain their state.
+RC 1 avoids downloading or copying files that already match the target manifest. Preserved files remain in the managed registry so later scans and repairs can still explain their state.
 
 ## Repairing
 

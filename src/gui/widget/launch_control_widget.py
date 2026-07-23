@@ -24,6 +24,8 @@ class LaunchControlWidget(QFrame):
         self._last_result: dict | None = None
         self._last_error_status = "Launch failed"
         self._last_error_detail = "launch.error.logs_hint"
+        self._last_completed_status = "Task completed"
+        self._last_completed_detail = "Everything is ready."
         self._last_exit_result: object | None = None
         self._busy = False
         self._launch_active = False
@@ -143,6 +145,23 @@ class LaunchControlWidget(QFrame):
         self._refresh_launch_button()
 
 
+
+    def set_operation_completed(self, status: str, detail: str) -> None:
+        self._mode = "operation_completed"
+        self._last_completed_status = status or "Task completed"
+        self._last_completed_detail = detail or "Everything is ready."
+        self._busy = False
+        self._launch_active = False
+        self._pause_pending = False
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100)
+        self.progress_bar.setFormat("100%")
+        self.status_label.setText(tr(self._last_completed_status))
+        self.detail_label.setText(tr(self._last_completed_detail))
+        self.stage_label.setText(tr("READY"))
+        self._set_stage_state("success")
+        self._refresh_launch_button()
+
     def set_exit_result(self, result: object) -> None:
         self._mode = "exit"
         self._last_exit_result = result
@@ -258,6 +277,8 @@ class LaunchControlWidget(QFrame):
             self.set_failed(self._last_error_status, self._last_error_detail)
         elif self._mode == "paused":
             self.set_paused()
+        elif self._mode == "operation_completed":
+            self.set_operation_completed(self._last_completed_status, self._last_completed_detail)
         elif self._mode == "exit" and self._last_exit_result is not None:
             self.set_exit_result(self._last_exit_result)
         else:
@@ -275,7 +296,7 @@ class LaunchControlWidget(QFrame):
         return compact
 
     def _set_stage_state(self, state: str) -> None:
-        icon_state = "ready" if state == "success" and self._mode == "idle" else state
+        icon_state = "ready" if state == "success" and self._mode in {"idle", "operation_completed"} else state
         state_key = f"{state}:{icon_state}"
         if self._stage_state == state_key:
             return

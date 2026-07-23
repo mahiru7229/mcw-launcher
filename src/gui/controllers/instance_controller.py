@@ -30,7 +30,9 @@ class InstanceController(BaseController):
     package_progress = Signal(object)
     repair_finished = Signal(object)
     forge_diagnostics_finished = Signal(object)
+    instance_created = Signal(object)
 
+    CREATE_TASK_ID = "instance.create"
     REPAIR_TASK_ID = "instance.repair.full"
     LOADER_CHANGE_TASK_ID = "instance.loader"
     LOADER_REPAIR_TASK_ID = "instance.loader.repair"
@@ -84,14 +86,14 @@ class InstanceController(BaseController):
             return
         self.selected_instance_changed.emit(instance)
 
-    def create(self, name: str, version_id: str, loader_name: str = "vanilla", loader_version: str = ModLoaderManager.AUTO) -> None:
+    def create(self, name: str, version_id: str, loader_name: str = "vanilla", loader_version: str = ModLoaderManager.AUTO) -> bool:
         name = self._validated_name(name)
         version_id = version_id.strip()
         loader_name, loader_version = ModLoaderManager.normalize((loader_name, loader_version))
         if name is None or not version_id:
             if not version_id:
                 self._emit_error("Create instance", "Select a Minecraft version first.")
-            return
+            return False
 
         reporter = ProgressReporter(self._on_loader_progress)
 
@@ -101,7 +103,7 @@ class InstanceController(BaseController):
             ModLoaderManager.prepare(version, *resolved_loader, reporter=reporter)
             return InstanceManager.create(name=name, version=version, mod_loader=resolved_loader)
 
-        self._task_runner.run("instance.create", task, f"Creating instance '{name}'...")
+        return self._task_runner.run(self.CREATE_TASK_ID, task, f"Creating instance '{name}'...")
 
     def change_loader(self, name: str, loader_name: str, loader_version: str) -> None:
         name = name.strip()
@@ -244,8 +246,9 @@ class InstanceController(BaseController):
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
         selected_name = self._selected_name
-        if task_id == "instance.create":
+        if task_id == self.CREATE_TASK_ID:
             selected_name = result.name
+            self.instance_created.emit(result)
             self.status_changed.emit(f"Created '{selected_name}'")
         elif task_id == "instance.rename":
             selected_name = result["target"]

@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QSignalBlocker, QTimer, Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QLabel, QPushButton
 
+from src.core.language.language_manager import language_manager, tr
 from src.core.theme.theme_manager import theme_manager
 from src.gui.config import NAVIGATION_ITEMS, VERSION
 from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
-from src.core.language.language_manager import language_manager, tr
+
 
 class LauncherSettingsPage(BasePage):
     save_requested = Signal(dict)
@@ -18,13 +19,35 @@ class LauncherSettingsPage(BasePage):
     reload_theme_requested = Signal(str)
     scan_java_requested = Signal()
     open_java_requested = Signal(object)
+    dirty_changed = Signal(bool)
 
     def __init__(self) -> None:
         super().__init__("Launcher Settings", "Preferences here belong to the GUI, not to an individual Minecraft instance.", "launcher_settings")
         self._java_installations: list[object] = []
+        self._tracking_suspended = True
+        self._dirty = False
+        self._saved_data: dict = {}
+        self._force_replace_on_next_settings = True
+        self._theme_preview_timer = QTimer(self)
+        self._theme_preview_timer.setSingleShot(True)
+        self._theme_preview_timer.setInterval(25)
+        self._theme_preview_timer.timeout.connect(self._emit_theme_preview)
         self._build_ui()
+        self._connect_dirty_tracking()
+        self._tracking_suspended = False
+        self._set_dirty(False)
+
+    @property
+    def is_dirty(self) -> bool:
+        return self._dirty
 
     def _build_ui(self) -> None:
+        self.unsaved_label = QLabel()
+        self.unsaved_label.setObjectName("UnsavedChangesBanner")
+        self.unsaved_label.setWordWrap(True)
+        self.unsaved_label.setVisible(False)
+        self.root_layout.addWidget(self.unsaved_label)
+
         behavior_card = CardWidget("Startup and behavior")
         self.start_page_combo = QComboBox()
         for page_id, label in NAVIGATION_ITEMS:
@@ -118,22 +141,37 @@ class LauncherSettingsPage(BasePage):
         self.show_static_text = QCheckBox("Show static text over themed controls")
         self.show_static_text.setToolTip("Turn this off only when the selected theme PNG already contains its own fixed label, such as the word LAUNCH.")
         reload_theme_button = set_theme_icon(QPushButton("Reload and preview theme"), "icon.action.theme")
-        reload_theme_button.clicked.connect(lambda: self.reload_theme_requested.emit(str(self.theme_combo.currentData() or "mcw-default")))
-        self.show_static_text.toggled.connect(lambda _checked: self.reload_theme_requested.emit(str(self.theme_combo.currentData() or "mcw-default")))
+        reload_theme_button.clicked.connect(self._emit_theme_preview)
+        self.show_static_text.toggled.connect(self._queue_theme_preview)
         appearance_card.layout.addWidget(QLabel("Launcher theme"))
         appearance_card.layout.addWidget(self.theme_combo)
         appearance_card.layout.addWidget(self.show_static_text)
         appearance_card.layout.addWidget(reload_theme_button)
         self.root_layout.addWidget(appearance_card)
 
-        save_button = set_theme_icon(QPushButton("Save launcher settings"), "icon.action.save")
-        save_button.setObjectName("PrimaryButton")
-        save_button.clicked.connect(lambda: self.save_requested.emit(self.form_data()))
+        self.save_button = set_theme_icon(QPushButton("Save launcher settings"), "icon.action.save")
+        self.save_button.setObjectName("PrimaryButton")
+        self.save_button.clicked.connect(self.request_save)
         reset_button = set_theme_icon(QPushButton("Reset to defaults"), "icon.action.reset")
-        reset_button.clicked.connect(self.reset_requested.emit)
-        self.root_layout.addWidget(save_button)
+        reset_button.clicked.connect(self.request_reset)
+        self.root_layout.addWidget(self.save_button)
         self.root_layout.addWidget(reset_button)
         self.root_layout.addStretch()
+
+    def _connect_dirty_tracking(self) -> None:
+        self.start_page_combo.currentIndexChanged.connect(self._refresh_dirty_state)
+        self.show_snapshots.toggled.connect(self._refresh_dirty_state)
+        self.remember_window_size.toggled.connect(self._refresh_dirty_state)
+        self.debug_mode.toggled.connect(self._refresh_dirty_state)
+        self.limit_download_speed.toggled.connect(self._refresh_dirty_state)
+        self.download_limit_mbps.valueChanged.connect(self._refresh_dirty_state)
+        self.language_combo.currentIndexChanged.connect(self._refresh_dirty_state)
+        self.modrinth_include_beta.toggled.connect(self._refresh_dirty_state)
+        self.modrinth_include_alpha.toggled.connect(self._refresh_dirty_state)
+        self.auto_check_updates.toggled.connect(self._refresh_dirty_state)
+        self.join_tester_program.toggled.connect(self._refresh_dirty_state)
+        self.theme_combo.currentIndexChanged.connect(self._refresh_dirty_state)
+        self.show_static_text.toggled.connect(self._refresh_dirty_state)
 
     def set_java_installations(self, installations: list) -> None:
         self._java_installations = list(installations)
@@ -193,7 +231,86 @@ class LauncherSettingsPage(BasePage):
         if locale:
             self.language_changed.emit(str(locale))
 
-    def set_settings(self, settings: dict) -> None:
+    def set_settings(self, settings: dict, preserve_unsaved: bool = False) -> None:
+        preserve = bool(preserve_unsaved and self._dirty and not self._force_replace_on_next_settings)
+        pending_data = self.form_data() if preserve else None
+        self._tracking_suspended = True
+        try:
+            self._apply_form_data(settings)
+            self._saved_data = self.form_data()
+            if pending_data is not None:
+                self._apply_form_data(pending_data)
+        finally:
+            self._tracking_suspended = False
+            self._force_replace_on_next_settings = False
+        self._set_dirty(self.form_data() != self._saved_data)
+        if pending_data is not None:
+            self.language_changed.emit(str(pending_data.get("language", "en-US")))
+            self.reload_theme_requested.emit(str(pending_data.get("theme", "mcw-default")))
+
+    def form_data(self) -> dict:
+        return {
+            "start_page": self.start_page_combo.currentData(),
+            "show_snapshots": self.show_snapshots.isChecked(),
+            "debug_mode": self.debug_mode.isChecked(),
+            "remember_window_size": self.remember_window_size.isChecked(),
+            "language": self.language_combo.currentData() or "en-US",
+            "auto_check_updates": self.auto_check_updates.isChecked(),
+            "tester_mode": self.join_tester_program.isChecked(),
+            "theme": self.theme_combo.currentData() or "mcw-default",
+            "show_static_text": self.show_static_text.isChecked(),
+            "modrinth_include_beta": self.modrinth_include_beta.isChecked(),
+            "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
+            "download_limit_mbps": self.download_limit_mbps.value() if self.limit_download_speed.isChecked() else 0.0,
+        }
+
+    def request_save(self) -> None:
+        self._force_replace_on_next_settings = True
+        self.save_requested.emit(self.form_data())
+
+    def request_reset(self) -> None:
+        self._force_replace_on_next_settings = True
+        self.reset_requested.emit()
+
+    def discard_changes(self) -> None:
+        if not self._saved_data:
+            return
+        self._tracking_suspended = True
+        try:
+            self._apply_form_data(self._saved_data)
+        finally:
+            self._tracking_suspended = False
+        self._set_dirty(False)
+        self.language_changed.emit(str(self._saved_data.get("language", "en-US")))
+        self.reload_theme_requested.emit(str(self._saved_data.get("theme", "mcw-default")))
+
+    def set_update_status(self, message: str) -> None:
+        self.update_status_label.setText(message)
+
+    def set_update_busy(self, busy: bool) -> None:
+        self.check_updates_button.setEnabled(not busy)
+
+    def retranslate_dynamic(self) -> None:
+        self.unsaved_label.setText(tr("settings.unsaved.banner"))
+        self._update_save_button_text()
+
+    def _apply_form_data(self, settings: dict) -> None:
+        persisted_controls = (
+            self.start_page_combo,
+            self.show_snapshots,
+            self.debug_mode,
+            self.remember_window_size,
+            self.auto_check_updates,
+            self.modrinth_include_beta,
+            self.modrinth_include_alpha,
+            self.limit_download_speed,
+            self.download_limit_mbps,
+            self.join_tester_program,
+            self.language_combo,
+            self.theme_combo,
+            self.show_static_text,
+        )
+        blockers = [QSignalBlocker(control) for control in persisted_controls]
         index = self.start_page_combo.findData(settings.get("start_page", "home"))
         self.start_page_combo.setCurrentIndex(max(0, index))
         self.show_snapshots.setChecked(bool(settings.get("show_snapshots", False)))
@@ -216,29 +333,36 @@ class LauncherSettingsPage(BasePage):
         self.language_combo.blockSignals(False)
         self.reload_themes()
         theme_index = self.theme_combo.findData(settings.get("theme", "mcw-default"))
+        self.theme_combo.blockSignals(True)
         self.theme_combo.setCurrentIndex(max(0, theme_index))
-        self.show_static_text.blockSignals(True)
+        self.theme_combo.blockSignals(False)
         self.show_static_text.setChecked(bool(settings.get("show_static_text", True)))
-        self.show_static_text.blockSignals(False)
+        del blockers
 
-    def form_data(self) -> dict:
-        return {
-            "start_page": self.start_page_combo.currentData(),
-            "show_snapshots": self.show_snapshots.isChecked(),
-            "debug_mode": self.debug_mode.isChecked(),
-            "remember_window_size": self.remember_window_size.isChecked(),
-            "language": self.language_combo.currentData() or "en-US",
-            "auto_check_updates": self.auto_check_updates.isChecked(),
-            "tester_mode": self.join_tester_program.isChecked(),
-            "theme": self.theme_combo.currentData() or "mcw-default",
-            "show_static_text": self.show_static_text.isChecked(),
-            "modrinth_include_beta": self.modrinth_include_beta.isChecked(),
-            "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
-            "download_limit_mbps": self.download_limit_mbps.value() if self.limit_download_speed.isChecked() else 0.0,
-        }
+    def _refresh_dirty_state(self, *_args) -> None:
+        if self._tracking_suspended:
+            return
+        self._set_dirty(self.form_data() != self._saved_data)
 
-    def set_update_status(self, message: str) -> None:
-        self.update_status_label.setText(message)
+    def _set_dirty(self, dirty: bool) -> None:
+        dirty = bool(dirty)
+        changed = dirty != self._dirty
+        self._dirty = dirty
+        self.unsaved_label.setVisible(dirty)
+        self.unsaved_label.setText(tr("settings.unsaved.banner"))
+        self.save_button.setProperty("unsavedChanges", dirty)
+        self.save_button.style().unpolish(self.save_button)
+        self.save_button.style().polish(self.save_button)
+        self._update_save_button_text()
+        if changed:
+            self.dirty_changed.emit(dirty)
 
-    def set_update_busy(self, busy: bool) -> None:
-        self.check_updates_button.setEnabled(not busy)
+    def _update_save_button_text(self) -> None:
+        label = tr("Save launcher settings")
+        self.save_button.setText(f"● {label}" if self._dirty else label)
+
+    def _queue_theme_preview(self, _checked: bool) -> None:
+        self._theme_preview_timer.start()
+
+    def _emit_theme_preview(self) -> None:
+        self.reload_theme_requested.emit(str(self.theme_combo.currentData() or "mcw-default"))

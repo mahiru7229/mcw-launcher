@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QLabel, QLineEdit, QMessageBox, QPushButton
 
 from src.core.config.curseforge_config_manager import CurseForgeConfigManager
@@ -50,6 +50,10 @@ class InstancesPage(BasePage):
         self._synchronizing = False
         self._modpack_update_info: object | None = None
         self._modpack_managed = False
+        self._version_filter_timer = QTimer(self)
+        self._version_filter_timer.setSingleShot(True)
+        self._version_filter_timer.setInterval(25)
+        self._version_filter_timer.timeout.connect(self._apply_version_filter)
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -70,7 +74,7 @@ class InstancesPage(BasePage):
         self.create_name_input.setPlaceholderText("New instance name")
         self.version_combo = QComboBox()
         self.snapshot_checkbox = QCheckBox("Show snapshots, old alpha, and old beta")
-        self.snapshot_checkbox.toggled.connect(self._apply_version_filter)
+        self.snapshot_checkbox.toggled.connect(self._queue_version_filter)
         self.create_loader_combo = QComboBox()
         self.create_loader_combo.addItem("Vanilla", "vanilla")
         self.create_loader_combo.addItem("Fabric", "fabric")
@@ -255,6 +259,17 @@ class InstancesPage(BasePage):
     def current_instance_name(self) -> str:
         return self.instance_combo.currentText().strip()
 
+    def select_instance(self, name: str) -> None:
+        previous = self._synchronizing
+        self._synchronizing = True
+        try:
+            self.instance_combo.blockSignals(True)
+            self.instance_combo.setCurrentText(name)
+            self.instance_combo.blockSignals(False)
+            self._render_instance(name)
+        finally:
+            self._synchronizing = previous
+
     def selected_create_loader(self) -> str:
         return str(self.create_loader_combo.currentData() or "vanilla")
 
@@ -268,6 +283,9 @@ class InstancesPage(BasePage):
 
     def set_busy(self, busy: bool) -> None:
         self.setEnabled(not busy)
+
+    def _queue_version_filter(self, _checked: bool) -> None:
+        self._version_filter_timer.start()
 
     def _apply_version_filter(self) -> None:
         selected = self.version_combo.currentText()

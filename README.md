@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/latest">
-    <img src="https://img.shields.io/badge/Current-v0.6.0--beta.5-orange" alt="Current version">
+    <img src="https://img.shields.io/badge/Current-v0.6.0--rc.1-blue" alt="Current version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -22,11 +22,11 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v0.6.0-beta.5.md">Beta 5 release notes</a>
+  <a href="docs/RELEASE-v0.6.0-rc.1.md">RC 1 release notes</a>
 </p>
 
 > [!WARNING]
-> `v0.6.0-beta.5` là bản thử nghiệm dành cho tester. Hãy sao lưu world quan trọng trước khi cập nhật modpack, sửa chữa instance hoặc thử Forge trên các phiên bản Minecraft cũ.
+> `v0.6.0-rc.1` là Release Candidate đầu tiên của dòng 0.6 và vẫn dành cho tester trước khi lên Stable. Hãy sao lưu world quan trọng trước khi cập nhật modpack, sửa chữa instance hoặc thử Forge trên các phiên bản Minecraft cũ.
 
 ---
 
@@ -43,15 +43,18 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 - Tạo và chạy instance **Vanilla, Fabric hoặc Forge**.
 - Cài đặt, thay đổi và repair Fabric Loader hoặc Minecraft Forge.
 - Tìm, cài và cập nhật mod từ **Modrinth** với bộ lọc loader/version/channel.
+- Trang **Cài mod** độc lập chỉ hiển thị instance khớp chính xác Minecraft version và loader trước khi cài.
 - Cài modpack `.mrpack`, kiểm tra update và **repair file modpack bị thiếu hoặc bị sửa**.
 - Backup an toàn trước update/repair và rollback khi thao tác thất bại.
 - Cache kết quả xác minh để không hash lại file modpack không đổi ở mỗi lần launch.
 - Quản lý RAM bằng **slider + ô nhập MB chính xác**, với ràng buộc `Min ≤ Max ≤ RAM vật lý`.
+- Hiển thị màn hình khởi động với tiến trình rõ ràng trong khi launcher chuẩn bị settings, database, tài khoản và giao diện.
 - Tự chọn bố cục theo màn hình:
   - `1920×1080` trở lên → cửa sổ `1600×900`.
   - `1366×768` → cửa sổ gọn `1280×720`.
   - Màn hình nhỏ hơn → profile an toàn theo vùng hiển thị khả dụng.
-- Dialog có palette tương phản riêng để tránh lỗi nền trắng và chữ trắng trên một số máy Windows.
+- Dialog dùng màu chữ xám trung tính có thể đọc trên cả nền sáng lẫn nền tối khi Windows theme hiển thị sai.
+- Sau khi cài hoặc repair loader, progress chuyển rõ ràng sang `100% / READY` thay vì mắc ở trạng thái đang tải.
 - Khi launch thất bại, progress chỉ hiện thông báo ngắn; lỗi kỹ thuật đầy đủ nằm trong **Logs**.
 - Microsoft OAuth PKCE, nhiều tài khoản Microsoft, SQLite và bảo vệ refresh token bằng Windows DPAPI.
 - Theo dõi process Minecraft, thời gian chơi, exit code, game log và crash report.
@@ -101,14 +104,14 @@ Quy tắc release của dự án: chỉ build khi test không có `failed` hoặ
 
 ```powershell
 python -m PyInstaller --clean mcw_launcher.spec
-python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.6.0-beta.5"
+python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.1"
 ```
 
 Kết quả updater package:
 
 ```text
-MCW-Launcher-v0.6.0-beta.5-windows-x64.zip
-MCW-Launcher-v0.6.0-beta.5-windows-x64.zip.sha256
+MCW-Launcher-v0.6.0-rc.1-windows-x64.zip
+MCW-Launcher-v0.6.0-rc.1-windows-x64.zip.sha256
 ```
 
 Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -128,10 +131,12 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 - Create and launch **Vanilla, Fabric, and Forge** instances.
 - Install, change, and repair Fabric Loader or Minecraft Forge.
 - Search, install, and update **Modrinth** mods with loader, version, and release-channel filtering.
+- A standalone **Install Mods** page only offers instances matching the selected Minecraft version and loader.
 - Install `.mrpack` modpacks, check for updates, and **repair missing or locally modified managed files**.
 - Create safety backups before update/repair operations and roll back failed changes.
 - Cache successful file verification so unchanged pack files are not hashed on every launch.
 - Configure Java memory with a **slider and exact MB input**, enforcing `Min ≤ Max ≤ detected physical RAM`.
+- Show a startup screen with clear progress while settings, databases, accounts, and the main interface are prepared.
 - Select a responsive display profile automatically:
   - `1920×1080` or larger → `1600×900` window.
   - `1366×768` → compact `1280×720` window.
@@ -186,14 +191,14 @@ The release flow requires zero failed tests and zero collection/runtime errors b
 
 ```powershell
 python -m PyInstaller --clean mcw_launcher.spec
-python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.6.0-beta.5"
+python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.1"
 ```
 
 Expected updater assets:
 
 ```text
-MCW-Launcher-v0.6.0-beta.5-windows-x64.zip
-MCW-Launcher-v0.6.0-beta.5-windows-x64.zip.sha256
+MCW-Launcher-v0.6.0-rc.1-windows-x64.zip
+MCW-Launcher-v0.6.0-rc.1-windows-x64.zip.sha256
 ```
 
 See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -283,7 +288,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
-| [`docs/RELEASE-v0.6.0-beta.5.md`](docs/RELEASE-v0.6.0-beta.5.md) | Complete Beta 5 release notes |
+| [`docs/RELEASE-v0.6.0-rc.1.md`](docs/RELEASE-v0.6.0-rc.1.md) | Complete RC 1 release notes |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core architecture |
 | [`docs/INSTANCE_SYSTEM.md`](docs/INSTANCE_SYSTEM.md) | Instance metadata and lifecycle |
 | [`docs/MODRINTH_INTEGRATION.md`](docs/MODRINTH_INTEGRATION.md) | Modrinth integration |
@@ -296,7 +301,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v0.6.0-beta.5 |
+| Component | Status in v0.6.0-rc.1 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |

@@ -17,6 +17,8 @@ class SidebarWidget(QFrame):
         self._compact = bool(compact)
         self.setProperty("compactLayout", self._compact)
         self._buttons: dict[str, QPushButton] = {}
+        self._button_labels: dict[str, str] = {}
+        self._dirty_pages: set[str] = set()
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -43,8 +45,8 @@ class SidebarWidget(QFrame):
         layout.addWidget(Separator())
         layout.addSpacing(4 if self._compact else 8)
 
-        for index, (page_id, label) in enumerate(NAVIGATION_ITEMS):
-            if index in {2, 4, 6}:
+        for page_id, label in NAVIGATION_ITEMS:
+            if page_id in {"instances", "launcher_settings", "about"}:
                 layout.addSpacing(2)
                 layout.addWidget(Separator("#2f352a", 2))
                 layout.addSpacing(2)
@@ -55,6 +57,7 @@ class SidebarWidget(QFrame):
             button.setFixedHeight(38 if self._compact else 46)
             button.clicked.connect(lambda _checked=False, current_page=page_id: self.page_requested.emit(current_page))
             self._buttons[page_id] = button
+            self._button_labels[page_id] = label
             layout.addWidget(button)
 
         layout.addStretch()
@@ -72,3 +75,17 @@ class SidebarWidget(QFrame):
     def set_current_page(self, page_id: str) -> None:
         for current_id, button in self._buttons.items():
             button.setChecked(current_id == page_id)
+
+    def set_page_dirty(self, page_id: str, dirty: bool) -> None:
+        button = self._buttons.get(page_id)
+        if button is None:
+            return
+        if dirty:
+            self._dirty_pages.add(page_id)
+        else:
+            self._dirty_pages.discard(page_id)
+        button.setProperty("unsavedChanges", bool(dirty))
+        label = self._button_labels.get(page_id, button.text())
+        button.setText(f"● {label}" if dirty else label)
+        button.style().unpolish(button)
+        button.style().polish(button)

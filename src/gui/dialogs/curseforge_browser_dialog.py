@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
 from src.core.instance.instance_manager import InstanceManager
@@ -35,6 +35,11 @@ class CurseForgeBrowserDialog(QDialog):
         self._index = 0
         self._suggested_instance_name = ""
         self._instance_name_customized = False
+        self._pending_channel_preferences = (False, False)
+        self._channel_change_timer = QTimer(self)
+        self._channel_change_timer.setSingleShot(True)
+        self._channel_change_timer.setInterval(25)
+        self._channel_change_timer.timeout.connect(self._apply_queued_channel_change)
         self._build_ui()
         self.retranslate_dynamic()
 
@@ -223,7 +228,15 @@ class CurseForgeBrowserDialog(QDialog):
         self.next_button.setEnabled(not busy and self._result is not None and self._result.index + self._result.page_size < self._result.total_count)
 
     def _channels_changed(self, _checked: bool) -> None:
-        self.channel_preferences_changed.emit(self.include_beta_checkbox.isChecked(), self.include_alpha_checkbox.isChecked())
+        self._pending_channel_preferences = (
+            self.include_beta_checkbox.isChecked(),
+            self.include_alpha_checkbox.isChecked(),
+        )
+        self._channel_change_timer.start()
+
+    def _apply_queued_channel_change(self) -> None:
+        include_beta, include_alpha = self._pending_channel_preferences
+        self.channel_preferences_changed.emit(include_beta, include_alpha)
         if self._selected_project is not None:
             self.files_requested.emit(self.project_type, self._selected_project.project_id, self.game_version, self.allowed_release_types)
 

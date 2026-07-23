@@ -13,6 +13,7 @@ from src.gui.widget.card_widget import CardWidget
 class InstanceSettingsPage(BasePage):
     load_requested = Signal(str)
     save_requested = Signal(str, dict)
+    dirty_changed = Signal(bool)
 
     def __init__(self, total_memory_mb: int | None = None) -> None:
         super().__init__("Instance Settings", "Settings are loaded and saved through the public SettingsManager API.", "instance_settings")
@@ -20,9 +21,22 @@ class InstanceSettingsPage(BasePage):
         self._memory_detection_failed = detected_memory_mb <= 0
         self._physical_memory_mb = detected_memory_mb if detected_memory_mb > 0 else MemoryAllocationPolicy.FALLBACK_PHYSICAL_LIMIT_MB
         self._memory_limit_mb = max(MemoryAllocationPolicy.MIN_MEMORY_MB, self._physical_memory_mb)
+        self._tracking_suspended = True
+        self._dirty = False
+        self._saved_data: dict = {}
+        self._loaded_instance_name = ""
         self._build_ui()
+        self._connect_dirty_tracking()
+        self._tracking_suspended = False
+        self._set_dirty(False)
 
     def _build_ui(self) -> None:
+        self.unsaved_label = QLabel()
+        self.unsaved_label.setObjectName("UnsavedChangesBanner")
+        self.unsaved_label.setWordWrap(True)
+        self.unsaved_label.setVisible(False)
+        self.root_layout.addWidget(self.unsaved_label)
+
         selector_card = CardWidget("Target instance")
         self.instance_combo = QComboBox()
         self.instance_combo.currentTextChanged.connect(self.load_requested.emit)
@@ -124,11 +138,11 @@ class InstanceSettingsPage(BasePage):
         arguments_card.layout.addWidget(self.game_arguments)
         self.root_layout.addWidget(arguments_card)
 
-        save_button = set_theme_icon(QPushButton("Save instance settings"), "icon.action.save")
-        save_button.setObjectName("PrimaryButton")
-        save_button.setMinimumHeight(48)
-        save_button.clicked.connect(lambda: self.save_requested.emit(self.current_instance_name(), self.form_data()))
-        self.root_layout.addWidget(save_button)
+        self.save_button = set_theme_icon(QPushButton("Save instance settings"), "icon.action.save")
+        self.save_button.setObjectName("PrimaryButton")
+        self.save_button.setMinimumHeight(48)
+        self.save_button.clicked.connect(self.request_save)
+        self.root_layout.addWidget(self.save_button)
         self.root_layout.addStretch()
 
     @property
@@ -139,12 +153,22 @@ class InstanceSettingsPage(BasePage):
     def memory_limit_mb(self) -> int:
         return self._memory_limit_mb
 
+    @property
+    def is_dirty(self) -> bool:
+        return self._dirty
+
+    @property
+    def loaded_instance_name(self) -> str:
+        return self._loaded_instance_name
+
     def set_instances(self, instances: list, selected_name: str) -> None:
+        names = [instance.name for instance in instances]
+        preferred = self._loaded_instance_name if self._dirty and self._loaded_instance_name in names else selected_name
         self.instance_combo.blockSignals(True)
         self.instance_combo.clear()
-        self.instance_combo.addItems([instance.name for instance in instances])
-        if selected_name:
-            self.instance_combo.setCurrentText(selected_name)
+        self.instance_combo.addItems(names)
+        if preferred:
+            self.instance_combo.setCurrentText(preferred)
         self.instance_combo.blockSignals(False)
 
     def select_instance(self, name: str) -> None:
@@ -152,26 +176,38 @@ class InstanceSettingsPage(BasePage):
         self.instance_combo.setCurrentText(name)
         self.instance_combo.blockSignals(False)
 
+    def revert_instance_selection(self) -> None:
+        self.select_instance(self._loaded_instance_name)
+
     def current_instance_name(self) -> str:
         return self.instance_combo.currentText().strip()
 
     def set_settings(self, instance_name: str, settings: object | None) -> None:
-        if settings is None:
-            self._clear_form()
-            return
-        if instance_name and self.instance_combo.currentText() != instance_name:
-            self.instance_combo.blockSignals(True)
-            self.instance_combo.setCurrentText(instance_name)
-            self.instance_combo.blockSignals(False)
-        self.java_path_input.setText(str(getattr(settings, "java_path", "") or ""))
-        self._apply_memory_values(getattr(settings, "min_memory", 1024), getattr(settings, "max_memory", 2048))
-        self.window_width.setValue(int(getattr(settings, "width", 1280)))
-        self.window_height.setValue(int(getattr(settings, "height", 720)))
-        self.fullscreen.setChecked(bool(getattr(settings, "fullscreen", False)))
-        self.offline_multiplayer.setChecked(bool(getattr(settings, "offline_multiplayer_enabled", False)))
-        self.block_modrinth_failure.setChecked(bool(getattr(settings, "block_launch_on_modrinth_failure", True)))
-        self.jvm_arguments.setPlainText("\n".join(getattr(settings, "jvm_arguments", [])))
-        self.game_arguments.setPlainText("\n".join(getattr(settings, "game_arguments", [])))
+        self._tracking_suspended = True
+        try:
+            if settings is None:
+                self._loaded_instance_name = ""
+                self._clear_form()
+            else:
+                self._loaded_instance_name = instance_name.strip()
+                if instance_name and self.instance_combo.currentText() != instance_name:
+                    self.select_instance(instance_name)
+                self._apply_form_data({
+                    "java_path": str(getattr(settings, "java_path", "") or ""),
+                    "min_memory": getattr(settings, "min_memory", 1024),
+                    "max_memory": getattr(settings, "max_memory", 2048),
+                    "width": int(getattr(settings, "width", 1280)),
+                    "height": int(getattr(settings, "height", 720)),
+                    "fullscreen": bool(getattr(settings, "fullscreen", False)),
+                    "offline_multiplayer_enabled": bool(getattr(settings, "offline_multiplayer_enabled", False)),
+                    "block_launch_on_modrinth_failure": bool(getattr(settings, "block_launch_on_modrinth_failure", True)),
+                    "jvm_arguments": list(getattr(settings, "jvm_arguments", [])),
+                    "game_arguments": list(getattr(settings, "game_arguments", [])),
+                })
+            self._saved_data = self.form_data()
+        finally:
+            self._tracking_suspended = False
+        self._set_dirty(False)
 
     def form_data(self) -> dict:
         return {
@@ -187,11 +223,62 @@ class InstanceSettingsPage(BasePage):
             "game_arguments": self._lines(self.game_arguments.toPlainText()),
         }
 
+    def request_save(self) -> None:
+        self.save_requested.emit(self._loaded_instance_name or self.current_instance_name(), self.form_data())
+
+    def discard_changes(self) -> None:
+        if not self._saved_data:
+            return
+        self._tracking_suspended = True
+        try:
+            self._apply_form_data(self._saved_data)
+        finally:
+            self._tracking_suspended = False
+        self._set_dirty(False)
+
     def set_busy(self, busy: bool) -> None:
         self.setEnabled(not busy)
 
     def retranslate_dynamic(self) -> None:
         self._update_memory_labels()
+        self.unsaved_label.setText(tr("settings.unsaved.banner"))
+        self._update_save_button_text()
+
+    def _connect_dirty_tracking(self) -> None:
+        self.java_path_input.textChanged.connect(self._refresh_dirty_state)
+        self.min_memory.valueChanged.connect(self._refresh_dirty_state)
+        self.max_memory.valueChanged.connect(self._refresh_dirty_state)
+        self.min_memory_input.valueChanged.connect(self._refresh_dirty_state)
+        self.max_memory_input.valueChanged.connect(self._refresh_dirty_state)
+        self.window_width.valueChanged.connect(self._refresh_dirty_state)
+        self.window_height.valueChanged.connect(self._refresh_dirty_state)
+        self.fullscreen.toggled.connect(self._refresh_dirty_state)
+        self.offline_multiplayer.toggled.connect(self._refresh_dirty_state)
+        self.block_modrinth_failure.toggled.connect(self._refresh_dirty_state)
+        self.jvm_arguments.textChanged.connect(self._refresh_dirty_state)
+        self.game_arguments.textChanged.connect(self._refresh_dirty_state)
+
+    def _refresh_dirty_state(self, *_args) -> None:
+        if self._tracking_suspended:
+            return
+        self._set_dirty(bool(self._loaded_instance_name) and self.form_data() != self._saved_data)
+
+    def _set_dirty(self, dirty: bool) -> None:
+        dirty = bool(dirty)
+        changed = dirty != self._dirty
+        self._dirty = dirty
+        self.unsaved_label.setVisible(dirty)
+        self.unsaved_label.setText(tr("settings.unsaved.banner"))
+        self.save_button.setProperty("unsavedChanges", dirty)
+        self.save_button.style().unpolish(self.save_button)
+        self.save_button.style().polish(self.save_button)
+        self._update_save_button_text()
+        if changed:
+            self.dirty_changed.emit(dirty)
+
+    def _update_save_button_text(self) -> None:
+        label = tr("Save instance settings")
+        self.save_button.setText(f"● {label}" if self._dirty else label)
 
     def _browse_java(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Choose Java executable", "", "Java executable (java.exe javaw.exe);;All files (*)")
@@ -199,15 +286,29 @@ class InstanceSettingsPage(BasePage):
             self.java_path_input.setText(path)
 
     def _clear_form(self) -> None:
-        self.java_path_input.clear()
-        self._apply_memory_values(MemoryAllocationPolicy.DEFAULT_MIN_MEMORY_MB, MemoryAllocationPolicy.DEFAULT_MAX_MEMORY_MB)
-        self.window_width.setValue(1280)
-        self.window_height.setValue(720)
-        self.fullscreen.setChecked(False)
-        self.offline_multiplayer.setChecked(False)
-        self.block_modrinth_failure.setChecked(True)
-        self.jvm_arguments.clear()
-        self.game_arguments.clear()
+        self._apply_form_data({
+            "java_path": "",
+            "min_memory": MemoryAllocationPolicy.DEFAULT_MIN_MEMORY_MB,
+            "max_memory": MemoryAllocationPolicy.DEFAULT_MAX_MEMORY_MB,
+            "width": 1280,
+            "height": 720,
+            "fullscreen": False,
+            "offline_multiplayer_enabled": False,
+            "block_launch_on_modrinth_failure": True,
+            "jvm_arguments": [],
+            "game_arguments": [],
+        })
+
+    def _apply_form_data(self, data: dict) -> None:
+        self.java_path_input.setText(str(data.get("java_path", "") or ""))
+        self._apply_memory_values(data.get("min_memory", 1024), data.get("max_memory", 2048))
+        self.window_width.setValue(int(data.get("width", 1280)))
+        self.window_height.setValue(int(data.get("height", 720)))
+        self.fullscreen.setChecked(bool(data.get("fullscreen", False)))
+        self.offline_multiplayer.setChecked(bool(data.get("offline_multiplayer_enabled", False)))
+        self.block_modrinth_failure.setChecked(bool(data.get("block_launch_on_modrinth_failure", True)))
+        self.jvm_arguments.setPlainText("\n".join(data.get("jvm_arguments", [])))
+        self.game_arguments.setPlainText("\n".join(data.get("game_arguments", [])))
 
     def _apply_memory_values(self, min_memory_mb: object, max_memory_mb: object) -> None:
         minimum, maximum = MemoryAllocationPolicy.normalize(min_memory_mb, max_memory_mb, self._memory_limit_mb)
@@ -243,6 +344,7 @@ class InstanceSettingsPage(BasePage):
         self.min_memory_input.setValue(minimum)
         del blockers
         self._update_memory_labels()
+        self._refresh_dirty_state()
 
     def _update_memory_labels(self) -> None:
         physical = MemoryAllocationPolicy.format_mb(self._physical_memory_mb)

@@ -79,6 +79,7 @@
     "icon.nav.home": "icons/navigation/home.png",
     "icon.nav.accounts": "icons/navigation/accounts.png",
     "icon.nav.instances": "icons/navigation/instances.png",
+    "icon.nav.mods": "icons/actions/mods.png",
     "icon.nav.instance_settings": "icons/navigation/instance_settings.png",
     "icon.nav.launcher_settings": "icons/navigation/launcher_settings.png",
     "icon.nav.logs": "icons/navigation/logs.png",

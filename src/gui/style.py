@@ -15,26 +15,26 @@ QDialog {
 }
 
 QMessageBox {
-    background: #f2f3ef;
-    color: #171817;
+    background: #f1f1f1;
+    color: #767676;
 }
 
-QMessageBox QLabel {
+QMessageBox QLabel, QMessageBox QTextEdit {
     background: transparent;
-    color: #171817;
+    color: #767676;
     font-family: "Segoe UI";
 }
 
 QMessageBox QPushButton {
     min-width: 88px;
-    background: #dfe3da;
-    color: #171817;
-    border-color: #747a6e;
+    background: #dddddd;
+    color: #767676;
+    border-color: #767676;
 }
 
 QMessageBox QPushButton:hover {
-    background: #cbd7bf;
-    color: #10120e;
+    background: #cfcfcf;
+    color: #666666;
 }
 
 QFrame#Sidebar {
@@ -177,6 +177,39 @@ QPushButton#PrimaryButton {
 QPushButton#PrimaryButton:hover {
     background: #7db45e;
     color: #0c1009;
+}
+
+
+QLabel#UnsavedChangesBanner {
+    background: #5a421d;
+    color: #fff0b0;
+    border: 2px solid #d6a93c;
+    padding: 9px 12px;
+    font-weight: 900;
+}
+
+QPushButton#PrimaryButton[unsavedChanges="true"] {
+    background: #d6a93c;
+    color: #151108;
+    border: 3px solid #fff0a8;
+}
+
+QPushButton#PrimaryButton[unsavedChanges="true"]:hover {
+    background: #edc95f;
+    color: #151108;
+}
+
+QPushButton#NavButton[unsavedChanges="true"] {
+    background: #5a421d;
+    color: #ffe69a;
+    border-color: #d6a93c;
+    font-weight: 900;
+}
+
+QPushButton#NavButton[unsavedChanges="true"]:checked {
+    background: #6b5124;
+    color: #fff0b0;
+    border-color: #edc95f;
 }
 
 QPushButton#DangerButton {
