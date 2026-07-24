@@ -134,7 +134,7 @@ def test_theme_and_modrinth_channels_are_created_and_persisted(tmp_path: Path) -
     manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
 
     data = manager.load()
-    assert data["appearance"] == {"theme": "mcw-default", "show_static_text": True}
+    assert data["appearance"] == {"theme": "mcw-default", "show_static_text": False}
     assert data["modrinth"] == {"include_beta": False, "include_alpha": False}
 
     manager.save({"appearance": {"theme": "pixel-night", "show_static_text": "off"}, "modrinth": {"include_beta": True, "include_alpha": "yes"}})

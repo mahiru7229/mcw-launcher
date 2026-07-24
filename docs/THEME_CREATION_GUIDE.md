@@ -127,7 +127,7 @@ Chỉ dùng cho chữ cố định. Ví dụ nút Launch đã vẽ chữ `LAUNCH
 }
 ```
 
-Người dùng có thể tắt **Show static text over themed controls**. Launcher chỉ ẩn chữ khi PNG hợp lệ đã được load; thiếu ảnh thì chữ tự quay lại.
+**Show static text over themed controls** mặc định tắt trong `v0.6.0`. Launcher chỉ ẩn chữ khi PNG hợp lệ đã được load; thiếu ảnh thì chữ tự quay lại. Người dùng có thể bật lại nếu muốn chữ Qt đè lên PNG.
 
 Không vẽ sẵn nội dung thay đổi theo thời gian như username, tên instance, version, trạng thái tải hoặc error message.
 

@@ -239,6 +239,86 @@ class Paths:
         loader = quote(loader_version, safe="") or "unknown"
         return Paths.fabric_metadata_root() / "profiles" / game / f"{loader}.json"
 
+    @staticmethod
+    def forge_root() -> Path:
+        directory = Paths.CACHE_ROOT / "modloaders" / "forge"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def forge_version_dir(game_version: str, forge_version: str) -> Path:
+        directory = Paths.CACHE_ROOT / "versions" / f"forge-{game_version}-{forge_version}"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def forge_version_json(game_version: str, forge_version: str) -> Path:
+        directory = Paths.forge_version_dir(game_version, forge_version)
+        return directory / f"{directory.name}.json"
+
+    @staticmethod
+    def forge_installer_path(game_version: str, forge_version: str) -> Path:
+        directory = Paths.forge_root() / "installers" / game_version
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory / f"forge-{game_version}-{forge_version}-installer.jar"
+
+    @staticmethod
+    def forge_staging_dir(game_version: str, forge_version: str) -> Path:
+        directory = Paths.forge_root() / "staging" / f"{game_version}-{forge_version}"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def forge_instance_root(instance: Instance) -> Path:
+        directory = Path(instance.instance_dir) / ".mcw" / "forge"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def forge_rollback_path(instance: Instance) -> Path:
+        return Paths.forge_instance_root(instance) / "previous-installation.json"
+
+    @staticmethod
+    def forge_instance_log_path(instance: Instance) -> Path:
+        directory = Paths.forge_instance_root(instance) / "logs"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory / "forge-change.log"
+
+    @staticmethod
+    def forge_diagnostics_default_path(instance: Instance) -> Path:
+        from datetime import datetime
+
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        safe_name = "".join(character if character.isalnum() or character in {"-", "_"} else "-" for character in instance.name).strip("-") or "instance"
+        return Paths.logs_root() / f"MCW-Forge-Diagnostics-{safe_name}-{timestamp}.zip"
+
+    @staticmethod
+    def curseforge_root() -> Path:
+        directory = Paths.CACHE_ROOT / "content" / "curseforge"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def curseforge_api_cache(cache_key: str) -> Path:
+        return Paths.curseforge_root() / "api" / f"{cache_key}.json"
+
+    @staticmethod
+    def curseforge_file_cache(project_id: int | str, file_id: int | str, filename: str) -> Path:
+        safe_name = Path(str(filename)).name or "download.bin"
+        return Paths.curseforge_root() / "files" / str(project_id) / str(file_id) / safe_name
+
+    @staticmethod
+    def curseforge_pack_cache(project_id: int | str, file_id: int | str, filename: str) -> Path:
+        return Paths.curseforge_file_cache(project_id, file_id, filename)
+
+    @staticmethod
+    def curseforge_instance_registry(instance: Instance) -> Path:
+        return Path(instance.instance_dir) / ".mcw" / "curseforge.json"
+
+    @staticmethod
+    def curseforge_pack_registry(instance: Instance) -> Path:
+        return Path(instance.instance_dir) / ".mcw" / "curseforge-pack.json"
+
 
     @staticmethod
     def instance_logs_dir(instance: Instance) -> Path:

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QLabel, QLineEdit, QMessageBox, QPushButton
 
+from src.core.config.curseforge_config_manager import CurseForgeConfigManager
 from src.core.language.language_manager import tr
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
@@ -21,26 +22,38 @@ class InstancesPage(BasePage):
     import_requested = Signal(object)
     export_requested = Signal(str, object, bool)
     fabric_versions_requested = Signal(str)
+    forge_versions_requested = Signal(str)
     loader_change_requested = Signal(str, str, str)
     repair_loader_requested = Signal(str)
+    restore_forge_requested = Signal(str)
+    open_forge_logs_requested = Signal(str)
+    export_forge_diagnostics_requested = Signal(str)
     repair_instance_requested = Signal(str)
     manage_mods_requested = Signal(str)
     browse_modpacks_requested = Signal()
+    browse_curseforge_modpacks_requested = Signal()
     backup_requested = Signal(str, str)
     restore_backup_requested = Signal(str, object)
     open_backups_requested = Signal(str)
     scan_modpack_requested = Signal(str)
+    repair_modpack_requested = Signal(str)
     check_modpack_update_requested = Signal(str)
     apply_modpack_update_requested = Signal(str)
 
     def __init__(self) -> None:
-        super().__init__("Instances", "Create and manage isolated Minecraft instances, including Fabric Loader and per-instance mods.", "instances")
+        super().__init__("Instances", "Create and manage isolated Minecraft instances with Vanilla, Fabric, or Forge.", "instances")
         self._instances: dict[str, object] = {}
         self._versions: list[object] = []
         self._fabric_versions: dict[str, list[object]] = {}
+        self._forge_versions: dict[str, list[object]] = {}
         self._pending_manage_loader_version = ""
         self._synchronizing = False
         self._modpack_update_info: object | None = None
+        self._modpack_managed = False
+        self._version_filter_timer = QTimer(self)
+        self._version_filter_timer.setSingleShot(True)
+        self._version_filter_timer.setInterval(25)
+        self._version_filter_timer.timeout.connect(self._apply_version_filter)
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -56,16 +69,17 @@ class InstancesPage(BasePage):
         selected_card.layout.addWidget(refresh_button)
         self.root_layout.addWidget(selected_card)
 
-        create_card = CardWidget("Create instance", "Choose Vanilla or Fabric. Fabric automatically uses the recommended stable Loader version.")
+        create_card = CardWidget("Create instance", "Choose Vanilla, Fabric, or Forge. Automatic mode selects a compatible loader version.")
         self.create_name_input = QLineEdit()
         self.create_name_input.setPlaceholderText("New instance name")
         self.version_combo = QComboBox()
         self.snapshot_checkbox = QCheckBox("Show snapshots, old alpha, and old beta")
-        self.snapshot_checkbox.toggled.connect(self._apply_version_filter)
+        self.snapshot_checkbox.toggled.connect(self._queue_version_filter)
         self.create_loader_combo = QComboBox()
         self.create_loader_combo.addItem("Vanilla", "vanilla")
         self.create_loader_combo.addItem("Fabric", "fabric")
-        self.create_loader_status = QLabel("Fabric Loader versions can be changed later under Manage selected instance.")
+        self.create_loader_combo.addItem("Forge", "forge")
+        self.create_loader_status = QLabel("Fabric and Forge versions can be changed later under Manage selected instance.")
         self.create_loader_status.setObjectName("MutedLabel")
         self.create_loader_status.setWordWrap(True)
         create_button = set_theme_icon(QPushButton("Create instance"), "icon.action.add")
@@ -73,6 +87,9 @@ class InstancesPage(BasePage):
         create_button.clicked.connect(self._request_create)
         self.browse_modpacks_button = set_theme_icon(QPushButton("Browse Modrinth modpacks"), "icon.action.modrinth")
         self.browse_modpacks_button.clicked.connect(self.browse_modpacks_requested.emit)
+        self.browse_curseforge_modpacks_button = set_theme_icon(QPushButton("Browse CurseForge modpacks"), "icon.action.download")
+        self.browse_curseforge_modpacks_button.setVisible(CurseForgeConfigManager.is_configured())
+        self.browse_curseforge_modpacks_button.clicked.connect(self.browse_curseforge_modpacks_requested.emit)
         create_card.layout.addWidget(QLabel("Name"))
         create_card.layout.addWidget(self.create_name_input)
         create_card.layout.addWidget(QLabel("Minecraft version"))
@@ -83,12 +100,14 @@ class InstancesPage(BasePage):
         create_card.layout.addWidget(self.create_loader_status)
         create_card.layout.addWidget(create_button)
         create_card.layout.addWidget(self.browse_modpacks_button)
+        create_card.layout.addWidget(self.browse_curseforge_modpacks_button)
         self.root_layout.addWidget(create_card)
 
-        manage_card = CardWidget("Manage selected instance", "Change the selected instance's Fabric Loader version without recreating it.")
+        manage_card = CardWidget("Manage selected instance", "Change the selected instance's Fabric or Forge version without recreating it.")
         self.manage_loader_combo = QComboBox()
         self.manage_loader_combo.addItem("Vanilla", "vanilla")
         self.manage_loader_combo.addItem("Fabric", "fabric")
+        self.manage_loader_combo.addItem("Forge", "forge")
         self.manage_loader_combo.currentTextChanged.connect(self._manage_loader_selected)
         self.manage_loader_version_combo = QComboBox()
         self.manage_loader_version_combo.setEnabled(False)
@@ -98,10 +117,21 @@ class InstancesPage(BasePage):
         self.apply_loader_button = set_theme_icon(QPushButton("Apply mod loader"), "icon.action.save")
         self.apply_loader_button.clicked.connect(self._request_loader_change)
         self.apply_loader_button.setEnabled(False)
-        self.repair_loader_button = set_theme_icon(QPushButton("Repair Fabric"), "icon.action.repair")
-        self.repair_loader_button.setToolTip("Rebuild Fabric metadata and verify Loader libraries without changing mods or saves.")
+        self.repair_loader_button = set_theme_icon(QPushButton("Repair mod loader"), "icon.action.repair")
+        self.repair_loader_button.setToolTip("Rebuild Fabric or Forge metadata and verify loader libraries without changing mods or saves.")
         self.repair_loader_button.clicked.connect(self._request_loader_repair)
         self.repair_loader_button.setEnabled(False)
+        self.restore_forge_button = set_theme_icon(QPushButton("Restore previous loader"), "icon.action.restore")
+        self.restore_forge_button.setToolTip("Restore the mod-loader installation recorded before the last Forge change.")
+        self.restore_forge_button.clicked.connect(self._request_restore_forge)
+        self.restore_forge_button.setEnabled(False)
+        self.open_forge_logs_button = set_theme_icon(QPushButton("Open Forge logs"), "icon.action.folder")
+        self.open_forge_logs_button.clicked.connect(lambda: self.open_forge_logs_requested.emit(self.current_instance_name()))
+        self.open_forge_logs_button.setEnabled(False)
+        self.export_forge_diagnostics_button = set_theme_icon(QPushButton("Export Forge diagnostics"), "icon.action.export")
+        self.export_forge_diagnostics_button.setToolTip("Export Forge profile, logs, mod metadata, and pre-launch results without accounts, tokens, worlds, or mod JAR contents.")
+        self.export_forge_diagnostics_button.clicked.connect(lambda: self.export_forge_diagnostics_requested.emit(self.current_instance_name()))
+        self.export_forge_diagnostics_button.setEnabled(False)
         self.repair_instance_button = set_theme_icon(QPushButton("Repair instance"), "icon.action.repair")
         self.repair_instance_button.setToolTip("Verify the client, libraries, assets, natives, mod loader, and Java without changing worlds or mods.")
         self.repair_instance_button.clicked.connect(self._request_instance_repair)
@@ -136,11 +166,14 @@ class InstancesPage(BasePage):
 
         manage_card.layout.addWidget(QLabel("Mod loader"))
         manage_card.layout.addWidget(self.manage_loader_combo)
-        manage_card.layout.addWidget(QLabel("Fabric Loader version"))
+        manage_card.layout.addWidget(QLabel("Loader version"))
         manage_card.layout.addWidget(self.manage_loader_version_combo)
         manage_card.layout.addWidget(self.manage_loader_status)
         manage_card.layout.addWidget(self.apply_loader_button)
         manage_card.layout.addWidget(self.repair_loader_button)
+        manage_card.layout.addWidget(self.restore_forge_button)
+        manage_card.layout.addWidget(self.open_forge_logs_button)
+        manage_card.layout.addWidget(self.export_forge_diagnostics_button)
         manage_card.layout.addWidget(QLabel("Target name"))
         manage_card.layout.addWidget(self.target_name_input)
         manage_card.layout.addWidget(self.include_saves_checkbox)
@@ -168,14 +201,17 @@ class InstancesPage(BasePage):
         self.modpack_status.setObjectName("MutedLabel")
         self.modpack_status.setWordWrap(True)
         self.scan_modpack_button = set_theme_icon(QPushButton("Scan managed pack files"), "icon.action.search")
+        self.repair_modpack_button = set_theme_icon(QPushButton("Repair modpack"), "icon.action.repair")
         self.check_modpack_update_button = set_theme_icon(QPushButton("Check modpack update"), "icon.action.update")
         self.apply_modpack_update_button = set_theme_icon(QPushButton("Update modpack"), "icon.action.download")
         self.apply_modpack_update_button.setObjectName("PrimaryButton")
         self.scan_modpack_button.clicked.connect(lambda: self.scan_modpack_requested.emit(self.current_instance_name()))
+        self.repair_modpack_button.clicked.connect(self._confirm_modpack_repair)
         self.check_modpack_update_button.clicked.connect(lambda: self.check_modpack_update_requested.emit(self.current_instance_name()))
         self.apply_modpack_update_button.clicked.connect(self._confirm_modpack_update)
         lifecycle_card.layout.addWidget(self.modpack_status)
         lifecycle_card.layout.addWidget(self.scan_modpack_button)
+        lifecycle_card.layout.addWidget(self.repair_modpack_button)
         lifecycle_card.layout.addWidget(self.check_modpack_update_button)
         lifecycle_card.layout.addWidget(self.apply_modpack_update_button)
         self.root_layout.addWidget(lifecycle_card)
@@ -196,6 +232,15 @@ class InstancesPage(BasePage):
 
         self._populate_manage_fabric_versions(instance, versions)
 
+    def set_forge_versions(self, game_version: str, versions: list) -> None:
+        self._forge_versions[game_version] = list(versions)
+        instance = self._instances.get(self.current_instance_name())
+        if instance is None or instance.version_id != game_version:
+            return
+        if self.manage_loader_combo.currentData() != "forge":
+            return
+        self._populate_manage_forge_versions(instance, versions)
+
     def set_instances(self, instances: list, selected_name: str) -> None:
         self._instances = {instance.name: instance for instance in instances}
         self._synchronizing = True
@@ -214,12 +259,23 @@ class InstancesPage(BasePage):
     def current_instance_name(self) -> str:
         return self.instance_combo.currentText().strip()
 
+    def select_instance(self, name: str) -> None:
+        previous = self._synchronizing
+        self._synchronizing = True
+        try:
+            self.instance_combo.blockSignals(True)
+            self.instance_combo.setCurrentText(name)
+            self.instance_combo.blockSignals(False)
+            self._render_instance(name)
+        finally:
+            self._synchronizing = previous
+
     def selected_create_loader(self) -> str:
         return str(self.create_loader_combo.currentData() or "vanilla")
 
     def selected_manage_loader(self) -> tuple[str, str]:
         loader_name = str(self.manage_loader_combo.currentData() or "vanilla")
-        loader_version = str(self.manage_loader_version_combo.currentData() or "").strip() if loader_name == "fabric" else "-1"
+        loader_version = str(self.manage_loader_version_combo.currentData() or "").strip() if loader_name in {"fabric", "forge"} else "-1"
         return loader_name, loader_version
 
     def selected_loader(self) -> tuple[str, str]:
@@ -227,6 +283,9 @@ class InstancesPage(BasePage):
 
     def set_busy(self, busy: bool) -> None:
         self.setEnabled(not busy)
+
+    def _queue_version_filter(self, _checked: bool) -> None:
+        self._version_filter_timer.start()
 
     def _apply_version_filter(self) -> None:
         selected = self.version_combo.currentText()
@@ -251,14 +310,19 @@ class InstancesPage(BasePage):
             self.manage_loader_status.setText(tr("Select an instance to manage its mod loader."))
             self.manage_mods_button.setEnabled(False)
             self.repair_loader_button.setEnabled(False)
+            self.restore_forge_button.setEnabled(False)
+            self.open_forge_logs_button.setEnabled(False)
+            self.export_forge_diagnostics_button.setEnabled(False)
             self.repair_instance_button.setEnabled(False)
             self.create_backup_button.setEnabled(False)
             self.restore_backup_button.setEnabled(False)
             self.open_backups_button.setEnabled(False)
             self.scan_modpack_button.setEnabled(False)
+            self.repair_modpack_button.setEnabled(False)
             self.check_modpack_update_button.setEnabled(False)
             self.apply_modpack_update_button.setEnabled(False)
             self.modpack_status.setText(tr("Select a Modrinth modpack instance to check its managed files and updates."))
+            self._modpack_managed = False
             return
 
         loader_name, loader_version = self._instance_loader(instance)
@@ -266,20 +330,27 @@ class InstancesPage(BasePage):
         self.instance_info.setText(f"{tr('Minecraft {version}', version=instance.version_id)} • {loader_text} • {instance.instance_dir}")
         self.target_name_input.setText(instance.name)
         self._set_manage_loader_available(True)
-        self._pending_manage_loader_version = loader_version if loader_name == "fabric" else ""
+        self._pending_manage_loader_version = loader_version if loader_name in {"fabric", "forge"} else ""
 
         self.manage_loader_combo.blockSignals(True)
         self.manage_loader_combo.setCurrentIndex(max(0, self.manage_loader_combo.findData(loader_name)))
         self.manage_loader_combo.blockSignals(False)
-        self.manage_mods_button.setEnabled(loader_name == "fabric")
-        self.repair_loader_button.setEnabled(loader_name == "fabric")
+        self.manage_mods_button.setEnabled(loader_name in {"fabric", "forge"})
+        self.repair_loader_button.setEnabled(loader_name in {"fabric", "forge"})
+        is_forge = loader_name == "forge"
+        rollback_path = Path(instance.instance_dir) / ".mcw" / "forge" / "previous-installation.json"
+        self.restore_forge_button.setEnabled(rollback_path.is_file())
+        self.open_forge_logs_button.setEnabled(is_forge)
+        self.export_forge_diagnostics_button.setEnabled(is_forge)
         self.repair_instance_button.setEnabled(True)
         self.create_backup_button.setEnabled(True)
         self.restore_backup_button.setEnabled(True)
         self.open_backups_button.setEnabled(True)
         pack_registry = Path(instance.instance_dir) / ".mcw" / "modrinth-pack.json"
         is_managed_pack = pack_registry.is_file()
+        self._modpack_managed = is_managed_pack
         self.scan_modpack_button.setEnabled(is_managed_pack)
+        self.repair_modpack_button.setEnabled(is_managed_pack)
         self.check_modpack_update_button.setEnabled(is_managed_pack)
         self.apply_modpack_update_button.setEnabled(False)
         self._modpack_update_info = None
@@ -296,6 +367,9 @@ class InstancesPage(BasePage):
         self.apply_loader_button.setEnabled(available)
         if not available:
             self.repair_loader_button.setEnabled(False)
+            self.restore_forge_button.setEnabled(False)
+            self.open_forge_logs_button.setEnabled(False)
+            self.export_forge_diagnostics_button.setEnabled(False)
             self.repair_instance_button.setEnabled(False)
 
     def _manage_loader_selected(self, _loader_text: str = "") -> None:
@@ -304,64 +378,87 @@ class InstancesPage(BasePage):
             self._set_manage_loader_available(False)
             return
 
-        is_fabric = self.manage_loader_combo.currentData() == "fabric"
+        selected_loader = str(self.manage_loader_combo.currentData() or "vanilla")
+        current_loader_name, current_loader_version = self._instance_loader(instance)
+        is_modded = selected_loader in {"fabric", "forge"}
+        current_is_modded = current_loader_name in {"fabric", "forge"}
         self.manage_loader_version_combo.clear()
-        self.manage_loader_version_combo.setEnabled(is_fabric)
-        current_is_fabric = self._instance_loader(instance)[0] == "fabric"
-        self.manage_mods_button.setEnabled(current_is_fabric)
-        self.repair_loader_button.setEnabled(current_is_fabric)
+        self.manage_loader_version_combo.setEnabled(is_modded)
+        self.manage_mods_button.setEnabled(current_is_modded)
+        self.repair_loader_button.setEnabled(current_is_modded)
+        current_is_forge = current_loader_name == "forge"
+        rollback_path = Path(instance.instance_dir) / ".mcw" / "forge" / "previous-installation.json"
+        self.restore_forge_button.setEnabled(rollback_path.is_file())
+        self.open_forge_logs_button.setEnabled(current_is_forge)
+        self.export_forge_diagnostics_button.setEnabled(current_is_forge)
 
-        if not is_fabric:
-            self.manage_loader_status.setText(tr("Apply Vanilla to remove Fabric Loader from this instance. Mod files are kept in its mods folder."))
+        if selected_loader == "vanilla":
+            self.manage_loader_status.setText(tr("Apply Vanilla to remove the current mod loader. Mod files are kept in the instance mods folder."))
             self.apply_loader_button.setEnabled(True)
             return
 
-        current_loader_name, current_loader_version = self._instance_loader(instance)
-        self._pending_manage_loader_version = current_loader_version if current_loader_name == "fabric" else ""
-        versions = self._fabric_versions.get(instance.version_id)
-        if versions is None:
-            self.manage_loader_status.setText(tr("Loading compatible Fabric Loader versions..."))
-            self.apply_loader_button.setEnabled(False)
-            self.fabric_versions_requested.emit(instance.version_id)
+        self._pending_manage_loader_version = current_loader_version if current_loader_name == selected_loader else ""
+        if selected_loader == "fabric":
+            versions = self._fabric_versions.get(instance.version_id)
+            if versions is None:
+                self.manage_loader_status.setText(tr("Loading compatible Fabric Loader versions..."))
+                self.apply_loader_button.setEnabled(False)
+                self.fabric_versions_requested.emit(instance.version_id)
+                return
+            self._populate_manage_fabric_versions(instance, versions)
             return
 
-        self._populate_manage_fabric_versions(instance, versions)
+        versions = self._forge_versions.get(instance.version_id)
+        if versions is None:
+            self.manage_loader_status.setText(tr("Loading compatible Minecraft Forge versions..."))
+            self.apply_loader_button.setEnabled(False)
+            self.forge_versions_requested.emit(instance.version_id)
+            return
+        self._populate_manage_forge_versions(instance, versions)
 
     def _populate_manage_fabric_versions(self, instance: object, versions: list) -> None:
         current_loader_name, current_loader_version = self._instance_loader(instance)
         preferred = self._pending_manage_loader_version
         self._pending_manage_loader_version = ""
+        if not preferred and current_loader_name != "fabric":
+            preferred = next((str(version.version) for version in versions if getattr(version, "stable", False)), "")
+        entries = [(version.version, version.version + (tr(" (stable)") if getattr(version, "stable", False) else "")) for version in versions]
+        self._populate_loader_versions("fabric", current_loader_name, current_loader_version, preferred, entries)
 
+    def _populate_manage_forge_versions(self, instance: object, versions: list) -> None:
+        current_loader_name, current_loader_version = self._instance_loader(instance)
+        preferred = self._pending_manage_loader_version
+        self._pending_manage_loader_version = ""
+        entries = [(version.forge_version, version.forge_version) for version in versions]
+        self._populate_loader_versions("forge", current_loader_name, current_loader_version, preferred, entries)
+
+    def _populate_loader_versions(self, loader_name: str, current_loader_name: str, current_loader_version: str, preferred: str, entries: list[tuple[str, str]]) -> None:
         self.manage_loader_version_combo.blockSignals(True)
         self.manage_loader_version_combo.clear()
-        for version in versions:
-            label = version.version + (tr(" (stable)") if getattr(version, "stable", False) else "")
-            self.manage_loader_version_combo.addItem(label, version.version)
-
-        selected_version = preferred or (current_loader_version if current_loader_name == "fabric" else "")
+        for value, label in entries:
+            self.manage_loader_version_combo.addItem(label, value)
+        selected_version = preferred or (current_loader_version if current_loader_name == loader_name else "")
         selected_index = self.manage_loader_version_combo.findData(selected_version) if selected_version else -1
         if selected_version and selected_index < 0:
             self.manage_loader_version_combo.insertItem(0, f"{selected_version}{tr(' (current)')}", selected_version)
             selected_index = 0
         if selected_index >= 0:
             self.manage_loader_version_combo.setCurrentIndex(selected_index)
-        elif versions:
-            stable_index = next((index for index, version in enumerate(versions) if getattr(version, "stable", False)), 0)
-            self.manage_loader_version_combo.setCurrentIndex(stable_index)
+        elif entries:
+            self.manage_loader_version_combo.setCurrentIndex(0)
         self.manage_loader_version_combo.blockSignals(False)
-
         has_version = self.manage_loader_version_combo.count() > 0
         self.manage_loader_version_combo.setEnabled(has_version)
         self.apply_loader_button.setEnabled(has_version)
-
-        if versions:
+        title = "Fabric Loader" if loader_name == "fabric" else "Minecraft Forge"
+        if entries:
             selected = str(self.manage_loader_version_combo.currentData() or "")
-            current_text = tr(" Current: {version}.", version=current_loader_version) if current_loader_name == "fabric" else ""
-            self.manage_loader_status.setText(tr("{count} compatible Fabric Loader version(s) found.{current} Selected: {selected}.", count=len(versions), current=current_text, selected=selected))
-        elif current_loader_name == "fabric" and current_loader_version:
+            current_text = tr(" Current: {version}.", version=current_loader_version) if current_loader_name == loader_name else ""
+            self.manage_loader_status.setText(tr("{count} compatible {loader} version(s) found.{current} Selected: {selected}.", count=len(entries), loader=title, current=current_text, selected=selected))
+        elif current_loader_name == loader_name and current_loader_version:
             self.manage_loader_status.setText(tr("Compatible versions could not be loaded. The current Loader {version} remains available.", version=current_loader_version))
         else:
-            self.manage_loader_status.setText(tr("Fabric Loader is unavailable for this Minecraft version, or Fabric Meta could not be reached."))
+            self.manage_loader_status.setText(tr("{loader} is unavailable for this Minecraft version, or its metadata service could not be reached.", loader=title))
 
     @staticmethod
     def _instance_loader(instance: object) -> tuple[str, str]:
@@ -378,9 +475,10 @@ class InstancesPage(BasePage):
         missing = int(getattr(report, "missing_count", 0))
         managed = int(getattr(report, "managed_files", 0))
         if not changes:
-            self.modpack_status.setText(tr("Managed pack files are healthy: {count} file(s) verified.", count=managed))
+            cache_hits = int(getattr(report, "cache_hits", 0))
+            self.modpack_status.setText(tr("Managed pack files are healthy: {count} file(s) verified, {cached} reused from verification cache.", count=managed, cached=cache_hits))
         else:
-            self.modpack_status.setText(tr("Managed pack changes detected: {modified} modified, {missing} missing. User changes will be preserved during update.", modified=modified, missing=missing))
+            self.modpack_status.setText(tr("Managed pack changes detected: {modified} modified, {missing} missing. Repair restores the current pack version; update still preserves user changes.", modified=modified, missing=missing))
 
     def set_modpack_update_info(self, info: object | None) -> None:
         self._modpack_update_info = info
@@ -394,8 +492,9 @@ class InstancesPage(BasePage):
             self.modpack_status.setText(tr("This Modrinth modpack is up to date."))
 
     def set_modpack_busy(self, busy: bool) -> None:
-        managed = self.scan_modpack_button.isEnabled() or self.check_modpack_update_button.isEnabled() or self._modpack_update_info is not None
+        managed = self._modpack_managed
         self.scan_modpack_button.setEnabled(managed and not busy)
+        self.repair_modpack_button.setEnabled(managed and not busy)
         self.check_modpack_update_button.setEnabled(managed and not busy)
         self.apply_modpack_update_button.setEnabled(bool(self._modpack_update_info is not None and getattr(self._modpack_update_info, "available", False)) and not busy)
 
@@ -419,6 +518,14 @@ class InstancesPage(BasePage):
         if answer == QMessageBox.StandardButton.Yes:
             self.apply_modpack_update_requested.emit(name)
 
+    def _confirm_modpack_repair(self) -> None:
+        name = self.current_instance_name()
+        if not name or not self._modpack_managed:
+            return
+        answer = QMessageBox.question(self, tr("Repair Modrinth modpack"), tr("Repair all missing or modified managed files in '{name}' using its current Modrinth version? A full safety backup will be created before any file is replaced. Worlds and unmanaged files are kept.", name=name), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if answer == QMessageBox.StandardButton.Yes:
+            self.repair_modpack_requested.emit(name)
+
     def _request_create(self) -> None:
         self.create_requested.emit(self.create_name_input.text(), self.version_combo.currentText(), self.selected_create_loader())
 
@@ -427,17 +534,35 @@ class InstancesPage(BasePage):
         if not name:
             return
         loader_name, loader_version = self.selected_manage_loader()
-        if loader_name == "fabric" and not loader_version:
-            QMessageBox.information(self, tr("Fabric Loader"), tr("Select a Fabric Loader version first."))
+        if loader_name in {"fabric", "forge"} and not loader_version:
+            QMessageBox.information(self, tr("Mod loader"), tr("Select a mod loader version first."))
             return
         self.loader_change_requested.emit(name, loader_name, loader_version)
 
     def _request_loader_repair(self) -> None:
         name = self.current_instance_name()
         instance = self._instances.get(name)
-        if instance is None or self._instance_loader(instance)[0] != "fabric":
+        if instance is None or self._instance_loader(instance)[0] not in {"fabric", "forge"}:
             return
         self.repair_loader_requested.emit(name)
+
+
+    def _request_restore_forge(self) -> None:
+        name = self.current_instance_name()
+        instance = self._instances.get(name)
+        if instance is None:
+            return
+        rollback_path = Path(instance.instance_dir) / ".mcw" / "forge" / "previous-installation.json"
+        if not rollback_path.is_file():
+            return
+        answer = QMessageBox.question(
+            self,
+            tr("Restore previous loader"),
+            tr("Restore the previous mod-loader installation for '{name}'? Mods, config, saves, and settings will be kept.", name=name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.restore_forge_requested.emit(name)
 
 
     def _request_instance_repair(self) -> None:
@@ -474,4 +599,10 @@ class InstancesPage(BasePage):
 
     def retranslate_dynamic(self) -> None:
         self.browse_modpacks_button.setText(tr("modrinth.modpack.browse"))
+        self.browse_curseforge_modpacks_button.setText(tr("curseforge.modpack.browse"))
+        self.restore_forge_button.setText(tr("forge.restore_previous"))
+        self.restore_forge_button.setToolTip(tr("forge.restore.tooltip"))
+        self.open_forge_logs_button.setText(tr("forge.open_logs"))
+        self.export_forge_diagnostics_button.setText(tr("forge.export_diagnostics"))
+        self.export_forge_diagnostics_button.setToolTip(tr("forge.diagnostics.tooltip"))
         self._render_instance(self.current_instance_name())

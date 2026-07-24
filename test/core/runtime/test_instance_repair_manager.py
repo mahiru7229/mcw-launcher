@@ -94,3 +94,23 @@ def test_repair_is_blocked_while_instance_runs(monkeypatch: pytest.MonkeyPatch, 
 
     with pytest.raises(RuntimeError, match="Close Minecraft"):
         InstanceRepairManager.repair(instance)
+
+
+def test_repair_forge_uses_mod_loader_repair(monkeypatch: pytest.MonkeyPatch, instance) -> None:
+    instance.mod_loader = ("forge", "47.4.21")
+    version = SimpleNamespace(id="forge-1.20.1-47.4.21", java_version={"majorVersion": 17})
+    repaired = []
+
+    monkeypatch.setattr(InstanceRunLock, "is_active", classmethod(lambda cls, received: False))
+    monkeypatch.setattr(VersionManifestManager, "get", staticmethod(lambda: []))
+    monkeypatch.setattr(ModLoaderManager, "repair", staticmethod(lambda received, reporter=None: repaired.append(received) or version))
+    monkeypatch.setattr(DownloadClientManager, "load", staticmethod(lambda **kwargs: Path("client.jar")))
+    monkeypatch.setattr(DownloadLibraryManager, "load", staticmethod(lambda **kwargs: []))
+    monkeypatch.setattr(AssetManager, "load", staticmethod(lambda **kwargs: Path("assets")))
+    monkeypatch.setattr(JavaResolver, "resolve", staticmethod(lambda major, reporter=None: Path("javaw.exe")))
+    monkeypatch.setattr(Paths, "natives", staticmethod(lambda received: Path(instance.instance_dir) / "missing-natives"))
+
+    result = InstanceRepairManager.repair(instance)
+
+    assert repaired == [instance]
+    assert result.mod_loader == "forge 47.4.21"

@@ -14,13 +14,18 @@ class LaunchControlWidget(QFrame):
     LAUNCH_TEXT = "launch.button"
     CANCEL_TEXT = "launch.cancel_button"
 
-    def __init__(self) -> None:
+    def __init__(self, compact: bool = False) -> None:
         super().__init__()
         self.setObjectName("LaunchControl")
+        self._compact = bool(compact)
+        self.setProperty("compactLayout", self._compact)
         self._mode = "idle"
         self._last_event: object | None = None
         self._last_result: dict | None = None
-        self._last_error = ""
+        self._last_error_status = "Launch failed"
+        self._last_error_detail = "launch.error.logs_hint"
+        self._last_completed_status = "Task completed"
+        self._last_completed_detail = "Everything is ready."
         self._last_exit_result: object | None = None
         self._busy = False
         self._launch_active = False
@@ -32,8 +37,12 @@ class LaunchControlWidget(QFrame):
 
     def _build_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(20, 14, 20, 14)
-        layout.setSpacing(18)
+        if self._compact:
+            layout.setContentsMargins(14, 9, 14, 9)
+            layout.setSpacing(12)
+        else:
+            layout.setContentsMargins(20, 14, 20, 14)
+            layout.setSpacing(18)
 
         progress_layout = QVBoxLayout()
         progress_layout.setContentsMargins(0, 0, 0, 0)
@@ -43,7 +52,8 @@ class LaunchControlWidget(QFrame):
         status_row.setContentsMargins(0, 0, 0, 0)
         status_row.setSpacing(10)
 
-        self.stage_icon = set_theme_pixmap(QLabel(), "icon.state.ready", 32, 32)
+        stage_icon_size = 26 if self._compact else 32
+        self.stage_icon = set_theme_pixmap(QLabel(), "icon.state.ready", stage_icon_size, stage_icon_size)
 
         self.status_label = QLabel("Ready")
         self.status_label.setObjectName("ValueLabel")
@@ -69,11 +79,14 @@ class LaunchControlWidget(QFrame):
         progress_layout.addWidget(self.detail_label)
         progress_layout.addWidget(self.progress_bar)
 
-        self.launch_button = set_theme_icon(QPushButton(tr(self.LAUNCH_TEXT)), "icon.action.launch", 40)
+        self.launch_button = set_theme_icon(QPushButton(tr(self.LAUNCH_TEXT)), "icon.action.launch", 32 if self._compact else 40)
         set_theme_static_text(self.launch_button, "control.launch", tr(self.LAUNCH_TEXT))
         self.launch_button.setObjectName("PrimaryButton")
         self.launch_button.setProperty("themeRole", "launch")
-        self.launch_button.setFixedSize(230, 72)
+        if self._compact:
+            self.launch_button.setFixedSize(190, 60)
+        else:
+            self.launch_button.setFixedSize(230, 72)
         self.launch_button.clicked.connect(self.launch_clicked.emit)
 
         layout.addLayout(progress_layout, 1)
@@ -132,6 +145,23 @@ class LaunchControlWidget(QFrame):
         self._refresh_launch_button()
 
 
+
+    def set_operation_completed(self, status: str, detail: str) -> None:
+        self._mode = "operation_completed"
+        self._last_completed_status = status or "Task completed"
+        self._last_completed_detail = detail or "Everything is ready."
+        self._busy = False
+        self._launch_active = False
+        self._pause_pending = False
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100)
+        self.progress_bar.setFormat("100%")
+        self.status_label.setText(tr(self._last_completed_status))
+        self.detail_label.setText(tr(self._last_completed_detail))
+        self.stage_label.setText(tr("READY"))
+        self._set_stage_state("success")
+        self._refresh_launch_button()
+
     def set_exit_result(self, result: object) -> None:
         self._mode = "exit"
         self._last_exit_result = result
@@ -156,14 +186,17 @@ class LaunchControlWidget(QFrame):
             self._set_stage_state("success")
         self._refresh_launch_button()
 
-    def set_failed(self, message: str) -> None:
+    def set_failed(self, status: str = "Launch failed", detail: str | None = None) -> None:
         self._mode = "failed"
-        self._last_error = message
+        self._last_error_status = status or "Launch failed"
+        self._last_error_detail = detail or "launch.error.logs_hint"
+        status_text = self._compact_failure_text(self._last_error_status, "Launch failed", 120)
+        detail_text = self._compact_failure_text(self._last_error_detail, "launch.error.logs_hint", 180)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat(tr("FAILED"))
-        self.status_label.setText(tr("Launch failed"))
-        self.detail_label.setText(message or tr("Minecraft could not be started."))
+        self.status_label.setText(status_text)
+        self.detail_label.setText(detail_text)
         self.stage_label.setText(tr("FAILED"))
         self._set_stage_state("error")
         self._refresh_launch_button()
@@ -241,9 +274,11 @@ class LaunchControlWidget(QFrame):
         elif self._mode == "result" and self._last_result is not None:
             self.set_result(self._last_result)
         elif self._mode == "failed":
-            self.set_failed(self._last_error)
+            self.set_failed(self._last_error_status, self._last_error_detail)
         elif self._mode == "paused":
             self.set_paused()
+        elif self._mode == "operation_completed":
+            self.set_operation_completed(self._last_completed_status, self._last_completed_detail)
         elif self._mode == "exit" and self._last_exit_result is not None:
             self.set_exit_result(self._last_exit_result)
         else:
@@ -252,8 +287,16 @@ class LaunchControlWidget(QFrame):
             self.stage_label.setText(tr("READY"))
             self._refresh_launch_button()
 
+    @staticmethod
+    def _compact_failure_text(value: str, fallback: str, max_length: int) -> str:
+        translated = tr(value or fallback)
+        compact = " ".join(str(translated).split())
+        if not compact or len(compact) > max_length:
+            return tr(fallback)
+        return compact
+
     def _set_stage_state(self, state: str) -> None:
-        icon_state = "ready" if state == "success" and self._mode == "idle" else state
+        icon_state = "ready" if state == "success" and self._mode in {"idle", "operation_completed"} else state
         state_key = f"{state}:{icon_state}"
         if self._stage_state == state_key:
             return

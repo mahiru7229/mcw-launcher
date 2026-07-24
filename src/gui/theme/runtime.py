@@ -130,9 +130,9 @@ class ThemeRuntime:
     def __init__(self, manager: ThemeManager | None = None) -> None:
         self.manager = manager or theme_manager
         self._base_stylesheet = ""
-        self._show_static_text = True
+        self._show_static_text = False
 
-    def apply(self, root: QWidget, base_stylesheet: str, theme_id: str, show_static_text: bool = True) -> str:
+    def apply(self, root: QWidget, base_stylesheet: str, theme_id: str, show_static_text: bool = False) -> str:
         self._base_stylesheet = str(base_stylesheet)
         self._show_static_text = bool(show_static_text)
         self.manager.reload()

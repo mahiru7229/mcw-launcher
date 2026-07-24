@@ -86,3 +86,28 @@ def test_non_blocking_modrinth_warning_is_shown_without_failed_state(app):
     assert widget.stage_label.text() == "WARNING"
     assert widget.stage_label.property("state") == "warning"
     assert widget.launch_button.text() == "Launch"
+
+
+def test_failed_state_keeps_technical_error_out_of_progress_area(app):
+    widget = LaunchControlWidget()
+    technical_error = "Forge pre-launch check failed:\n" + "\n".join(f"- broken mod {index}" for index in range(80))
+
+    widget.set_failed(technical_error)
+
+    assert widget.status_label.text() == "Launch failed"
+    assert widget.detail_label.text() == "Open Logs to see the full error details."
+    assert "broken mod" not in widget.detail_label.text()
+    assert widget.stage_label.text() == "FAILED"
+
+
+def test_completed_operation_sets_terminal_ready_progress(app):
+    widget = LaunchControlWidget()
+
+    widget.set_operation_completed("loader.progress.ready", "loader.progress.ready_detail")
+
+    assert widget.progress_bar.value() == 100
+    assert widget.progress_bar.format() == "100%"
+    assert widget.stage_label.text() == "READY"
+    assert widget.stage_label.property("state") == "success"
+    assert widget.status_label.text() == "Mod loader ready"
+    assert "instance is ready" in widget.detail_label.text()

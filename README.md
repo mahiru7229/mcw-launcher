@@ -1,10 +1,14 @@
 # MCW Launcher
 
 <p align="center">
-  <strong>A modular, instance-based Minecraft launcher written in Python.</strong>
+  <strong>Trình khởi chạy Minecraft theo từng instance, được viết bằng Python và PySide6.</strong><br>
+  <em>An instance-first Minecraft launcher built with Python and PySide6.</em>
 </p>
 
 <p align="center">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/latest">
+    <img src="https://img.shields.io/badge/Current-v0.6.0-brightgreen" alt="Current version">
+  </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
   </a>
@@ -12,148 +16,235 @@
     <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License">
   </a>
   <img src="https://img.shields.io/badge/Platform-Windows-0078D4" alt="Windows">
-  <img src="https://img.shields.io/badge/Status-Beta-orange" alt="Beta">
+  <img src="https://img.shields.io/badge/GUI-PySide6-41CD52" alt="PySide6">
 </p>
 
-> [!WARNING]
-> MCW Launcher is under active beta development. Back up important worlds before testing new builds.
+<p align="center">
+  <a href="#tiếng-việt">Tiếng Việt</a> ·
+  <a href="#english">English</a> ·
+  <a href="docs/RELEASE-v0.6.0.md">v0.6.0 release notes</a>
+</p>
+
+> [!NOTE]
+> `v0.6.0` là bản Stable đầu tiên của dòng 0.6. Người dùng thông thường nhận cập nhật qua kênh `stable`; các bản thử nghiệm 0.7.x chỉ xuất hiện khi chủ động tham gia tester program.
 
 ---
 
-## Overview
+## Tiếng Việt
 
-MCW Launcher is an open-source Minecraft launcher focused on isolated instances, a modular core, visible launch progress, and a GUI that remains separate from launcher logic.
+### MCW Launcher là gì?
 
-The project is currently developed primarily for Windows and uses PySide6 for its graphical interface.
+MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độc lập**, tiến trình tải rõ ràng, khả năng sửa chữa an toàn và kiến trúc tách biệt giữa GUI với launcher core.
 
-## Features
+Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
-### Minecraft launching
+### Điểm nổi bật của dòng 0.6
 
-- Launch Vanilla Minecraft across modern and legacy version formats.
-- Download and verify the client, libraries, assets, and native files.
-- Build modern and legacy launch arguments.
-- Select a compatible Java runtime automatically.
-- Download and manage compatible Java runtimes when required.
-- Display structured progress while preparing and launching the game.
-- Show active network speed, remaining bytes/files, and aggregate multi-file throughput while downloads are running.
-- Apply an optional global download bandwidth limit shared by all concurrent downloads.
-- Press the Launch button again while it shows Cancel to pause the active launch download; partial files are kept and resumed on the next Launch.
-- Track the Minecraft process until exit, including PID, exit code, session duration, latest game log, and crash report detection.
+- Tạo và chạy instance **Vanilla, Fabric hoặc Forge**.
+- Cài đặt, thay đổi và repair Fabric Loader hoặc Minecraft Forge.
+- Tìm, cài và cập nhật mod từ **Modrinth** với bộ lọc loader/version/channel.
+- Trang **Cài mod** độc lập chỉ hiển thị instance khớp chính xác Minecraft version và loader trước khi cài.
+- Cài modpack `.mrpack`, kiểm tra update và **repair file modpack bị thiếu hoặc bị sửa**.
+- Backup an toàn trước update/repair và rollback khi thao tác thất bại.
+- Cache kết quả xác minh để không hash lại file modpack không đổi ở mỗi lần launch.
+- Quản lý RAM bằng **slider + ô nhập MB chính xác**, với ràng buộc `Min ≤ Max ≤ RAM vật lý`.
+- Hiển thị màn hình khởi động với tiến trình rõ ràng trong khi launcher chuẩn bị settings, database, tài khoản và giao diện.
+- Tự chọn bố cục theo màn hình:
+  - `1920×1080` trở lên → cửa sổ `1600×900`.
+  - `1366×768` → cửa sổ gọn `1280×720`.
+  - Màn hình nhỏ hơn → profile an toàn theo vùng hiển thị khả dụng.
+- Launcher và toàn bộ Qt dialog luôn dùng nền tối cùng chữ trắng, không phụ thuộc Light/Dark mode của Windows.
+- Sau khi cài hoặc repair loader, progress chuyển rõ ràng sang `100% / READY` thay vì mắc ở trạng thái đang tải.
+- Khi launch thất bại, progress chỉ hiện thông báo ngắn; lỗi kỹ thuật đầy đủ nằm trong **Logs**.
+- Microsoft OAuth PKCE, nhiều tài khoản Microsoft, SQLite và bảo vệ refresh token bằng Windows DPAPI.
+- Theo dõi process Minecraft, thời gian chơi, exit code, game log và crash report.
+- Hỗ trợ ngôn ngữ Việt/Anh và theme PNG ngoài EXE; chữ tĩnh đè lên PNG mặc định tắt để artwork của theme hiển thị đúng.
 
-### Instance management
+### Tải và chạy
 
-Each instance has its own game directory, metadata, settings, saves, mods, and runtime state.
+Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
-- Create, rename, clone, and delete instances.
-- Import and export instances using the `.mcwpack` format.
-- Include or exclude saves while cloning or exporting.
-- Configure memory, resolution, fullscreen mode, Java path, JVM arguments, and game arguments per instance.
-- Prevent the same instance from being launched more than once at the same time.
-- Show instances that are currently preparing or running.
-- Fully repair an instance without touching worlds, mods, resource packs, screenshots, or instance settings.
-- Record `last_played`, accumulated play time, last exit code, and crash state in instance metadata.
+- [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
+- `v0.6.0` là bản Stable hiện tại dành cho người dùng thông thường.
+- Các bản `0.7.x` chỉ dành cho người chủ động tham gia tester program.
 
-### Fabric and mods
+Yêu cầu cơ bản:
 
-- Create Vanilla or Fabric instances.
-- Automatically select a recommended stable Fabric Loader version.
-- Change or repair the Fabric Loader version from instance management.
-- Cache Fabric metadata and reuse it when possible.
-- Manage Fabric mods in a dedicated window.
-- Add, remove, enable, or disable mod files.
-- Read metadata from `fabric.mod.json`.
-- Drag and drop supported mod JAR files into the Mod Manager.
-- Analyze duplicate mod IDs, missing/disabled dependencies, version constraints, and declared Fabric conflicts.
-- Check, install, and bulk-install compatible Modrinth mod updates.
-- Lock individual Modrinth mods to prevent automatic dependency or bulk updates.
+- Windows 10 hoặc Windows 11, 64-bit.
+- Kết nối Internet khi tải phiên bản Minecraft, Java, mod loader, mods hoặc modpack lần đầu.
+- Đủ dung lượng trống cho assets, libraries, Java runtimes, instances, backups và mods.
 
-> Fabric API is a separate mod and is not installed automatically by the Fabric Loader itself.
+Java tương thích có thể được launcher tự phát hiện hoặc tải khi cần.
 
-### Modrinth
+### Chạy từ source
 
-- Search and install Fabric mods from Modrinth.
-- Install required Modrinth dependencies automatically.
-- Search `.mrpack` modpacks and create isolated instances automatically.
-- Filter versions by Release, Beta, and Alpha channels. Release remains enabled by default; Beta and Alpha require explicit opt-in.
-- Persist channel preferences in `config/launcher_settings.json`.
-- Verify downloaded files and protect modpack extraction paths.
-- Check all managed Modrinth files before downloading, retry missing files in up to three complete rounds, and fail clearly when required files still cannot be obtained.
-- Resume interrupted partial downloads, recover from invalid HTTP ranges, use fallback URLs, and preserve failed entries for the next launch.
-- Allow each instance to continue with manual Modrinth file installation when the user explicitly disables launch blocking.
-- Track Modrinth mod provenance, installed versions, update locks, and managed modpack files.
-- Detect missing or locally modified files that originally came from an installed `.mrpack`.
-- Check and install newer modpack versions.
-- Create a full safety backup before changing a managed modpack.
-- Preserve user-modified and unmanaged conflicting files instead of overwriting them silently.
-- Roll back instance files, runtime profile, and registry metadata when an update fails.
+Python `3.12` được khuyến nghị.
 
-### PNG themes
+```powershell
+git clone https://github.com/mahiru7229/mcw-launcher.git
+cd mcw-launcher
+git switch beta/0.6
 
-- Load themes from `themes/<theme-id>/theme.json`.
-- Replace launcher backgrounds, page backgrounds, dialogs, cards, buttons, inputs, progress bars, scrollbars, badges, logos, navigation icons, action icons, and state icons with PNG assets.
-- Reload and preview themes from Launcher Settings.
-- Fall back per component to the built-in CSS interface when a PNG is missing, invalid, or unreadable.
-- Ship external themes beside the EXE so visual assets can be updated without rebuilding the launcher.
-- Support dedicated Cancel-state artwork, with bundled PNG fallbacks when a custom theme does not provide it.
-
-See [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) for every filename, path, and recommended canvas size.
-
-### Accounts
-
-- Offline account support.
-- SQLite account storage.
-- Windows DPAPI v2 protection for Microsoft refresh tokens, scoped per account and credential type.
-- Microsoft OAuth PKCE, Xbox Live, XSTS, Minecraft Services, entitlement verification, profile retrieval, and token refresh.
-- Add and store multiple Microsoft accounts, identified by Minecraft UUID.
-- Microsoft sign-in runs in a background task and can be cancelled from the Accounts page without freezing the launcher.
-- Minecraft access tokens remain in memory only; account records include integrity validation and security audit/re-protection controls.
-- Logs, error dialogs, and diagnostic exports automatically redact OAuth credentials and bearer tokens.
-
-### Java diagnostics
-
-- Scan `JAVA_HOME`, PATH, Program Files, the Windows Registry, and managed runtime folders.
-- Verify that discovered Java executables can run.
-- Display Java major version, vendor, architecture, source, and executable path.
-- Open the folder of a selected Java installation from Launcher Settings.
-
-### Backup and restore
-
-- Create full-instance or worlds-only `.mcwbackup` archives.
-- Store backups separately under `backups/<instance-id>/`.
-- Restore through a transactional staging directory.
-- Create a safety backup before replacing current data.
-- Reject unsafe archive paths and symbolic links.
-- Keep launcher metadata, runtime locks, logs, and crash reports outside normal backup payloads.
-
-### Language packs
-
-Built-in language packs:
-
-- `en-US.json` — English - US
-- `vi-VN.json` — Tiếng Việt - Việt Nam
-
-Language packs use semantic keys such as:
-
-```text
-instance.create.success
-mod_manager.add_files
-launcher_settings.language.label
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python launcher.py
 ```
 
-A new language can be added by placing another compatible JSON file inside the `lang` directory. Missing translations fall back to `en-US`.
+### Kiểm thử
 
-See [`docs/LANGUAGE_PACKS.md`](docs/LANGUAGE_PACKS.md) for the pack format.
+```powershell
+python -m pytest test -q
+```
 
-### Reliability and development
+Quy tắc release của dự án: chỉ build khi test không có `failed` hoặc `error`.
 
-- Shared HTTP client and reusable download pipeline.
-- SHA-1 verification for Minecraft files.
-- Atomic writes for important cache and metadata files.
-- SQLite schema initialization and migration.
-- Runtime instance locks with stale-lock recovery.
-- Automated tests through GitHub Actions.
-- Modular managers, models, controllers, pages, and presenters.
+### Build EXE và gói updater
+
+```powershell
+python -m PyInstaller --clean mcw_launcher.spec
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0"
+```
+
+Kết quả updater package:
+
+```text
+MCW-Launcher-v0.6.0-windows-x64.zip
+MCW-Launcher-v0.6.0-windows-x64.zip.sha256
+```
+
+Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
+
+---
+
+## English
+
+### What is MCW Launcher?
+
+MCW Launcher is an open-source Minecraft launcher centered around **isolated instances**, visible download progress, safe repair workflows, and a GUI that remains separate from launcher logic.
+
+Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
+
+### v0.6 highlights
+
+- Create and launch **Vanilla, Fabric, and Forge** instances.
+- Install, change, and repair Fabric Loader or Minecraft Forge.
+- Search, install, and update **Modrinth** mods with loader, version, and release-channel filtering.
+- A standalone **Install Mods** page only offers instances matching the selected Minecraft version and loader.
+- Install `.mrpack` modpacks, check for updates, and **repair missing or locally modified managed files**.
+- Create safety backups before update/repair operations and roll back failed changes.
+- Cache successful file verification so unchanged pack files are not hashed on every launch.
+- Configure Java memory with a **slider and exact MB input**, enforcing `Min ≤ Max ≤ detected physical RAM`.
+- Show a startup screen with clear progress while settings, databases, accounts, and the main interface are prepared.
+- Select a responsive display profile automatically:
+  - `1920×1080` or larger → `1600×900` window.
+  - `1366×768` → compact `1280×720` window.
+  - Smaller displays → a safe size based on available screen geometry.
+- Apply a high-contrast compatibility palette to message dialogs to avoid white-on-white rendering issues.
+- Keep launch-progress failures short while preserving complete technical details in **Logs**.
+- Support Microsoft OAuth PKCE, multiple Microsoft accounts, SQLite storage, and Windows DPAPI protection for refresh tokens.
+- Track the Minecraft process, play time, exit status, latest game log, and detected crash reports.
+- Support English/Vietnamese language packs and external PNG themes; static text over themed PNG controls is disabled by default.
+
+### Download and run
+
+Packaged Windows builds are published on the **Releases** page:
+
+- [Open releases](https://github.com/mahiru7229/mcw-launcher/releases)
+- `v0.6.0` is the current Stable release for regular users.
+- Experimental `0.7.x` builds are available only after explicitly joining the tester program.
+
+Requirements:
+
+- 64-bit Windows 10 or Windows 11.
+- Internet access for first-time Minecraft, Java, loader, mod, and modpack downloads.
+- Enough storage for assets, libraries, runtimes, instances, backups, and mods.
+
+A compatible Java runtime can be detected or provisioned automatically.
+
+### Run from source
+
+Python `3.12` is recommended.
+
+```powershell
+git clone https://github.com/mahiru7229/mcw-launcher.git
+cd mcw-launcher
+git switch beta/0.6
+
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python launcher.py
+```
+
+### Test
+
+```powershell
+python -m pytest test -q
+```
+
+The release flow requires zero failed tests and zero collection/runtime errors before packaging.
+
+### Build the EXE and updater package
+
+```powershell
+python -m PyInstaller --clean mcw_launcher.spec
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0"
+```
+
+Expected updater assets:
+
+```text
+MCW-Launcher-v0.6.0-windows-x64.zip
+MCW-Launcher-v0.6.0-windows-x64.zip.sha256
+```
+
+See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
+
+---
+
+## Core capabilities
+
+### Instances and runtime
+
+- Per-instance metadata and settings.
+- Create, rename, clone, delete, import, and export.
+- `.mcwpack` packages and `.mcwbackup` backups.
+- Runtime locks that prevent duplicate launches.
+- Transactional restore and full-instance repair without deleting personal content.
+- Configurable resolution, fullscreen, JVM/game arguments, Java path, and memory.
+
+### Minecraft and Java
+
+- Modern and legacy Minecraft argument formats.
+- Client, library, asset, native, and logging downloads with checksum verification.
+- Java scanning through `JAVA_HOME`, PATH, Program Files, Windows Registry, and managed runtimes.
+- Compatible Java selection based on Minecraft metadata.
+- Automatic runtime provisioning for supported Java majors.
+
+### Mods and modpacks
+
+- Fabric and Forge mod metadata parsing.
+- Enable/disable, drag-and-drop, dependency analysis, duplicate-ID detection, and loader mismatch checks.
+- Modrinth dependency installation, update checks, update locks, retry/resume, and fallback URLs.
+- Managed modpack registry with update, repair, conflict preservation, backup, rollback, and verification cache.
+
+### Accounts and privacy
+
+- Offline and Microsoft accounts.
+- Microsoft PKCE/Xbox/XSTS/Minecraft Services flow.
+- Windows DPAPI protection for persisted refresh tokens.
+- Access tokens kept in memory only.
+- Credential and bearer-token redaction in logs and diagnostics.
+
+### Interface
+
+- PySide6 GUI with full and compact display profiles.
+- Unified progress for launcher updates, Minecraft files, Java, mods, modpacks, imports, exports, and repairs.
+- English and Vietnamese language packs.
+- External PNG theme system with per-asset fallback.
 
 ---
 
@@ -163,9 +254,9 @@ See [`docs/LANGUAGE_PACKS.md`](docs/LANGUAGE_PACKS.md) for the pack format.
 mcw-launcher/
 ├── launcher.py
 ├── mcw_launcher.spec
+├── config/
+├── docs/
 ├── lang/
-│   ├── en-US.json
-│   └── vi-VN.json
 ├── src/
 │   ├── core/
 │   │   ├── account/
@@ -173,196 +264,67 @@ mcw-launcher/
 │   │   ├── backup/
 │   │   ├── instance/
 │   │   ├── java/
-│   │   ├── language/
 │   │   ├── minecraft/
 │   │   ├── mod/
 │   │   ├── modloader/
 │   │   ├── modrinth/
-│   │   ├── runtime/
-│   │   ├── theme/
 │   │   ├── network/
-│   │   └── package/
+│   │   ├── progress/
+│   │   ├── runtime/
+│   │   ├── security/
+│   │   ├── system/
+│   │   ├── theme/
+│   │   └── update/
 │   ├── gui/
 │   └── models/
-├── docs/
 ├── test/
-└── themes/
+├── themes/
+└── tools/
 ```
 
-The GUI calls the public launcher core instead of implementing Minecraft logic directly.
-
----
-
-## Requirements
-
-### Running a packaged build
-
-- Windows 10 or Windows 11, 64-bit.
-- Internet access for the first download of a Minecraft version.
-- Enough free storage for Minecraft assets, libraries, Java runtimes, instances, and mods.
-
-Java can be detected or provisioned by the launcher.
-
-### Running from source
-
-- Python 3.12 is recommended.
-- Git is optional but recommended.
-
-Create a virtual environment:
-
-```powershell
-git clone https://github.com/mahiru7229/mcw-launcher.git
-cd mcw-launcher
-
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-python -m pip install --upgrade pip
-python -m pip install PySide6 requests httpx cryptography
-```
-
-Start the launcher:
-
-```powershell
-python launcher.py
-```
-
----
-
-## Testing
-
-Install test dependencies:
-
-```powershell
-python -m pip install pytest pytest-cov
-```
-
-Run the full test suite:
-
-```powershell
-python -m pytest test -v
-```
-
-GitHub Actions also runs the tests on pushes and pull requests targeting `main`.
-
----
-
-## Build a Windows executable
-
-Install PyInstaller:
-
-```powershell
-python -m pip install pyinstaller
-```
-
-Build using the project specification:
-
-```powershell
-python -m PyInstaller --clean mcw_launcher.spec
-```
-
-The specification creates a windowed executable and bundles the built-in language packs.
-
-Windows SmartScreen may warn about unsigned beta builds. Code signing is not currently included.
-
----
-
-## Runtime data
-
-When running from source, runtime data is created beside the project. In a packaged build, it is created beside the executable.
-
-```text
-accounts/       Account database
-backups/        Instance and world backup archives
-cache/          Minecraft and mod-loader cache
-config/         Launcher configuration
-instances/      Instance directories and metadata
-lang/           External language packs
-runtimes/       Managed Java runtimes
-themes/         Theme assets
-```
-
-Do not commit runtime data, downloaded Minecraft files, account databases, or personal worlds.
-
----
+The GUI calls public core services instead of implementing Minecraft behavior directly.
 
 ## Documentation
 
 | Document | Purpose |
 |---|---|
+| [`docs/RELEASE-v0.6.0.md`](docs/RELEASE-v0.6.0.md) | Complete v0.6.0 Stable release notes |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core architecture |
 | [`docs/INSTANCE_SYSTEM.md`](docs/INSTANCE_SYSTEM.md) | Instance metadata and lifecycle |
-| [`docs/PACKAGE_FORMAT.md`](docs/PACKAGE_FORMAT.md) | `.mcwpack` package format |
-| [`docs/LANGUAGE_PACKS.md`](docs/LANGUAGE_PACKS.md) | Creating language packs |
-| [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) | PNG theme filenames, paths, and canvas sizes |
-| [`docs/THEME_CREATION_GUIDE.md`](docs/THEME_CREATION_GUIDE.md) | Step-by-step theme creation guide |
-| [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md) | Building updater-compatible release ZIPs |
-| [`docs/BETA7_RUNTIME_REPAIR.md`](docs/BETA7_RUNTIME_REPAIR.md) | Runtime monitoring, crash detection, and full instance repair |
-| [`docs/BETA8_MOD_MANAGEMENT.md`](docs/BETA8_MOD_MANAGEMENT.md) | Mod updates, version locks, compatibility analysis, and managed modpack files |
-| [`docs/BETA9_ACCOUNTS_JAVA_MODPACK_BACKUP.md`](docs/BETA9_ACCOUNTS_JAVA_MODPACK_BACKUP.md) | Microsoft authentication, Java diagnostics, backups, and safe modpack updates |
-| [`docs/BETA10_ACCOUNT_SECURITY.md`](docs/BETA10_ACCOUNT_SECURITY.md) | DPAPI v2, account integrity, SQLite hardening, and privacy protections |
-| [`docs/gui-api.en.md`](docs/gui-api.en.md) | GUI integration API in English |
-| [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API in Vietnamese |
+| [`docs/MODRINTH_INTEGRATION.md`](docs/MODRINTH_INTEGRATION.md) | Modrinth integration |
+| [`docs/FORGE_MODRINTH.md`](docs/FORGE_MODRINTH.md) | Forge and Modrinth behavior |
+| [`docs/PACKAGE_FORMAT.md`](docs/PACKAGE_FORMAT.md) | `.mcwpack` format |
+| [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md) | Updater-compatible release ZIPs |
+| [`docs/LANGUAGE_PACKS.md`](docs/LANGUAGE_PACKS.md) | Language pack format |
+| [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) | PNG theme assets and sizes |
+| [`docs/gui-api.en.md`](docs/gui-api.en.md) / [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API |
 
----
+## Support status
 
-## Current status
-
-| Component | Status |
+| Component | Status in v0.6.0 |
 |---|---|
-| Vanilla launch pipeline | Available |
-| Instance system | Available |
+| Vanilla instances | Available |
+| Fabric Loader and mods | Available |
+| Forge Loader and mods | Beta |
+| Modrinth mods and `.mrpack` modpacks | Beta — update and repair available |
+| Microsoft accounts | Beta |
 | Offline accounts | Available |
-| Automatic Java handling | Available |
-| Java diagnostics and multi-source scanning | Beta |
-| PySide6 GUI | Stable in v0.5.1 |
-| Fabric Loader | Stable in v0.5.1 |
-| Fabric Mod Manager | Beta — update, lock, and compatibility analysis available |
-| Modrinth mods and Fabric modpacks | Stable in v0.5.1 — retry, resume, progress and safe pack handling available |
-| Release/Beta/Alpha Modrinth channels | Available |
-| English and Vietnamese language packs | Available |
-| Microsoft authentication | Beta — multi-account, cancellable sign-in, DPAPI v2 and integrity protection |
-| Forge / NeoForge / Quilt | Not currently supported |
-| Optional PNG theme system | Beta |
-| Game lifecycle and crash detection | Beta |
-| Full instance repair | Beta |
-| Instance/world backup and transactional restore | Beta |
+| English / Vietnamese | Available |
+| PNG themes | Beta |
+| NeoForge / Quilt | Not supported |
+| CurseForge public integration | Deferred to `0.7.x` |
 
----
+## Contributing and bug reports
 
-## Roadmap
-
-Near-term priorities:
-
-- Maintain the v0.5.1 stable line with focused hotfixes when required.
-- Develop experimental v0.6.x builds through the opt-in tester program.
-- Add interactive per-file conflict resolution for modpack updates.
-- Add backup retention rules, backup size previews, and a dedicated backup browser.
-- Improve crash diagnostics and runtime history presentation.
-- Continue replacing hard-coded GUI text with semantic translation keys.
-- Improve packaged-build testing and release automation.
-- Test community PNG themes across multiple DPI and screen sizes.
-
-Other mod loaders should be developed and tested on separate branches before being included in stable beta releases.
-
----
-
-## Contributing
-
-Bug reports and focused pull requests are welcome.
-
-When reporting a bug, include:
+Focused issues and pull requests are welcome. A useful bug report includes:
 
 - MCW Launcher version.
-- Windows version.
-- Minecraft version.
-- Selected Java and mod-loader version.
+- Windows and screen resolution/DPI.
+- Minecraft, Java, and mod-loader versions.
 - Reproduction steps.
-- Relevant logs or screenshots.
+- Relevant launcher/game logs and screenshots.
 
-Please avoid committing downloaded game files, account data, tokens, worlds, build output, or local cache directories.
-
----
+Never publish account databases, access/refresh tokens, private worlds, or other personal runtime data.
 
 ## License
 

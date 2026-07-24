@@ -16,6 +16,7 @@ NAVIGATION_ITEMS = (
     ("home", "Home"),
     ("accounts", "Accounts"),
     ("instances", "Instances"),
+    ("mods", "Mods"),
     ("instance_settings", "Instance Settings"),
     ("launcher_settings", "Launcher Settings"),
     ("logs", "Logs"),

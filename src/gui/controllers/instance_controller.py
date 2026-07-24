@@ -6,14 +6,18 @@ from typing import Any
 
 from PySide6.QtCore import Signal, Slot
 
+from src.core.diagnostics.forge_diagnostics_manager import ForgeDiagnosticsManager
 from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.minecraft.version_manager import VersionManager
+from src.core.modloader.forge.forge_change_manager import ForgeChangeManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.progress.progress_reporter import ProgressReporter
 from src.core.runtime.instance_repair_manager import InstanceRepairManager
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
+from src.config import VERSION_ID
 
 
 class InstanceController(BaseController):
@@ -22,10 +26,18 @@ class InstanceController(BaseController):
     selected_instance_changed = Signal(object)
     export_finished = Signal(object)
     repair_progress = Signal(object)
+    loader_progress = Signal(object)
     package_progress = Signal(object)
     repair_finished = Signal(object)
+    forge_diagnostics_finished = Signal(object)
+    instance_created = Signal(object)
 
+    CREATE_TASK_ID = "instance.create"
     REPAIR_TASK_ID = "instance.repair.full"
+    LOADER_CHANGE_TASK_ID = "instance.loader"
+    LOADER_REPAIR_TASK_ID = "instance.loader.repair"
+    FORGE_RESTORE_TASK_ID = "instance.loader.restore"
+    FORGE_DIAGNOSTICS_TASK_ID = "instance.forge.diagnostics"
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
 
     def __init__(self, task_runner: TaskRunner) -> None:
@@ -74,22 +86,24 @@ class InstanceController(BaseController):
             return
         self.selected_instance_changed.emit(instance)
 
-    def create(self, name: str, version_id: str, loader_name: str = "vanilla", loader_version: str = ModLoaderManager.AUTO) -> None:
+    def create(self, name: str, version_id: str, loader_name: str = "vanilla", loader_version: str = ModLoaderManager.AUTO) -> bool:
         name = self._validated_name(name)
         version_id = version_id.strip()
         loader_name, loader_version = ModLoaderManager.normalize((loader_name, loader_version))
         if name is None or not version_id:
             if not version_id:
                 self._emit_error("Create instance", "Select a Minecraft version first.")
-            return
+            return False
+
+        reporter = ProgressReporter(self._on_loader_progress)
 
         def task() -> Any:
             version = VersionManager.load(version_id)
             resolved_loader = ModLoaderManager.resolve(version.id, loader_name, loader_version)
-            ModLoaderManager.prepare(version, *resolved_loader)
+            ModLoaderManager.prepare(version, *resolved_loader, reporter=reporter)
             return InstanceManager.create(name=name, version=version, mod_loader=resolved_loader)
 
-        self._task_runner.run("instance.create", task, f"Creating instance '{name}'...")
+        return self._task_runner.run(self.CREATE_TASK_ID, task, f"Creating instance '{name}'...")
 
     def change_loader(self, name: str, loader_name: str, loader_version: str) -> None:
         name = name.strip()
@@ -100,31 +114,66 @@ class InstanceController(BaseController):
             self._emit_error("Change mod loader", "Select a Fabric Loader version first.")
             return
 
+        reporter = ProgressReporter(self._on_loader_progress)
+
         def task() -> Any:
             instance = InstanceManager.load(name)
             if InstanceRunLock.is_active(instance):
                 raise RuntimeError("Close Minecraft before changing this instance's mod loader.")
+            current_loader, _ = ModLoaderManager.normalize(instance.mod_loader)
+            if current_loader == ModLoaderManager.FORGE or loader_name == ModLoaderManager.FORGE:
+                return ForgeChangeManager.change(instance, loader_name, loader_version, reporter=reporter)
             version = VersionManager.load(instance.version_id)
             resolved_loader = ModLoaderManager.resolve(version.id, loader_name, loader_version)
-            ModLoaderManager.prepare(version, *resolved_loader)
+            ModLoaderManager.prepare(version, *resolved_loader, reporter=reporter)
             return InstanceManager.set_mod_loader(name, resolved_loader)
 
-        self._task_runner.run("instance.loader", task, f"Applying {loader_name.title()} to '{name}'...")
+        self._task_runner.run(self.LOADER_CHANGE_TASK_ID, task, f"Applying {loader_name.title()} to '{name}'...")
 
     def repair_loader(self, name: str) -> None:
         name = name.strip()
         if not name:
             return
 
+        reporter = ProgressReporter(self._on_loader_progress)
+
         def task() -> Any:
             instance = InstanceManager.load(name)
             if InstanceRunLock.is_active(instance):
                 raise RuntimeError("Close Minecraft before repairing this instance's mod loader.")
-            version = ModLoaderManager.repair(instance)
-            DownloadLibraryManager.load(version)
+            version = ModLoaderManager.repair(instance, reporter=reporter)
+            loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
+            if loader_name != ModLoaderManager.FORGE:
+                DownloadLibraryManager.load(version, reporter=reporter)
             return instance
 
-        self._task_runner.run("instance.loader.repair", task, f"Repairing Fabric for '{name}'...")
+        self._task_runner.run(self.LOADER_REPAIR_TASK_ID, task, f"Repairing mod loader for '{name}'...")
+
+    def restore_previous_forge(self, name: str) -> None:
+        name = name.strip()
+        if not name:
+            return
+
+        reporter = ProgressReporter(self._on_loader_progress)
+
+        def task() -> Any:
+            instance = InstanceManager.load(name)
+            if InstanceRunLock.is_active(instance):
+                raise RuntimeError("Close Minecraft before restoring the previous Forge installation.")
+            return ForgeChangeManager.restore_previous(instance, reporter=reporter)
+
+        self._task_runner.run(self.FORGE_RESTORE_TASK_ID, task, f"Restoring previous Forge installation for '{name}'...")
+
+    def export_forge_diagnostics(self, name: str, output_path: Path) -> None:
+        name = name.strip()
+        if not name:
+            return
+
+        def task() -> Path:
+            instance = InstanceManager.load(name)
+            return ForgeDiagnosticsManager.export(instance, output_path, launcher_version=VERSION_ID)
+
+        self._task_runner.run(self.FORGE_DIAGNOSTICS_TASK_ID, task, f"Exporting Forge diagnostics for '{name}'...", blocking=False)
 
 
     def repair_instance(self, name: str) -> None:
@@ -142,6 +191,12 @@ class InstanceController(BaseController):
         self.repair_progress.emit(event)
         stage = getattr(getattr(event, "stage", None), "value", "repair")
         message = str(getattr(event, "message", "Repairing instance..."))
+        self.log_created.emit(f"[{stage}] {message}")
+
+    def _on_loader_progress(self, event: object) -> None:
+        self.loader_progress.emit(event)
+        stage = getattr(getattr(event, "stage", None), "value", "mod_loader")
+        message = str(getattr(event, "message", "Preparing mod loader..."))
         self.log_created.emit(f"[{stage}] {message}")
 
     def rename(self, source_name: str, target_name: str) -> None:
@@ -191,8 +246,9 @@ class InstanceController(BaseController):
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
         selected_name = self._selected_name
-        if task_id == "instance.create":
+        if task_id == self.CREATE_TASK_ID:
             selected_name = result.name
+            self.instance_created.emit(result)
             self.status_changed.emit(f"Created '{selected_name}'")
         elif task_id == "instance.rename":
             selected_name = result["target"]
@@ -209,14 +265,25 @@ class InstanceController(BaseController):
         elif task_id == "instance.import":
             selected_name = result.name
             self.status_changed.emit(f"Imported '{selected_name}'")
-        elif task_id == "instance.loader":
+        elif task_id == self.LOADER_CHANGE_TASK_ID:
             selected_name = result.name
             loader_name, loader_version = ModLoaderManager.normalize(result.mod_loader)
             loader_text = loader_name if loader_name == "vanilla" else f"{loader_name} {loader_version}"
             self.status_changed.emit(f"Applied {loader_text} to '{selected_name}'")
-        elif task_id == "instance.loader.repair":
+        elif task_id == self.LOADER_REPAIR_TASK_ID:
             selected_name = result.name
-            self.status_changed.emit(f"Repaired Fabric for '{selected_name}'")
+            loader_name, _ = ModLoaderManager.normalize(result.mod_loader)
+            self.status_changed.emit(f"Repaired {loader_name.title()} for '{selected_name}'")
+        elif task_id == self.FORGE_RESTORE_TASK_ID:
+            selected_name = result.name
+            loader_name, loader_version = ModLoaderManager.normalize(result.mod_loader)
+            loader_text = loader_name.title() if loader_name == ModLoaderManager.VANILLA else f"{loader_name.title()} {loader_version}"
+            self.status_changed.emit(f"Restored {loader_text} for '{selected_name}'")
+        elif task_id == self.FORGE_DIAGNOSTICS_TASK_ID:
+            self.forge_diagnostics_finished.emit(result)
+            self.status_changed.emit("Forge diagnostics export completed")
+            self.log_created.emit(f"Forge diagnostics exported to: {result}")
+            return
         elif task_id == self.REPAIR_TASK_ID:
             selected_name = result.instance_name
             self.repair_finished.emit(result)

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Signal, Slot
 
+from src.core.curseforge.curseforge_registry import CurseForgeRegistry
 from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
 from src.core.mod.mod_manager import ModManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
@@ -37,7 +38,7 @@ class ModController(BaseController):
     def current_instance(self) -> Instance | None:
         return self._instance
 
-    def set_instance(self, instance: Instance | None) -> None:
+    def set_instance(self, instance: Instance | None, *, refresh: bool = True) -> None:
         self._instance = instance
         self._scan_pending = False
         self.instance_changed.emit(instance)
@@ -45,7 +46,8 @@ class ModController(BaseController):
         if instance is None:
             self.mods_changed.emit([])
             return
-        self.refresh()
+        if refresh:
+            self.refresh()
 
     def refresh(self) -> None:
         instance = self._require_instance()
@@ -53,7 +55,7 @@ class ModController(BaseController):
             return
 
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name != ModLoaderManager.FABRIC:
+        if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
             self.mods_changed.emit([])
             return
 
@@ -77,7 +79,9 @@ class ModController(BaseController):
             return
         def add() -> list:
             added = ModManager.add_mods(instance, paths, replace)
-            ModrinthRegistry.remove_by_filenames(instance, [mod.file_name for mod in added])
+            filenames = [mod.file_name for mod in added]
+            ModrinthRegistry.remove_by_filenames(instance, filenames)
+            CurseForgeRegistry.remove_by_filenames(instance, filenames)
             return added
 
         self._task_runner.run("mods.add", add, f"Adding {len(paths)} mod file(s)...")
@@ -90,6 +94,7 @@ class ModController(BaseController):
             filenames = [path.name[:-len(ModManager.DISABLED_SUFFIX)] if path.name.endswith(ModManager.DISABLED_SUFFIX) else path.name for path in paths]
             ModManager.remove_mods(instance, paths)
             ModrinthRegistry.remove_by_filenames(instance, filenames)
+            CurseForgeRegistry.remove_by_filenames(instance, filenames)
 
         self._task_runner.run("mods.remove", remove, f"Removing {len(paths)} mod file(s)...")
 
@@ -104,6 +109,10 @@ class ModController(BaseController):
         instance = self._require_instance()
         if instance is None:
             return
+        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
+        if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+            self.updates_changed.emit(ModrinthModUpdateReport(entries=()))
+            return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
         self._task_runner.run("mods.update.check", lambda: (instance_id, ModrinthModUpdateManager.check(instance, allowed_version_types, force_refresh=force_refresh)), "Checking Modrinth mod updates...", blocking=False)
@@ -111,6 +120,9 @@ class ModController(BaseController):
     def update_projects(self, project_ids: list[str], allowed_version_types: tuple[str, ...]) -> None:
         instance = self._require_instance()
         if instance is None or not project_ids:
+            return
+        if ModLoaderManager.normalize(instance.mod_loader)[0] not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+            self._emit_error("Manage mods", "Modrinth update actions require a Fabric or Forge instance.")
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
@@ -120,6 +132,9 @@ class ModController(BaseController):
     def update_all(self, allowed_version_types: tuple[str, ...]) -> None:
         instance = self._require_instance()
         if instance is None:
+            return
+        if ModLoaderManager.normalize(instance.mod_loader)[0] not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+            self._emit_error("Manage mods", "Modrinth update actions require a Fabric or Forge instance.")
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
@@ -138,7 +153,7 @@ class ModController(BaseController):
         if instance is None:
             return
         instance_id = instance.instance_id
-        self._task_runner.run("mods.health", lambda: (instance_id, ModCompatibilityManager.scan(instance)), "Analyzing Fabric mod compatibility...", blocking=False)
+        self._task_runner.run("mods.health", lambda: (instance_id, ModCompatibilityManager.scan(instance)), "Analyzing mod compatibility...", blocking=False)
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:

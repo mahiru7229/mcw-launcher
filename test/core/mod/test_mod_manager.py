@@ -96,3 +96,119 @@ def test_replace_same_mod_file_does_not_delete_source(tmp_path):
 
     assert installed.path.exists()
     assert replaced[0].mod_id == "example"
+
+
+def make_forge_mod(path: Path, mod_id="forge_example", name="Forge Example", version="1.0.0") -> Path:
+    metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[47,)"\n'
+        'license="MIT"\n\n'
+        '[[mods]]\n'
+        f'modId="{mod_id}"\n'
+        f'version="{version}"\n'
+        f'displayName="{name}"\n'
+        'authors="Mahiru"\n'
+        'description="A Forge test mod."\n'
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("META-INF/mods.toml", metadata)
+    return path
+
+
+def test_adds_and_reads_forge_mod(tmp_path):
+    instance = make_instance(tmp_path, loader=("forge", "47.3.0"))
+    source = make_forge_mod(tmp_path / "forge-example.jar")
+
+    added = ModManager.add_mods(instance, [source])
+
+    assert added[0].mod_id == "forge_example"
+    assert added[0].name == "Forge Example"
+    assert added[0].version == "1.0.0"
+    assert added[0].status == "Ready"
+
+
+def make_forge_mod_with_dependencies(path: Path, mod_id="forge_consumer", version="1.0.0") -> Path:
+    metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[47,)"\n'
+        'license="MIT"\n\n'
+        '[[mods]]\n'
+        f'modId="{mod_id}"\n'
+        f'version="{version}"\n'
+        'displayName="Forge Consumer"\n'
+        'authors="Mahiru, Tester"\n'
+        'description="Forge dependency test."\n\n'
+        f'[[dependencies.{mod_id}]]\n'
+        'modId="minecraft"\n'
+        'mandatory=true\n'
+        'versionRange="[1.20.1,1.21)"\n'
+        'ordering="NONE"\n'
+        'side="BOTH"\n\n'
+        f'[[dependencies.{mod_id}]]\n'
+        'modId="librarymod"\n'
+        'mandatory=false\n'
+        'versionRange="[2.0,)"\n'
+        'ordering="AFTER"\n'
+        'side="BOTH"\n'
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("META-INF/mods.toml", metadata)
+    return path
+
+
+def make_legacy_forge_mod(path: Path) -> Path:
+    metadata = [
+        {
+            "modid": "legacy_example",
+            "name": "Legacy Example",
+            "version": "1.0.0",
+            "mcversion": "1.8.9",
+            "description": "A legacy Forge test mod.",
+            "authorList": ["Mahiru"],
+            "requiredMods": ["required-after:legacy_library@[1.0,)"]
+        }
+    ]
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("mcmod.info", json.dumps(metadata))
+    return path
+
+
+def test_reads_forge_dependencies_and_loader_requirement(tmp_path):
+    source = make_forge_mod_with_dependencies(tmp_path / "forge-consumer.jar")
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.loader == "forge"
+    assert mod.metadata_format == "mods.toml"
+    assert mod.dependencies["forge"] == "[47,)"
+    assert mod.dependencies["minecraft"] == "[1.20.1,1.21)"
+    assert mod.recommends["librarymod"] == "[2.0,)"
+    assert mod.authors == ("Mahiru", "Tester")
+
+
+def test_reads_legacy_forge_mcmod_info(tmp_path):
+    source = make_legacy_forge_mod(tmp_path / "legacy.jar")
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.loader == "forge"
+    assert mod.metadata_format == "mcmod.info"
+    assert mod.mod_id == "legacy_example"
+    assert mod.dependencies["minecraft"] == "1.8.9"
+    assert mod.dependencies["legacy_library"] == "[1.0,)"
+
+
+def test_rejects_wrong_loader_mod(tmp_path):
+    instance = make_instance(tmp_path, loader=("forge", "47.3.0"))
+    source = make_mod(tmp_path / "fabric-only.jar")
+
+    with pytest.raises(RuntimeError, match="Fabric mod"):
+        ModManager.add_mods(instance, [source])
+
+
+def test_rejects_duplicate_mod_id_with_different_filename(tmp_path):
+    instance = make_instance(tmp_path, loader=("forge", "47.3.0"))
+    ModManager.add_mods(instance, [make_forge_mod(tmp_path / "first.jar", mod_id="duplicate")])
+
+    with pytest.raises(FileExistsError, match="Mod ID 'duplicate'"):
+        ModManager.add_mods(instance, [make_forge_mod(tmp_path / "second.jar", mod_id="duplicate")])

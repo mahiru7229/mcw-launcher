@@ -21,7 +21,7 @@ class GuiSettingsController(BaseController):
         "update_channel": "stable",
         "tester_mode": False,
         "theme": "mcw-default",
-        "show_static_text": True,
+        "show_static_text": False,
         "modrinth_include_beta": False,
         "modrinth_include_alpha": False,
         "download_limit_mbps": 0.0,
