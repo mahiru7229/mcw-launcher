@@ -26,3 +26,4 @@ config/launcher_settings.json
 temp.txt
 # Local CurseForge gateway override (may contain a client token; never commit)
 config/curseforge.json
+config/launcher_settings.json

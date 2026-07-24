@@ -15,7 +15,7 @@ CURSEFORGE_USER_AGENT = MODRINTH_USER_AGENT
 # key remains on the server and is never bundled into the launcher.
 CURSEFORGE_GATEWAY_URL = "https://mcw-curseforge-gateway.vercel.app/api/curseforge"
 CURSEFORGE_CACHE_MAX_BYTES = 10 * 1024 * 1024
-CURSEFORGE_MANUAL_REFRESH_COOLDOWN_SECONDS = 0
+CURSEFORGE_MANUAL_REFRESH_COOLDOWN_SECONDS = 60
 
 # Microsoft authentication is available in public builds.
 MICROSOFT_AUTH_ENABLED = True

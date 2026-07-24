@@ -195,10 +195,10 @@ Một số PNG có thể vẽ sẵn chữ cố định, ví dụ nút Launch có
 }
 ```
 
-Trong **Launcher Settings → Appearance**, tùy chọn **Show static text over themed controls** quyết định Qt có vẽ thêm chữ hay không.
+Trong **Launcher Settings → Appearance**, tùy chọn **Show static text over themed controls** quyết định Qt có vẽ thêm chữ hay không. Tùy chọn này mặc định **tắt** trong `v0.6.0`.
 
 - Bật: luôn vẽ chữ Qt.
-- Tắt: chỉ ẩn chữ của control đã được khai báo trong `text_assets`.
+- Tắt (mặc định): chỉ ẩn chữ của control đã được khai báo trong `text_assets`.
 - Nếu PNG tương ứng thiếu hoặc hỏng, chữ tự xuất hiện lại.
 - Nội dung động như tên instance, version, progress, trạng thái và lỗi không bị ẩn.
 

@@ -3,6 +3,7 @@ from src.models.instance.settings import InstanceSettings
 from src.models.account.account_source import AccountSource
 from src.models.account.account import Account
 from src.core.minecraft.library_rule_manager import LibraryRuleManager
+import os
 import shlex
 
 
@@ -97,7 +98,21 @@ class ArgumentBuilder:
         return allowed
 
     @staticmethod
-    def resolve(value: str, context: dict):
+    def resolve(value: str, context: dict) -> str:
+        value = ArgumentBuilder._resolve_library_directory(value, context)
         for key, replacement in context.items():
+            if key == "library_directory":
+                continue
             value = value.replace("${" + key + "}", str(replacement))
         return value
+
+    @staticmethod
+    def _resolve_library_directory(value: str, context: dict) -> str:
+        token = "${library_directory}"
+        if token not in value or "library_directory" not in context:
+            return value
+
+        library_directory = os.path.normpath(str(context["library_directory"]))
+        value = value.replace(token + "/", library_directory + os.sep)
+        value = value.replace(token + "\\", library_directory + os.sep)
+        return value.replace(token, library_directory)

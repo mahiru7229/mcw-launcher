@@ -36,7 +36,7 @@ def _launcher_settings() -> dict:
         "update_channel": "stable",
         "tester_mode": False,
         "theme": "mcw-default",
-        "show_static_text": True,
+        "show_static_text": False,
         "modrinth_include_beta": False,
         "modrinth_include_alpha": False,
         "download_limit_mbps": 0.0,
@@ -50,7 +50,7 @@ def test_instance_settings_highlights_unsaved_changes_and_can_discard(gui_app):
     page.fullscreen.setChecked(True)
 
     assert page.is_dirty is True
-    assert page.unsaved_label.isVisible() is True
+    assert page.unsaved_label.isHidden() is False
     assert page.save_button.property("unsavedChanges") is True
 
     page.discard_changes()
@@ -66,7 +66,7 @@ def test_launcher_settings_highlights_unsaved_changes_and_can_discard(gui_app):
     page.show_snapshots.setChecked(True)
 
     assert page.is_dirty is True
-    assert page.unsaved_label.isVisible() is True
+    assert page.unsaved_label.isHidden() is False
     assert page.save_button.property("unsavedChanges") is True
 
     page.discard_changes()

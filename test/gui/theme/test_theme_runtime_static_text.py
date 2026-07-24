@@ -69,6 +69,27 @@ def test_static_text_is_hidden_only_for_a_valid_declared_asset(tmp_path: Path, a
     assert button.property("themeStaticTextHidden") is False
 
 
+def test_static_text_is_hidden_by_default_when_theme_declares_a_valid_text_asset(tmp_path: Path, app: QApplication) -> None:
+    theme_root = tmp_path / "themes" / "pixel-default-hidden"
+    theme_root.mkdir(parents=True)
+    (theme_root / "theme.json").write_text(json.dumps({
+        "schema_version": 1,
+        "id": "pixel-default-hidden",
+        "name": "Pixel Default Hidden",
+        "author": "Test",
+        "assets": {"button.launch": "launch.png"},
+        "text_assets": {"control.launch": "button.launch"},
+    }), encoding="utf-8")
+    write_png(theme_root / "launch.png", 461, 133)
+
+    root, button = build_root()
+    runtime = ThemeRuntime(ThemeManager(tmp_path / "themes"))
+    runtime.apply(root, "", "pixel-default-hidden")
+
+    assert button.text() == ""
+    assert button.property("themeStaticTextHidden") is True
+
+
 def test_missing_text_asset_keeps_fallback_text_visible(tmp_path: Path, app: QApplication) -> None:
     theme_root = tmp_path / "themes" / "incomplete"
     theme_root.mkdir(parents=True)

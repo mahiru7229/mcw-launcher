@@ -7,20 +7,33 @@ Automatic updates use a GitHub Release ZIP. The ZIP must contain the packaged la
 After building the EXE with PyInstaller, pass the target version to the package builder:
 
 ```powershell
+<<<<<<< HEAD
 python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0-beta.1"
+=======
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0"
+>>>>>>> main
 ```
 
 The command creates:
 
 ```text
+<<<<<<< HEAD
 MCW-Launcher-v0.7.0-beta.1-windows-x64.zip
 MCW-Launcher-v0.7.0-beta.1-windows-x64.zip.sha256
+=======
+MCW-Launcher-v0.6.0-windows-x64.zip
+MCW-Launcher-v0.6.0-windows-x64.zip.sha256
+>>>>>>> main
 ```
 
 The package contains a single wrapper directory:
 
 ```text
+<<<<<<< HEAD
 MCW-Launcher-v0.7.0-beta.1-windows-x64/
+=======
+MCW-Launcher-v0.6.0-windows-x64/
+>>>>>>> main
 ├── MCW Launcher.exe
 ├── mcw-update.json
 ├── lang/

@@ -31,7 +31,7 @@ class LauncherSettingsManager:
         },
         "appearance": {
             "theme": "mcw-default",
-            "show_static_text": True,
+            "show_static_text": False,
         },
         "modrinth": {
             "include_beta": False,
@@ -168,7 +168,7 @@ class LauncherSettingsManager:
 
         appearance = normalized.setdefault("appearance", {})
         appearance["theme"] = str(appearance.get("theme") or "mcw-default").strip() or "mcw-default"
-        appearance["show_static_text"] = self._as_bool(appearance.get("show_static_text"), True)
+        appearance["show_static_text"] = self._as_bool(appearance.get("show_static_text"), False)
 
         modrinth = normalized.setdefault("modrinth", {})
         modrinth["include_beta"] = self._as_bool(modrinth.get("include_beta"), False)

@@ -396,7 +396,7 @@
     "launcher_settings.theme.subtitle": "Các tệp theme PNG là tùy chọn. Tệp bị thiếu hoặc không hợp lệ sẽ tự dùng giao diện CSS tích hợp.",
     "launcher_settings.theme.reload": "Tải lại và xem trước theme",
     "launcher_settings.theme.show_static_text": "Hiển thị chữ tĩnh trên các thành phần dùng theme",
-    "launcher_settings.theme.show_static_text.tooltip": "Chỉ tắt khi PNG của theme đã chứa sẵn nội dung cố định, chẳng hạn chữ LAUNCH.",
+    "launcher_settings.theme.show_static_text.tooltip": "Mặc định tắt. Chỉ bật khi muốn launcher vẽ chữ lên trên các thành phần PNG của theme.",
     "runtime.minecraft_crashed_name": "Minecraft đã bị crash: {name}",
     "runtime.minecraft_exit_code_name": "Minecraft đã thoát với mã {code}: {name}",
     "runtime.minecraft_closed_name": "Minecraft đã đóng bình thường: {name}",
@@ -813,6 +813,7 @@
     "Modrinth mod catalog": "mods.catalog.title",
     "Select a loader and mod version. The launcher will only offer instances matching both Minecraft and loader versions.": "mods.catalog.subtitle",
     "Choose instance and install": "mods.catalog.choose_instance",
-    "Select a project to load its compatible versions.": "mods.catalog.select_project"
+    "Select a project to load its compatible versions.": "mods.catalog.select_project",
+    "Disabled by default. Enable this only when you want launcher text drawn over themed PNG controls.": "launcher_settings.theme.show_static_text.tooltip"
   }
 }
