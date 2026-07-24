@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/latest">
-    <img src="https://img.shields.io/badge/Current-v0.6.0--rc.1-blue" alt="Current version">
+    <img src="https://img.shields.io/badge/Current-v0.6.0--rc.3-blue" alt="Current version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -22,11 +22,11 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v0.6.0-rc.2.md">RC 2 release notes</a>
+  <a href="docs/RELEASE-v0.6.0-rc.3.md">RC 3 release notes</a>
 </p>
 
 > [!WARNING]
-> `v0.6.0-rc.2` là Release Candidate thứ hai của dòng 0.6 và vẫn dành cho tester trước khi lên Stable. Hãy sao lưu world quan trọng trước khi cập nhật modpack, sửa chữa instance hoặc thử Forge trên các phiên bản Minecraft cũ.
+> `v0.6.0-rc.3` là Release Candidate thứ ba của dòng 0.6 và vẫn dành cho tester trước khi lên Stable. Hãy sao lưu world quan trọng trước khi cập nhật modpack, sửa chữa instance hoặc thử Forge trên các phiên bản Minecraft cũ.
 
 ---
 
@@ -53,7 +53,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
   - `1920×1080` trở lên → cửa sổ `1600×900`.
   - `1366×768` → cửa sổ gọn `1280×720`.
   - Màn hình nhỏ hơn → profile an toàn theo vùng hiển thị khả dụng.
-- Dialog dùng màu chữ xám trung tính có thể đọc trên cả nền sáng lẫn nền tối khi Windows theme hiển thị sai.
+- Launcher và toàn bộ Qt dialog luôn dùng nền tối cùng chữ trắng, không phụ thuộc Light/Dark mode của Windows.
 - Sau khi cài hoặc repair loader, progress chuyển rõ ràng sang `100% / READY` thay vì mắc ở trạng thái đang tải.
 - Khi launch thất bại, progress chỉ hiện thông báo ngắn; lỗi kỹ thuật đầy đủ nằm trong **Logs**.
 - Microsoft OAuth PKCE, nhiều tài khoản Microsoft, SQLite và bảo vệ refresh token bằng Windows DPAPI.
@@ -104,14 +104,14 @@ Quy tắc release của dự án: chỉ build khi test không có `failed` hoặ
 
 ```powershell
 python -m PyInstaller --clean mcw_launcher.spec
-python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.2"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.3"
 ```
 
 Kết quả updater package:
 
 ```text
-MCW-Launcher-v0.6.0-rc.2-windows-x64.zip
-MCW-Launcher-v0.6.0-rc.2-windows-x64.zip.sha256
+MCW-Launcher-v0.6.0-rc.3-windows-x64.zip
+MCW-Launcher-v0.6.0-rc.3-windows-x64.zip.sha256
 ```
 
 Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -191,14 +191,14 @@ The release flow requires zero failed tests and zero collection/runtime errors b
 
 ```powershell
 python -m PyInstaller --clean mcw_launcher.spec
-python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.2"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.3"
 ```
 
 Expected updater assets:
 
 ```text
-MCW-Launcher-v0.6.0-rc.2-windows-x64.zip
-MCW-Launcher-v0.6.0-rc.2-windows-x64.zip.sha256
+MCW-Launcher-v0.6.0-rc.3-windows-x64.zip
+MCW-Launcher-v0.6.0-rc.3-windows-x64.zip.sha256
 ```
 
 See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -288,7 +288,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
-| [`docs/RELEASE-v0.6.0-rc.2.md`](docs/RELEASE-v0.6.0-rc.2.md) | Complete RC 2 release notes |
+| [`docs/RELEASE-v0.6.0-rc.3.md`](docs/RELEASE-v0.6.0-rc.3.md) | Complete RC 3 release notes |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core architecture |
 | [`docs/INSTANCE_SYSTEM.md`](docs/INSTANCE_SYSTEM.md) | Instance metadata and lifecycle |
 | [`docs/MODRINTH_INTEGRATION.md`](docs/MODRINTH_INTEGRATION.md) | Modrinth integration |
@@ -301,7 +301,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v0.6.0-rc.2 |
+| Component | Status in v0.6.0-rc.3 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |

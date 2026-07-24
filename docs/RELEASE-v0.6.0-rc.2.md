@@ -20,6 +20,14 @@
 - Splash screen không còn che dialog lỗi startup.
 - Chi tiết lỗi tiếp tục được lưu tại `logs/startup-error.log`.
 
+### Giao diện tối bắt buộc
+
+- Launcher và toàn bộ dialog luôn sử dụng giao diện tối, không phụ thuộc Light/Dark mode của Windows.
+- Toàn bộ chữ trong launcher, dialog, menu, input và button được ép thành màu trắng.
+- Tắt native Qt dialogs để QFileDialog và các dialog hệ thống tiếp tục nhận dark palette của launcher.
+- QMessageBox được áp palette và stylesheet trực tiếp, tránh lỗi nền trắng/chữ trắng hoặc theme Windows ghi đè một phần.
+- Splash screen và trạng thái disabled cũng giữ chữ trắng.
+
 ### Phiên bản
 
 ```text
@@ -45,6 +53,14 @@ UPDATE_CHANNEL = beta
 - Retains the startup worker, stage timeout and detailed error reporting introduced after RC1.
 - The splash screen no longer hides startup error dialogs.
 - Full details continue to be written to `logs/startup-error.log`.
+
+### Forced dark appearance
+
+- The launcher and all dialogs always use a dark appearance, independent of the Windows Light/Dark setting.
+- Text in the launcher, dialogs, menus, inputs and buttons is forced to white.
+- Native Qt dialogs are disabled so QFileDialog and other Qt dialogs inherit the launcher dark palette.
+- QMessageBox receives a direct palette and stylesheet to prevent partial Windows-theme overrides.
+- The startup splash and disabled states also retain white text.
 
 ### Version
 

@@ -1,28 +1,45 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QObject, Qt
-from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import QAbstractButton, QApplication, QLabel, QMessageBox, QTextEdit
+from PySide6.QtWidgets import QAbstractButton, QApplication, QLabel, QMessageBox, QPlainTextEdit, QTextEdit
+
+from src.gui.dark_theme import create_forced_dark_palette
+from src.gui.dark_theme_constants import (
+    DARK_BORDER,
+    DARK_BUTTON,
+    DARK_BUTTON_HOVER,
+    DARK_BUTTON_PRESSED,
+    DARK_INPUT,
+    DARK_SURFACE,
+    DARK_TEXT,
+)
 
 
-# #767676 keeps readable contrast against both pure white and pure black.
-# This is intentional: a few Windows/driver combinations may ignore either
-# the QMessageBox background or foreground palette, but not always both.
-DIALOG_NEUTRAL_TEXT = "#767676"
-DIALOG_BACKGROUND = "#f1f1f1"
-DIALOG_BUTTON = "#dddddd"
-DIALOG_BORDER = "#767676"
+DIALOG_TEXT = DARK_TEXT
+# Kept as an alias so older imports and downstream tests do not break.
+DIALOG_NEUTRAL_TEXT = DIALOG_TEXT
+DIALOG_BACKGROUND = DARK_SURFACE
+DIALOG_BUTTON = DARK_BUTTON
+DIALOG_BORDER = DARK_BORDER
 
 MESSAGE_BOX_STYLE = f"""
 QMessageBox {{
     background-color: {DIALOG_BACKGROUND};
-    color: {DIALOG_NEUTRAL_TEXT};
+    color: {DIALOG_TEXT};
 }}
 
-QMessageBox QLabel,
-QMessageBox QTextEdit {{
+QMessageBox QLabel {{
     background: transparent;
-    color: {DIALOG_NEUTRAL_TEXT};
+    color: {DIALOG_TEXT};
+    font-family: "Segoe UI";
+    font-size: 10.5pt;
+}}
+
+QMessageBox QTextEdit,
+QMessageBox QPlainTextEdit {{
+    background: {DARK_INPUT};
+    color: {DIALOG_TEXT};
+    border: 2px solid {DIALOG_BORDER};
     font-family: "Segoe UI";
     font-size: 10.5pt;
 }}
@@ -30,58 +47,54 @@ QMessageBox QTextEdit {{
 QMessageBox QPushButton {{
     min-width: 88px;
     background: {DIALOG_BUTTON};
-    color: {DIALOG_NEUTRAL_TEXT};
+    color: {DIALOG_TEXT};
     border: 2px solid {DIALOG_BORDER};
     padding: 7px 12px;
     font-weight: 700;
 }}
 
 QMessageBox QPushButton:hover {{
-    background: #cfcfcf;
-    color: #666666;
+    background: {DARK_BUTTON_HOVER};
+    color: {DIALOG_TEXT};
 }}
 
 QMessageBox QPushButton:pressed {{
-    background: #c2c2c2;
+    background: {DARK_BUTTON_PRESSED};
+    color: {DIALOG_TEXT};
 }}
 """
 
 
-def _neutral_palette(widget: QObject) -> QPalette:
-    palette = QPalette(getattr(widget, "palette")())
-    background = QColor(DIALOG_BACKGROUND)
-    foreground = QColor(DIALOG_NEUTRAL_TEXT)
-    button = QColor(DIALOG_BUTTON)
-    palette.setColor(QPalette.ColorRole.Window, background)
-    palette.setColor(QPalette.ColorRole.Base, background)
-    palette.setColor(QPalette.ColorRole.AlternateBase, background)
-    palette.setColor(QPalette.ColorRole.WindowText, foreground)
-    palette.setColor(QPalette.ColorRole.Text, foreground)
-    palette.setColor(QPalette.ColorRole.PlaceholderText, foreground)
-    palette.setColor(QPalette.ColorRole.Button, button)
-    palette.setColor(QPalette.ColorRole.ButtonText, foreground)
-    palette.setColor(QPalette.ColorRole.ToolTipText, foreground)
-    return palette
+def _force_dark_palette(widget: QObject):
+    return create_forced_dark_palette(getattr(widget, "palette")())
 
 
 def apply_message_box_compatibility(message_box: QMessageBox) -> None:
     message_box.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-    message_box.setPalette(_neutral_palette(message_box))
+
+    message_box_options = getattr(QMessageBox, "Option", None)
+    dont_use_native = getattr(message_box_options, "DontUseNativeDialog", None)
+    if dont_use_native is not None:
+        message_box.setOption(dont_use_native, True)
+
+    message_box.setPalette(_force_dark_palette(message_box))
     message_box.setStyleSheet(MESSAGE_BOX_STYLE)
 
-    # Apply the neutral foreground directly to native-created children too.
-    # Some Windows themes ignore an inherited QMessageBox palette while still
-    # respecting a child palette or child stylesheet.
+    # Apply foreground/background directly to children created by QMessageBox.
+    # This protects against Windows styles that partially ignore inherited QSS.
     for label in message_box.findChildren(QLabel):
-        label.setPalette(_neutral_palette(label))
-        label.setStyleSheet(f"background: transparent; color: {DIALOG_NEUTRAL_TEXT};")
-    for text_edit in message_box.findChildren(QTextEdit):
-        text_edit.setPalette(_neutral_palette(text_edit))
-        text_edit.setStyleSheet(f"background: {DIALOG_BACKGROUND}; color: {DIALOG_NEUTRAL_TEXT};")
+        label.setPalette(_force_dark_palette(label))
+        label.setStyleSheet(f"background: transparent; color: {DIALOG_TEXT};")
+    for text_edit in [*message_box.findChildren(QTextEdit), *message_box.findChildren(QPlainTextEdit)]:
+        text_edit.setPalette(_force_dark_palette(text_edit))
+        text_edit.setStyleSheet(
+            f"background: {DARK_INPUT}; color: {DIALOG_TEXT}; "
+            f"border: 2px solid {DIALOG_BORDER};"
+        )
     for button in message_box.findChildren(QAbstractButton):
-        button.setPalette(_neutral_palette(button))
+        button.setPalette(_force_dark_palette(button))
         button.setStyleSheet(
-            f"background: {DIALOG_BUTTON}; color: {DIALOG_NEUTRAL_TEXT}; "
+            f"background: {DIALOG_BUTTON}; color: {DIALOG_TEXT}; "
             f"border: 2px solid {DIALOG_BORDER}; padding: 7px 12px; font-weight: 700;"
         )
 

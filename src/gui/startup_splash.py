@@ -86,31 +86,31 @@ class StartupSplash(QWidget):
                 border-radius: 12px;
             }
             QLabel#StartupEyebrow {
-                color: #9bdc64;
+                color: #ffffff;
                 font-family: "Segoe UI";
                 font-size: 11px;
                 font-weight: 700;
                 letter-spacing: 2px;
             }
             QLabel#StartupTitle {
-                color: #f2f4ef;
+                color: #ffffff;
                 font-family: "Segoe UI";
                 font-size: 30px;
                 font-weight: 800;
             }
             QLabel#StartupVersion {
-                color: #a8afa4;
+                color: #ffffff;
                 font-family: "Segoe UI";
                 font-size: 12px;
             }
             QLabel#StartupStatus {
-                color: #f2f4ef;
+                color: #ffffff;
                 font-family: "Segoe UI";
                 font-size: 15px;
                 font-weight: 700;
             }
             QLabel#StartupDetail {
-                color: #afb6ac;
+                color: #ffffff;
                 font-family: "Segoe UI";
                 font-size: 12px;
             }
@@ -129,10 +129,10 @@ class StartupSplash(QWidget):
     def _apply_palette(self) -> None:
         palette = self.palette()
         palette.setColor(QPalette.ColorRole.Window, QColor("#20231f"))
-        palette.setColor(QPalette.ColorRole.WindowText, QColor("#f2f4ef"))
-        palette.setColor(QPalette.ColorRole.Text, QColor("#f2f4ef"))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor("#ffffff"))
+        palette.setColor(QPalette.ColorRole.Text, QColor("#ffffff"))
         palette.setColor(QPalette.ColorRole.Highlight, QColor("#8ed35b"))
-        palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#111310"))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
         self.setPalette(palette)
 
     def _center_on_primary_screen(self) -> None:
