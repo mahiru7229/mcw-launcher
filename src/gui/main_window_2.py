@@ -1149,6 +1149,9 @@ class MainWindow(QMainWindow):
         self.curseforge_mod_dialog.set_channel_preferences(include_beta, include_alpha)
         self.curseforge_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
         self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
+        curseforge_available = bool(settings.get("curseforge_gateway_urls", ()))
+        self.instances_page.browse_curseforge_modpacks_button.setVisible(curseforge_available)
+        self.mod_manager_dialog.curseforge_button.setVisible(curseforge_available)
         self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")), bool(settings.get("show_static_text", False)))
 
     def _preview_theme(self, theme_id: str) -> None:

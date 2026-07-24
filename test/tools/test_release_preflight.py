@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from src.config import VERSION_TAG
-from tools.release_preflight import audit_language_packs, find_merge_markers
+from tools.release_preflight import audit_language_packs, audit_private_gateway_bundling, find_merge_markers
 
 
 def write_pack(path: Path, locale: str, translations: dict[str, str]) -> None:
@@ -47,3 +47,23 @@ def test_language_audit_reports_missing_keys_and_placeholder_mismatch(tmp_path: 
 def test_current_release_notes_exist() -> None:
     project_root = Path(__file__).resolve().parents[2]
     assert (project_root / "docs" / f"RELEASE-{VERSION_TAG}.md").is_file()
+
+
+def test_private_gateway_audit_rejects_bundled_url(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "config.py").write_text(
+        'CURSEFORGE_GATEWAY_URL = "https://private.example/api/curseforge"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "curseforge.example.json").write_text(
+        json.dumps({"bundled_gateway_urls": ["https://private.example/api/curseforge"]}),
+        encoding="utf-8",
+    )
+    (tmp_path / ".gitignore").write_text("", encoding="utf-8")
+
+    errors = audit_private_gateway_bundling(tmp_path)
+
+    assert "Private CurseForge gateway URL must not be bundled in src/config.py" in errors
+    assert "config/curseforge.example.json must not contain bundled gateway URLs" in errors
+    assert ".gitignore must exclude config/private/" in errors

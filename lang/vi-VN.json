@@ -781,7 +781,22 @@
     "mods.catalog.curseforge.contacting": "Đang kết nối MCW CurseForge Gateway và tải danh sách dự án...",
     "mods.catalog.curseforge.failed": "Tìm kiếm CurseForge thất bại",
     "mods.catalog.curseforge.error": "Không thể tìm kiếm trên CurseForge: {error}",
-    "mods.catalog.curseforge.select_project": "Chọn một dự án CurseForge để tải các file tương thích."
+    "mods.catalog.curseforge.select_project": "Chọn một dự án CurseForge để tải các file tương thích.",
+    "curseforge.gateway.settings.title": "Gateway CurseForge riêng tư",
+    "curseforge.gateway.settings.subtitle": "Có thể cấu hình tối đa năm liên kết gateway HTTPS riêng tư. Các liên kết được lưu ngoài tệp cài đặt launcher và được bảo vệ bằng Windows DPAPI. Launcher sẽ thử lần lượt từng liên kết khi gateway trước đó không khả dụng.",
+    "curseforge.gateway.slot": "Liên kết gateway {index}",
+    "curseforge.gateway.placeholder": "Dán liên kết gateway HTTPS riêng tư",
+    "curseforge.gateway.reveal.toggle": "Hiện các liên kết gateway được bảo vệ",
+    "curseforge.gateway.security.note": "Liên kết gateway được che trong giao diện và mã hóa cho tài khoản Windows hiện tại.",
+    "curseforge.gateway.reveal.title": "Hiện các liên kết gateway được bảo vệ?",
+    "curseforge.gateway.reveal.message": "Các liên kết này có thể cấp quyền truy cập vào gateway riêng tư. Hãy chắc chắn không ai nhìn thấy màn hình trước khi mở.",
+    "curseforge.gateway.reveal.details": "Nút Hiện sẽ được mở khóa sau 5 giây. Chọn Hủy để tiếp tục che toàn bộ liên kết.",
+    "curseforge.gateway.reveal.countdown": "Hiện ({seconds})",
+    "curseforge.gateway.reveal.confirm": "Hiện",
+    "curseforge.gateway.save.error.title": "Không thể lưu liên kết gateway riêng tư",
+    "curseforge.gateway.required.external": "Chưa cấu hình gateway CurseForge. Hãy thêm ít nhất một liên kết gateway được bảo vệ trong Cài đặt launcher.",
+    "curseforge.gateway.all_unavailable": "Tất cả gateway CurseForge đã cấu hình đều không khả dụng.",
+    "common.cancel": "Hủy"
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",
@@ -814,6 +829,13 @@
     "Select a loader and mod version. The launcher will only offer instances matching both Minecraft and loader versions.": "mods.catalog.subtitle",
     "Choose instance and install": "mods.catalog.choose_instance",
     "Select a project to load its compatible versions.": "mods.catalog.select_project",
-    "Disabled by default. Enable this only when you want launcher text drawn over themed PNG controls.": "launcher_settings.theme.show_static_text.tooltip"
+    "Disabled by default. Enable this only when you want launcher text drawn over themed PNG controls.": "launcher_settings.theme.show_static_text.tooltip",
+    "Private CurseForge gateways": "curseforge.gateway.settings.title",
+    "Configure up to five private HTTPS gateway links. They are stored outside the launcher settings file and protected with Windows DPAPI. Requests try each link in order when an earlier gateway is unavailable.": "curseforge.gateway.settings.subtitle",
+    "Paste private HTTPS gateway link": "curseforge.gateway.placeholder",
+    "Reveal protected gateway links": "curseforge.gateway.reveal.toggle",
+    "Gateway links are masked in the interface and encrypted for the current Windows account.": "curseforge.gateway.security.note",
+    "No CurseForge gateway is configured. Add at least one protected gateway link in Launcher Settings.": "curseforge.gateway.required.external",
+    "All configured CurseForge gateways are unavailable.": "curseforge.gateway.all_unavailable"
   }
 }

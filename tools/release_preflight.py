@@ -91,6 +91,38 @@ def audit_language_packs(project_root: Path) -> list[str]:
     return errors
 
 
+
+
+def audit_private_gateway_bundling(project_root: Path) -> list[str]:
+    errors: list[str] = []
+    config_path = project_root / "src" / "config.py"
+    try:
+        config_text = config_path.read_text(encoding="utf-8")
+    except OSError as error:
+        return [f"Unable to inspect src/config.py: {error}"]
+    if re.search(r"^CURSEFORGE_GATEWAY_URL\s*=", config_text, flags=re.MULTILINE):
+        errors.append("Private CurseForge gateway URL must not be bundled in src/config.py")
+
+    example_path = project_root / "config" / "curseforge.example.json"
+    try:
+        example = json.loads(example_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        errors.append(f"CurseForge config template error: {error}")
+    else:
+        bundled = example.get("bundled_gateway_urls") if isinstance(example, dict) else None
+        if bundled != []:
+            errors.append("config/curseforge.example.json must not contain bundled gateway URLs")
+
+    gitignore_path = project_root / ".gitignore"
+    try:
+        gitignore = gitignore_path.read_text(encoding="utf-8")
+    except OSError as error:
+        errors.append(f"Unable to inspect .gitignore: {error}")
+    else:
+        if "config/private/" not in gitignore:
+            errors.append(".gitignore must exclude config/private/")
+    return errors
+
 def audit_version_metadata(project_root: Path) -> list[str]:
     errors: list[str] = []
     if VERSION_TAG != f"v{VERSION_ID}":
@@ -118,6 +150,7 @@ def audit_version_metadata(project_root: Path) -> list[str]:
 def run_preflight(project_root: Path = PROJECT_ROOT) -> list[str]:
     errors: list[str] = []
     errors.extend(audit_version_metadata(project_root))
+    errors.extend(audit_private_gateway_bundling(project_root))
     errors.extend(find_merge_markers(project_root))
     errors.extend(audit_language_packs(project_root))
     return errors

@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Beta-v0.7.0--beta.1-orange" alt="Current beta version">
+    <img src="https://img.shields.io/badge/Stable-v0.7.0-brightgreen" alt="Current stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -22,12 +22,12 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v0.7.0-beta.1.md">Beta 1 release notes</a> ·
+  <a href="docs/RELEASE-v0.7.0.md">v0.7.0 release notes</a> ·
   <a href="docs/RELEASE-v0.6.0.md">Stable release notes</a>
 </p>
 
-> [!WARNING]
-> `v0.7.0-beta.1` mở dòng thử nghiệm 0.7 với CurseForge Gateway và cache provider mới. Đây không phải bản Stable; hãy sao lưu world/instance quan trọng và giữ `v0.6.0` nếu cần ưu tiên độ ổn định.
+> [!NOTE]
+> `v0.7.0` là bản Stable đầu tiên của dòng 0.7. Launcher không đóng gói bất kỳ liên kết gateway CurseForge riêng tư nào; chủ sở hữu tự cấu hình tối đa năm liên kết được bảo vệ trong Launcher Settings.
 
 ---
 
@@ -39,9 +39,9 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
-### Điểm nổi bật của `v0.7.0-beta.1`
+### Điểm nổi bật của `v0.7.0`
 
-- Tích hợp **CurseForge Gateway**: launcher không chứa CurseForge API key và chỉ gọi API trung gian qua HTTPS.
+- Tích hợp **CurseForge Gateway** mà không đóng gói API key hoặc gateway riêng tư trong source/release. Có thể cấu hình tối đa năm liên kết HTTPS, được che trong giao diện, mã hóa bằng Windows DPAPI và tự động failover theo thứ tự.
 - Tìm kiếm, chọn phiên bản và cài **CurseForge mods** cho Fabric/Forge từ Manage Mods hoặc trang Mods độc lập.
 - Tự tải file khi tác giả cho phép phân phối qua bên thứ ba; nếu không, launcher hướng dẫn tải thủ công rồi xác minh size/SHA-1 trước khi import.
 - Cache JSON CurseForge tối đa **10 MB**, dọn theo LRU, hỗ trợ dữ liệu stale khi gateway tạm lỗi.
@@ -72,8 +72,8 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.6.0` là bản Stable hiện tại dành cho người dùng thông thường.
-- Dòng `0.7.x` dùng kênh `beta` và chỉ dành cho người chủ động tham gia tester program.
+- `v0.7.0` là bản Stable hiện tại dành cho người dùng thông thường.
+- Các bản thử nghiệm tương lai vẫn chỉ xuất hiện khi người dùng chủ động tham gia tester program.
 
 Yêu cầu cơ bản:
 
@@ -90,7 +90,7 @@ Python `3.12` được khuyến nghị.
 ```powershell
 git clone https://github.com/mahiru7229/mcw-launcher.git
 cd mcw-launcher
-git switch beta/0.7
+git switch main
 
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -121,14 +121,14 @@ Hoặc chạy thủ công:
 python -m tools.release_preflight
 python -m pytest test -q
 python -m PyInstaller --clean --noconfirm mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0-beta.1"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0"
 ```
 
 Kết quả updater package:
 
 ```text
-MCW-Launcher-v0.7.0-beta.1-windows-x64.zip
-MCW-Launcher-v0.7.0-beta.1-windows-x64.zip.sha256
+MCW-Launcher-v0.7.0-windows-x64.zip
+MCW-Launcher-v0.7.0-windows-x64.zip.sha256
 ```
 
 Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -143,9 +143,9 @@ MCW Launcher is an open-source Minecraft launcher centered around **isolated ins
 
 Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
 
-### `v0.7.0-beta.1` highlights
+### `v0.7.0` highlights
 
-- Integrate a **CurseForge Gateway** so no CurseForge API key is embedded in the public launcher.
+- Integrate a **CurseForge Gateway** without bundling a private API key or gateway URL. Up to five HTTPS endpoints can be configured, masked in the interface, protected with Windows DPAPI, and tried in order for failover.
 - Search, select versions, and install **CurseForge mods** for Fabric/Forge from Manage Mods or the standalone Mods page.
 - Download automatically when third-party distribution is allowed; otherwise guide the user through a manual download verified by size and SHA-1.
 - Keep a local CurseForge JSON cache capped at **10 MB**, with LRU eviction and stale-data fallback during gateway outages.
@@ -175,8 +175,8 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 Packaged Windows builds are published on the **Releases** page:
 
 - [Open releases](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.6.0` is the current Stable release for regular users.
-- Experimental `0.7.x` builds use the `beta` channel and are available only after explicitly joining the tester program.
+- `v0.7.0` is the current Stable release for regular users.
+- Future experimental builds remain available only after explicitly joining the tester program.
 
 Requirements:
 
@@ -193,7 +193,7 @@ Python `3.12` is recommended.
 ```powershell
 git clone https://github.com/mahiru7229/mcw-launcher.git
 cd mcw-launcher
-git switch beta/0.7
+git switch main
 
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -224,14 +224,14 @@ Or run each step manually:
 python -m tools.release_preflight
 python -m pytest test -q
 python -m PyInstaller --clean --noconfirm mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0-beta.1"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0"
 ```
 
 Expected updater assets:
 
 ```text
-MCW-Launcher-v0.7.0-beta.1-windows-x64.zip
-MCW-Launcher-v0.7.0-beta.1-windows-x64.zip.sha256
+MCW-Launcher-v0.7.0-windows-x64.zip
+MCW-Launcher-v0.7.0-windows-x64.zip.sha256
 ```
 
 See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -323,7 +323,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
-| [`docs/RELEASE-v0.7.0-beta.1.md`](docs/RELEASE-v0.7.0-beta.1.md) | Complete 0.7 Beta 1 release notes |
+| [`docs/RELEASE-v0.7.0.md`](docs/RELEASE-v0.7.0.md) | Complete v0.7.0 Stable release notes |
 | [`docs/RELEASE-v0.6.0.md`](docs/RELEASE-v0.6.0.md) | Complete v0.6.0 Stable release notes |
 | [`docs/FORGE_CURSEFORGE.md`](docs/FORGE_CURSEFORGE.md) | CurseForge Gateway, cache and manual fallback |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core architecture |
@@ -338,18 +338,18 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v0.7.0-beta.1 |
+| Component | Status in v0.7.0 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |
-| Forge Loader and mods | Beta |
-| Modrinth mods and `.mrpack` modpacks | Beta — update and repair available |
-| Microsoft accounts | Beta |
+| Forge Loader and mods | Available |
+| Modrinth mods and `.mrpack` modpacks | Available — update and repair supported |
+| Microsoft accounts | Available |
 | Offline accounts | Available |
 | English / Vietnamese | Available |
-| PNG themes | Beta |
+| PNG themes | Available |
 | NeoForge / Quilt | Not supported |
-| CurseForge Gateway mods | Beta — Fabric/Forge, cache and manual fallback |
+| CurseForge Gateway mods | Available — private endpoints required; Fabric/Forge, cache and manual fallback |
 | CurseForge modpacks | Experimental — Forge flow through gateway |
 
 ## Contributing and bug reports

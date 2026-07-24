@@ -97,7 +97,7 @@ class CurseForgePackInstaller:
         if not game_version:
             raise RuntimeError("The CurseForge modpack does not declare a Minecraft version.")
         if selected is None:
-            raise RuntimeError("Only Forge CurseForge modpacks are supported in v0.7.0 Beta 1.")
+            raise RuntimeError("Only Forge CurseForge modpacks are supported in v0.7.0.")
         loader_id = str(selected.get("id") or "")
         forge_version = loader_id.split("-", 1)[1].strip() if "-" in loader_id else ""
         if not forge_version:

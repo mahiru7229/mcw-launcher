@@ -3,6 +3,7 @@ from threading import Thread
 from time import sleep
 
 import httpx
+import pytest
 
 from src.config import CURSEFORGE_USER_AGENT, VERSION_ID
 from src.core.config.curseforge_config_manager import CurseForgeConfigManager
@@ -12,7 +13,7 @@ from src.core.network.httpx_downloader import HttpDownloader
 
 
 def configure_gateway(monkeypatch, tmp_path: Path, client: httpx.Client, token: str = "") -> None:
-    monkeypatch.setattr(CurseForgeConfigManager, "gateway_url", staticmethod(lambda: "https://gateway.example/api/curseforge"))
+    monkeypatch.setattr(CurseForgeConfigManager, "gateway_urls", staticmethod(lambda: ("https://gateway.example/api/curseforge",)))
     monkeypatch.setattr(CurseForgeConfigManager, "client_token", staticmethod(lambda: token))
     monkeypatch.setattr(HttpDownloader, "get_client", classmethod(lambda cls: client))
     monkeypatch.setattr(CurseForgeCache, "root", staticmethod(lambda: tmp_path))
@@ -256,4 +257,69 @@ def test_catalog_file_list_sends_loader_without_game_version(monkeypatch, tmp_pa
     assert result.files == ()
     assert captured["request"].url.params["loader"] == "forge"
     assert "gameVersion" not in captured["request"].url.params
+    client.close()
+
+
+def test_request_fails_over_to_next_gateway(monkeypatch, tmp_path: Path) -> None:
+    requested_hosts = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_hosts.append(request.url.host)
+        if request.url.host == "primary.example":
+            return httpx.Response(503, request=request, json={"error": {"message": "Primary unavailable."}})
+        return httpx.Response(200, request=request, json=search_payload())
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    monkeypatch.setattr(
+        CurseForgeConfigManager,
+        "gateway_urls",
+        staticmethod(lambda: (
+            "https://primary.example/api/curseforge",
+            "https://secondary.example/api/curseforge",
+        )),
+    )
+    monkeypatch.setattr(CurseForgeConfigManager, "client_token", staticmethod(lambda: ""))
+    monkeypatch.setattr(HttpDownloader, "get_client", classmethod(lambda cls: client))
+    monkeypatch.setattr(CurseForgeCache, "root", staticmethod(lambda: tmp_path))
+    CurseForgeClient._inflight.clear()
+
+    result = CurseForgeClient.search_projects("mod", query="example", force_refresh=True)
+
+    assert requested_hosts == ["primary.example", "secondary.example"]
+    assert result.projects[0].project_id == 101
+    client.close()
+
+
+def test_non_transient_gateway_error_does_not_fail_over(monkeypatch, tmp_path: Path) -> None:
+    requested_hosts = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_hosts.append(request.url.host)
+        return httpx.Response(403, request=request, json={"error": {"message": "Forbidden."}})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    monkeypatch.setattr(
+        CurseForgeConfigManager,
+        "gateway_urls",
+        staticmethod(lambda: (
+            "https://primary.example/api/curseforge",
+            "https://secondary.example/api/curseforge",
+        )),
+    )
+    monkeypatch.setattr(CurseForgeConfigManager, "client_token", staticmethod(lambda: ""))
+    monkeypatch.setattr(HttpDownloader, "get_client", classmethod(lambda cls: client))
+    monkeypatch.setattr(CurseForgeCache, "root", staticmethod(lambda: tmp_path))
+    CurseForgeClient._inflight.clear()
+
+    with pytest.raises(RuntimeError, match="Forbidden"):
+        CurseForgeClient._request_json(
+            "GET",
+            "/search",
+            params={"query": "example"},
+            force_refresh=True,
+            allow_stale_on_error=False,
+            namespace="failover-test",
+        )
+
+    assert requested_hosts == ["primary.example"]
     client.close()

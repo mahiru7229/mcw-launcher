@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QSignalBlocker, QTimer, Signal
-from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QLabel, QPushButton
+from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QLabel, QLineEdit, QPushButton
 
 from src.core.language.language_manager import language_manager, tr
 from src.core.theme.theme_manager import theme_manager
 from src.gui.config import NAVIGATION_ITEMS, VERSION
+from src.gui.dialogs.protected_value_reveal_dialog import confirm_reveal_protected_values
 from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
@@ -94,6 +95,31 @@ class LauncherSettingsPage(BasePage):
         modrinth_card.layout.addWidget(self.modrinth_include_alpha)
         self.root_layout.addWidget(modrinth_card)
 
+        curseforge_card = CardWidget(
+            "Private CurseForge gateways",
+            "Configure up to five private HTTPS gateway links. They are stored outside the launcher settings file and protected with Windows DPAPI. Requests try each link in order when an earlier gateway is unavailable.",
+        )
+        self.curseforge_gateway_labels: list[QLabel] = []
+        self.curseforge_gateway_inputs: list[QLineEdit] = []
+        for index in range(1, 6):
+            label = QLabel(tr("curseforge.gateway.slot", index=index))
+            field = QLineEdit()
+            field.setPlaceholderText("Paste private HTTPS gateway link")
+            field.setEchoMode(QLineEdit.EchoMode.Password)
+            field.setClearButtonEnabled(True)
+            self.curseforge_gateway_labels.append(label)
+            self.curseforge_gateway_inputs.append(field)
+            curseforge_card.layout.addWidget(label)
+            curseforge_card.layout.addWidget(field)
+        self.reveal_curseforge_gateways = QCheckBox("Reveal protected gateway links")
+        self.reveal_curseforge_gateways.toggled.connect(self._set_gateway_links_revealed)
+        self.curseforge_gateway_security = QLabel("Gateway links are masked in the interface and encrypted for the current Windows account.")
+        self.curseforge_gateway_security.setObjectName("MutedLabel")
+        self.curseforge_gateway_security.setWordWrap(True)
+        curseforge_card.layout.addWidget(self.reveal_curseforge_gateways)
+        curseforge_card.layout.addWidget(self.curseforge_gateway_security)
+        self.root_layout.addWidget(curseforge_card)
+
         java_card = CardWidget("Java installations", "Scan Java from JAVA_HOME, PATH, Program Files, the Windows Registry, and managed runtimes.")
         java_card.setProperty("themeRole", "java")
         self.java_combo = QComboBox()
@@ -168,6 +194,8 @@ class LauncherSettingsPage(BasePage):
         self.language_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.modrinth_include_beta.toggled.connect(self._refresh_dirty_state)
         self.modrinth_include_alpha.toggled.connect(self._refresh_dirty_state)
+        for field in self.curseforge_gateway_inputs:
+            field.textChanged.connect(self._refresh_dirty_state)
         self.auto_check_updates.toggled.connect(self._refresh_dirty_state)
         self.join_tester_program.toggled.connect(self._refresh_dirty_state)
         self.theme_combo.currentIndexChanged.connect(self._refresh_dirty_state)
@@ -261,6 +289,7 @@ class LauncherSettingsPage(BasePage):
             "show_static_text": self.show_static_text.isChecked(),
             "modrinth_include_beta": self.modrinth_include_beta.isChecked(),
             "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
+            "curseforge_gateway_urls": [field.text().strip() for field in self.curseforge_gateway_inputs],
             "download_limit_mbps": self.download_limit_mbps.value() if self.limit_download_speed.isChecked() else 0.0,
         }
 
@@ -292,6 +321,10 @@ class LauncherSettingsPage(BasePage):
 
     def retranslate_dynamic(self) -> None:
         self.unsaved_label.setText(tr("settings.unsaved.banner"))
+        for index, label in enumerate(self.curseforge_gateway_labels, start=1):
+            label.setText(tr("curseforge.gateway.slot", index=index))
+        self.reveal_curseforge_gateways.setText(tr("curseforge.gateway.reveal.toggle"))
+        self.curseforge_gateway_security.setText(tr("curseforge.gateway.security.note"))
         self._update_save_button_text()
 
     def _apply_form_data(self, settings: dict) -> None:
@@ -309,6 +342,7 @@ class LauncherSettingsPage(BasePage):
             self.language_combo,
             self.theme_combo,
             self.show_static_text,
+            *self.curseforge_gateway_inputs,
         )
         blockers = [QSignalBlocker(control) for control in persisted_controls]
         index = self.start_page_combo.findData(settings.get("start_page", "home"))
@@ -319,6 +353,11 @@ class LauncherSettingsPage(BasePage):
         self.auto_check_updates.setChecked(bool(settings.get("auto_check_updates", True)))
         self.modrinth_include_beta.setChecked(bool(settings.get("modrinth_include_beta", False)))
         self.modrinth_include_alpha.setChecked(bool(settings.get("modrinth_include_alpha", False)))
+        gateway_urls = list(settings.get("curseforge_gateway_urls", ()) or ())[:5]
+        gateway_urls.extend([""] * (5 - len(gateway_urls)))
+        for field, value in zip(self.curseforge_gateway_inputs, gateway_urls):
+            field.setText(str(value or ""))
+        self._mask_gateway_links()
         download_limit = max(0.0, float(settings.get("download_limit_mbps", 0.0) or 0.0))
         self.limit_download_speed.setChecked(download_limit > 0)
         self.download_limit_mbps.setValue(download_limit if download_limit > 0 else 10.0)
@@ -338,6 +377,34 @@ class LauncherSettingsPage(BasePage):
         self.theme_combo.blockSignals(False)
         self.show_static_text.setChecked(bool(settings.get("show_static_text", False)))
         del blockers
+
+
+    def _set_gateway_links_revealed(self, revealed: bool) -> None:
+        if not revealed:
+            self._mask_gateway_links()
+            return
+        with QSignalBlocker(self.reveal_curseforge_gateways):
+            self.reveal_curseforge_gateways.setChecked(False)
+        if not any(field.text().strip() for field in self.curseforge_gateway_inputs):
+            self._mask_gateway_links()
+            return
+        if not confirm_reveal_protected_values(self, countdown_seconds=5):
+            self._mask_gateway_links()
+            return
+        for field in self.curseforge_gateway_inputs:
+            field.setEchoMode(QLineEdit.EchoMode.Normal)
+        with QSignalBlocker(self.reveal_curseforge_gateways):
+            self.reveal_curseforge_gateways.setChecked(True)
+
+    def _mask_gateway_links(self) -> None:
+        for field in self.curseforge_gateway_inputs:
+            field.setEchoMode(QLineEdit.EchoMode.Password)
+        with QSignalBlocker(self.reveal_curseforge_gateways):
+            self.reveal_curseforge_gateways.setChecked(False)
+
+    def hideEvent(self, event) -> None:
+        self._mask_gateway_links()
+        super().hideEvent(event)
 
     def _refresh_dirty_state(self, *_args) -> None:
         if self._tracking_suspended:

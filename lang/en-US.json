@@ -781,7 +781,22 @@
     "mods.catalog.curseforge.contacting": "Contacting the MCW CurseForge Gateway and loading projects...",
     "mods.catalog.curseforge.failed": "CurseForge search failed",
     "mods.catalog.curseforge.error": "CurseForge search failed: {error}",
-    "mods.catalog.curseforge.select_project": "Select a CurseForge project to load its compatible files."
+    "mods.catalog.curseforge.select_project": "Select a CurseForge project to load its compatible files.",
+    "curseforge.gateway.settings.title": "Private CurseForge gateways",
+    "curseforge.gateway.settings.subtitle": "Configure up to five private HTTPS gateway links. They are stored outside the launcher settings file and protected with Windows DPAPI. Requests try each link in order when an earlier gateway is unavailable.",
+    "curseforge.gateway.slot": "Gateway link {index}",
+    "curseforge.gateway.placeholder": "Paste private HTTPS gateway link",
+    "curseforge.gateway.reveal.toggle": "Reveal protected gateway links",
+    "curseforge.gateway.security.note": "Gateway links are masked in the interface and encrypted for the current Windows account.",
+    "curseforge.gateway.reveal.title": "Reveal protected gateway links?",
+    "curseforge.gateway.reveal.message": "These links may grant access to a private gateway. Make sure nobody can see your screen before revealing them.",
+    "curseforge.gateway.reveal.details": "The Reveal button unlocks after 5 seconds. Cancel keeps every link masked.",
+    "curseforge.gateway.reveal.countdown": "Reveal ({seconds})",
+    "curseforge.gateway.reveal.confirm": "Reveal",
+    "curseforge.gateway.save.error.title": "Could not save private gateway links",
+    "curseforge.gateway.required.external": "No CurseForge gateway is configured. Add at least one protected gateway link in Launcher Settings.",
+    "curseforge.gateway.all_unavailable": "All configured CurseForge gateways are unavailable.",
+    "common.cancel": "Cancel"
   },
   "aliases": {
     "MCW Launcher": "app.name",
@@ -1282,6 +1297,13 @@
     "Select a loader and mod version. The launcher will only offer instances matching both Minecraft and loader versions.": "mods.catalog.subtitle",
     "Choose instance and install": "mods.catalog.choose_instance",
     "Select a project to load its compatible versions.": "mods.catalog.select_project",
-    "Disabled by default. Enable this only when you want launcher text drawn over themed PNG controls.": "launcher_settings.theme.show_static_text.tooltip"
+    "Disabled by default. Enable this only when you want launcher text drawn over themed PNG controls.": "launcher_settings.theme.show_static_text.tooltip",
+    "Private CurseForge gateways": "curseforge.gateway.settings.title",
+    "Configure up to five private HTTPS gateway links. They are stored outside the launcher settings file and protected with Windows DPAPI. Requests try each link in order when an earlier gateway is unavailable.": "curseforge.gateway.settings.subtitle",
+    "Paste private HTTPS gateway link": "curseforge.gateway.placeholder",
+    "Reveal protected gateway links": "curseforge.gateway.reveal.toggle",
+    "Gateway links are masked in the interface and encrypted for the current Windows account.": "curseforge.gateway.security.note",
+    "No CurseForge gateway is configured. Add at least one protected gateway link in Launcher Settings.": "curseforge.gateway.required.external",
+    "All configured CurseForge gateways are unavailable.": "curseforge.gateway.all_unavailable"
   }
 }

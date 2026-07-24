@@ -35,6 +35,7 @@ class CurseForgeClient:
     FILE_TTL_SECONDS = 24 * 60 * 60
     BATCH_TTL_SECONDS = 24 * 60 * 60
     REQUEST_TIMEOUT_SECONDS = 20.0
+    FAILOVER_STATUS_CODES = frozenset({404, 408, 425, 429, *range(500, 600)})
 
     _inflight: dict[str, _InFlightRequest] = {}
     _inflight_guard = Lock()
@@ -44,11 +45,18 @@ class CurseForgeClient:
         return CurseForgeConfigManager.is_configured()
 
     @staticmethod
-    def gateway_url() -> str:
+    def gateway_urls() -> tuple[str, ...]:
         try:
-            return CurseForgeConfigManager.gateway_url()
-        except ValueError as error:
+            urls = CurseForgeConfigManager.gateway_urls()
+        except (RuntimeError, ValueError) as error:
             raise RuntimeError(str(error)) from error
+        if not urls:
+            raise RuntimeError("No CurseForge gateway is configured. Add at least one protected gateway link in Launcher Settings.")
+        return urls
+
+    @staticmethod
+    def gateway_url() -> str:
+        return CurseForgeClient.gateway_urls()[0]
 
     @staticmethod
     def cache_status() -> CurseForgeCacheInfo:
@@ -348,30 +356,54 @@ class CurseForgeClient:
         token = CurseForgeConfigManager.client_token()
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        url = CurseForgeClient.gateway_url() + route
+
+        gateways = CurseForgeClient.gateway_urls()
         client = HttpDownloader.get_client()
-        try:
-            response = client.request(
-                method.upper(),
-                url,
-                params=params or None,
-                json=body if method.upper() != "GET" else None,
-                headers=headers,
-                timeout=CurseForgeClient.REQUEST_TIMEOUT_SECONDS,
-            )
-            response.raise_for_status()
-            payload = response.json()
-        except httpx.HTTPStatusError as error:
-            raise CurseForgeClient._gateway_error(error.response) from error
-        except httpx.HTTPError as error:
-            raise RuntimeError(f"Unable to contact the CurseForge gateway: {error}") from error
-        except ValueError as error:
-            raise RuntimeError("The CurseForge gateway returned invalid JSON.") from error
-        if not isinstance(payload, dict):
-            raise RuntimeError("The CurseForge gateway returned an invalid response.")
-        if cache_response:
-            return CurseForgeCache.put(cache_key, namespace, payload, ttl)
-        return CacheLookup(payload=payload, cache_info=CurseForgeCache.status())
+        last_error: RuntimeError | None = None
+        for index, gateway in enumerate(gateways):
+            has_fallback = index + 1 < len(gateways)
+            try:
+                response = client.request(
+                    method.upper(),
+                    gateway + route,
+                    params=params or None,
+                    json=body if method.upper() != "GET" else None,
+                    headers=headers,
+                    timeout=CurseForgeClient.REQUEST_TIMEOUT_SECONDS,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                if not isinstance(payload, dict):
+                    raise ValueError("response root is not an object")
+            except httpx.HTTPStatusError as error:
+                converted = CurseForgeClient._gateway_error(error.response)
+                if has_fallback and int(error.response.status_code) in CurseForgeClient.FAILOVER_STATUS_CODES:
+                    last_error = converted
+                    continue
+                raise converted from error
+            except httpx.HTTPError as error:
+                converted = RuntimeError("Unable to contact the configured CurseForge gateway.")
+                if has_fallback:
+                    last_error = converted
+                    continue
+                raise converted from error
+            except ValueError as error:
+                converted = RuntimeError("The configured CurseForge gateway returned invalid JSON.")
+                if has_fallback:
+                    last_error = converted
+                    continue
+                raise converted from error
+
+            if cache_response:
+                return CurseForgeCache.put(cache_key, namespace, payload, ttl)
+            return CacheLookup(payload=payload, cache_info=CurseForgeCache.status())
+
+        if last_error is not None:
+            error = RuntimeError("All configured CurseForge gateways are unavailable.")
+            setattr(error, "gateway_failover_attempts", len(gateways))
+            setattr(error, "retry_after_seconds", int(getattr(last_error, "retry_after_seconds", 0) or 0))
+            raise error from last_error
+        raise RuntimeError("No CurseForge gateway is configured. Add at least one protected gateway link in Launcher Settings.")
 
     @staticmethod
     def _gateway_error(response: httpx.Response) -> RuntimeError:

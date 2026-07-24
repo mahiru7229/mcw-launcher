@@ -39,6 +39,7 @@ def _launcher_settings() -> dict:
         "show_static_text": False,
         "modrinth_include_beta": False,
         "modrinth_include_alpha": False,
+        "curseforge_gateway_urls": ("https://one.example/api/curseforge",),
         "download_limit_mbps": 0.0,
     }
 
@@ -73,3 +74,15 @@ def test_launcher_settings_highlights_unsaved_changes_and_can_discard(gui_app):
 
     assert page.is_dirty is False
     assert page.show_snapshots.isChecked() is False
+
+
+def test_launcher_settings_has_five_masked_gateway_slots(gui_app):
+    from PySide6.QtWidgets import QLineEdit
+
+    page = LauncherSettingsPage()
+    page.set_settings(_launcher_settings())
+
+    assert len(page.curseforge_gateway_inputs) == 5
+    assert all(field.echoMode() == QLineEdit.EchoMode.Password for field in page.curseforge_gateway_inputs)
+    assert page.curseforge_gateway_inputs[0].text() == "https://one.example/api/curseforge"
+    assert page.form_data()["curseforge_gateway_urls"][1:] == ["", "", "", ""]
