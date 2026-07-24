@@ -28,6 +28,8 @@ class SettingsManager:
         "launch": {
             "game_arguments": [],
             "offline_multiplayer_enabled": False,
+            "lan_auth_mode": "microsoft_only",
+            "lan_connection_provider": "manual",
             "block_launch_on_modrinth_failure": True,
         },
     }
@@ -113,6 +115,10 @@ class SettingsManager:
         max_memory = SettingsManager._as_positive_int(java.get("max_memory"), 2048)
         min_memory, max_memory = MemoryAllocationPolicy.normalize(min_memory, max_memory)
 
+        legacy_offline_multiplayer = SettingsManager._as_bool(launch.get("offline_multiplayer_enabled"), False)
+        lan_auth_mode = SettingsManager._as_choice(launch.get("lan_auth_mode"), {"microsoft_only", "friends"}, "friends" if legacy_offline_multiplayer else "microsoft_only")
+        lan_connection_provider = SettingsManager._as_choice(launch.get("lan_connection_provider"), {"manual", "e4mc"}, "manual")
+
         return InstanceSettings(
             java_path=str(java.get("path") or ""),
             min_memory=min_memory,
@@ -122,7 +128,9 @@ class SettingsManager:
             width=SettingsManager._as_positive_int(window.get("width"), 1280),
             height=SettingsManager._as_positive_int(window.get("height"), 720),
             fullscreen=SettingsManager._as_bool(window.get("fullscreen"), False),
-            offline_multiplayer_enabled=SettingsManager._as_bool(launch.get("offline_multiplayer_enabled"), False),
+            offline_multiplayer_enabled=legacy_offline_multiplayer,
+            lan_auth_mode=lan_auth_mode,
+            lan_connection_provider=lan_connection_provider,
             block_launch_on_modrinth_failure=SettingsManager._as_bool(launch.get("block_launch_on_modrinth_failure"), True),
         )
 
@@ -142,7 +150,9 @@ class SettingsManager:
             },
             "launch": {
                 "game_arguments": [str(argument) for argument in settings.game_arguments],
-                "offline_multiplayer_enabled": bool(settings.offline_multiplayer_enabled),
+                "offline_multiplayer_enabled": False,
+                "lan_auth_mode": SettingsManager._as_choice(settings.lan_auth_mode, {"microsoft_only", "friends"}, "microsoft_only"),
+                "lan_connection_provider": SettingsManager._as_choice(settings.lan_connection_provider, {"manual", "e4mc"}, "manual"),
                 "block_launch_on_modrinth_failure": bool(settings.block_launch_on_modrinth_failure),
             },
         }
@@ -189,6 +199,11 @@ class SettingsManager:
         if not isinstance(value, (list, tuple)):
             return []
         return [str(item) for item in value]
+
+    @staticmethod
+    def _as_choice(value: Any, choices: set[str], default: str) -> str:
+        normalized = str(value or "").strip().lower()
+        return normalized if normalized in choices else default
 
     @staticmethod
     def _as_bool(value: Any, default: bool) -> bool:

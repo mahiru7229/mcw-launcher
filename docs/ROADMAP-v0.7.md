@@ -37,3 +37,10 @@ Planned focus after the v0.7.2 maintenance release:
 - Expand provider diagnostics without exposing private gateway links.
 - Improve CurseForge modpack compatibility and recovery.
 - Continue performance profiling for launch, repair and update flows.
+
+## v0.7.3 Beta 1 — LAN hosting profiles
+
+- Separate LAN authentication policy from connection transport.
+- Support Microsoft-only and trusted-friends Offline-compatible hosting without MCW Verified Auth.
+- Manage LAN Properties and optional e4mc through compatible Modrinth Release builds.
+- Keep manual LAN, VPN, direct-port, and custom-relay workflows available when e4mc is not used.

@@ -19,6 +19,8 @@ def make_settings(block_launch_on_modrinth_failure: bool) -> SimpleNamespace:
         height=720,
         fullscreen=False,
         offline_multiplayer_enabled=False,
+        lan_auth_mode="microsoft_only",
+        lan_connection_provider="manual",
         block_launch_on_modrinth_failure=block_launch_on_modrinth_failure,
         jvm_arguments=[],
         game_arguments=[],
@@ -102,3 +104,16 @@ def test_memory_number_inputs_are_left_aligned(gui_app) -> None:
 
     assert page.min_memory_input.alignment() & Qt.AlignmentFlag.AlignLeft
     assert page.max_memory_input.alignment() & Qt.AlignmentFlag.AlignLeft
+
+
+def test_lan_hosting_profile_serializes_auth_and_connection_separately(gui_app) -> None:
+    page = InstanceSettingsPage()
+    page.set_settings("Pack", make_settings(True))
+
+    page.lan_auth_mode.setCurrentIndex(page.lan_auth_mode.findData("friends"))
+    page.lan_connection_provider.setCurrentIndex(page.lan_connection_provider.findData("e4mc"))
+
+    data = page.form_data()
+    assert data["lan_auth_mode"] == "friends"
+    assert data["lan_connection_provider"] == "e4mc"
+    assert "trusted" in page.lan_security_label.text().lower()

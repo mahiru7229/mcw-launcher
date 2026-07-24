@@ -54,6 +54,8 @@ def test_invalid_setting_types_fall_back_without_crashing(tmp_path: Path) -> Non
     assert settings.game_arguments == []
     assert settings.fullscreen is False
     assert settings.offline_multiplayer_enabled is True
+    assert settings.lan_auth_mode == "friends"
+    assert settings.lan_connection_provider == "manual"
     assert settings.block_launch_on_modrinth_failure is False
 
 
@@ -112,3 +114,21 @@ def test_saved_memory_is_clamped_to_physical_ram(tmp_path: Path, monkeypatch) ->
     saved = json.loads((instance.instance_dir / "settings.json").read_text(encoding="utf-8"))
     assert saved["java"]["min_memory"] == 4096
     assert saved["java"]["max_memory"] == 4096
+
+
+def test_lan_hosting_profile_is_saved_and_legacy_flag_is_retired(tmp_path: Path) -> None:
+    instance = make_instance(tmp_path)
+    settings = SettingsManager.load(instance)
+    settings.offline_multiplayer_enabled = True
+    settings.lan_auth_mode = "friends"
+    settings.lan_connection_provider = "e4mc"
+
+    SettingsManager.save(instance, settings)
+
+    saved = json.loads((instance.instance_dir / "settings.json").read_text(encoding="utf-8"))
+    assert saved["launch"]["offline_multiplayer_enabled"] is False
+    assert saved["launch"]["lan_auth_mode"] == "friends"
+    assert saved["launch"]["lan_connection_provider"] == "e4mc"
+    reloaded = SettingsManager.load(instance)
+    assert reloaded.lan_auth_mode == "friends"
+    assert reloaded.lan_connection_provider == "e4mc"

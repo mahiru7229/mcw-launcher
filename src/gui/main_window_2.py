@@ -27,6 +27,7 @@ from src.gui.controllers.modpack_lifecycle_controller import ModpackLifecycleCon
 from src.gui.controllers.gui_settings_controller import GuiSettingsController
 from src.gui.controllers.instance_controller import InstanceController
 from src.gui.controllers.launch_controller import LaunchController
+from src.gui.controllers.lan_hosting_controller import LanHostingController
 from src.gui.controllers.mod_catalog_controller import ModCatalogController
 from src.gui.controllers.mod_controller import ModController
 from src.gui.controllers.mod_loader_controller import ModLoaderController
@@ -90,6 +91,7 @@ class MainWindow(QMainWindow):
         language_manager.reload()
         language_manager.set_language(self._startup_settings.get("language", "en-US"), notify=False)
         self.launch_controller = LaunchController(self.task_runner)
+        self.lan_hosting_controller = LanHostingController(self.task_runner)
         self.update_controller = UpdateController(self.task_runner, channel=self._startup_settings.get("update_channel", "stable"))
         self.running_instances_timer = QTimer(self)
         self._modrinth_tasks: set[str] = set()
@@ -276,6 +278,7 @@ class MainWindow(QMainWindow):
 
         self.instance_settings_page.load_requested.connect(self._request_instance_settings_load)
         self.instance_settings_page.save_requested.connect(self.instance_settings_controller.save)
+        self.instance_settings_page.lan_prepare_requested.connect(self._request_lan_hosting_prepare)
         self.instance_settings_page.dirty_changed.connect(lambda dirty: self.sidebar.set_page_dirty("instance_settings", dirty))
 
         self.launcher_settings_page.save_requested.connect(self.gui_settings_controller.save)
@@ -383,6 +386,8 @@ class MainWindow(QMainWindow):
         self.mod_controller.progress_received.connect(self._on_progress)
         self.modpack_lifecycle_controller.progress_received.connect(self._on_progress)
         self.update_controller.progress_received.connect(self._on_progress)
+        self.lan_hosting_controller.progress_received.connect(self._on_progress)
+        self.lan_hosting_controller.prepared.connect(self._on_lan_hosting_prepared)
         self.launch_controller.launch_finished.connect(self.launch_control.set_result)
         self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
         self.launch_controller.game_exited.connect(self._on_game_exited)
@@ -423,6 +428,7 @@ class MainWindow(QMainWindow):
             self.instance_settings_controller,
             self.gui_settings_controller,
             self.launch_controller,
+            self.lan_hosting_controller,
             self.update_controller,
         )
 
@@ -928,6 +934,59 @@ class MainWindow(QMainWindow):
         self.curseforge_modpack_dialog.close()
         QMessageBox.information(self, tr("curseforge.modpack.install"), tr("curseforge.modpack.installed", name=selected_name))
 
+
+    def _request_lan_hosting_prepare(self, instance_name: str, auth_mode: str, connection_provider: str) -> None:
+        if self.instance_settings_page.is_dirty:
+            self.instance_settings_page.request_save()
+            if self.instance_settings_page.is_dirty:
+                return
+
+        if str(auth_mode) == "friends":
+            answer = QMessageBox.warning(
+                self,
+                tr("lan.hosting.warning.title"),
+                tr("lan.hosting.warning.message"),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+
+        self.instance_settings_page.set_lan_prepare_status(tr("lan.hosting.preparing"))
+        self.lan_hosting_controller.prepare(instance_name, auth_mode, connection_provider)
+
+    def _on_lan_hosting_prepared(self, result: object) -> None:
+        installed = tuple(getattr(result, "installed_projects", ()) or ())
+        reused = tuple(getattr(result, "reused_projects", ()) or ())
+        disabled = tuple(getattr(result, "disabled_projects", ()) or ())
+        warnings = tuple(getattr(result, "warnings", ()) or ())
+        auth_mode = str(getattr(result, "auth_mode", "microsoft_only"))
+        connection_provider = str(getattr(result, "connection_provider", "manual"))
+
+        lines = [tr("lan.hosting.prepared.summary")]
+        if installed:
+            lines.append(tr("lan.hosting.prepared.installed", projects=", ".join(installed)))
+        if reused:
+            lines.append(tr("lan.hosting.prepared.reused", projects=", ".join(reused)))
+        if disabled:
+            lines.append(tr("lan.hosting.prepared.disabled", projects=", ".join(disabled)))
+        if auth_mode == "friends":
+            lines.append(tr("lan.hosting.prepared.friends_steps"))
+        else:
+            lines.append(tr("lan.hosting.prepared.microsoft_steps"))
+        if connection_provider == "e4mc":
+            lines.append(tr("lan.hosting.prepared.e4mc_steps"))
+        else:
+            lines.append(tr("lan.hosting.prepared.manual_steps"))
+        if warnings:
+            lines.append(tr("common.warning") + "\n" + "\n".join(str(item) for item in warnings))
+
+        message = "\n\n".join(lines)
+        self.instance_settings_page.set_lan_prepare_status(tr("lan.hosting.ready"))
+        current = self.mod_controller.current_instance
+        if current is not None and current.name == str(getattr(result, "instance_name", "")):
+            self.mod_controller.refresh()
+        QMessageBox.information(self, tr("lan.hosting.title"), message)
 
     def _open_java_folder(self, installation: object) -> None:
         if installation is None:

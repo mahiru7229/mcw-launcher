@@ -19,6 +19,8 @@ def _instance_settings() -> SimpleNamespace:
         height=720,
         fullscreen=False,
         offline_multiplayer_enabled=False,
+        lan_auth_mode="microsoft_only",
+        lan_connection_provider="manual",
         block_launch_on_modrinth_failure=True,
         jvm_arguments=[],
         game_arguments=[],

@@ -57,7 +57,13 @@ class InstanceSettingsController(BaseController):
             settings.width = width
             settings.height = height
             settings.fullscreen = bool(data["fullscreen"])
-            settings.offline_multiplayer_enabled = bool(data["offline_multiplayer_enabled"])
+            settings.offline_multiplayer_enabled = False
+            settings.lan_auth_mode = str(data.get("lan_auth_mode", "microsoft_only")).strip().lower()
+            settings.lan_connection_provider = str(data.get("lan_connection_provider", "manual")).strip().lower()
+            if settings.lan_auth_mode not in {"microsoft_only", "friends"}:
+                raise ValueError(tr("Unsupported LAN authentication policy."))
+            if settings.lan_connection_provider not in {"manual", "e4mc"}:
+                raise ValueError(tr("Unsupported LAN connection provider."))
             settings.block_launch_on_modrinth_failure = bool(data.get("block_launch_on_modrinth_failure", True))
             settings.jvm_arguments = list(data["jvm_arguments"])
             settings.game_arguments = list(data["game_arguments"])
