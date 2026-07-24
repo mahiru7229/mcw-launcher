@@ -27,15 +27,16 @@ class _InFlightRequest:
 
 class CurseForgeClient:
     MINECRAFT_GAME_ID = 432
+
     CLASS_MODS = 6
     CLASS_MODPACKS = 4471
-    SEARCH_TTL_SECONDS = 30 * 60
-    FILES_TTL_SECONDS = 60 * 60
-    PROJECT_TTL_SECONDS = 12 * 60 * 60
-    FILE_TTL_SECONDS = 24 * 60 * 60
-    BATCH_TTL_SECONDS = 24 * 60 * 60
-    REQUEST_TIMEOUT_SECONDS = 20.0
-    FAILOVER_STATUS_CODES = frozenset({404, 408, 425, 429, *range(500, 600)})
+    SEARCH_TTL_SECONDS = 2 * 60
+    FILES_TTL_SECONDS = 5 * 60
+    PROJECT_TTL_SECONDS = 10 * 60
+    FILE_TTL_SECONDS = 30 * 60
+    BATCH_TTL_SECONDS = 30 * 60
+    REQUEST_TIMEOUT_SECONDS = 15.0
+    FAILOVER_STATUS_CODES = frozenset({404, 408, 425, 429,*range(500, 600),})
 
     _inflight: dict[str, _InFlightRequest] = {}
     _inflight_guard = Lock()
