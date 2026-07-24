@@ -965,7 +965,7 @@ class MainWindow(QMainWindow):
         self.curseforge_mod_dialog.set_channel_preferences(include_beta, include_alpha)
         self.curseforge_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
         self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")), bool(settings.get("show_static_text", True)))
+        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")), bool(settings.get("show_static_text", False)))
 
     def _preview_theme(self, theme_id: str) -> None:
         selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked())

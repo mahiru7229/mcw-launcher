@@ -139,7 +139,7 @@ class LauncherSettingsPage(BasePage):
         self.theme_combo = QComboBox()
         self.reload_themes()
         self.show_static_text = QCheckBox("Show static text over themed controls")
-        self.show_static_text.setToolTip("Turn this off only when the selected theme PNG already contains its own fixed label, such as the word LAUNCH.")
+        self.show_static_text.setToolTip("Disabled by default. Enable this only when you want launcher text drawn over themed PNG controls.")
         reload_theme_button = set_theme_icon(QPushButton("Reload and preview theme"), "icon.action.theme")
         reload_theme_button.clicked.connect(self._emit_theme_preview)
         self.show_static_text.toggled.connect(self._queue_theme_preview)
@@ -336,7 +336,7 @@ class LauncherSettingsPage(BasePage):
         self.theme_combo.blockSignals(True)
         self.theme_combo.setCurrentIndex(max(0, theme_index))
         self.theme_combo.blockSignals(False)
-        self.show_static_text.setChecked(bool(settings.get("show_static_text", True)))
+        self.show_static_text.setChecked(bool(settings.get("show_static_text", False)))
         del blockers
 
     def _refresh_dirty_state(self, *_args) -> None:

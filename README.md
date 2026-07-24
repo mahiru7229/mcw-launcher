@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/latest">
-    <img src="https://img.shields.io/badge/Current-v0.6.0--rc.3-blue" alt="Current version">
+    <img src="https://img.shields.io/badge/Current-v0.6.0-brightgreen" alt="Current version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -22,11 +22,11 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v0.6.0-rc.3.md">RC 3 release notes</a>
+  <a href="docs/RELEASE-v0.6.0.md">v0.6.0 release notes</a>
 </p>
 
-> [!WARNING]
-> `v0.6.0-rc.3` là Release Candidate thứ ba của dòng 0.6 và vẫn dành cho tester trước khi lên Stable. Hãy sao lưu world quan trọng trước khi cập nhật modpack, sửa chữa instance hoặc thử Forge trên các phiên bản Minecraft cũ.
+> [!NOTE]
+> `v0.6.0` là bản Stable đầu tiên của dòng 0.6. Người dùng thông thường nhận cập nhật qua kênh `stable`; các bản thử nghiệm 0.7.x chỉ xuất hiện khi chủ động tham gia tester program.
 
 ---
 
@@ -58,15 +58,15 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 - Khi launch thất bại, progress chỉ hiện thông báo ngắn; lỗi kỹ thuật đầy đủ nằm trong **Logs**.
 - Microsoft OAuth PKCE, nhiều tài khoản Microsoft, SQLite và bảo vệ refresh token bằng Windows DPAPI.
 - Theo dõi process Minecraft, thời gian chơi, exit code, game log và crash report.
-- Hỗ trợ ngôn ngữ Việt/Anh và theme PNG ngoài EXE.
+- Hỗ trợ ngôn ngữ Việt/Anh và theme PNG ngoài EXE; chữ tĩnh đè lên PNG mặc định tắt để artwork của theme hiển thị đúng.
 
 ### Tải và chạy
 
 Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-- Stable dành cho người dùng thông thường vẫn thuộc dòng `0.5.1`.
-- Dòng `0.6.x` sử dụng kênh `beta` và dành cho người chủ động tham gia tester program.
+- `v0.6.0` là bản Stable hiện tại dành cho người dùng thông thường.
+- Các bản `0.7.x` chỉ dành cho người chủ động tham gia tester program.
 
 Yêu cầu cơ bản:
 
@@ -104,14 +104,14 @@ Quy tắc release của dự án: chỉ build khi test không có `failed` hoặ
 
 ```powershell
 python -m PyInstaller --clean mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.3"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0"
 ```
 
 Kết quả updater package:
 
 ```text
-MCW-Launcher-v0.6.0-rc.3-windows-x64.zip
-MCW-Launcher-v0.6.0-rc.3-windows-x64.zip.sha256
+MCW-Launcher-v0.6.0-windows-x64.zip
+MCW-Launcher-v0.6.0-windows-x64.zip.sha256
 ```
 
 Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -145,15 +145,15 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 - Keep launch-progress failures short while preserving complete technical details in **Logs**.
 - Support Microsoft OAuth PKCE, multiple Microsoft accounts, SQLite storage, and Windows DPAPI protection for refresh tokens.
 - Track the Minecraft process, play time, exit status, latest game log, and detected crash reports.
-- Support English/Vietnamese language packs and external PNG themes.
+- Support English/Vietnamese language packs and external PNG themes; static text over themed PNG controls is disabled by default.
 
 ### Download and run
 
 Packaged Windows builds are published on the **Releases** page:
 
 - [Open releases](https://github.com/mahiru7229/mcw-launcher/releases)
-- The regular-user stable channel remains on the `0.5.1` line.
-- `0.6.x` uses the opt-in `beta` tester channel.
+- `v0.6.0` is the current Stable release for regular users.
+- Experimental `0.7.x` builds are available only after explicitly joining the tester program.
 
 Requirements:
 
@@ -191,14 +191,14 @@ The release flow requires zero failed tests and zero collection/runtime errors b
 
 ```powershell
 python -m PyInstaller --clean mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.3"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0"
 ```
 
 Expected updater assets:
 
 ```text
-MCW-Launcher-v0.6.0-rc.3-windows-x64.zip
-MCW-Launcher-v0.6.0-rc.3-windows-x64.zip.sha256
+MCW-Launcher-v0.6.0-windows-x64.zip
+MCW-Launcher-v0.6.0-windows-x64.zip.sha256
 ```
 
 See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -288,7 +288,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
-| [`docs/RELEASE-v0.6.0-rc.3.md`](docs/RELEASE-v0.6.0-rc.3.md) | Complete RC 3 release notes |
+| [`docs/RELEASE-v0.6.0.md`](docs/RELEASE-v0.6.0.md) | Complete v0.6.0 Stable release notes |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core architecture |
 | [`docs/INSTANCE_SYSTEM.md`](docs/INSTANCE_SYSTEM.md) | Instance metadata and lifecycle |
 | [`docs/MODRINTH_INTEGRATION.md`](docs/MODRINTH_INTEGRATION.md) | Modrinth integration |
@@ -301,7 +301,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v0.6.0-rc.3 |
+| Component | Status in v0.6.0 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |

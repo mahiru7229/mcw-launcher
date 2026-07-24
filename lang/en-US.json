@@ -396,7 +396,7 @@
     "launcher_settings.theme.subtitle": "PNG theme files are optional. Missing or invalid files automatically fall back to the built-in CSS interface.",
     "launcher_settings.theme.reload": "Reload and preview theme",
     "launcher_settings.theme.show_static_text": "Show static text over themed controls",
-    "launcher_settings.theme.show_static_text.tooltip": "Turn this off only when the selected theme PNG already contains its own fixed label, such as the word LAUNCH.",
+    "launcher_settings.theme.show_static_text.tooltip": "Disabled by default. Enable this only when you want launcher text drawn over themed PNG controls.",
     "runtime.minecraft_crashed_name": "Minecraft crashed: {name}",
     "runtime.minecraft_exit_code_name": "Minecraft exited with code {code}: {name}",
     "runtime.minecraft_closed_name": "Minecraft closed normally: {name}",
@@ -1220,6 +1220,7 @@
     "Modrinth mod catalog": "mods.catalog.title",
     "Select a loader and mod version. The launcher will only offer instances matching both Minecraft and loader versions.": "mods.catalog.subtitle",
     "Choose instance and install": "mods.catalog.choose_instance",
-    "Select a project to load its compatible versions.": "mods.catalog.select_project"
+    "Select a project to load its compatible versions.": "mods.catalog.select_project",
+    "Disabled by default. Enable this only when you want launcher text drawn over themed PNG controls.": "launcher_settings.theme.show_static_text.tooltip"
   }
 }
