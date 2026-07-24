@@ -4,36 +4,23 @@ Automatic updates use a GitHub Release ZIP. The ZIP must contain the packaged la
 
 ## Build a release package
 
-After building the EXE with PyInstaller, pass the target version to the package builder:
+After building the EXE with PyInstaller, pass the target version to the package builder. The version must match `src.config.VERSION_ID`:
 
 ```powershell
-<<<<<<< HEAD
 python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0-beta.1"
-=======
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0"
->>>>>>> main
 ```
 
 The command creates:
 
 ```text
-<<<<<<< HEAD
 MCW-Launcher-v0.7.0-beta.1-windows-x64.zip
 MCW-Launcher-v0.7.0-beta.1-windows-x64.zip.sha256
-=======
-MCW-Launcher-v0.6.0-windows-x64.zip
-MCW-Launcher-v0.6.0-windows-x64.zip.sha256
->>>>>>> main
 ```
 
 The package contains a single wrapper directory:
 
 ```text
-<<<<<<< HEAD
 MCW-Launcher-v0.7.0-beta.1-windows-x64/
-=======
-MCW-Launcher-v0.6.0-windows-x64/
->>>>>>> main
 ├── MCW Launcher.exe
 ├── mcw-update.json
 ├── lang/
@@ -55,3 +42,13 @@ MCW-Launcher-v0.6.0-windows-x64/
 6. Confirm `config`, `instances`, `accounts`, and other user data remain intact.
 
 The updater copies and overwrites files present in the ZIP. It does not delete unrelated files from the installation directory.
+
+## One-command Windows release build
+
+From a clean working tree, run:
+
+```powershell
+.\build_release.ps1
+```
+
+The script runs the release preflight, the complete test suite, removes previous build output, builds the windowed EXE, and creates the updater ZIP plus SHA-256 checksum. It reads the version from `src/config.py`; the API JSON publication time remains an external release setting and is not changed by the script.

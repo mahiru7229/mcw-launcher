@@ -6,13 +6,8 @@
 </p>
 
 <p align="center">
-<<<<<<< HEAD
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Current-v0.7.0--beta.1-orange" alt="Current version">
-=======
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/latest">
-    <img src="https://img.shields.io/badge/Current-v0.6.0-brightgreen" alt="Current version">
->>>>>>> main
+    <img src="https://img.shields.io/badge/Beta-v0.7.0--beta.1-orange" alt="Current beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -27,19 +22,12 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-<<<<<<< HEAD
-  <a href="docs/RELEASE-v0.7.0-beta.1.md">Beta 1 release notes</a>
+  <a href="docs/RELEASE-v0.7.0-beta.1.md">Beta 1 release notes</a> ·
+  <a href="docs/RELEASE-v0.6.0.md">Stable release notes</a>
 </p>
 
 > [!WARNING]
-> `v0.7.0-beta.1` mở dòng thử nghiệm 0.7 với CurseForge Gateway và cache provider mới. Đây không phải bản Stable; hãy sao lưu world/instance quan trọng và giữ `v0.6.0-rc.2` nếu cần ưu tiên độ ổn định.
-=======
-  <a href="docs/RELEASE-v0.6.0.md">v0.6.0 release notes</a>
-</p>
-
-> [!NOTE]
-> `v0.6.0` là bản Stable đầu tiên của dòng 0.6. Người dùng thông thường nhận cập nhật qua kênh `stable`; các bản thử nghiệm 0.7.x chỉ xuất hiện khi chủ động tham gia tester program.
->>>>>>> main
+> `v0.7.0-beta.1` mở dòng thử nghiệm 0.7 với CurseForge Gateway và cache provider mới. Đây không phải bản Stable; hãy sao lưu world/instance quan trọng và giữ `v0.6.0` nếu cần ưu tiên độ ổn định.
 
 ---
 
@@ -84,14 +72,8 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-<<<<<<< HEAD
-- Stable dành cho người dùng thông thường vẫn thuộc dòng `0.5.1`.
-- `v0.6.0-rc.2` là nhánh ổn định hơn để regression trước Stable.
-- Dòng `0.7.x` dùng kênh `beta` và dành cho người chủ động thử CurseForge cùng các provider mới.
-=======
 - `v0.6.0` là bản Stable hiện tại dành cho người dùng thông thường.
-- Các bản `0.7.x` chỉ dành cho người chủ động tham gia tester program.
->>>>>>> main
+- Dòng `0.7.x` dùng kênh `beta` và chỉ dành cho người chủ động tham gia tester program.
 
 Yêu cầu cơ bản:
 
@@ -127,25 +109,26 @@ Quy tắc release của dự án: chỉ build khi test không có `failed` hoặ
 
 ### Build EXE và gói updater
 
+Từ working tree sạch, có thể chạy toàn bộ preflight, test, build và đóng gói bằng một lệnh:
+
 ```powershell
-python -m PyInstaller --clean mcw_launcher.spec
-<<<<<<< HEAD
+.\build_release.ps1
+```
+
+Hoặc chạy thủ công:
+
+```powershell
+python -m tools.release_preflight
+python -m pytest test -q
+python -m PyInstaller --clean --noconfirm mcw_launcher.spec
 python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0-beta.1"
-=======
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0"
->>>>>>> main
 ```
 
 Kết quả updater package:
 
 ```text
-<<<<<<< HEAD
 MCW-Launcher-v0.7.0-beta.1-windows-x64.zip
 MCW-Launcher-v0.7.0-beta.1-windows-x64.zip.sha256
-=======
-MCW-Launcher-v0.6.0-windows-x64.zip
-MCW-Launcher-v0.6.0-windows-x64.zip.sha256
->>>>>>> main
 ```
 
 Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -181,7 +164,7 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
   - `1920×1080` or larger → `1600×900` window.
   - `1366×768` → compact `1280×720` window.
   - Smaller displays → a safe size based on available screen geometry.
-- Apply a high-contrast compatibility palette to message dialogs to avoid white-on-white rendering issues.
+- Force the launcher and Qt dialogs to use a dark palette with white text, independent of the Windows appearance setting.
 - Keep launch-progress failures short while preserving complete technical details in **Logs**.
 - Support Microsoft OAuth PKCE, multiple Microsoft accounts, SQLite storage, and Windows DPAPI protection for refresh tokens.
 - Track the Minecraft process, play time, exit status, latest game log, and detected crash reports.
@@ -192,14 +175,8 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 Packaged Windows builds are published on the **Releases** page:
 
 - [Open releases](https://github.com/mahiru7229/mcw-launcher/releases)
-<<<<<<< HEAD
-- The regular-user stable channel remains on the `0.5.1` line.
-- `v0.6.0-rc.2` remains the safer regression candidate before Stable.
-- `0.7.x` uses the opt-in `beta` channel for CurseForge and provider experiments.
-=======
 - `v0.6.0` is the current Stable release for regular users.
-- Experimental `0.7.x` builds are available only after explicitly joining the tester program.
->>>>>>> main
+- Experimental `0.7.x` builds use the `beta` channel and are available only after explicitly joining the tester program.
 
 Requirements:
 
@@ -235,25 +212,26 @@ The release flow requires zero failed tests and zero collection/runtime errors b
 
 ### Build the EXE and updater package
 
+From a clean working tree, run the complete preflight, tests, build, and packaging flow with one command:
+
 ```powershell
-python -m PyInstaller --clean mcw_launcher.spec
-<<<<<<< HEAD
+.\build_release.ps1
+```
+
+Or run each step manually:
+
+```powershell
+python -m tools.release_preflight
+python -m pytest test -q
+python -m PyInstaller --clean --noconfirm mcw_launcher.spec
 python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0-beta.1"
-=======
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0"
->>>>>>> main
 ```
 
 Expected updater assets:
 
 ```text
-<<<<<<< HEAD
 MCW-Launcher-v0.7.0-beta.1-windows-x64.zip
 MCW-Launcher-v0.7.0-beta.1-windows-x64.zip.sha256
-=======
-MCW-Launcher-v0.6.0-windows-x64.zip
-MCW-Launcher-v0.6.0-windows-x64.zip.sha256
->>>>>>> main
 ```
 
 See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -345,12 +323,9 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
-<<<<<<< HEAD
 | [`docs/RELEASE-v0.7.0-beta.1.md`](docs/RELEASE-v0.7.0-beta.1.md) | Complete 0.7 Beta 1 release notes |
-| [`docs/FORGE_CURSEFORGE.md`](docs/FORGE_CURSEFORGE.md) | CurseForge Gateway, cache and manual fallback |
-=======
 | [`docs/RELEASE-v0.6.0.md`](docs/RELEASE-v0.6.0.md) | Complete v0.6.0 Stable release notes |
->>>>>>> main
+| [`docs/FORGE_CURSEFORGE.md`](docs/FORGE_CURSEFORGE.md) | CurseForge Gateway, cache and manual fallback |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core architecture |
 | [`docs/INSTANCE_SYSTEM.md`](docs/INSTANCE_SYSTEM.md) | Instance metadata and lifecycle |
 | [`docs/MODRINTH_INTEGRATION.md`](docs/MODRINTH_INTEGRATION.md) | Modrinth integration |
@@ -363,11 +338,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-<<<<<<< HEAD
 | Component | Status in v0.7.0-beta.1 |
-=======
-| Component | Status in v0.6.0 |
->>>>>>> main
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |

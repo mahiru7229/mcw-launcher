@@ -79,16 +79,25 @@ VERSION_ID = 0.7.0-beta.1
 UPDATE_CHANNEL = beta
 ```
 
+### Gia cố trước phát hành
+
+- Đồng bộ các bản sửa cuối từ `v0.6.0` Stable, bao gồm dark theme cố định và static text trên PNG mặc định tắt.
+- Giữ metadata của nhánh thử nghiệm ở `v0.7.0-beta.1` và update channel `beta`.
+- Sửa phần dựng command Forge hiện đại để client JAR Minecraft không bị đưa nhầm vào module layer.
+- Dọn sạch toàn bộ merge marker còn sót trong README và tài liệu updater.
+- Thêm release preflight để chặn build khi sai version/channel, thiếu release notes, lệch key/placeholder bản dịch hoặc còn merge conflict marker.
+- Thêm script `build_release.ps1` để test, build EXE và tạo updater ZIP trong một lệnh. Script không thay đổi thời gian xuất bản API JSON.
+
 ### Kiểm thử
 
 ```text
-762 passed
-46 skipped
+782 passed
+47 skipped
 0 failed
 0 errors
 ```
 
-Các test bị skip là nhóm GUI/PySide6 không khả dụng trong môi trường regression. Toàn bộ core CurseForge, cache, downloader, manual fallback và regression hiện có đều hoàn tất không có lỗi.
+Các test bị skip là nhóm GUI/PySide6 không khả dụng trong môi trường regression hiện tại. Toàn bộ core CurseForge, cache, downloader, manual fallback, Forge command builder, release preflight và regression hiện có đều hoàn tất không có lỗi.
 
 ### Lưu ý tester
 
@@ -175,16 +184,25 @@ VERSION_ID = 0.7.0-beta.1
 UPDATE_CHANNEL = beta
 ```
 
+### Release hardening
+
+- Synced the final fixes from `v0.6.0` Stable, including the forced dark palette and static text over themed PNG controls being disabled by default.
+- Preserved `v0.7.0-beta.1` metadata and the opt-in `beta` update channel.
+- Hardened modern Forge command construction so the Minecraft client JAR is not exposed as a duplicate Java module.
+- Removed all leftover merge markers from the README and updater documentation.
+- Added a release preflight that blocks packaging on version/channel mismatches, missing release notes, translation key/placeholder drift, or unresolved merge markers.
+- Added `build_release.ps1` for one-command tests, EXE build, and updater ZIP creation. The script intentionally leaves the API JSON publication time untouched.
+
 ### Tests
 
 ```text
-762 passed
-46 skipped
+782 passed
+47 skipped
 0 failed
 0 errors
 ```
 
-Skipped tests are GUI/PySide6-dependent tests unavailable in the regression environment. The CurseForge core, cache, downloader, manual fallback, and the existing regression suite completed without failures.
+Skipped tests are GUI/PySide6-dependent tests unavailable in the current regression environment. The CurseForge core, cache, downloader, manual fallback, Forge command builder, release preflight, and the existing regression suite completed without failures.
 
 ### Tester notes
 
