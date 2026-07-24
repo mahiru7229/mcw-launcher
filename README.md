@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Stable-v0.7.0.1-brightgreen" alt="Current stable version">
+    <img src="https://img.shields.io/badge/Stable-v0.7.1-brightgreen" alt="Current stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -22,12 +22,12 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v0.7.0.1.md">v0.7.0.1 hotfix notes</a> ·
+  <a href="docs/RELEASE-v0.7.1.md">v0.7.1 release notes</a> ·
   <a href="docs/RELEASE-v0.6.0.md">Stable release notes</a>
 </p>
 
 > [!NOTE]
-> `v0.7.0.1` là hotfix Stable cho bản đầu tiên của dòng 0.7. Launcher không đóng gói bất kỳ liên kết gateway CurseForge riêng tư nào; chủ sở hữu tự cấu hình tối đa năm liên kết được bảo vệ trong Launcher Settings.
+> `v0.7.1` là bản Stable hiện tại của dòng 0.7 và bổ sung hotfix Offline/Forge trên nền v0.7.0. Launcher không đóng gói bất kỳ liên kết gateway CurseForge riêng tư nào; chủ sở hữu tự cấu hình tối đa năm liên kết được bảo vệ trong Launcher Settings.
 
 ---
 
@@ -39,7 +39,7 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
-### Điểm nổi bật của `v0.7.0`
+### Điểm nổi bật của `v0.7.1`
 
 - Tích hợp **CurseForge Gateway** mà không đóng gói API key hoặc gateway riêng tư trong source/release. Có thể cấu hình tối đa năm liên kết HTTPS, được che trong giao diện, mã hóa bằng Windows DPAPI và tự động failover theo thứ tự.
 - Tìm kiếm, chọn phiên bản và cài **CurseForge mods** cho Fabric/Forge từ Manage Mods hoặc trang Mods độc lập.
@@ -48,6 +48,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 - Hiển thị **lần cập nhật gần nhất**, dung lượng cache, nguồn dữ liệu và lỗi refresh gần nhất.
 - Cooldown refresh, backoff sau lỗi và request deduplication để hạn chế gọi API trùng hoặc spam gateway.
 - Tạo và chạy instance **Vanilla, Fabric hoặc Forge**.
+- Sửa luồng Offline trên Forge: tài khoản Offline không còn gọi Microsoft Auth hoặc chèn các auth host giả gây `Auth currently unreachable`.
 - Cài đặt, thay đổi và repair Fabric Loader hoặc Minecraft Forge.
 - Tìm, cài và cập nhật mod từ **Modrinth** với bộ lọc loader/version/channel.
 - Trang **Cài mod** độc lập chỉ hiển thị instance khớp chính xác Minecraft version và loader trước khi cài.
@@ -72,7 +73,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.7.0.1` là bản Stable hiện tại dành cho người dùng thông thường.
+- `v0.7.1` là bản Stable hiện tại dành cho người dùng thông thường.
 - Các bản thử nghiệm tương lai vẫn chỉ xuất hiện khi người dùng chủ động tham gia tester program.
 
 Yêu cầu cơ bản:
@@ -121,14 +122,14 @@ Hoặc chạy thủ công:
 python -m tools.release_preflight
 python -m pytest test -q
 python -m PyInstaller --clean --noconfirm mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0.1"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.1"
 ```
 
 Kết quả updater package:
 
 ```text
-MCW-Launcher-v0.7.0.1-windows-x64.zip
-MCW-Launcher-v0.7.0.1-windows-x64.zip.sha256
+MCW-Launcher-v0.7.1-windows-x64.zip
+MCW-Launcher-v0.7.1-windows-x64.zip.sha256
 ```
 
 Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -143,7 +144,7 @@ MCW Launcher is an open-source Minecraft launcher centered around **isolated ins
 
 Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
 
-### `v0.7.0` highlights
+### `v0.7.1` highlights
 
 - Integrate a **CurseForge Gateway** without bundling a private API key or gateway URL. Up to five HTTPS endpoints can be configured, masked in the interface, protected with Windows DPAPI, and tried in order for failover.
 - Search, select versions, and install **CurseForge mods** for Fabric/Forge from Manage Mods or the standalone Mods page.
@@ -152,6 +153,7 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 - Display the **last successful refresh**, cache size, data source, cooldown, and latest refresh error.
 - Coalesce identical requests and apply refresh cooldown/backoff to reduce unnecessary API traffic.
 - Create and launch **Vanilla, Fabric, and Forge** instances.
+- Restore Offline launches on Forge: Offline accounts no longer call Microsoft Auth or inject invalid auth hosts that cause `Auth currently unreachable`.
 - Install, change, and repair Fabric Loader or Minecraft Forge.
 - Search, install, and update **Modrinth** mods with loader, version, and release-channel filtering.
 - A standalone **Install Mods** page only offers instances matching the selected Minecraft version and loader.
@@ -175,7 +177,7 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 Packaged Windows builds are published on the **Releases** page:
 
 - [Open releases](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.7.0.1` is the current Stable release for regular users.
+- `v0.7.1` is the current Stable release for regular users.
 - Future experimental builds remain available only after explicitly joining the tester program.
 
 Requirements:
@@ -224,14 +226,14 @@ Or run each step manually:
 python -m tools.release_preflight
 python -m pytest test -q
 python -m PyInstaller --clean --noconfirm mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0.1"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.1"
 ```
 
 Expected updater assets:
 
 ```text
-MCW-Launcher-v0.7.0.1-windows-x64.zip
-MCW-Launcher-v0.7.0.1-windows-x64.zip.sha256
+MCW-Launcher-v0.7.1-windows-x64.zip
+MCW-Launcher-v0.7.1-windows-x64.zip.sha256
 ```
 
 See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -323,7 +325,8 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
-| [`docs/RELEASE-v0.7.0.md`](docs/RELEASE-v0.7.0.md) | Complete v0.7.0 Stable release notes |
+| [`docs/RELEASE-v0.7.1.md`](docs/RELEASE-v0.7.1.md) | Complete v0.7.1 Stable maintenance release notes |
+| [`docs/RELEASE-v0.7.0.md`](docs/RELEASE-v0.7.0.md) | Original v0.7.0 Stable release notes |
 | [`docs/RELEASE-v0.6.0.md`](docs/RELEASE-v0.6.0.md) | Complete v0.6.0 Stable release notes |
 | [`docs/FORGE_CURSEFORGE.md`](docs/FORGE_CURSEFORGE.md) | CurseForge Gateway, cache and manual fallback |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core architecture |
@@ -338,7 +341,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v0.7.0 |
+| Component | Status in v0.7.1 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |
