@@ -8,12 +8,17 @@ import shlex
 
 
 class ArgumentBuilder:
-    OFFLINE_MULTIPLAYER_ARGUMENTS = [
-        "-Dminecraft.api.auth.host=https://nope.invalid",
-        "-Dminecraft.api.account.host=https://nope.invalid",
-        "-Dminecraft.api.session.host=https://nope.invalid",
-        "-Dminecraft.api.services.host=https://nope.invalid",
-    ]
+    # MCW Launcher previously redirected Mojang service hosts to ``nope.invalid``
+    # when the legacy offline multiplayer option was enabled. Offline accounts
+    # do not need this redirect to launch or join offline-mode servers, and Forge
+    # interprets it as an authentication outage. Keep the persisted setting for
+    # backwards compatibility, but never emit or retain those JVM properties.
+    UNSAFE_OFFLINE_AUTH_HOST_PREFIXES = (
+        "-Dminecraft.api.auth.host=",
+        "-Dminecraft.api.account.host=",
+        "-Dminecraft.api.session.host=",
+        "-Dminecraft.api.services.host=",
+    )
     DEFAULT_ARGUMENT_FEATURES = {
         "is_demo_user": False,
         "has_custom_resolution": False,
@@ -56,10 +61,18 @@ class ArgumentBuilder:
                 if argument not in jvm_args:
                     jvm_args.append(argument)
 
-        if account.account_type == AccountSource.OFFLINE and settings.offline_multiplayer_enabled:
-            jvm_args.extend(ArgumentBuilder.OFFLINE_MULTIPLAYER_ARGUMENTS)
+        if account.account_type == AccountSource.OFFLINE:
+            jvm_args = ArgumentBuilder._remove_unsafe_offline_auth_overrides(jvm_args)
 
         return jvm_args, game_args
+
+    @staticmethod
+    def _remove_unsafe_offline_auth_overrides(arguments: list[str]) -> list[str]:
+        return [
+            argument
+            for argument in arguments
+            if not any(argument.startswith(prefix) for prefix in ArgumentBuilder.UNSAFE_OFFLINE_AUTH_HOST_PREFIXES)
+        ]
 
     @staticmethod
     def _resolve_argument_entry(argument: object, context: dict) -> list[str]:

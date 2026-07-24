@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Stable-v0.7.0-brightgreen" alt="Current stable version">
+    <img src="https://img.shields.io/badge/Stable-v0.7.0.1-brightgreen" alt="Current stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -22,12 +22,12 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v0.7.0.md">v0.7.0 release notes</a> ·
+  <a href="docs/RELEASE-v0.7.0.1.md">v0.7.0.1 hotfix notes</a> ·
   <a href="docs/RELEASE-v0.6.0.md">Stable release notes</a>
 </p>
 
 > [!NOTE]
-> `v0.7.0` là bản Stable đầu tiên của dòng 0.7. Launcher không đóng gói bất kỳ liên kết gateway CurseForge riêng tư nào; chủ sở hữu tự cấu hình tối đa năm liên kết được bảo vệ trong Launcher Settings.
+> `v0.7.0.1` là hotfix Stable cho bản đầu tiên của dòng 0.7. Launcher không đóng gói bất kỳ liên kết gateway CurseForge riêng tư nào; chủ sở hữu tự cấu hình tối đa năm liên kết được bảo vệ trong Launcher Settings.
 
 ---
 
@@ -72,7 +72,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.7.0` là bản Stable hiện tại dành cho người dùng thông thường.
+- `v0.7.0.1` là bản Stable hiện tại dành cho người dùng thông thường.
 - Các bản thử nghiệm tương lai vẫn chỉ xuất hiện khi người dùng chủ động tham gia tester program.
 
 Yêu cầu cơ bản:
@@ -121,14 +121,14 @@ Hoặc chạy thủ công:
 python -m tools.release_preflight
 python -m pytest test -q
 python -m PyInstaller --clean --noconfirm mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0.1"
 ```
 
 Kết quả updater package:
 
 ```text
-MCW-Launcher-v0.7.0-windows-x64.zip
-MCW-Launcher-v0.7.0-windows-x64.zip.sha256
+MCW-Launcher-v0.7.0.1-windows-x64.zip
+MCW-Launcher-v0.7.0.1-windows-x64.zip.sha256
 ```
 
 Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -175,7 +175,7 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 Packaged Windows builds are published on the **Releases** page:
 
 - [Open releases](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.7.0` is the current Stable release for regular users.
+- `v0.7.0.1` is the current Stable release for regular users.
 - Future experimental builds remain available only after explicitly joining the tester program.
 
 Requirements:
@@ -224,14 +224,14 @@ Or run each step manually:
 python -m tools.release_preflight
 python -m pytest test -q
 python -m PyInstaller --clean --noconfirm mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0.1"
 ```
 
 Expected updater assets:
 
 ```text
-MCW-Launcher-v0.7.0-windows-x64.zip
-MCW-Launcher-v0.7.0-windows-x64.zip.sha256
+MCW-Launcher-v0.7.0.1-windows-x64.zip
+MCW-Launcher-v0.7.0.1-windows-x64.zip.sha256
 ```
 
 See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).

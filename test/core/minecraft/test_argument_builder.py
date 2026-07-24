@@ -333,61 +333,66 @@ def test_build_supports_rule_based_game_entries():
     )
 
 
-def test_offline_multiplayer_arguments_are_added_for_offline_account():
+def test_deprecated_offline_multiplayer_setting_does_not_redirect_auth_services():
+    version = make_version()
+    settings = make_settings(offline_multiplayer_enabled=True)
+
+    jvm_args, _ = ArgumentBuilder.build(
+        version=version,
+        context={},
+        settings=settings,
+        account=make_account(AccountSource.OFFLINE),
+    )
+
+    assert not any("nope.invalid" in argument for argument in jvm_args)
+    assert not any(
+        argument.startswith(prefix)
+        for argument in jvm_args
+        for prefix in ArgumentBuilder.UNSAFE_OFFLINE_AUTH_HOST_PREFIXES
+    )
+
+
+def test_offline_account_removes_unsafe_custom_auth_host_overrides():
     version = make_version()
     settings = make_settings(
-        offline_multiplayer_enabled=True
+        jvm_arguments=[
+            "-Dsafe.option=true",
+            "-Dminecraft.api.auth.host=https://nope.invalid",
+            "-Dminecraft.api.account.host=https://nope.invalid",
+            "-Dminecraft.api.session.host=https://nope.invalid",
+            "-Dminecraft.api.services.host=https://nope.invalid",
+        ],
     )
 
     jvm_args, _ = ArgumentBuilder.build(
         version=version,
         context={},
         settings=settings,
-        account=make_account(
-            AccountSource.OFFLINE
-        ),
+        account=make_account(AccountSource.OFFLINE),
     )
 
-    for argument in ArgumentBuilder.OFFLINE_MULTIPLAYER_ARGUMENTS:
-        assert argument in jvm_args
+    assert "-Dsafe.option=true" in jvm_args
+    assert not any("nope.invalid" in argument for argument in jvm_args)
+    assert not any(
+        argument.startswith(prefix)
+        for argument in jvm_args
+        for prefix in ArgumentBuilder.UNSAFE_OFFLINE_AUTH_HOST_PREFIXES
+    )
 
 
-def test_offline_multiplayer_arguments_are_not_added_when_disabled():
+def test_microsoft_account_keeps_explicit_auth_host_overrides():
+    override = "-Dminecraft.api.auth.host=https://example.invalid"
     version = make_version()
-    settings = make_settings(
-        offline_multiplayer_enabled=False
-    )
+    settings = make_settings(jvm_arguments=[override])
 
     jvm_args, _ = ArgumentBuilder.build(
         version=version,
         context={},
         settings=settings,
-        account=make_account(
-            AccountSource.OFFLINE
-        ),
+        account=make_account(AccountSource.MICROSOFT),
     )
 
-    for argument in ArgumentBuilder.OFFLINE_MULTIPLAYER_ARGUMENTS:
-        assert argument not in jvm_args
-
-
-def test_offline_multiplayer_arguments_are_not_added_for_microsoft_account():
-    version = make_version()
-    settings = make_settings(
-        offline_multiplayer_enabled=True
-    )
-
-    jvm_args, _ = ArgumentBuilder.build(
-        version=version,
-        context={},
-        settings=settings,
-        account=make_account(
-            AccountSource.MICROSOFT
-        ),
-    )
-
-    for argument in ArgumentBuilder.OFFLINE_MULTIPLAYER_ARGUMENTS:
-        assert argument not in jvm_args
+    assert override in jvm_args
 
 
 @pytest.mark.parametrize(

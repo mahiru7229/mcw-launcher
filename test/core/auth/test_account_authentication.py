@@ -30,6 +30,20 @@ def test_offline_account_uses_offline_authentication() -> None:
     assert authentication.user_type == "offline"
 
 
+def test_offline_account_never_touches_microsoft_authentication(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail(*_args, **_kwargs):
+        raise AssertionError("Microsoft authentication must not run for an offline account")
+
+    monkeypatch.setattr("src.core.auth.account_authentication.MicrosoftAuthenticationGate.require_enabled", fail)
+    monkeypatch.setattr("src.core.auth.account_authentication.MicrosoftAccountAuthenticator.refresh", fail)
+
+    authentication = AccountAuthentication.authenticate(_account(AccountSource.OFFLINE))
+
+    assert authentication.player_name == "PremiumPlayer"
+    assert authentication.access_token == "0"
+    assert authentication.user_type == "offline"
+
+
 def test_microsoft_account_uses_minecraft_session(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("src.core.auth.account_authentication.MicrosoftAuthenticationGate.require_enabled", lambda: None)
     monkeypatch.setattr("src.core.auth.account_authentication.MicrosoftAuthConfig.CLIENT_ID", "launcher-client-id")
