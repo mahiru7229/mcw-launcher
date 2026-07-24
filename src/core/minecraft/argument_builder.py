@@ -19,6 +19,15 @@ class ArgumentBuilder:
         "-Dminecraft.api.session.host=",
         "-Dminecraft.api.services.host=",
     )
+    OFFLINE_IDENTITY_ARGUMENTS = (
+        "--username",
+        "--uuid",
+        "--accessToken",
+        "--userType",
+        "--clientId",
+        "--xuid",
+    )
+    OFFLINE_OMITTED_ARGUMENTS = {"--clientId", "--xuid"}
     DEFAULT_ARGUMENT_FEATURES = {
         "is_demo_user": False,
         "has_custom_resolution": False,
@@ -63,6 +72,7 @@ class ArgumentBuilder:
 
         if account.account_type == AccountSource.OFFLINE:
             jvm_args = ArgumentBuilder._remove_unsafe_offline_auth_overrides(jvm_args)
+            game_args = ArgumentBuilder._normalize_offline_identity_arguments(game_args, context)
 
         return jvm_args, game_args
 
@@ -73,6 +83,42 @@ class ArgumentBuilder:
             for argument in arguments
             if not any(argument.startswith(prefix) for prefix in ArgumentBuilder.UNSAFE_OFFLINE_AUTH_HOST_PREFIXES)
         ]
+
+    @staticmethod
+    def _normalize_offline_identity_arguments(arguments: list[str], context: dict) -> list[str]:
+        canonical_values = {
+            "--username": str(context.get("auth_player_name") or "").strip(),
+            "--uuid": str(context.get("auth_uuid") or "").replace("-", "").strip(),
+            "--accessToken": "0",
+            "--userType": "legacy",
+        }
+
+        normalized: list[str] = []
+        seen: set[str] = set()
+        index = 0
+
+        while index < len(arguments):
+            argument = str(arguments[index])
+            matched_flag = next((flag for flag in ArgumentBuilder.OFFLINE_IDENTITY_ARGUMENTS if argument == flag or argument.startswith(flag + "=")), None)
+            if matched_flag is None:
+                normalized.append(argument)
+                index += 1
+                continue
+
+            inline_value = argument.startswith(matched_flag + "=")
+            index += 1 if inline_value else 2
+
+            if matched_flag in seen or matched_flag in ArgumentBuilder.OFFLINE_OMITTED_ARGUMENTS:
+                continue
+
+            value = canonical_values.get(matched_flag, "")
+            if not value:
+                continue
+
+            normalized.extend((matched_flag, value))
+            seen.add(matched_flag)
+
+        return normalized
 
     @staticmethod
     def _resolve_argument_entry(argument: object, context: dict) -> list[str]:

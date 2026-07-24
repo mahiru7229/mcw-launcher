@@ -12,7 +12,8 @@ class AccountManager:
 
     @staticmethod
     def create_offline_account(username: str) -> Account:
-        if not username.strip():
+        username = str(username or "").strip()
+        if not username:
             raise ValueError("Username cannot be empty.")
 
         if AccountManager.is_account_exist(username):

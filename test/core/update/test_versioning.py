@@ -20,6 +20,7 @@ def test_version_order_handles_prereleases() -> None:
     assert LauncherVersion.parse("0.7.0") < LauncherVersion.parse("0.7.0.1")
     assert LauncherVersion.parse("0.7.0.1") < LauncherVersion.parse("0.7.1-beta.1")
     assert LauncherVersion.parse("0.7.1-beta.1") < LauncherVersion.parse("0.7.1")
+    assert LauncherVersion.parse("0.7.1") < LauncherVersion.parse("0.7.2")
 
 
 def test_invalid_version_is_rejected() -> None:

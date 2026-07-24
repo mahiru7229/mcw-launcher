@@ -569,3 +569,130 @@ def test_build_respects_last_matching_argument_rule():
     jvm_args, _ = ArgumentBuilder.build(version=version, context={}, settings=make_settings(), account=make_account())
 
     assert "-Dblocked=true" not in jvm_args
+
+
+def test_offline_account_normalizes_modern_launch_identity_arguments():
+    version = make_version(
+        game_arguments=[
+            "--username",
+            "${auth_player_name}",
+            "--uuid",
+            "${auth_uuid}",
+            "--accessToken",
+            "${auth_access_token}",
+            "--clientId",
+            "${clientid}",
+            "--xuid",
+            "${auth_xuid}",
+            "--userType",
+            "${user_type}",
+            "--versionType",
+            "release",
+        ]
+    )
+
+    _, game_args = ArgumentBuilder.build(
+        version=version,
+        context={
+            "auth_player_name": "OfflinePlayer",
+            "auth_uuid": "5627dd98-e6be-3c21-b8a8-e92344183641",
+            "auth_access_token": "stale-token",
+            "clientid": "stale-client-id",
+            "auth_xuid": "stale-xuid",
+            "user_type": "offline",
+        },
+        settings=make_settings(),
+        account=make_account(AccountSource.OFFLINE),
+    )
+
+    assert game_args[game_args.index("--username") + 1] == "OfflinePlayer"
+    assert game_args[game_args.index("--uuid") + 1] == "5627dd98e6be3c21b8a8e92344183641"
+    assert game_args[game_args.index("--accessToken") + 1] == "0"
+    assert game_args[game_args.index("--userType") + 1] == "legacy"
+    assert "--clientId" not in game_args
+    assert "--xuid" not in game_args
+    assert "--versionType" in game_args
+
+
+def test_offline_account_removes_duplicate_or_custom_identity_overrides():
+    version = make_version(
+        game_arguments=[
+            "--username",
+            "${auth_player_name}",
+            "--uuid",
+            "${auth_uuid}",
+            "--accessToken",
+            "${auth_access_token}",
+            "--userType",
+            "${user_type}",
+        ]
+    )
+    settings = make_settings(
+        game_arguments=[
+            "--uuid=invalid",
+            "--accessToken",
+            "invalid-token",
+            "--userType=msa",
+            "--clientId=secret",
+            "--xuid",
+            "secret-xuid",
+        ]
+    )
+
+    _, game_args = ArgumentBuilder.build(
+        version=version,
+        context={
+            "auth_player_name": "Steve",
+            "auth_uuid": "5627dd98e6be3c21b8a8e92344183641",
+            "auth_access_token": "0",
+            "user_type": "legacy",
+        },
+        settings=settings,
+        account=make_account(AccountSource.OFFLINE),
+    )
+
+    assert game_args.count("--uuid") == 1
+    assert game_args.count("--accessToken") == 1
+    assert game_args.count("--userType") == 1
+    assert game_args[game_args.index("--uuid") + 1] == "5627dd98e6be3c21b8a8e92344183641"
+    assert game_args[game_args.index("--accessToken") + 1] == "0"
+    assert game_args[game_args.index("--userType") + 1] == "legacy"
+    assert not any(value.startswith("--clientId") for value in game_args)
+    assert not any(value.startswith("--xuid") for value in game_args)
+
+
+def test_microsoft_account_keeps_modern_identity_arguments_unchanged():
+    version = make_version(
+        game_arguments=[
+            "--uuid",
+            "${auth_uuid}",
+            "--accessToken",
+            "${auth_access_token}",
+            "--clientId",
+            "${clientid}",
+            "--xuid",
+            "${auth_xuid}",
+            "--userType",
+            "${user_type}",
+        ]
+    )
+    context = {
+        "auth_uuid": "premium-uuid",
+        "auth_access_token": "premium-token",
+        "clientid": "premium-client-id",
+        "auth_xuid": "premium-xuid",
+        "user_type": "msa",
+    }
+
+    _, game_args = ArgumentBuilder.build(
+        version=version,
+        context=context,
+        settings=make_settings(),
+        account=make_account(AccountSource.MICROSOFT),
+    )
+
+    assert game_args[game_args.index("--uuid") + 1] == "premium-uuid"
+    assert game_args[game_args.index("--accessToken") + 1] == "premium-token"
+    assert game_args[game_args.index("--clientId") + 1] == "premium-client-id"
+    assert game_args[game_args.index("--xuid") + 1] == "premium-xuid"
+    assert game_args[game_args.index("--userType") + 1] == "msa"

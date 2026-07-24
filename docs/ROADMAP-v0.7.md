@@ -20,16 +20,16 @@ Status: **implemented and release-ready**.
 - [x] Batch project/file metadata requests
 - [x] Modern Forge command/module-path hardening
 
-## v0.7.1 Stable — Offline/Forge maintenance
+## v0.7.2 Stable — Offline/Forge maintenance
 
 - [x] Restore Offline account launches on Forge.
 - [x] Remove invalid authentication host overrides from legacy settings.
 - [x] Preserve Microsoft account behavior.
 - [x] Keep updater compatibility with both three-part and four-part historical versions.
 
-## v0.7.2 — Optimization and maintenance
+## v0.7.3 — Optimization and maintenance
 
-Planned focus after the v0.7.1 maintenance release:
+Planned focus after the v0.7.2 maintenance release:
 
 - Reduce CurseForge catalog latency and unnecessary refreshes.
 - Improve endpoint health tracking and prefer the most recently healthy gateway without weakening configured priority.

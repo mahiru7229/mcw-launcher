@@ -29,7 +29,7 @@ def test_authenticate_returns_authentication_model():
     assert isinstance(result, Authentication)
 
 
-def test_authenticate_copies_username_and_uuid():
+def test_authenticate_rebuilds_compact_offline_uuid_from_username():
     account = make_account(
         username="Mahiru",
         player_uuid="12345678-1234-5678-9234-567812345678",
@@ -38,9 +38,9 @@ def test_authenticate_copies_username_and_uuid():
     result = OfflineAuthentication.authenticate(account)
 
     assert result.player_name == "Mahiru"
-    assert result.uuid == (
-        "12345678-1234-5678-9234-567812345678"
-    )
+    assert result.uuid == OfflineAuthentication.uuid_generator("Mahiru").replace("-", "")
+    assert len(result.uuid) == 32
+    assert "-" not in result.uuid
 
 
 def test_authenticate_uses_offline_placeholder_tokens():
@@ -49,9 +49,21 @@ def test_authenticate_uses_offline_placeholder_tokens():
     )
 
     assert result.access_token == "0"
-    assert result.xuid == "0"
-    assert result.client_id == "0"
-    assert result.user_type == "offline"
+    assert result.xuid == ""
+    assert result.client_id == ""
+    assert result.user_type == "legacy"
+
+
+def test_authenticate_strips_username_before_building_identity():
+    result = OfflineAuthentication.authenticate(make_account(username="  Steve  "))
+
+    assert result.player_name == "Steve"
+    assert result.uuid == OfflineAuthentication.uuid_generator("Steve").replace("-", "")
+
+
+def test_authenticate_rejects_empty_username():
+    with pytest.raises(ValueError, match="username"):
+        OfflineAuthentication.authenticate(make_account(username="   "))
 
 
 def test_authenticate_does_not_modify_account():

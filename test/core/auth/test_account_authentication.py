@@ -27,7 +27,7 @@ def test_offline_account_uses_offline_authentication() -> None:
     authentication = AccountAuthentication.authenticate(_account(AccountSource.OFFLINE))
 
     assert authentication.access_token == "0"
-    assert authentication.user_type == "offline"
+    assert authentication.user_type == "legacy"
 
 
 def test_offline_account_never_touches_microsoft_authentication(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -41,7 +41,7 @@ def test_offline_account_never_touches_microsoft_authentication(monkeypatch: pyt
 
     assert authentication.player_name == "PremiumPlayer"
     assert authentication.access_token == "0"
-    assert authentication.user_type == "offline"
+    assert authentication.user_type == "legacy"
 
 
 def test_microsoft_account_uses_minecraft_session(monkeypatch: pytest.MonkeyPatch) -> None:
