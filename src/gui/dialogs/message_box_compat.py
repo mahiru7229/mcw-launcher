@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QAbstractButton, QApplication, QLabel, QMessageBox, QPlainTextEdit, QTextEdit
 
 from src.gui.dark_theme import create_forced_dark_palette
@@ -66,7 +67,19 @@ QMessageBox QPushButton:pressed {{
 
 
 def _force_dark_palette(widget: QObject):
-    return create_forced_dark_palette(getattr(widget, "palette")())
+    palette = create_forced_dark_palette(getattr(widget, "palette")())
+
+    # QMessageBox uses a slightly lighter surface than the main window.
+    # Set the palette role explicitly as well as QSS because some Qt/Windows
+    # styles read QPalette.Window directly when creating child controls.
+    dialog_background = QColor(DIALOG_BACKGROUND)
+    for color_group in (
+        QPalette.ColorGroup.Active,
+        QPalette.ColorGroup.Inactive,
+        QPalette.ColorGroup.Disabled,
+    ):
+        palette.setColor(color_group, QPalette.ColorRole.Window, dialog_background)
+    return palette
 
 
 def apply_message_box_compatibility(message_box: QMessageBox) -> None:
