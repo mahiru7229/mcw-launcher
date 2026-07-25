@@ -8,6 +8,7 @@ from src.core.system.memory import MemoryAllocationPolicy, SystemMemory
 from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
+from src.gui.widget.settings_section import SettingsSection
 
 
 class InstanceSettingsPage(BasePage):
@@ -39,6 +40,13 @@ class InstanceSettingsPage(BasePage):
         self.unsaved_label.setVisible(False)
         self.root_layout.addWidget(self.unsaved_label)
 
+        target_section = SettingsSection("instance.settings.section.target", "instance.settings.section.target_detail")
+        runtime_section = SettingsSection("instance.settings.section.runtime", "instance.settings.section.runtime_detail")
+        multiplayer_section = SettingsSection("instance.settings.section.multiplayer", "instance.settings.section.multiplayer_detail")
+        advanced_section = SettingsSection("instance.settings.section.advanced", "instance.settings.section.advanced_detail")
+        for section in (target_section, runtime_section, multiplayer_section, advanced_section):
+            self.root_layout.addWidget(section)
+
         selector_card = CardWidget("Target instance")
         self.instance_combo = QComboBox()
         self.instance_combo.currentTextChanged.connect(self.load_requested.emit)
@@ -46,7 +54,7 @@ class InstanceSettingsPage(BasePage):
         reload_button.clicked.connect(lambda: self.load_requested.emit(self.current_instance_name()))
         selector_card.layout.addWidget(self.instance_combo)
         selector_card.layout.addWidget(reload_button)
-        self.root_layout.addWidget(selector_card)
+        target_section.add_card(selector_card, span=2)
 
         java_card = CardWidget("Java and memory")
         self.java_path_input = QLineEdit()
@@ -93,7 +101,7 @@ class InstanceSettingsPage(BasePage):
         java_card.layout.addWidget(self.java_path_input)
         java_card.layout.addWidget(browse_button)
         java_card.layout.addLayout(memory_grid)
-        self.root_layout.addWidget(java_card)
+        runtime_section.add_card(java_card)
         self._apply_memory_values(MemoryAllocationPolicy.DEFAULT_MIN_MEMORY_MB, MemoryAllocationPolicy.DEFAULT_MAX_MEMORY_MB)
 
         window_card = CardWidget("Game window")
@@ -109,7 +117,7 @@ class InstanceSettingsPage(BasePage):
         window_grid.addWidget(self.window_height, 1, 1)
         window_card.layout.addLayout(window_grid)
         window_card.layout.addWidget(self.fullscreen)
-        self.root_layout.addWidget(window_card)
+        runtime_section.add_card(window_card)
 
         hosting_card = CardWidget(
             "LAN hosting",
@@ -139,7 +147,7 @@ class InstanceSettingsPage(BasePage):
         hosting_card.layout.addWidget(self.lan_prepare_status)
         hosting_card.layout.addWidget(self.lan_prepare_button)
         hosting_card.layout.addWidget(self.lan_agent_log_button)
-        self.root_layout.addWidget(hosting_card)
+        multiplayer_section.add_card(hosting_card, span=2)
         self.lan_auth_mode.currentIndexChanged.connect(self._update_lan_help)
         self.lan_connection_provider.currentIndexChanged.connect(self._update_lan_help)
         self._update_lan_help()
@@ -154,7 +162,7 @@ class InstanceSettingsPage(BasePage):
             "This option belongs to the selected instance. Disable it to let Minecraft launch after three failed download rounds, then place the missing files manually in the paths shown by the launcher."
         )
         modrinth_card.layout.addWidget(self.block_modrinth_failure)
-        self.root_layout.addWidget(modrinth_card)
+        multiplayer_section.add_card(modrinth_card, span=2)
 
         arguments_card = CardWidget("Custom arguments", "Enter one argument per line.")
         self.jvm_arguments = QTextEdit()
@@ -169,7 +177,7 @@ class InstanceSettingsPage(BasePage):
         arguments_card.layout.addWidget(self.jvm_arguments)
         arguments_card.layout.addWidget(QLabel("Game arguments"))
         arguments_card.layout.addWidget(self.game_arguments)
-        self.root_layout.addWidget(arguments_card)
+        advanced_section.add_card(arguments_card, span=2)
 
         self.save_button = set_theme_icon(QPushButton("Save instance settings"), "icon.action.save")
         self.save_button.setObjectName("PrimaryButton")

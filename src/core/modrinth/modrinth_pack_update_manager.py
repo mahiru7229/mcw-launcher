@@ -24,14 +24,22 @@ from src.models.progress.progress_stage import ProgressStage
 
 class ModrinthPackUpdateManager:
     @staticmethod
-    def check(instance: Instance, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, force_refresh: bool = False) -> ModrinthPackUpdateInfo | None:
+    def check(instance: Instance, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, force_refresh: bool = False, reporter: ProgressReporter | None = None) -> ModrinthPackUpdateInfo | None:
+        if reporter is not None:
+            reporter.steps(ProgressStage.CHECKING_MODPACK, "modpack.update_check.loading_registry", 0, 5)
         registry = ModrinthPackRegistry.load(instance)
         project_id = str(registry.get("projectId") or "").strip()
         current_version_id = str(registry.get("versionId") or "").strip()
         if not project_id or not current_version_id:
+            if reporter is not None:
+                reporter.steps(ProgressStage.CHECKING_MODPACK, "modpack.update_check.not_managed", 5, 5)
             return None
+        if reporter is not None:
+            reporter.steps(ProgressStage.CHECKING_MODPACK, "modpack.update_check.loading_project", 1, 5)
         project = ModrinthClient.get_project(project_id, force_refresh=force_refresh)
         current_number = str(registry.get("versionNumber") or current_version_id)
+        if reporter is not None:
+            reporter.steps(ProgressStage.CHECKING_MODPACK, "modpack.update_check.loading_current", 2, 5)
         try:
             current_version = ModrinthClient.get_version(current_version_id, force_refresh=force_refresh)
             current_timestamp = ModrinthClient._published_timestamp(current_version.date_published)
@@ -39,8 +47,14 @@ class ModrinthPackUpdateManager:
         except RuntimeError:
             current_timestamp = 0.0
         loader_name = ModrinthPackUpdateManager._registry_loader(registry)
+        if reporter is not None:
+            reporter.steps(ProgressStage.CHECKING_MODPACK, "modpack.update_check.loading_versions", 3, 5)
         versions = ModrinthClient.list_project_versions(project_id, loader=loader_name, game_version=str(registry.get("minecraftVersion") or instance.version_id), version_types=allowed_version_types, force_refresh=force_refresh)
+        if reporter is not None:
+            reporter.steps(ProgressStage.CHECKING_MODPACK, "modpack.update_check.comparing", 4, 5)
         candidate = next((version for version in versions if version.version_id != current_version_id and ModrinthClient._published_timestamp(version.date_published) > current_timestamp), None)
+        if reporter is not None:
+            reporter.steps(ProgressStage.CHECKING_MODPACK, "modpack.update_check.checked", 5, 5)
         if candidate is None:
             return ModrinthPackUpdateInfo(project_id=project_id, pack_name=project.title, current_version_id=current_version_id, current_version_number=current_number, target_version_id="", target_version_number="", target_version_type="", target_date_published="")
         return ModrinthPackUpdateInfo(project_id=project_id, pack_name=project.title, current_version_id=current_version_id, current_version_number=current_number, target_version_id=candidate.version_id, target_version_number=candidate.version_number, target_version_type=candidate.version_type, target_date_published=candidate.date_published)

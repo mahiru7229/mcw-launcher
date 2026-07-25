@@ -103,6 +103,18 @@ QLabel#PageSubtitle {
     font-size: 11pt;
 }
 
+QLabel#SectionTitle {
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 900;
+    padding-top: 4px;
+}
+
+QLabel#SectionSubtitle {
+    color: #d7d7d7;
+    font-size: 10pt;
+}
+
 QLabel#CardTitle {
     color: #ffffff;
     font-size: 14px;

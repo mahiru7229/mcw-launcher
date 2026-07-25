@@ -16,6 +16,7 @@ _WIDGET_CALL_ARGUMENTS = {
     "QCheckBox": (0,),
     "QGroupBox": (0,),
     "CardWidget": (0, 1),
+    "SettingsSection": (0, 1),
     "BasePage": (0, 1),
     "QAction": (0,),
 }

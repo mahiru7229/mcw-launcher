@@ -6,6 +6,8 @@ import re
 import subprocess
 
 from src.core.java.java_manager import JavaManager
+from src.core.progress.progress_reporter import ProgressReporter
+from src.models.progress.progress_stage import ProgressStage
 from src.models.java.java_diagnostic import JavaDiagnostic
 from src.models.java.java import JavaInstallation
 
@@ -14,8 +16,21 @@ class JavaDiagnosticsManager:
     PROPERTY_PATTERN = re.compile(r"^\s*([^=]+?)\s*=\s*(.*?)\s*$")
 
     @staticmethod
-    def scan() -> list[JavaDiagnostic]:
-        diagnostics = [JavaDiagnosticsManager.inspect(java) for java in JavaManager.find_installation()]
+    def scan(reporter: ProgressReporter | None = None) -> list[JavaDiagnostic]:
+        installations = JavaManager.find_installation(reporter=reporter)
+        diagnostics: list[JavaDiagnostic] = []
+        total = max(len(installations), 1)
+
+        if not installations and reporter is not None:
+            reporter.steps(ProgressStage.SELECTING_JAVA, "java.scan.no_installations", 1, 1)
+
+        for index, java in enumerate(installations, start=1):
+            if reporter is not None:
+                reporter.steps(ProgressStage.SELECTING_JAVA, "java.scan.inspecting", index - 1, total)
+            diagnostics.append(JavaDiagnosticsManager.inspect(java))
+
+        if installations and reporter is not None:
+            reporter.steps(ProgressStage.SELECTING_JAVA, "java.scan.completed", total, total)
         return sorted(diagnostics, key=lambda item: (item.major_version, item.vendor.casefold(), str(item.executable).casefold()))
 
     @staticmethod

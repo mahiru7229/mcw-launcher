@@ -2,6 +2,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from src.gui.widget.card_widget import CardWidget
+from src.gui.widget.settings_section import SettingsSection
 
 
 class BasePage(QScrollArea):
@@ -39,6 +40,8 @@ class BasePage(QScrollArea):
             self.root_layout.setContentsMargins(28, 24, 28, 24)
             self.root_layout.setSpacing(18)
 
+        for section in self.findChildren(SettingsSection):
+            section.set_compact_mode(self._compact)
         for card in self.findChildren(CardWidget):
             card.set_compact_mode(self._compact)
 

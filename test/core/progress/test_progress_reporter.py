@@ -3,6 +3,7 @@ import pytest
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.progress.progress_event import ProgressEvent
 from src.models.progress.progress_stage import ProgressStage
+from src.models.progress.progress_state import ProgressState
 from src.models.progress.progress_unit import ProgressUnit
 
 
@@ -402,3 +403,41 @@ def test_files_can_report_aggregate_download_speed():
     event = received[0]
     assert event.unit is ProgressUnit.FILES
     assert event.bytes_per_second == 1024.0
+
+
+def test_terminal_helpers_emit_explicit_states() -> None:
+    received: list[ProgressEvent] = []
+    reporter = ProgressReporter(received.append)
+
+    reporter.succeeded(ProgressStage.FINISHED, "done", "ready")
+    reporter.failed(ProgressStage.CHECKING_MODPACK, "failed", "network")
+    reporter.cancelled(ProgressStage.DOWNLOADING_MODS, "cancelled")
+
+    assert [event.state for event in received] == [ProgressState.SUCCEEDED, ProgressState.FAILED, ProgressState.CANCELLED]
+    assert all(event.is_terminal for event in received)
+    assert received[0].percentage == 100.0
+    assert received[1].detail == "network"
+
+
+def test_task_context_reports_failure_before_reraising() -> None:
+    received: list[ProgressEvent] = []
+    reporter = ProgressReporter(received.append)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        with reporter.task(ProgressStage.CHECKING_MODPACK, "start", "done", "failed"):
+            raise RuntimeError("boom")
+
+    assert [event.message for event in received] == ["start", "failed"]
+    assert received[-1].state is ProgressState.FAILED
+    assert received[-1].detail == "boom"
+
+
+def test_task_context_reports_success() -> None:
+    received: list[ProgressEvent] = []
+    reporter = ProgressReporter(received.append)
+
+    with reporter.task(ProgressStage.SELECTING_JAVA, "start", "done", "failed"):
+        pass
+
+    assert received[-1].state is ProgressState.SUCCEEDED
+    assert received[-1].message == "done"

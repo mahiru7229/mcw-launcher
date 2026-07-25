@@ -4,6 +4,7 @@ from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_mod_installer import ModrinthModInstaller
 from src.core.modrinth.modrinth_mod_update_manager import ModrinthModUpdateManager
+from src.core.progress.progress_reporter import ProgressReporter
 from src.core.modrinth.modrinth_registry import ModrinthRegistry
 from src.models.instance.instance import Instance
 from src.models.modrinth.install_result import ModrinthModInstallResult
@@ -67,3 +68,15 @@ def test_forge_update_check_uses_forge_loader_filter(tmp_path, monkeypatch):
 
     assert report.update_count == 1
     assert seen == ["forge"]
+
+
+def test_update_check_reports_tracked_mod_progress(tmp_path, monkeypatch) -> None:
+    instance = make_instance(tmp_path)
+    monkeypatch.setattr(ModrinthClient, "list_project_versions", lambda *args, **kwargs: [version("new", "2.0")])
+    events = []
+
+    ModrinthModUpdateManager.check(instance, ("release",), reporter=ProgressReporter(events.append))
+
+    assert [event.current for event in events] == [0, 1]
+    assert [event.total for event in events] == [1, 1]
+    assert events[-1].message == "mods.update_check.checked_project"

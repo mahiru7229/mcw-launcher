@@ -115,7 +115,8 @@ class ModController(BaseController):
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
-        self._task_runner.run("mods.update.check", lambda: (instance_id, ModrinthModUpdateManager.check(instance, allowed_version_types, force_refresh=force_refresh)), "Checking Modrinth mod updates...", blocking=False)
+        reporter = ProgressReporter(self.progress_received.emit)
+        self._task_runner.run("mods.update.check", lambda: (instance_id, ModrinthModUpdateManager.check(instance, allowed_version_types, force_refresh=force_refresh, reporter=reporter)), "Checking Modrinth mod updates...", blocking=False)
 
     def update_projects(self, project_ids: list[str], allowed_version_types: tuple[str, ...]) -> None:
         instance = self._require_instance()

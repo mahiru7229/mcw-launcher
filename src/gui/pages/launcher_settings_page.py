@@ -10,6 +10,7 @@ from src.gui.dialogs.protected_value_reveal_dialog import confirm_reveal_protect
 from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
+from src.gui.widget.settings_section import SettingsSection
 
 
 class LauncherSettingsPage(BasePage):
@@ -49,6 +50,13 @@ class LauncherSettingsPage(BasePage):
         self.unsaved_label.setVisible(False)
         self.root_layout.addWidget(self.unsaved_label)
 
+        general_section = SettingsSection("settings.section.general", "settings.section.general_detail")
+        downloads_section = SettingsSection("settings.section.downloads", "settings.section.downloads_detail")
+        runtime_section = SettingsSection("settings.section.runtime", "settings.section.runtime_detail")
+        appearance_section = SettingsSection("settings.section.appearance", "settings.section.appearance_detail")
+        for section in (general_section, downloads_section, runtime_section, appearance_section):
+            self.root_layout.addWidget(section)
+
         behavior_card = CardWidget("Startup and behavior")
         self.start_page_combo = QComboBox()
         for page_id, label in NAVIGATION_ITEMS:
@@ -61,7 +69,7 @@ class LauncherSettingsPage(BasePage):
         behavior_card.layout.addWidget(self.show_snapshots)
         behavior_card.layout.addWidget(self.remember_window_size)
         behavior_card.layout.addWidget(self.debug_mode)
-        self.root_layout.addWidget(behavior_card)
+        general_section.add_card(behavior_card)
 
         bandwidth_card = CardWidget("Download bandwidth", "The limit is shared by all simultaneous downloads. Leave it disabled for unlimited speed.")
         self.limit_download_speed = QCheckBox("Limit download speed")
@@ -75,7 +83,7 @@ class LauncherSettingsPage(BasePage):
         self.limit_download_speed.toggled.connect(self.download_limit_mbps.setEnabled)
         bandwidth_card.layout.addWidget(self.limit_download_speed)
         bandwidth_card.layout.addWidget(self.download_limit_mbps)
-        self.root_layout.addWidget(bandwidth_card)
+        downloads_section.add_card(bandwidth_card)
 
         language_card = CardWidget("Language", "Add another language by placing a compatible JSON file in the lang folder.")
         self.language_combo = QComboBox()
@@ -86,14 +94,14 @@ class LauncherSettingsPage(BasePage):
         language_card.layout.addWidget(QLabel("Launcher language"))
         language_card.layout.addWidget(self.language_combo)
         language_card.layout.addWidget(reload_languages_button)
-        self.root_layout.addWidget(language_card)
+        general_section.add_card(language_card)
 
         modrinth_card = CardWidget("Modrinth release channels", "Release versions are always shown. Enable Beta or Alpha only when you accept less stable project versions.")
         self.modrinth_include_beta = QCheckBox("Include Beta mod and modpack versions")
         self.modrinth_include_alpha = QCheckBox("Include Alpha mod and modpack versions")
         modrinth_card.layout.addWidget(self.modrinth_include_beta)
         modrinth_card.layout.addWidget(self.modrinth_include_alpha)
-        self.root_layout.addWidget(modrinth_card)
+        downloads_section.add_card(modrinth_card)
 
         curseforge_card = CardWidget(
             "Private CurseForge gateways",
@@ -118,7 +126,7 @@ class LauncherSettingsPage(BasePage):
         self.curseforge_gateway_security.setWordWrap(True)
         curseforge_card.layout.addWidget(self.reveal_curseforge_gateways)
         curseforge_card.layout.addWidget(self.curseforge_gateway_security)
-        self.root_layout.addWidget(curseforge_card)
+        downloads_section.add_card(curseforge_card, span=2)
 
         java_card = CardWidget("Java installations", "Scan Java from JAVA_HOME, PATH, Program Files, the Windows Registry, and managed runtimes.")
         java_card.setProperty("themeRole", "java")
@@ -136,7 +144,7 @@ class LauncherSettingsPage(BasePage):
         java_card.layout.addWidget(self.java_details)
         java_card.layout.addWidget(scan_java_button)
         java_card.layout.addWidget(self.open_java_button)
-        self.root_layout.addWidget(java_card)
+        runtime_section.add_card(java_card)
 
         update_card = CardWidget("Launcher updates", "Stable updates are used by default. Join the tester program only when you want to receive experimental builds.")
         current_version_label = QLabel(f"Current version: {VERSION}")
@@ -159,7 +167,7 @@ class LauncherSettingsPage(BasePage):
         update_card.layout.addWidget(self.tester_warning_label)
         update_card.layout.addWidget(self.update_status_label)
         update_card.layout.addWidget(self.check_updates_button)
-        self.root_layout.addWidget(update_card)
+        runtime_section.add_card(update_card)
 
         appearance_card = CardWidget("Appearance", "PNG theme files are optional. Missing or invalid files automatically fall back to the built-in CSS interface.")
         self.theme_combo = QComboBox()
@@ -173,7 +181,7 @@ class LauncherSettingsPage(BasePage):
         appearance_card.layout.addWidget(self.theme_combo)
         appearance_card.layout.addWidget(self.show_static_text)
         appearance_card.layout.addWidget(reload_theme_button)
-        self.root_layout.addWidget(appearance_card)
+        appearance_section.add_card(appearance_card, span=2)
 
         self.save_button = set_theme_icon(QPushButton("Save launcher settings"), "icon.action.save")
         self.save_button.setObjectName("PrimaryButton")
