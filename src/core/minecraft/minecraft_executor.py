@@ -36,6 +36,7 @@ class MinecraftExecutor:
     def run(instance: Instance, authentication: Authentication, account: Account, debug_mode: bool = False, on_progress: ProgressCallback | None = None, on_exit: Callable[[GameExitResult], None] | None = None) -> dict:
         run_lock = InstanceRunLock.acquire(instance)
         process_started = False
+        lan_log_path = None
 
         try:
             reporter = ProgressReporter(on_progress)
@@ -44,8 +45,11 @@ class MinecraftExecutor:
 
             settings = SettingsManager.load(instance)
             lan_auth_mode = getattr(settings, "lan_auth_mode", "microsoft_only")
+            lan_log_path = LanAgentManager.prepare_log(instance, lan_auth_mode)
+            LanAgentManager.append_log_path(lan_log_path, "Launcher settings were loaded successfully.")
             if LanAgentManager.is_enabled(lan_auth_mode):
                 LanHostingManager.disable_legacy_auth_bridges(instance)
+                LanAgentManager.append_log_path(lan_log_path, "Legacy LAN authentication bridges were checked and disabled if present.")
             download_pause_controller.raise_if_requested()
             block_managed_failure = bool(getattr(settings, "block_launch_on_modrinth_failure", True))
             modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_managed_failure)
@@ -83,22 +87,28 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.BUILDING_COMMAND, message="Building launch command...")
-            lan_runtime_arguments = LanAgentManager.runtime_arguments(version, lan_auth_mode)
+            lan_runtime_arguments = LanAgentManager.runtime_arguments(version, lan_auth_mode, instance)
             if lan_runtime_arguments:
                 command = LauncherManager.build(version, context, settings, account, runtime_jvm_arguments=lan_runtime_arguments)
             else:
                 command = LauncherManager.build(version, context, settings, account)
+            LanAgentManager.append_log_path(
+                lan_log_path,
+                f"Launch command built; agent attached: {bool(lan_runtime_arguments)}; main class: {getattr(version, 'main_class', 'unknown')}",
+            )
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.SELECTING_JAVA, message="Selecting Java runtime...")
             java_major = version.java_version.get("majorVersion") or 8
             java = JavaResolver.resolve(java_major, reporter)
+            LanAgentManager.append_log_path(lan_log_path, f"Java selected: {java} (major {java_major}).")
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.LAUNCHING, message=f"Launching Minecraft {version.id}...")
             started_at = datetime.now(timezone.utc)
             process = JavaRuntime.run(java, command, instance)
             process_started = True
+            LanAgentManager.append_log_path(lan_log_path, f"Minecraft process started; pid={getattr(process, 'pid', 'unknown')}.")
             run_lock.track_process(process)
             GameRuntimeManager.watch(process, instance, version.id, started_at, on_exit)
             reporter.status(stage=ProgressStage.FINISHED, message=f"Minecraft {version.id} launched successfully.")
@@ -120,7 +130,12 @@ class MinecraftExecutor:
             if warnings:
                 result["warnings"] = warnings
             return result
-        except Exception:
+        except Exception as error:
+            if lan_log_path is not None:
+                LanAgentManager.append_log_path(
+                    lan_log_path,
+                    f"Launcher aborted: {type(error).__name__}: {error}",
+                )
             if not process_started:
                 run_lock.release()
             raise

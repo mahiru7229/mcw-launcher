@@ -24,6 +24,7 @@ Khi Private Group được bật, command có thêm:
 -Dmcw.lan.offline=true
 -Dmcw.lan.target.class=net/minecraft/server/MinecraftServer
 -Dmcw.lan.target.method=setUsesAuthentication
+-Dmcw.lan.log=<instance>/logs/mcw-lan-agent.log
 -javaagent:<cache>/runtime/agents/mcw-lan-agent/mcw-lan-agent.jar
 ```
 
@@ -59,13 +60,17 @@ JAR agent được bundle trong launcher, kiểm tra SHA-256 trước khi sao ch
 3. Chọn **Manual connection** hoặc **e4mc tunnel**.
 4. Nhấn **Prepare hosting support**.
 5. Khởi chạy Minecraft và mở world ra LAN như bình thường.
-6. Kiểm tra log game có dòng:
+6. Trong **Instance Settings → LAN hosting**, nhấn **Xem log MCW Agent**.
+7. Kiểm tra log riêng có dòng:
 
 ```text
 [MCW LAN Agent] patched net.minecraft.server.MinecraftServer#setUsesAuthentication(boolean)
+[MCW LAN Agent] shutdown summary: LAN Offline Mode patch was applied successfully
 ```
 
-7. Chỉ chia sẻ địa chỉ với người đáng tin.
+Log riêng nằm tại `instances/<tên instance>/logs/mcw-lan-agent.log` và được làm mới ở mỗi lần launch host. Nếu class mục tiêu không được load hoặc setter không khớp, log sẽ ghi rõ trạng thái fail-safe thay vì chỉ để lại lỗi `Invalid session` ở guest.
+
+8. Chỉ chia sẻ địa chỉ với người đáng tin.
 
 ### Phạm vi Beta
 
@@ -78,7 +83,7 @@ JAR agent được bundle trong launcher, kiểm tra SHA-256 trước khi sao ch
 ### Kiểm thử
 
 ```text
-812 passed, 48 skipped
+813 passed, 48 skipped
 ```
 
 Java Agent smoke test:
@@ -116,6 +121,7 @@ Private Group adds these launch arguments:
 -Dmcw.lan.offline=true
 -Dmcw.lan.target.class=net/minecraft/server/MinecraftServer
 -Dmcw.lan.target.method=setUsesAuthentication
+-Dmcw.lan.log=<instance>/logs/mcw-lan-agent.log
 -javaagent:<cache>/runtime/agents/mcw-lan-agent/mcw-lan-agent.jar
 ```
 
@@ -151,13 +157,17 @@ The agent JAR is bundled with the launcher, SHA-256 verified before being copied
 3. Select **Manual connection** or **e4mc tunnel**.
 4. Click **Prepare hosting support**.
 5. Launch Minecraft and open the world to LAN normally.
-6. Confirm the game log contains:
+6. Under **Instance Settings → LAN hosting**, click **View MCW Agent log**.
+7. Confirm the dedicated log contains:
 
 ```text
 [MCW LAN Agent] patched net.minecraft.server.MinecraftServer#setUsesAuthentication(boolean)
+[MCW LAN Agent] shutdown summary: LAN Offline Mode patch was applied successfully
 ```
 
-7. Share the address only with trusted people.
+The dedicated file is stored at `instances/<instance name>/logs/mcw-lan-agent.log` and is reset for each host launch. When the target class is never loaded or the setter shape does not match, the log records the fail-safe result instead of leaving only an `Invalid session` message on the guest.
+
+8. Share the address only with trusted people.
 
 ### Beta scope
 
@@ -170,7 +180,7 @@ The agent JAR is bundled with the launcher, SHA-256 verified before being copied
 ### Tests
 
 ```text
-812 passed, 48 skipped
+813 passed, 48 skipped
 ```
 
 Java Agent smoke test:

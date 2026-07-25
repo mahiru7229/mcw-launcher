@@ -819,12 +819,21 @@
     "lan.hosting.prepared.installed": "Đã cài: {projects}",
     "lan.hosting.prepared.reused": "Đã có sẵn: {projects}",
     "lan.hosting.prepared.disabled": "Đã tắt vì không còn được chọn: {projects}",
-    "lan.hosting.prepared.private_offline_steps": "Khởi chạy Minecraft từ instance này rồi mở world ra LAN như bình thường. MCW sẽ tự gắn LAN Agent đã xác minh và ép integrated server sang Offline Mode. Hãy tìm dòng “[MCW LAN Agent] patched” trong log game. Dữ liệu người chơi có thể dùng UUID khác, vì vậy hãy thử bằng world đã sao lưu trước.",
+    "lan.hosting.prepared.private_offline_steps": "Khởi chạy Minecraft từ instance này rồi mở world ra LAN như bình thường. MCW sẽ tự gắn LAN Agent đã xác minh và ép integrated server sang Offline Mode. Hãy tìm dòng “[MCW LAN Agent] patched” trong log game. Dữ liệu người chơi có thể dùng UUID khác, vì vậy hãy thử bằng world đã sao lưu trước. Dùng nút Xem log MCW Agent trong Cài đặt instance để kiểm tra class mục tiêu đã được tìm thấy và patch hay chưa.",
     "lan.hosting.prepared.microsoft_steps": "Mở world ra LAN như bình thường. Việc xác minh phiên Microsoft vẫn được bật.",
     "lan.hosting.prepared.e4mc_steps": "e4mc sẽ hiển thị domain công khai sau khi world được mở ra LAN. Chỉ chia sẻ domain với người đáng tin.",
     "lan.hosting.prepared.manual_steps": "Dùng địa chỉ LAN, địa chỉ VPN riêng, mở port hoặc địa chỉ relay riêng để kết nối.",
     "lan.hosting.error.unsupported_auth": "Chính sách xác thực LAN không được hỗ trợ.",
-    "lan.hosting.error.unsupported_connection": "Phương thức kết nối LAN không được hỗ trợ."
+    "lan.hosting.error.unsupported_connection": "Phương thức kết nối LAN không được hỗ trợ.",
+    "lan.agent.log.title": "Log MCW LAN Agent",
+    "lan.agent.log.description": "File này chỉ chứa chẩn đoán lúc MCW LAN Agent khởi động, tìm class mục tiêu, áp dụng patch và kết thúc. Hãy làm mới sau khi launch instance host.",
+    "lan.agent.log.path": "File log: {path}",
+    "lan.agent.log.open_file": "Mở file log",
+    "lan.agent.log.open_folder": "Mở thư mục log",
+    "lan.agent.log.not_found": "Chưa có log MCW LAN Agent. Hãy lưu chế độ Private LAN, launch instance này làm host rồi mở lại cửa sổ này.",
+    "lan.agent.log.read_error": "Không thể đọc log MCW LAN Agent: {error}",
+    "lan.agent.log.select_instance": "Hãy chọn một instance trước.",
+    "lan.agent.log.view": "Xem log MCW Agent"
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",
@@ -876,6 +885,7 @@
     "Prepare hosting support": "lan.hosting.prepare",
     "Unsupported LAN authentication policy.": "lan.hosting.error.unsupported_auth",
     "Unsupported LAN connection provider.": "lan.hosting.error.unsupported_connection",
-    "Authentication policy and connection transport are configured separately. Private LAN uses the bundled MCW LAN Agent; no custom authentication service is used.": "lan.hosting.subtitle"
+    "Authentication policy and connection transport are configured separately. Private LAN uses the bundled MCW LAN Agent; no custom authentication service is used.": "lan.hosting.subtitle",
+    "View MCW Agent log": "lan.agent.log.view"
   }
 }

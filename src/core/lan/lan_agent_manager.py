@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 import hashlib
 import os
@@ -9,6 +10,7 @@ import sys
 import zipfile
 
 from src.core.fs.paths import Paths
+from src.models.instance.instance import Instance
 from src.models.minecraft.version import Version
 
 
@@ -29,7 +31,8 @@ class LanAgentManager:
 
     AUTH_PRIVATE_OFFLINE = "private_offline"
     AGENT_FILENAME = "mcw-lan-agent.jar"
-    AGENT_SHA256 = "2ef0a5a6bb92d137a1075010468780ad3b5f9f654da0d08f6642bb67018f88e4"
+    AGENT_LOG_FILENAME = "mcw-lan-agent.log"
+    AGENT_SHA256 = "c6c39033c85d8b111411ac1a0afb67f4b717a91af532befd8c3379f8c03667cc"
     TARGET_CLASS = "net/minecraft/server/MinecraftServer"
     TARGET_METHOD = "setUsesAuthentication"
     TARGET_DESCRIPTOR = "(Z)V"
@@ -63,18 +66,88 @@ class LanAgentManager:
         return LanAgentInstallResult(path=destination, installed=True)
 
     @classmethod
-    def runtime_arguments(cls, version: Version, auth_mode: object) -> list[str]:
+    def runtime_arguments(cls, version: Version, auth_mode: object, instance: Instance) -> list[str]:
+        path = cls.log_path(instance)
+        if not path.is_file():
+            path = cls.prepare_log(instance, auth_mode)
         if not cls.is_enabled(auth_mode):
+            cls.append_log_path(path, f"Agent not attached because LAN authentication mode is {auth_mode!r}.")
             return []
 
-        cls._verify_supported_client(version)
-        installation = cls.install()
-        return [
-            "-Dmcw.lan.offline=true",
-            f"-Dmcw.lan.target.class={cls.TARGET_CLASS}",
-            f"-Dmcw.lan.target.method={cls.TARGET_METHOD}",
-            f"-javaagent:{installation.path}",
-        ]
+        cls.append_log_path(path, "Private LAN mode is enabled; validating the MCW LAN Agent.")
+        try:
+            cls._verify_supported_client(version)
+            cls.append_log_path(path, f"Minecraft client compatibility check passed for {version.id}.")
+            installation = cls.install()
+            cls.append_log_path(
+                path,
+                f"Agent {'installed' if installation.installed else 'reused'}: {installation.path.resolve()}",
+            )
+            arguments = [
+                "-Dmcw.lan.offline=true",
+                f"-Dmcw.lan.target.class={cls.TARGET_CLASS}",
+                f"-Dmcw.lan.target.method={cls.TARGET_METHOD}",
+                f"-Dmcw.lan.log={path.resolve().as_posix()}",
+                f"-javaagent:{installation.path}",
+            ]
+            cls.append_log_path(path, "Agent JVM arguments were prepared successfully.")
+            return arguments
+        except Exception as error:
+            cls.append_log_path(path, f"ERROR while preparing the agent: {type(error).__name__}: {error}")
+            raise
+
+    @classmethod
+    def log_path(cls, instance: Instance) -> Path:
+        instance_dir = Path(getattr(instance, "instance_dir", Paths.load_instance_dir(instance.name)))
+        directory = instance_dir / "logs"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory / cls.AGENT_LOG_FILENAME
+
+    @classmethod
+    def prepare_log(cls, instance: Instance, auth_mode: object = "unknown") -> Path:
+        path = cls.log_path(instance)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+        bundled_path = cls._bundled_agent_path()
+        runtime_path = cls.runtime_agent_path()
+        path.write_text(
+            "[MCW Launcher] MCW LAN Agent launch diagnostics\n"
+            f"[MCW Launcher] Started: {timestamp}\n"
+            f"[MCW Launcher] Instance: {instance.name}\n"
+            f"[MCW Launcher] Instance directory: {Path(getattr(instance, 'instance_dir', Paths.load_instance_dir(instance.name))).resolve()}\n"
+            f"[MCW Launcher] LAN authentication mode: {auth_mode}\n"
+            f"[MCW Launcher] Agent requested: {cls.is_enabled(auth_mode)}\n"
+            f"[MCW Launcher] Launcher mode: {'frozen executable' if getattr(sys, 'frozen', False) else 'source'}\n"
+            f"[MCW Launcher] Bundled agent: {bundled_path.resolve()}\n"
+            f"[MCW Launcher] Runtime agent: {runtime_path.resolve()}\n"
+            f"[MCW Launcher] Target: {cls.TARGET_CLASS.replace('/', '.')}#{cls.TARGET_METHOD}{cls.TARGET_DESCRIPTOR}\n",
+            encoding="utf-8",
+        )
+        return path
+
+    @classmethod
+    def append_log(cls, instance: Instance, message: str) -> None:
+        cls.append_log_path(cls.log_path(instance), message)
+
+    @staticmethod
+    def append_log_path(path: Path, message: str) -> None:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+            with path.open("a", encoding="utf-8") as stream:
+                stream.write(f"[MCW Launcher] {timestamp} {message}\n")
+        except OSError:
+            return
+
+    @classmethod
+    def read_log(cls, instance: Instance) -> str:
+        path = cls.log_path(instance)
+        if not path.is_file():
+            return ""
+        try:
+            return path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ""
 
     @classmethod
     def sanitize_user_jvm_arguments(cls, arguments: list[str]) -> list[str]:

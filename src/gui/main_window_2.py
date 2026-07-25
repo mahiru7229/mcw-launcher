@@ -13,6 +13,7 @@ from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.language.language_manager import language_manager, tr
+from src.core.lan.lan_agent_manager import LanAgentManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.network.download_pause import is_download_paused
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
@@ -38,6 +39,7 @@ from src.gui.controllers.update_controller import UpdateController
 from src.gui.dialogs.compatible_instance_dialog import CompatibleInstanceDialog
 from src.gui.dialogs.curseforge_browser_dialog import CurseForgeBrowserDialog
 from src.gui.dialogs.curseforge_manual_download_dialog import CurseForgeManualDownloadDialog
+from src.gui.dialogs.lan_agent_log_dialog import LanAgentLogDialog
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
 from src.gui.dialogs.update_dialog import UpdateDialog
@@ -279,6 +281,7 @@ class MainWindow(QMainWindow):
         self.instance_settings_page.load_requested.connect(self._request_instance_settings_load)
         self.instance_settings_page.save_requested.connect(self.instance_settings_controller.save)
         self.instance_settings_page.lan_prepare_requested.connect(self._request_lan_hosting_prepare)
+        self.instance_settings_page.lan_agent_log_requested.connect(self._open_lan_agent_log)
         self.instance_settings_page.dirty_changed.connect(lambda dirty: self.sidebar.set_page_dirty("instance_settings", dirty))
 
         self.launcher_settings_page.save_requested.connect(self.gui_settings_controller.save)
@@ -954,6 +957,19 @@ class MainWindow(QMainWindow):
 
         self.instance_settings_page.set_lan_prepare_status(tr("lan.hosting.preparing"))
         self.lan_hosting_controller.prepare(instance_name, auth_mode, connection_provider)
+
+    def _open_lan_agent_log(self, instance_name: str) -> None:
+        name = str(instance_name).strip()
+        if not name:
+            QMessageBox.information(self, tr("lan.agent.log.title"), tr("lan.agent.log.select_instance"))
+            return
+        try:
+            instance = InstanceManager.load(name)
+            log_path = LanAgentManager.log_path(instance)
+        except Exception as error:
+            self._show_error(tr("lan.agent.log.title"), str(error))
+            return
+        LanAgentLogDialog(log_path, self).exec()
 
     def _on_lan_hosting_prepared(self, result: object) -> None:
         installed = tuple(getattr(result, "installed_projects", ()) or ())

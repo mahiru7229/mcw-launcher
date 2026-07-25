@@ -13,6 +13,10 @@ def make_version() -> SimpleNamespace:
     return SimpleNamespace(id="26.2", raw_json={})
 
 
+def make_instance() -> SimpleNamespace:
+    return SimpleNamespace(name="Pack")
+
+
 def write_supported_client(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = b"class-data:setUsesAuthentication:(Z)V"
@@ -49,13 +53,17 @@ def test_runtime_arguments_are_emitted_only_for_private_offline(tmp_path: Path, 
     monkeypatch.setattr(Paths, "client", staticmethod(lambda _version: client))
     monkeypatch.setattr(LanAgentManager, "install", classmethod(lambda cls: LanAgentInstallResult(installed, False)))
 
-    assert LanAgentManager.runtime_arguments(make_version(), "microsoft_only") == []
-    arguments = LanAgentManager.runtime_arguments(make_version(), "private_offline")
+    agent_log = tmp_path / "logs" / LanAgentManager.AGENT_LOG_FILENAME
+    monkeypatch.setattr(LanAgentManager, "prepare_log", classmethod(lambda cls, _instance: agent_log))
+
+    assert LanAgentManager.runtime_arguments(make_version(), "microsoft_only", make_instance()) == []
+    arguments = LanAgentManager.runtime_arguments(make_version(), "private_offline", make_instance())
 
     assert arguments == [
         "-Dmcw.lan.offline=true",
         f"-Dmcw.lan.target.class={LanAgentManager.TARGET_CLASS}",
         f"-Dmcw.lan.target.method={LanAgentManager.TARGET_METHOD}",
+        f"-Dmcw.lan.log={agent_log.resolve().as_posix()}",
         f"-javaagent:{installed}",
     ]
 
@@ -67,7 +75,24 @@ def test_runtime_arguments_fail_safe_for_unsupported_client(tmp_path: Path, monk
     monkeypatch.setattr(Paths, "client", staticmethod(lambda _version: client))
 
     with pytest.raises(RuntimeError, match="experimental"):
-        LanAgentManager.runtime_arguments(make_version(), "private_offline")
+        LanAgentManager.runtime_arguments(make_version(), "private_offline", make_instance())
+
+
+def test_prepare_log_replaces_previous_run_and_read_log_returns_content(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "logs" / LanAgentManager.AGENT_LOG_FILENAME
+    path.parent.mkdir(parents=True)
+    path.write_text("stale log", encoding="utf-8")
+    instance = make_instance()
+    monkeypatch.setattr(LanAgentManager, "log_path", classmethod(lambda cls, _instance: path))
+
+    prepared = LanAgentManager.prepare_log(instance)
+
+    assert prepared == path
+    text = LanAgentManager.read_log(instance)
+    assert "stale log" not in text
+    assert "MCW LAN Agent launch diagnostics" in text
+    assert "Instance: Pack" in text
+    assert "MinecraftServer#setUsesAuthentication(Z)V" in text
 
 
 def test_sanitize_user_arguments_removes_only_mcw_agent_overrides() -> None:

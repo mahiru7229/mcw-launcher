@@ -117,3 +117,14 @@ def test_lan_hosting_profile_serializes_auth_and_connection_separately(gui_app) 
     assert data["lan_auth_mode"] == "private_offline"
     assert data["lan_connection_provider"] == "e4mc"
     assert "trusted" in page.lan_security_label.text().lower()
+
+
+def test_lan_agent_log_button_emits_loaded_instance(gui_app) -> None:
+    page = InstanceSettingsPage()
+    page.set_settings("Pack", make_settings(True))
+    emitted: list[str] = []
+    page.lan_agent_log_requested.connect(emitted.append)
+
+    page.lan_agent_log_button.click()
+
+    assert emitted == ["Pack"]

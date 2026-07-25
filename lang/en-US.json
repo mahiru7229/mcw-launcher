@@ -819,12 +819,21 @@
     "lan.hosting.prepared.installed": "Installed: {projects}",
     "lan.hosting.prepared.reused": "Already ready: {projects}",
     "lan.hosting.prepared.disabled": "Disabled because they are no longer selected: {projects}",
-    "lan.hosting.prepared.private_offline_steps": "Launch Minecraft from this instance and open the world to LAN normally. MCW automatically attaches the verified LAN Agent and forces the integrated server to Offline Mode. Look for “[MCW LAN Agent] patched” in the game log. Player data may use different UUIDs, so test with a backup first.",
+    "lan.hosting.prepared.private_offline_steps": "Launch Minecraft from this instance and open the world to LAN normally. MCW automatically attaches the verified LAN Agent and forces the integrated server to Offline Mode. Look for “[MCW LAN Agent] patched” in the game log. Player data may use different UUIDs, so test with a backup first. Use View MCW Agent log in Instance Settings to inspect whether the target class was found and patched.",
     "lan.hosting.prepared.microsoft_steps": "Open the world to LAN normally. Microsoft session verification remains enabled.",
     "lan.hosting.prepared.e4mc_steps": "e4mc will display a public domain after the world is opened to LAN. Share that domain only with trusted players.",
     "lan.hosting.prepared.manual_steps": "Use the LAN address, a private VPN address, port forwarding, or your own relay address to connect.",
     "lan.hosting.error.unsupported_auth": "Unsupported LAN authentication policy.",
-    "lan.hosting.error.unsupported_connection": "Unsupported LAN connection provider."
+    "lan.hosting.error.unsupported_connection": "Unsupported LAN connection provider.",
+    "lan.agent.log.title": "MCW LAN Agent log",
+    "lan.agent.log.description": "This file contains only MCW LAN Agent startup, target-class, patch, and shutdown diagnostics. Refresh it after launching the host instance.",
+    "lan.agent.log.path": "Log file: {path}",
+    "lan.agent.log.open_file": "Open log file",
+    "lan.agent.log.open_folder": "Open log folder",
+    "lan.agent.log.not_found": "No MCW LAN Agent log exists yet. Save Private LAN mode, launch this instance as the host, then open this window again.",
+    "lan.agent.log.read_error": "The MCW LAN Agent log could not be read: {error}",
+    "lan.agent.log.select_instance": "Select an instance first.",
+    "lan.agent.log.view": "View MCW Agent log"
   },
   "aliases": {
     "MCW Launcher": "app.name",
@@ -1344,6 +1353,7 @@
     "Prepare hosting support": "lan.hosting.prepare",
     "Unsupported LAN authentication policy.": "lan.hosting.error.unsupported_auth",
     "Unsupported LAN connection provider.": "lan.hosting.error.unsupported_connection",
-    "Authentication policy and connection transport are configured separately. Private LAN uses the bundled MCW LAN Agent; no custom authentication service is used.": "lan.hosting.subtitle"
+    "Authentication policy and connection transport are configured separately. Private LAN uses the bundled MCW LAN Agent; no custom authentication service is used.": "lan.hosting.subtitle",
+    "View MCW Agent log": "lan.agent.log.view"
   }
 }

@@ -117,10 +117,12 @@ def verify_agent(agent_jar: Path) -> None:
         run([javac, "--release", "8", "-d", str(root), str(server_source), str(main_source)])
 
         normal = subprocess.run([java, "-cp", str(root), "AgentSmokeTest"], check=True, capture_output=True, text=True)
+        agent_log = root / "mcw-lan-agent.log"
         patched = subprocess.run(
             [
                 java,
                 "-Dmcw.lan.offline=true",
+                f"-Dmcw.lan.log={agent_log.as_posix()}",
                 f"-javaagent:{agent_jar}",
                 "-cp",
                 str(root),
@@ -136,6 +138,17 @@ def verify_agent(agent_jar: Path) -> None:
             raise RuntimeError(f"Agent smoke test failed: stdout={patched.stdout!r}, stderr={patched.stderr!r}")
         if "patched net.minecraft.server.MinecraftServer#setUsesAuthentication(boolean)" not in patched.stderr:
             raise RuntimeError(f"Agent did not report a successful patch: {patched.stderr!r}")
+        log_text = agent_log.read_text(encoding="utf-8")
+        expected_log_messages = (
+            "premain entered",
+            "enabled for net.minecraft.server.MinecraftServer#setUsesAuthentication(boolean)",
+            "target class loaded by",
+            "patched net.minecraft.server.MinecraftServer#setUsesAuthentication(boolean)",
+            "shutdown summary: LAN Offline Mode patch was applied successfully",
+        )
+        missing = [message for message in expected_log_messages if message not in log_text]
+        if missing:
+            raise RuntimeError(f"Dedicated agent log is incomplete; missing={missing!r}, log={log_text!r}")
 
 
 if __name__ == "__main__":

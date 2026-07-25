@@ -918,7 +918,7 @@ def test_private_lan_attaches_agent_and_disables_legacy_auth_bridge(monkeypatch:
 
     monkeypatch.setattr(SettingsManager, "load", lambda _instance: settings)
     monkeypatch.setattr(LanHostingManager, "disable_legacy_auth_bridges", staticmethod(lambda received: events.append(("cleanup", received)) or ()))
-    monkeypatch.setattr(LanAgentManager, "runtime_arguments", classmethod(lambda cls, version, mode: events.append(("agent", version, mode)) or runtime_arguments))
+    monkeypatch.setattr(LanAgentManager, "runtime_arguments", classmethod(lambda cls, version, mode, received_instance: events.append(("agent", version, mode, received_instance)) or runtime_arguments))
 
     def build(version, context, received_settings, account, runtime_jvm_arguments=None):
         events.append(("command", runtime_jvm_arguments))
@@ -929,5 +929,5 @@ def test_private_lan_attaches_agent_and_disables_legacy_auth_bridge(monkeypatch:
     MinecraftExecutor.run(instance=instance, authentication=object(), account=object())
 
     assert events[0] == ("cleanup", instance)
-    assert events[1] == ("agent", pipeline["version"], "private_offline")
+    assert events[1] == ("agent", pipeline["version"], "private_offline", instance)
     assert events[2] == ("command", runtime_arguments)

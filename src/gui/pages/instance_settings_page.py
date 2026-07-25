@@ -14,6 +14,7 @@ class InstanceSettingsPage(BasePage):
     load_requested = Signal(str)
     save_requested = Signal(str, dict)
     lan_prepare_requested = Signal(str, str, str)
+    lan_agent_log_requested = Signal(str)
     dirty_changed = Signal(bool)
 
     def __init__(self, total_memory_mb: int | None = None) -> None:
@@ -127,7 +128,9 @@ class InstanceSettingsPage(BasePage):
         self.lan_prepare_status.setObjectName("CardSubtitle")
         self.lan_prepare_status.setWordWrap(True)
         self.lan_prepare_button = set_theme_icon(QPushButton("Prepare hosting support"), "icon.action.download")
+        self.lan_agent_log_button = set_theme_icon(QPushButton("View MCW Agent log"), "icon.action.folder")
         self.lan_prepare_button.clicked.connect(self.request_lan_prepare)
+        self.lan_agent_log_button.clicked.connect(self.request_lan_agent_log)
         hosting_card.layout.addWidget(QLabel("Authentication policy"))
         hosting_card.layout.addWidget(self.lan_auth_mode)
         hosting_card.layout.addWidget(QLabel("Connection provider"))
@@ -135,6 +138,7 @@ class InstanceSettingsPage(BasePage):
         hosting_card.layout.addWidget(self.lan_security_label)
         hosting_card.layout.addWidget(self.lan_prepare_status)
         hosting_card.layout.addWidget(self.lan_prepare_button)
+        hosting_card.layout.addWidget(self.lan_agent_log_button)
         self.root_layout.addWidget(hosting_card)
         self.lan_auth_mode.currentIndexChanged.connect(self._update_lan_help)
         self.lan_connection_provider.currentIndexChanged.connect(self._update_lan_help)
@@ -265,6 +269,10 @@ class InstanceSettingsPage(BasePage):
             str(self.lan_connection_provider.currentData() or "manual"),
         )
 
+    def request_lan_agent_log(self) -> None:
+        instance_name = self._loaded_instance_name or self.current_instance_name()
+        self.lan_agent_log_requested.emit(instance_name)
+
     def set_lan_prepare_status(self, message: str) -> None:
         self.lan_prepare_status.setText(str(message))
 
@@ -285,6 +293,7 @@ class InstanceSettingsPage(BasePage):
         self.lan_connection_provider.setEnabled(enabled)
         self.save_button.setEnabled(enabled)
         self.lan_prepare_button.setEnabled(enabled)
+        self.lan_agent_log_button.setEnabled(enabled)
 
     def retranslate_dynamic(self) -> None:
         self._update_memory_labels()
