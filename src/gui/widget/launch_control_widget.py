@@ -31,6 +31,9 @@ class LaunchControlWidget(QFrame):
         self._status_message = "Ready"
         self._detail_message = "Select an account and an instance, then launch."
         self._stage_state: str | None = None
+        self._busy = False
+        self._launch_active = False
+        self._pause_pending = False
         self._build_ui()
 
     def _build_ui(self) -> None:

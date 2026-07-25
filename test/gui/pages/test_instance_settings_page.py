@@ -106,6 +106,14 @@ def test_memory_number_inputs_are_left_aligned(gui_app) -> None:
     assert page.max_memory_input.alignment() & Qt.AlignmentFlag.AlignLeft
 
 
+def test_game_window_labels_are_grouped_directly_above_inputs(gui_app) -> None:
+    page = InstanceSettingsPage()
+
+    assert page.window_width_label.parentWidget() is page.window_width.parentWidget()
+    assert page.window_height_label.parentWidget() is page.window_height.parentWidget()
+    assert page.window_size_row.spacing() == 10
+
+
 def test_lan_hosting_profile_serializes_auth_and_connection_separately(gui_app) -> None:
     page = InstanceSettingsPage()
     page.set_settings("Pack", make_settings(True))

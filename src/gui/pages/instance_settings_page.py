@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QSignalBlocker, Qt, Signal
-from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QLabel, QLineEdit, QPushButton, QSlider, QSpinBox, QTextEdit
+from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSlider, QSpinBox, QTextEdit, QVBoxLayout
 
 from src.core.language.language_manager import tr
 from src.core.system.memory import MemoryAllocationPolicy, SystemMemory
@@ -105,18 +105,34 @@ class InstanceSettingsPage(BasePage):
         self._apply_memory_values(MemoryAllocationPolicy.DEFAULT_MIN_MEMORY_MB, MemoryAllocationPolicy.DEFAULT_MAX_MEMORY_MB)
 
         window_card = CardWidget("Game window")
-        window_grid = QGridLayout()
         self.window_width = QSpinBox()
         self.window_height = QSpinBox()
         for spin_box in (self.window_width, self.window_height):
             spin_box.setRange(320, 7680)
+
+        self.window_width_label = QLabel("Width")
+        self.window_height_label = QLabel("Height")
+        width_field = QVBoxLayout()
+        width_field.setContentsMargins(0, 0, 0, 0)
+        width_field.setSpacing(6)
+        width_field.addWidget(self.window_width_label)
+        width_field.addWidget(self.window_width)
+        height_field = QVBoxLayout()
+        height_field.setContentsMargins(0, 0, 0, 0)
+        height_field.setSpacing(6)
+        height_field.addWidget(self.window_height_label)
+        height_field.addWidget(self.window_height)
+
+        self.window_size_row = QHBoxLayout()
+        self.window_size_row.setContentsMargins(0, 0, 0, 0)
+        self.window_size_row.setSpacing(10)
+        self.window_size_row.addLayout(width_field, 1)
+        self.window_size_row.addLayout(height_field, 1)
+
         self.fullscreen = QCheckBox("Launch in fullscreen")
-        window_grid.addWidget(QLabel("Width"), 0, 0)
-        window_grid.addWidget(self.window_width, 1, 0)
-        window_grid.addWidget(QLabel("Height"), 0, 1)
-        window_grid.addWidget(self.window_height, 1, 1)
-        window_card.layout.addLayout(window_grid)
+        window_card.layout.addLayout(self.window_size_row)
         window_card.layout.addWidget(self.fullscreen)
+        window_card.layout.addStretch(1)
         runtime_section.add_card(window_card)
 
         hosting_card = CardWidget(
