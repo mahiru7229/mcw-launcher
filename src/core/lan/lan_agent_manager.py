@@ -7,9 +7,10 @@ import hashlib
 import os
 import shutil
 import sys
-import zipfile
 
 from src.core.fs.paths import Paths
+from src.core.lan.lan_agent_target_resolver import LanAgentTargetResolver
+from src.core.progress.progress_reporter import ProgressReporter
 from src.models.instance.instance import Instance
 from src.models.minecraft.version import Version
 
@@ -32,7 +33,7 @@ class LanAgentManager:
     AUTH_PRIVATE_OFFLINE = "private_offline"
     AGENT_FILENAME = "mcw-lan-agent.jar"
     AGENT_LOG_FILENAME = "mcw-lan-agent.log"
-    AGENT_SHA256 = "c6c39033c85d8b111411ac1a0afb67f4b717a91af532befd8c3379f8c03667cc"
+    AGENT_SHA256 = "ba8a66ee3ec7f85901d0d9aa32788406d0078ecb92f7bb20cd3816d06227823b"
     TARGET_CLASS = "net/minecraft/server/MinecraftServer"
     TARGET_METHOD = "setUsesAuthentication"
     TARGET_DESCRIPTOR = "(Z)V"
@@ -66,7 +67,7 @@ class LanAgentManager:
         return LanAgentInstallResult(path=destination, installed=True)
 
     @classmethod
-    def runtime_arguments(cls, version: Version, auth_mode: object, instance: Instance) -> list[str]:
+    def runtime_arguments(cls, version: Version, auth_mode: object, instance: Instance, reporter: ProgressReporter | None = None) -> list[str]:
         path = cls.log_path(instance)
         if not path.is_file():
             path = cls.prepare_log(instance, auth_mode)
@@ -74,10 +75,28 @@ class LanAgentManager:
             cls.append_log_path(path, f"Agent not attached because LAN authentication mode is {auth_mode!r}.")
             return []
 
-        cls.append_log_path(path, "Private LAN mode is enabled; validating the MCW LAN Agent.")
+        cls.append_log_path(path, "Private LAN mode is enabled; resolving runtime mappings for the MCW LAN Agent.")
         try:
-            cls._verify_supported_client(version)
-            cls.append_log_path(path, f"Minecraft client compatibility check passed for {version.id}.")
+            resolution = LanAgentTargetResolver.resolve(version, instance, reporter)
+            cls.append_log_path(
+                path,
+                f"Mapping profile: Minecraft {resolution.game_version}; loader={resolution.loader}; candidates={len(resolution.targets)}.",
+            )
+            for warning in resolution.warnings:
+                cls.append_log_path(path, f"WARNING: {warning}")
+            for target in resolution.targets:
+                cls.append_log_path(
+                    path,
+                    f"Resolved target [{target.namespace}]: {target.class_name.replace('/', '.')}#{target.method_name}{cls.TARGET_DESCRIPTOR}",
+                )
+
+            if not resolution.targets:
+                cls.append_log_path(
+                    path,
+                    "Agent was not attached because this Minecraft version is outside the supported 1.17+ range. Minecraft will launch unchanged.",
+                )
+                return []
+
             installation = cls.install()
             cls.append_log_path(
                 path,
@@ -85,8 +104,7 @@ class LanAgentManager:
             )
             arguments = [
                 "-Dmcw.lan.offline=true",
-                f"-Dmcw.lan.target.class={cls.TARGET_CLASS}",
-                f"-Dmcw.lan.target.method={cls.TARGET_METHOD}",
+                f"-Dmcw.lan.targets={resolution.encoded_targets}",
                 f"-Dmcw.lan.log={path.resolve().as_posix()}",
                 f"-javaagent:{installation.path}",
             ]
@@ -120,7 +138,9 @@ class LanAgentManager:
             f"[MCW Launcher] Launcher mode: {'frozen executable' if getattr(sys, 'frozen', False) else 'source'}\n"
             f"[MCW Launcher] Bundled agent: {bundled_path.resolve()}\n"
             f"[MCW Launcher] Runtime agent: {runtime_path.resolve()}\n"
-            f"[MCW Launcher] Target: {cls.TARGET_CLASS.replace('/', '.')}#{cls.TARGET_METHOD}{cls.TARGET_DESCRIPTOR}\n",
+            f"[MCW Launcher] Named target aliases: {cls.TARGET_CLASS.replace('/', '.')}#setUsesAuthentication{cls.TARGET_DESCRIPTOR}; "
+            f"{cls.TARGET_CLASS.replace('/', '.')}#setOnlineMode{cls.TARGET_DESCRIPTOR}\n"
+            "[MCW Launcher] Runtime targets: resolved from Mojang/Fabric mappings during launch\n",
             encoding="utf-8",
         )
         return path
@@ -173,32 +193,6 @@ class LanAgentManager:
             bundle_root = Paths.root()
         return bundle_root / "runtime" / cls.AGENT_FILENAME
 
-    @classmethod
-    def _verify_supported_client(cls, version: Version) -> None:
-        client_path = Paths.client(version)
-        if not client_path.is_file():
-            raise RuntimeError("Minecraft client is missing; repair the instance before enabling Private LAN.")
-
-        class_entry = cls.TARGET_CLASS + ".class"
-        try:
-            with zipfile.ZipFile(client_path) as archive:
-                class_bytes = archive.read(class_entry)
-        except KeyError as error:
-            raise RuntimeError(
-                "Force LAN Offline Mode is experimental and this Minecraft runtime does not expose "
-                "the supported named MinecraftServer class. Use Microsoft-only LAN for this version "
-                "or test with Minecraft 26.2 while broader mapping support is developed."
-            ) from error
-        except (OSError, zipfile.BadZipFile) as error:
-            raise RuntimeError("Minecraft client JAR could not be inspected for LAN Agent compatibility.") from error
-
-        method_name = cls.TARGET_METHOD.encode("utf-8")
-        descriptor = cls.TARGET_DESCRIPTOR.encode("ascii")
-        if method_name not in class_bytes or descriptor not in class_bytes:
-            raise RuntimeError(
-                "The current MinecraftServer bytecode is not compatible with this MCW LAN Agent build. "
-                "Minecraft will not be patched; use Microsoft-only LAN for this version."
-            )
 
     @classmethod
     def _verify_file(cls, path: Path, label: str) -> None:

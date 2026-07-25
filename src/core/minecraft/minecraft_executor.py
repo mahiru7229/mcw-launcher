@@ -87,7 +87,7 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.BUILDING_COMMAND, message="Building launch command...")
-            lan_runtime_arguments = LanAgentManager.runtime_arguments(version, lan_auth_mode, instance)
+            lan_runtime_arguments = LanAgentManager.runtime_arguments(version, lan_auth_mode, instance, reporter)
             if lan_runtime_arguments:
                 command = LauncherManager.build(version, context, settings, account, runtime_jvm_arguments=lan_runtime_arguments)
             else:

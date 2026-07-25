@@ -2,18 +2,17 @@ package org.mcwlauncher.lanagent;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.security.ProtectionDomain;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 final class LanOfflineTransformer implements ClassFileTransformer {
-    private final String targetClassName;
-    private final String targetMethodName;
+    private final List<TargetSpec> targets;
     private final AtomicBoolean targetSeen = new AtomicBoolean(false);
     private final AtomicBoolean patched = new AtomicBoolean(false);
     private final AtomicBoolean patchFailed = new AtomicBoolean(false);
 
-    LanOfflineTransformer(String targetClassName, String targetMethodName) {
-        this.targetClassName = targetClassName;
-        this.targetMethodName = targetMethodName;
+    LanOfflineTransformer(List<TargetSpec> targets) {
+        this.targets = targets;
     }
 
     @Override
@@ -24,27 +23,38 @@ final class LanOfflineTransformer implements ClassFileTransformer {
         ProtectionDomain protectionDomain,
         byte[] classfileBuffer
     ) {
-        if (!targetClassName.equals(className) || classfileBuffer == null) {
+        if (className == null || classfileBuffer == null) {
             return null;
         }
 
-        targetSeen.set(true);
-        McwLanAgent.log("target class loaded by " + loaderName(loader) + ": " + className.replace('/', '.'));
-        try {
-            byte[] transformed = BooleanSetterPatcher.patch(classfileBuffer, targetMethodName);
-            if (transformed == null) {
-                patchFailed.set(true);
-                McwLanAgent.log("target class loaded, but the expected setter bytecode was not found; leaving Minecraft unchanged");
-                return null;
+        boolean matchedClass = false;
+        for (TargetSpec target : targets) {
+            if (!target.className.equals(className)) {
+                continue;
             }
-            patched.set(true);
-            McwLanAgent.log("patched " + className.replace('/', '.') + "#" + targetMethodName + "(boolean)");
-            return transformed;
-        } catch (RuntimeException exception) {
-            patchFailed.set(true);
-            McwLanAgent.log("patch failed safely: " + exception.getMessage());
-            return null;
+            matchedClass = true;
+            targetSeen.set(true);
+            McwLanAgent.log("target class loaded by " + loaderName(loader) + ": " + className.replace('/', '.'));
+            try {
+                byte[] transformed = BooleanSetterPatcher.patch(classfileBuffer, target.methodName);
+                if (transformed == null) {
+                    McwLanAgent.log("candidate method was not found: " + target.displayName());
+                    continue;
+                }
+                patched.set(true);
+                McwLanAgent.log("patched " + target.displayName());
+                return transformed;
+            } catch (RuntimeException exception) {
+                patchFailed.set(true);
+                McwLanAgent.log("patch candidate failed safely for " + target.displayName() + ": " + exception.getMessage());
+            }
         }
+
+        if (matchedClass) {
+            patchFailed.set(true);
+            McwLanAgent.log("target class loaded, but none of its resolved setter candidates matched; leaving Minecraft unchanged");
+        }
+        return null;
     }
 
     String shutdownSummary() {
@@ -52,9 +62,9 @@ final class LanOfflineTransformer implements ClassFileTransformer {
             return "shutdown summary: LAN Offline Mode patch was applied successfully";
         }
         if (targetSeen.get() || patchFailed.get()) {
-            return "shutdown summary: target class was found, but the patch was not applied; Minecraft stayed unchanged";
+            return "shutdown summary: a resolved target class was found, but the patch was not applied; Minecraft stayed unchanged";
         }
-        return "shutdown summary: target class was never loaded; the runtime class name or mapping may differ";
+        return "shutdown summary: none of the resolved target classes were loaded; runtime mappings may differ";
     }
 
     private static String loaderName(ClassLoader loader) {

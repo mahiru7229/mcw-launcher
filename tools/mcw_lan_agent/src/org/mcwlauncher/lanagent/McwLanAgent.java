@@ -8,23 +8,29 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Minimal host-side LAN agent used by MCW Launcher.
  *
  * <p>The agent is intentionally dormant unless {@code -Dmcw.lan.offline=true}
  * is present. It does not touch Authlib, tokens, networking, or Minecraft
- * files. Its only transformer targets
+ * files. Its only transformer targets the resolved runtime equivalents of
  * MinecraftServer#setUsesAuthentication(boolean) and forces the value written
  * by that setter to {@code false}.</p>
  */
 public final class McwLanAgent {
     static final String ENABLE_PROPERTY = "mcw.lan.offline";
+    static final String TARGETS_PROPERTY = "mcw.lan.targets";
     static final String TARGET_CLASS_PROPERTY = "mcw.lan.target.class";
     static final String TARGET_METHOD_PROPERTY = "mcw.lan.target.method";
     static final String LOG_PATH_PROPERTY = "mcw.lan.log";
     static final String DEFAULT_TARGET_CLASS = "net/minecraft/server/MinecraftServer";
     static final String DEFAULT_TARGET_METHOD = "setUsesAuthentication";
+    private static final int MAX_TARGETS = 12;
     private static final Object LOG_LOCK = new Object();
     private static boolean fileLogFailureReported;
 
@@ -38,14 +44,13 @@ public final class McwLanAgent {
             return;
         }
 
-        String targetClass = normalizeClassName(System.getProperty(TARGET_CLASS_PROPERTY, DEFAULT_TARGET_CLASS));
-        String targetMethod = System.getProperty(TARGET_METHOD_PROPERTY, DEFAULT_TARGET_METHOD).trim();
-        if (!isSafeMinecraftTarget(targetClass, targetMethod)) {
-            log("refused unsafe target configuration");
+        List<TargetSpec> targets = parseTargets();
+        if (targets.isEmpty()) {
+            log("refused empty or unsafe target configuration");
             return;
         }
 
-        final LanOfflineTransformer transformer = new LanOfflineTransformer(targetClass, targetMethod);
+        final LanOfflineTransformer transformer = new LanOfflineTransformer(targets);
         instrumentation.addTransformer(transformer, false);
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
             @Override
@@ -53,7 +58,54 @@ public final class McwLanAgent {
                 log(transformer.shutdownSummary());
             }
         }, "mcw-lan-agent-summary"));
-        log("enabled for " + targetClass.replace('/', '.') + "#" + targetMethod + "(boolean)");
+
+        log("enabled with " + targets.size() + " resolved target candidate(s)");
+        for (TargetSpec target : targets) {
+            log("candidate: " + target.displayName());
+        }
+    }
+
+    static List<TargetSpec> parseTargets() {
+        String configured = System.getProperty(TARGETS_PROPERTY, "").trim();
+        List<TargetSpec> result = new ArrayList<TargetSpec>();
+        Set<String> seen = new LinkedHashSet<String>();
+
+        if (!configured.isEmpty()) {
+            String[] entries = configured.split(";");
+            for (String entry : entries) {
+                if (result.size() >= MAX_TARGETS) {
+                    break;
+                }
+                int separator = entry.lastIndexOf('#');
+                if (separator <= 0 || separator >= entry.length() - 1) {
+                    continue;
+                }
+                addTarget(result, seen, entry.substring(0, separator), entry.substring(separator + 1));
+            }
+        }
+
+        if (result.isEmpty()) {
+            addTarget(
+                result,
+                seen,
+                System.getProperty(TARGET_CLASS_PROPERTY, DEFAULT_TARGET_CLASS),
+                System.getProperty(TARGET_METHOD_PROPERTY, DEFAULT_TARGET_METHOD)
+            );
+        }
+        return result;
+    }
+
+    private static void addTarget(List<TargetSpec> targets, Set<String> seen, String rawClassName, String rawMethodName) {
+        String className = normalizeClassName(rawClassName);
+        String methodName = rawMethodName == null ? "" : rawMethodName.trim();
+        if (!isSafeMinecraftTarget(className, methodName)) {
+            log("ignored unsafe target candidate");
+            return;
+        }
+        String key = className + "#" + methodName;
+        if (seen.add(key)) {
+            targets.add(new TargetSpec(className, methodName));
+        }
     }
 
     static String normalizeClassName(String value) {
@@ -61,8 +113,9 @@ public final class McwLanAgent {
     }
 
     static boolean isSafeMinecraftTarget(String className, String methodName) {
-        return className.startsWith("net/minecraft/")
-            && className.length() <= 240
+        boolean namedOrIntermediary = className.startsWith("net/minecraft/") && className.length() <= 240;
+        boolean officialObfuscated = className.matches("[A-Za-z_$][A-Za-z0-9_$]{0,31}");
+        return (namedOrIntermediary || officialObfuscated)
             && methodName.matches("[A-Za-z_$][A-Za-z0-9_$]{0,127}");
     }
 

@@ -1,27 +1,19 @@
 from pathlib import Path
 from types import SimpleNamespace
 import hashlib
-import zipfile
 
 import pytest
 
-from src.core.fs.paths import Paths
 from src.core.lan.lan_agent_manager import LanAgentInstallResult, LanAgentManager
+from src.core.lan.lan_agent_target_resolver import LanAgentTarget, LanAgentTargetResolution, LanAgentTargetResolver
 
 
-def make_version() -> SimpleNamespace:
-    return SimpleNamespace(id="26.2", raw_json={})
+def make_version(version_id: str = "26.2") -> SimpleNamespace:
+    return SimpleNamespace(id=version_id, raw_json={}, downloads={}, libraries=[])
 
 
-def make_instance() -> SimpleNamespace:
-    return SimpleNamespace(name="Pack")
-
-
-def write_supported_client(path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = b"class-data:setUsesAuthentication:(Z)V"
-    with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr(LanAgentManager.TARGET_CLASS + ".class", payload)
+def make_instance(tmp_path: Path, version_id: str = "26.2", loader: str = "fabric") -> SimpleNamespace:
+    return SimpleNamespace(name="Pack", instance_dir=tmp_path / "Pack", version_id=version_id, mod_loader=(loader, "test"))
 
 
 def test_bundled_agent_matches_pinned_sha256() -> None:
@@ -47,45 +39,65 @@ def test_install_copies_verified_agent_atomically(tmp_path: Path, monkeypatch: p
 
 
 def test_runtime_arguments_are_emitted_only_for_private_offline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    client = tmp_path / "client.jar"
-    write_supported_client(client)
-
     installed = tmp_path / "mcw-lan-agent.jar"
     agent_log = tmp_path / "logs" / LanAgentManager.AGENT_LOG_FILENAME
+    instance = make_instance(tmp_path, "1.20.1")
+    resolution = LanAgentTargetResolution(
+        game_version="1.20.1",
+        loader="fabric",
+        targets=(
+            LanAgentTarget("intermediary", "net/minecraft/server/MinecraftServer", "method_3864"),
+            LanAgentTarget("official", "net/minecraft/server/MinecraftServer", "d"),
+        ),
+    )
 
-    monkeypatch.setattr(Paths, "client", staticmethod(lambda _version: client))
     monkeypatch.setattr(LanAgentManager, "install", classmethod(lambda cls: LanAgentInstallResult(installed, False)))
     monkeypatch.setattr(LanAgentManager, "log_path", classmethod(lambda cls, _instance: agent_log))
     monkeypatch.setattr(LanAgentManager, "prepare_log", classmethod(lambda cls, _instance, _auth_mode=None: agent_log))
+    monkeypatch.setattr(LanAgentTargetResolver, "resolve", classmethod(lambda cls, _version, _instance, _reporter=None: resolution))
 
-    assert LanAgentManager.runtime_arguments(make_version(), "microsoft_only", make_instance()) == []
-
-    arguments = LanAgentManager.runtime_arguments(make_version(), "private_offline", make_instance())
+    assert LanAgentManager.runtime_arguments(make_version("1.20.1"), "microsoft_only", instance) == []
+    arguments = LanAgentManager.runtime_arguments(make_version("1.20.1"), "private_offline", instance)
 
     assert arguments == [
         "-Dmcw.lan.offline=true",
-        f"-Dmcw.lan.target.class={LanAgentManager.TARGET_CLASS}",
-        f"-Dmcw.lan.target.method={LanAgentManager.TARGET_METHOD}",
+        "-Dmcw.lan.targets=net/minecraft/server/MinecraftServer#method_3864;net/minecraft/server/MinecraftServer#d",
         f"-Dmcw.lan.log={agent_log.resolve().as_posix()}",
         f"-javaagent:{installed}",
     ]
 
 
-def test_runtime_arguments_fail_safe_for_unsupported_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    client = tmp_path / "client.jar"
-    with zipfile.ZipFile(client, "w") as archive:
-        archive.writestr("a/b.class", b"unknown")
-    monkeypatch.setattr(Paths, "client", staticmethod(lambda _version: client))
+def test_runtime_arguments_skip_unsupported_legacy_version_without_blocking_launch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    agent_log = tmp_path / "logs" / LanAgentManager.AGENT_LOG_FILENAME
+    instance = make_instance(tmp_path, "1.16.5")
+    resolution = LanAgentTargetResolution(
+        game_version="1.16.5",
+        loader="fabric",
+        targets=(),
+        warnings=("MCW LAN Agent supports Minecraft 1.17 or newer.",),
+    )
+    install_called = False
 
-    with pytest.raises(RuntimeError, match="experimental"):
-        LanAgentManager.runtime_arguments(make_version(), "private_offline", make_instance())
+    def install(cls):
+        nonlocal install_called
+        install_called = True
+        raise AssertionError("install must not run for unsupported versions")
+
+    monkeypatch.setattr(LanAgentManager, "install", classmethod(install))
+    monkeypatch.setattr(LanAgentManager, "log_path", classmethod(lambda cls, _instance: agent_log))
+    monkeypatch.setattr(LanAgentManager, "prepare_log", classmethod(lambda cls, _instance, _auth_mode=None: agent_log))
+    monkeypatch.setattr(LanAgentTargetResolver, "resolve", classmethod(lambda cls, _version, _instance, _reporter=None: resolution))
+
+    assert LanAgentManager.runtime_arguments(make_version("1.16.5"), "private_offline", instance) == []
+    assert install_called is False
+    assert "outside the supported 1.17+ range" in agent_log.read_text(encoding="utf-8")
 
 
 def test_prepare_log_replaces_previous_run_and_read_log_returns_content(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "logs" / LanAgentManager.AGENT_LOG_FILENAME
     path.parent.mkdir(parents=True)
     path.write_text("stale log", encoding="utf-8")
-    instance = make_instance()
+    instance = make_instance(tmp_path)
     monkeypatch.setattr(LanAgentManager, "log_path", classmethod(lambda cls, _instance: path))
 
     prepared = LanAgentManager.prepare_log(instance)
@@ -95,14 +107,14 @@ def test_prepare_log_replaces_previous_run_and_read_log_returns_content(tmp_path
     assert "stale log" not in text
     assert "MCW LAN Agent launch diagnostics" in text
     assert "Instance: Pack" in text
-    assert "MinecraftServer#setUsesAuthentication(Z)V" in text
+    assert "Runtime targets: resolved from Mojang/Fabric mappings" in text
 
 
 def test_sanitize_user_arguments_removes_only_mcw_agent_overrides() -> None:
     arguments = LanAgentManager.sanitize_user_jvm_arguments(
         [
             "-Dmcw.lan.offline=false",
-            "-Dmcw.lan.target.class=example/Evil",
+            "-Dmcw.lan.targets=example/Evil#run",
             "-javaagent:C:/cache/mcw-lan-agent.jar",
             "-javaagent:C:/tools/other-agent.jar",
             "-Dexample=true",
