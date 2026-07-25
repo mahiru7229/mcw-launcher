@@ -688,3 +688,33 @@ def test_build_keeps_minecraft_client_out_of_forge_module_path(
     assert str(client) in result[classpath_index + 1].split(os.pathsep)
     ignore_list = next(value for value in result if value.startswith("-DignoreList="))
     assert "1.20.1.jar" in ignore_list.split("=", 1)[1].split(",")
+
+
+def test_build_places_runtime_jvm_arguments_before_classpath_and_main(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    version = make_version()
+    settings = make_settings()
+    account = make_account()
+
+    monkeypatch.setattr(Paths, "client", lambda _version: tmp_path / "client.jar")
+    monkeypatch.setattr(Paths, "libraries", lambda: tmp_path / "libraries")
+    monkeypatch.setattr(ClasspathBuilder, "build", lambda *_args: "classpath")
+    monkeypatch.setattr(ArgumentBuilder, "build", lambda *_args: (["-Xmx2G"], ["--username", "Steve"]))
+
+    result = LauncherManager.build(
+        version=version,
+        context={},
+        settings=settings,
+        account=account,
+        runtime_jvm_arguments=["-Dmcw.lan.offline=true", "-javaagent:C:/cache/mcw-lan-agent.jar"],
+    )
+
+    assert result == [
+        "-Xmx2G",
+        "-Dmcw.lan.offline=true",
+        "-javaagent:C:/cache/mcw-lan-agent.jar",
+        "-cp",
+        "classpath",
+        "net.minecraft.client.main.Main",
+        "--username",
+        "Steve",
+    ]

@@ -6,6 +6,8 @@ import pytest
 from src.core.fs.paths import Paths
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.instance.settings_manager import SettingsManager
+from src.core.lan.lan_agent_manager import LanAgentManager
+from src.core.lan.lan_hosting_manager import LanHostingManager
 from src.core.java.java_runtime import JavaRuntime
 from src.core.java.java_selector import JavaSelector
 from src.core.minecraft.asset_manager import AssetManager
@@ -905,3 +907,27 @@ def test_run_uses_per_instance_modrinth_failure_policy_and_returns_non_blocking_
     assert received["block_launch_on_failure"] is False
     assert result["warnings"] == ("mods/example.jar must be installed manually",)
 
+
+
+def test_private_lan_attaches_agent_and_disables_legacy_auth_bridge(monkeypatch: pytest.MonkeyPatch):
+    pipeline = patch_pipeline(monkeypatch)
+    settings = SimpleNamespace(lan_auth_mode="private_offline", block_launch_on_modrinth_failure=True)
+    instance = make_instance()
+    events: list[object] = []
+    runtime_arguments = ["-Dmcw.lan.offline=true", "-javaagent:C:/cache/mcw-lan-agent.jar"]
+
+    monkeypatch.setattr(SettingsManager, "load", lambda _instance: settings)
+    monkeypatch.setattr(LanHostingManager, "disable_legacy_auth_bridges", staticmethod(lambda received: events.append(("cleanup", received)) or ()))
+    monkeypatch.setattr(LanAgentManager, "runtime_arguments", classmethod(lambda cls, version, mode: events.append(("agent", version, mode)) or runtime_arguments))
+
+    def build(version, context, received_settings, account, runtime_jvm_arguments=None):
+        events.append(("command", runtime_jvm_arguments))
+        return pipeline["command"]
+
+    monkeypatch.setattr(LauncherManager, "build", build)
+
+    MinecraftExecutor.run(instance=instance, authentication=object(), account=object())
+
+    assert events[0] == ("cleanup", instance)
+    assert events[1] == ("agent", pipeline["version"], "private_offline")
+    assert events[2] == ("command", runtime_arguments)

@@ -11,7 +11,7 @@ class LauncherManager:
     CLASSPATH_FLAGS = ("-cp", "-classpath", "--class-path")
 
     @staticmethod
-    def build(version: Version, context: dict, settings: InstanceSettings, account: Account) -> list[str]:
+    def build(version: Version, context: dict, settings: InstanceSettings, account: Account, runtime_jvm_arguments: list[str] | None = None) -> list[str]:
         classpath = ClasspathBuilder.build(
             version,
             Paths.client(version),
@@ -20,6 +20,8 @@ class LauncherManager:
 
         jvm_args, game_args = ArgumentBuilder.build(version, context, settings, account)
         jvm_args = ForgeLaunchCommandManager.prepare(version, jvm_args, client_path=Paths.client(version), library_directory=Paths.libraries())
+        if runtime_jvm_arguments:
+            jvm_args.extend(str(argument) for argument in runtime_jvm_arguments)
 
         command = list(jvm_args)
         if not LauncherManager._has_classpath_argument(command):

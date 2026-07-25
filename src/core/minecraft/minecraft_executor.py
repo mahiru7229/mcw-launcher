@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from src.core.fs.paths import Paths
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.instance.settings_manager import SettingsManager
+from src.core.lan.lan_agent_manager import LanAgentManager
+from src.core.lan.lan_hosting_manager import LanHostingManager
 from src.core.java.java_resolver import JavaResolver
 from src.core.java.java_runtime import JavaRuntime
 from src.core.minecraft.asset_manager import AssetManager
@@ -41,6 +43,9 @@ class MinecraftExecutor:
             reporter.status(stage=ProgressStage.PREPARING, message="Preparing Minecraft...")
 
             settings = SettingsManager.load(instance)
+            lan_auth_mode = getattr(settings, "lan_auth_mode", "microsoft_only")
+            if LanAgentManager.is_enabled(lan_auth_mode):
+                LanHostingManager.disable_legacy_auth_bridges(instance)
             download_pause_controller.raise_if_requested()
             block_managed_failure = bool(getattr(settings, "block_launch_on_modrinth_failure", True))
             modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_managed_failure)
@@ -78,7 +83,11 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.BUILDING_COMMAND, message="Building launch command...")
-            command = LauncherManager.build(version, context, settings, account)
+            lan_runtime_arguments = LanAgentManager.runtime_arguments(version, lan_auth_mode)
+            if lan_runtime_arguments:
+                command = LauncherManager.build(version, context, settings, account, runtime_jvm_arguments=lan_runtime_arguments)
+            else:
+                command = LauncherManager.build(version, context, settings, account)
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.SELECTING_JAVA, message="Selecting Java runtime...")

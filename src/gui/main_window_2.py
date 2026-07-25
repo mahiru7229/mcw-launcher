@@ -941,7 +941,7 @@ class MainWindow(QMainWindow):
             if self.instance_settings_page.is_dirty:
                 return
 
-        if str(auth_mode) == "friends":
+        if str(auth_mode) in {"private_offline", "friends"}:
             answer = QMessageBox.warning(
                 self,
                 tr("lan.hosting.warning.title"),
@@ -970,8 +970,8 @@ class MainWindow(QMainWindow):
             lines.append(tr("lan.hosting.prepared.reused", projects=", ".join(reused)))
         if disabled:
             lines.append(tr("lan.hosting.prepared.disabled", projects=", ".join(disabled)))
-        if auth_mode == "friends":
-            lines.append(tr("lan.hosting.prepared.friends_steps"))
+        if auth_mode == "private_offline":
+            lines.append(tr("lan.hosting.prepared.private_offline_steps"))
         else:
             lines.append(tr("lan.hosting.prepared.microsoft_steps"))
         if connection_provider == "e4mc":

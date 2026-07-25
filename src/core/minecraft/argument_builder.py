@@ -3,6 +3,7 @@ from src.models.instance.settings import InstanceSettings
 from src.models.account.account_source import AccountSource
 from src.models.account.account import Account
 from src.core.minecraft.library_rule_manager import LibraryRuleManager
+from src.core.lan.lan_agent_manager import LanAgentManager
 import os
 import shlex
 
@@ -39,7 +40,8 @@ class ArgumentBuilder:
 
     @staticmethod
     def build(version: Version, context: dict, settings: InstanceSettings, account: Account) -> tuple[list[str], list[str]]:
-        jvm_args: list[str] = [f"-Xms{settings.min_memory}M", f"-Xmx{settings.max_memory}M", *settings.jvm_arguments]
+        user_jvm_arguments = LanAgentManager.sanitize_user_jvm_arguments(settings.jvm_arguments)
+        jvm_args: list[str] = [f"-Xms{settings.min_memory}M", f"-Xmx{settings.max_memory}M", *user_jvm_arguments]
         game_args: list[str] = ["--width", str(settings.width), "--height", str(settings.height)]
 
         if settings.fullscreen:

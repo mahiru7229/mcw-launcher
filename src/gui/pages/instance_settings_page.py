@@ -112,11 +112,11 @@ class InstanceSettingsPage(BasePage):
 
         hosting_card = CardWidget(
             "LAN hosting",
-            "Authentication policy and connection transport are configured separately. No MCW authentication service is used.",
+            "Authentication policy and connection transport are configured separately. Private LAN uses the bundled MCW LAN Agent; no custom authentication service is used.",
         )
         self.lan_auth_mode = QComboBox()
         self.lan_auth_mode.addItem("Microsoft accounts only", "microsoft_only")
-        self.lan_auth_mode.addItem("Friends — Microsoft and Offline accounts", "friends")
+        self.lan_auth_mode.addItem("Private group — Microsoft and Offline accounts", "private_offline")
         self.lan_connection_provider = QComboBox()
         self.lan_connection_provider.addItem("Manual connection — LAN, VPN, direct port, or custom relay", "manual")
         self.lan_connection_provider.addItem("e4mc tunnel", "e4mc")
@@ -435,8 +435,8 @@ class InstanceSettingsPage(BasePage):
     def _update_lan_help(self, *_args) -> None:
         auth_mode = str(self.lan_auth_mode.currentData() or "microsoft_only")
         provider = str(self.lan_connection_provider.currentData() or "manual")
-        if auth_mode == "friends":
-            auth_text = tr("lan.hosting.friends.warning")
+        if auth_mode == "private_offline":
+            auth_text = tr("lan.hosting.private_offline.warning")
         else:
             auth_text = tr("lan.hosting.microsoft_only.help")
         if provider == "e4mc":

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
 import sys
+import zipfile
 from typing import Iterable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config import UPDATE_CHANNEL, VERSION, VERSION_ID, VERSION_TAG
+from src.core.lan.lan_agent_manager import LanAgentManager
 
 TEXT_SUFFIXES = {".json", ".md", ".ps1", ".py", ".txt", ".yml", ".yaml"}
 IGNORED_DIRECTORIES = {".git", ".pytest_cache", ".venv", "__pycache__", "build", "cache", "dist", "release"}
@@ -123,6 +126,37 @@ def audit_private_gateway_bundling(project_root: Path) -> list[str]:
             errors.append(".gitignore must exclude config/private/")
     return errors
 
+
+
+def audit_lan_agent(project_root: Path) -> list[str]:
+    errors: list[str] = []
+    agent_path = project_root / "runtime" / LanAgentManager.AGENT_FILENAME
+    if not agent_path.is_file():
+        return [f"Missing MCW LAN Agent: {agent_path.relative_to(project_root)}"]
+
+    digest = hashlib.sha256(agent_path.read_bytes()).hexdigest()
+    if digest != LanAgentManager.AGENT_SHA256:
+        errors.append(f"MCW LAN Agent SHA-256 mismatch: expected {LanAgentManager.AGENT_SHA256}, got {digest}")
+
+    try:
+        with zipfile.ZipFile(agent_path) as archive:
+            manifest = archive.read("META-INF/MANIFEST.MF").decode("utf-8", errors="replace")
+    except (OSError, KeyError, zipfile.BadZipFile) as error:
+        errors.append(f"MCW LAN Agent JAR is invalid: {error}")
+    else:
+        expected = "Premain-Class: org.mcwlauncher.lanagent.McwLanAgent"
+        if expected not in manifest:
+            errors.append("MCW LAN Agent manifest is missing the expected Premain-Class")
+
+    try:
+        spec_text = (project_root / "mcw_launcher.spec").read_text(encoding="utf-8")
+    except OSError as error:
+        errors.append(f"Unable to inspect mcw_launcher.spec for LAN Agent bundling: {error}")
+    else:
+        if LanAgentManager.AGENT_FILENAME not in spec_text:
+            errors.append("mcw_launcher.spec does not bundle the MCW LAN Agent")
+    return errors
+
 def audit_version_metadata(project_root: Path) -> list[str]:
     errors: list[str] = []
     if VERSION_TAG != f"v{VERSION_ID}":
@@ -151,6 +185,7 @@ def run_preflight(project_root: Path = PROJECT_ROOT) -> list[str]:
     errors: list[str] = []
     errors.extend(audit_version_metadata(project_root))
     errors.extend(audit_private_gateway_bundling(project_root))
+    errors.extend(audit_lan_agent(project_root))
     errors.extend(find_merge_markers(project_root))
     errors.extend(audit_language_packs(project_root))
     return errors

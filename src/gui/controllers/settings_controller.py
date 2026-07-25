@@ -60,7 +60,9 @@ class InstanceSettingsController(BaseController):
             settings.offline_multiplayer_enabled = False
             settings.lan_auth_mode = str(data.get("lan_auth_mode", "microsoft_only")).strip().lower()
             settings.lan_connection_provider = str(data.get("lan_connection_provider", "manual")).strip().lower()
-            if settings.lan_auth_mode not in {"microsoft_only", "friends"}:
+            if settings.lan_auth_mode == "friends":
+                settings.lan_auth_mode = "private_offline"
+            if settings.lan_auth_mode not in {"microsoft_only", "private_offline"}:
                 raise ValueError(tr("Unsupported LAN authentication policy."))
             if settings.lan_connection_provider not in {"manual", "e4mc"}:
                 raise ValueError(tr("Unsupported LAN connection provider."))
