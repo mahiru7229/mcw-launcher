@@ -13,6 +13,8 @@ class InstanceSettings:
     game_arguments: list[str] = field(default_factory=list)
 
     offline_multiplayer_enabled: bool = False
+    lan_auth_mode: str = "microsoft_only"
+    lan_connection_provider: str = "manual"
     block_launch_on_modrinth_failure: bool = True
 
     width: int = 854

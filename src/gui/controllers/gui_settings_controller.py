@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QByteArray, Signal
 
+from src.core.config.curseforge_config_manager import CurseForgeConfigManager
 from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.language.language_manager import tr
 from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
@@ -24,6 +25,7 @@ class GuiSettingsController(BaseController):
         "show_static_text": False,
         "modrinth_include_beta": False,
         "modrinth_include_alpha": False,
+        "curseforge_gateway_urls": (),
         "download_limit_mbps": 0.0,
     }
 
@@ -47,6 +49,10 @@ class GuiSettingsController(BaseController):
         appearance = data.get("appearance", {})
         modrinth = data.get("modrinth", {})
         network = data.get("network", {})
+        try:
+            curseforge_gateway_urls = CurseForgeConfigManager.gateway_urls()
+        except (RuntimeError, ValueError):
+            curseforge_gateway_urls = ()
         self._current = {
             "start_page": str(gui.get("start_page", self.DEFAULTS["start_page"])),
             "show_snapshots": bool(gui.get("show_snapshots", self.DEFAULTS["show_snapshots"])),
@@ -60,6 +66,7 @@ class GuiSettingsController(BaseController):
             "show_static_text": bool(appearance.get("show_static_text", self.DEFAULTS["show_static_text"])),
             "modrinth_include_beta": bool(modrinth.get("include_beta", self.DEFAULTS["modrinth_include_beta"])),
             "modrinth_include_alpha": bool(modrinth.get("include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
+            "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": float(network.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]) or 0.0),
         }
         download_bandwidth_limiter.configure_mbps(self._current["download_limit_mbps"])
@@ -67,6 +74,12 @@ class GuiSettingsController(BaseController):
         return dict(self._current)
 
     def save(self, data: dict) -> None:
+        try:
+            CurseForgeConfigManager.save_local(data.get("curseforge_gateway_urls", self.DEFAULTS["curseforge_gateway_urls"]))
+            curseforge_gateway_urls = CurseForgeConfigManager.gateway_urls()
+        except (OSError, RuntimeError, ValueError) as error:
+            self._emit_error(tr("curseforge.gateway.save.error.title"), error)
+            return
         download_limit_mbps = download_bandwidth_limiter.configure_mbps(data.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]))
         tester_mode = bool(data.get("tester_mode", self.DEFAULTS["tester_mode"]))
         update_channel = "beta" if tester_mode else "stable"
@@ -83,6 +96,7 @@ class GuiSettingsController(BaseController):
             "show_static_text": bool(data.get("show_static_text", self.DEFAULTS["show_static_text"])),
             "modrinth_include_beta": bool(data.get("modrinth_include_beta", self.DEFAULTS["modrinth_include_beta"])),
             "modrinth_include_alpha": bool(data.get("modrinth_include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
+            "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": download_limit_mbps,
         }
         self._settings.save({

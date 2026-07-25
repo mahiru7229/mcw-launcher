@@ -6,8 +6,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/latest">
-    <img src="https://img.shields.io/badge/Current-v0.6.0-brightgreen" alt="Current version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases">
+    <img src="https://img.shields.io/badge/Stable-v0.7.2-brightgreen" alt="Current stable version">
+  </a>
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases">
+    <img src="https://img.shields.io/badge/Beta-v0.7.3--beta.1-orange" alt="Current beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -22,11 +25,12 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v0.6.0.md">v0.6.0 release notes</a>
+  <a href="docs/RELEASE-v0.7.3-beta.1.md">v0.7.3 Beta 1 release notes</a> ·
+  <a href="docs/RELEASE-v0.6.0.md">Stable release notes</a>
 </p>
 
 > [!NOTE]
-> `v0.6.0` là bản Stable đầu tiên của dòng 0.6. Người dùng thông thường nhận cập nhật qua kênh `stable`; các bản thử nghiệm 0.7.x chỉ xuất hiện khi chủ động tham gia tester program.
+> `v0.7.2` vẫn là Stable hiện tại. `v0.7.3-beta.1` thêm luồng host LAN tách riêng **xác thực** và **kết nối**, không dùng MCW Verified Auth; e4mc chỉ là một tunnel tùy chọn có thể thay thế.
 
 ---
 
@@ -38,9 +42,17 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
-### Điểm nổi bật của dòng 0.6
+### Điểm nổi bật của `v0.7.3-beta.1`
 
+- Thêm **LAN hosting profiles** trong Instance Settings: chọn `Microsoft only` hoặc `Friends (Microsoft + Offline)` độc lập với `Manual connection` hoặc `e4mc tunnel`. Launcher cài LAN Properties/e4mc theo loader và Minecraft version khi người dùng nhấn Prepare.
+- Tích hợp **CurseForge Gateway** mà không đóng gói API key hoặc gateway riêng tư trong source/release. Có thể cấu hình tối đa năm liên kết HTTPS, được che trong giao diện, mã hóa bằng Windows DPAPI và tự động failover theo thứ tự.
+- Tìm kiếm, chọn phiên bản và cài **CurseForge mods** cho Fabric/Forge từ Manage Mods hoặc trang Mods độc lập.
+- Tự tải file khi tác giả cho phép phân phối qua bên thứ ba; nếu không, launcher hướng dẫn tải thủ công rồi xác minh size/SHA-1 trước khi import.
+- Cache JSON CurseForge tối đa **10 MB**, dọn theo LRU, hỗ trợ dữ liệu stale khi gateway tạm lỗi.
+- Hiển thị **lần cập nhật gần nhất**, dung lượng cache, nguồn dữ liệu và lỗi refresh gần nhất.
+- Cooldown refresh, backoff sau lỗi và request deduplication để hạn chế gọi API trùng hoặc spam gateway.
 - Tạo và chạy instance **Vanilla, Fabric hoặc Forge**.
+- Sửa luồng Offline trên Forge: tài khoản Offline không còn gọi Microsoft Auth hoặc chèn các auth host giả gây `Auth currently unreachable`.
 - Cài đặt, thay đổi và repair Fabric Loader hoặc Minecraft Forge.
 - Tìm, cài và cập nhật mod từ **Modrinth** với bộ lọc loader/version/channel.
 - Trang **Cài mod** độc lập chỉ hiển thị instance khớp chính xác Minecraft version và loader trước khi cài.
@@ -65,8 +77,8 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.6.0` là bản Stable hiện tại dành cho người dùng thông thường.
-- Các bản `0.7.x` chỉ dành cho người chủ động tham gia tester program.
+- `v0.7.2` là bản Stable hiện tại dành cho người dùng thông thường.
+- Các bản thử nghiệm tương lai vẫn chỉ xuất hiện khi người dùng chủ động tham gia tester program.
 
 Yêu cầu cơ bản:
 
@@ -83,7 +95,7 @@ Python `3.12` được khuyến nghị.
 ```powershell
 git clone https://github.com/mahiru7229/mcw-launcher.git
 cd mcw-launcher
-git switch beta/0.6
+git switch main
 
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -102,16 +114,26 @@ Quy tắc release của dự án: chỉ build khi test không có `failed` hoặ
 
 ### Build EXE và gói updater
 
+Từ working tree sạch, có thể chạy toàn bộ preflight, test, build và đóng gói bằng một lệnh:
+
 ```powershell
-python -m PyInstaller --clean mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0"
+.\build_release.ps1
+```
+
+Hoặc chạy thủ công:
+
+```powershell
+python -m tools.release_preflight
+python -m pytest test -q
+python -m PyInstaller --clean --noconfirm mcw_launcher.spec
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.3-beta.1"
 ```
 
 Kết quả updater package:
 
 ```text
-MCW-Launcher-v0.6.0-windows-x64.zip
-MCW-Launcher-v0.6.0-windows-x64.zip.sha256
+MCW-Launcher-v0.7.3-beta.1-windows-x64.zip
+MCW-Launcher-v0.7.3-beta.1-windows-x64.zip.sha256
 ```
 
 Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -126,9 +148,17 @@ MCW Launcher is an open-source Minecraft launcher centered around **isolated ins
 
 Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
 
-### v0.6 highlights
+### `v0.7.3-beta.1` highlights
 
+- Add **LAN hosting profiles** under Instance Settings: choose `Microsoft only` or `Friends (Microsoft + Offline)` independently from `Manual connection` or `e4mc tunnel`. The launcher installs compatible LAN Properties/e4mc builds only after the user clicks Prepare.
+- Integrate a **CurseForge Gateway** without bundling a private API key or gateway URL. Up to five HTTPS endpoints can be configured, masked in the interface, protected with Windows DPAPI, and tried in order for failover.
+- Search, select versions, and install **CurseForge mods** for Fabric/Forge from Manage Mods or the standalone Mods page.
+- Download automatically when third-party distribution is allowed; otherwise guide the user through a manual download verified by size and SHA-1.
+- Keep a local CurseForge JSON cache capped at **10 MB**, with LRU eviction and stale-data fallback during gateway outages.
+- Display the **last successful refresh**, cache size, data source, cooldown, and latest refresh error.
+- Coalesce identical requests and apply refresh cooldown/backoff to reduce unnecessary API traffic.
 - Create and launch **Vanilla, Fabric, and Forge** instances.
+- Restore Offline launches on Forge: Offline accounts no longer call Microsoft Auth or inject invalid auth hosts that cause `Auth currently unreachable`.
 - Install, change, and repair Fabric Loader or Minecraft Forge.
 - Search, install, and update **Modrinth** mods with loader, version, and release-channel filtering.
 - A standalone **Install Mods** page only offers instances matching the selected Minecraft version and loader.
@@ -141,7 +171,7 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
   - `1920×1080` or larger → `1600×900` window.
   - `1366×768` → compact `1280×720` window.
   - Smaller displays → a safe size based on available screen geometry.
-- Apply a high-contrast compatibility palette to message dialogs to avoid white-on-white rendering issues.
+- Force the launcher and Qt dialogs to use a dark palette with white text, independent of the Windows appearance setting.
 - Keep launch-progress failures short while preserving complete technical details in **Logs**.
 - Support Microsoft OAuth PKCE, multiple Microsoft accounts, SQLite storage, and Windows DPAPI protection for refresh tokens.
 - Track the Minecraft process, play time, exit status, latest game log, and detected crash reports.
@@ -152,8 +182,8 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 Packaged Windows builds are published on the **Releases** page:
 
 - [Open releases](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.6.0` is the current Stable release for regular users.
-- Experimental `0.7.x` builds are available only after explicitly joining the tester program.
+- `v0.7.2` is the current Stable release for regular users.
+- Future experimental builds remain available only after explicitly joining the tester program.
 
 Requirements:
 
@@ -170,7 +200,7 @@ Python `3.12` is recommended.
 ```powershell
 git clone https://github.com/mahiru7229/mcw-launcher.git
 cd mcw-launcher
-git switch beta/0.6
+git switch main
 
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -189,16 +219,26 @@ The release flow requires zero failed tests and zero collection/runtime errors b
 
 ### Build the EXE and updater package
 
+From a clean working tree, run the complete preflight, tests, build, and packaging flow with one command:
+
 ```powershell
-python -m PyInstaller --clean mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.6.0"
+.\build_release.ps1
+```
+
+Or run each step manually:
+
+```powershell
+python -m tools.release_preflight
+python -m pytest test -q
+python -m PyInstaller --clean --noconfirm mcw_launcher.spec
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.3-beta.1"
 ```
 
 Expected updater assets:
 
 ```text
-MCW-Launcher-v0.6.0-windows-x64.zip
-MCW-Launcher-v0.6.0-windows-x64.zip.sha256
+MCW-Launcher-v0.7.3-beta.1-windows-x64.zip
+MCW-Launcher-v0.7.3-beta.1-windows-x64.zip.sha256
 ```
 
 See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -229,6 +269,7 @@ See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
 - Fabric and Forge mod metadata parsing.
 - Enable/disable, drag-and-drop, dependency analysis, duplicate-ID detection, and loader mismatch checks.
 - Modrinth dependency installation, update checks, update locks, retry/resume, and fallback URLs.
+- CurseForge Gateway search, compatible file selection, dependency installation, automatic/manual distribution handling, local JSON caching, refresh cooldown, and stale fallback.
 - Managed modpack registry with update, repair, conflict preservation, backup, rollback, and verification cache.
 
 ### Accounts and privacy
@@ -268,6 +309,7 @@ mcw-launcher/
 │   │   ├── mod/
 │   │   ├── modloader/
 │   │   ├── modrinth/
+│   │   ├── curseforge/
 │   │   ├── network/
 │   │   ├── progress/
 │   │   ├── runtime/
@@ -288,7 +330,11 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
+| [`docs/RELEASE-v0.7.3-beta.1.md`](docs/RELEASE-v0.7.3-beta.1.md) | v0.7.3 Beta 1 LAN hosting release notes |
+| [`docs/RELEASE-v0.7.2.md`](docs/RELEASE-v0.7.2.md) | Complete v0.7.2 Stable maintenance release notes |
+| [`docs/RELEASE-v0.7.0.md`](docs/RELEASE-v0.7.0.md) | Original v0.7.0 Stable release notes |
 | [`docs/RELEASE-v0.6.0.md`](docs/RELEASE-v0.6.0.md) | Complete v0.6.0 Stable release notes |
+| [`docs/FORGE_CURSEFORGE.md`](docs/FORGE_CURSEFORGE.md) | CurseForge Gateway, cache and manual fallback |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core architecture |
 | [`docs/INSTANCE_SYSTEM.md`](docs/INSTANCE_SYSTEM.md) | Instance metadata and lifecycle |
 | [`docs/MODRINTH_INTEGRATION.md`](docs/MODRINTH_INTEGRATION.md) | Modrinth integration |
@@ -301,18 +347,19 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v0.6.0 |
+| Component | Status in v0.7.2 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |
-| Forge Loader and mods | Beta |
-| Modrinth mods and `.mrpack` modpacks | Beta — update and repair available |
-| Microsoft accounts | Beta |
+| Forge Loader and mods | Available |
+| Modrinth mods and `.mrpack` modpacks | Available — update and repair supported |
+| Microsoft accounts | Available |
 | Offline accounts | Available |
 | English / Vietnamese | Available |
-| PNG themes | Beta |
+| PNG themes | Available |
 | NeoForge / Quilt | Not supported |
-| CurseForge public integration | Deferred to `0.7.x` |
+| CurseForge Gateway mods | Available — private endpoints required; Fabric/Forge, cache and manual fallback |
+| CurseForge modpacks | Experimental — Forge flow through gateway |
 
 ## Contributing and bug reports
 

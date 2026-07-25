@@ -13,6 +13,7 @@ from src.gui.widget.card_widget import CardWidget
 class InstanceSettingsPage(BasePage):
     load_requested = Signal(str)
     save_requested = Signal(str, dict)
+    lan_prepare_requested = Signal(str, str, str)
     dirty_changed = Signal(bool)
 
     def __init__(self, total_memory_mb: int | None = None) -> None:
@@ -101,15 +102,43 @@ class InstanceSettingsPage(BasePage):
         for spin_box in (self.window_width, self.window_height):
             spin_box.setRange(320, 7680)
         self.fullscreen = QCheckBox("Launch in fullscreen")
-        self.offline_multiplayer = QCheckBox("Enable offline multiplayer workaround")
         window_grid.addWidget(QLabel("Width"), 0, 0)
         window_grid.addWidget(self.window_width, 1, 0)
         window_grid.addWidget(QLabel("Height"), 0, 1)
         window_grid.addWidget(self.window_height, 1, 1)
         window_card.layout.addLayout(window_grid)
         window_card.layout.addWidget(self.fullscreen)
-        window_card.layout.addWidget(self.offline_multiplayer)
         self.root_layout.addWidget(window_card)
+
+        hosting_card = CardWidget(
+            "LAN hosting",
+            "Authentication policy and connection transport are configured separately. No MCW authentication service is used.",
+        )
+        self.lan_auth_mode = QComboBox()
+        self.lan_auth_mode.addItem("Microsoft accounts only", "microsoft_only")
+        self.lan_auth_mode.addItem("Friends — Microsoft and Offline accounts", "friends")
+        self.lan_connection_provider = QComboBox()
+        self.lan_connection_provider.addItem("Manual connection — LAN, VPN, direct port, or custom relay", "manual")
+        self.lan_connection_provider.addItem("e4mc tunnel", "e4mc")
+        self.lan_security_label = QLabel()
+        self.lan_security_label.setObjectName("CardSubtitle")
+        self.lan_security_label.setWordWrap(True)
+        self.lan_prepare_status = QLabel("Hosting support has not been prepared for the current selection.")
+        self.lan_prepare_status.setObjectName("CardSubtitle")
+        self.lan_prepare_status.setWordWrap(True)
+        self.lan_prepare_button = set_theme_icon(QPushButton("Prepare hosting support"), "icon.action.download")
+        self.lan_prepare_button.clicked.connect(self.request_lan_prepare)
+        hosting_card.layout.addWidget(QLabel("Authentication policy"))
+        hosting_card.layout.addWidget(self.lan_auth_mode)
+        hosting_card.layout.addWidget(QLabel("Connection provider"))
+        hosting_card.layout.addWidget(self.lan_connection_provider)
+        hosting_card.layout.addWidget(self.lan_security_label)
+        hosting_card.layout.addWidget(self.lan_prepare_status)
+        hosting_card.layout.addWidget(self.lan_prepare_button)
+        self.root_layout.addWidget(hosting_card)
+        self.lan_auth_mode.currentIndexChanged.connect(self._update_lan_help)
+        self.lan_connection_provider.currentIndexChanged.connect(self._update_lan_help)
+        self._update_lan_help()
 
         modrinth_card = CardWidget(
             "Modrinth downloads",
@@ -199,7 +228,8 @@ class InstanceSettingsPage(BasePage):
                     "width": int(getattr(settings, "width", 1280)),
                     "height": int(getattr(settings, "height", 720)),
                     "fullscreen": bool(getattr(settings, "fullscreen", False)),
-                    "offline_multiplayer_enabled": bool(getattr(settings, "offline_multiplayer_enabled", False)),
+                    "lan_auth_mode": str(getattr(settings, "lan_auth_mode", "microsoft_only") or "microsoft_only"),
+                    "lan_connection_provider": str(getattr(settings, "lan_connection_provider", "manual") or "manual"),
                     "block_launch_on_modrinth_failure": bool(getattr(settings, "block_launch_on_modrinth_failure", True)),
                     "jvm_arguments": list(getattr(settings, "jvm_arguments", [])),
                     "game_arguments": list(getattr(settings, "game_arguments", [])),
@@ -217,7 +247,8 @@ class InstanceSettingsPage(BasePage):
             "width": self.window_width.value(),
             "height": self.window_height.value(),
             "fullscreen": self.fullscreen.isChecked(),
-            "offline_multiplayer_enabled": self.offline_multiplayer.isChecked(),
+            "lan_auth_mode": str(self.lan_auth_mode.currentData() or "microsoft_only"),
+            "lan_connection_provider": str(self.lan_connection_provider.currentData() or "manual"),
             "block_launch_on_modrinth_failure": self.block_modrinth_failure.isChecked(),
             "jvm_arguments": self._lines(self.jvm_arguments.toPlainText()),
             "game_arguments": self._lines(self.game_arguments.toPlainText()),
@@ -225,6 +256,17 @@ class InstanceSettingsPage(BasePage):
 
     def request_save(self) -> None:
         self.save_requested.emit(self._loaded_instance_name or self.current_instance_name(), self.form_data())
+
+    def request_lan_prepare(self) -> None:
+        instance_name = self._loaded_instance_name or self.current_instance_name()
+        self.lan_prepare_requested.emit(
+            instance_name,
+            str(self.lan_auth_mode.currentData() or "microsoft_only"),
+            str(self.lan_connection_provider.currentData() or "manual"),
+        )
+
+    def set_lan_prepare_status(self, message: str) -> None:
+        self.lan_prepare_status.setText(str(message))
 
     def discard_changes(self) -> None:
         if not self._saved_data:
@@ -237,12 +279,18 @@ class InstanceSettingsPage(BasePage):
         self._set_dirty(False)
 
     def set_busy(self, busy: bool) -> None:
-        self.setEnabled(not busy)
+        enabled = not busy
+        self.instance_combo.setEnabled(enabled)
+        self.lan_auth_mode.setEnabled(enabled)
+        self.lan_connection_provider.setEnabled(enabled)
+        self.save_button.setEnabled(enabled)
+        self.lan_prepare_button.setEnabled(enabled)
 
     def retranslate_dynamic(self) -> None:
         self._update_memory_labels()
         self.unsaved_label.setText(tr("settings.unsaved.banner"))
         self._update_save_button_text()
+        self._update_lan_help()
 
     def _connect_dirty_tracking(self) -> None:
         self.java_path_input.textChanged.connect(self._refresh_dirty_state)
@@ -253,7 +301,8 @@ class InstanceSettingsPage(BasePage):
         self.window_width.valueChanged.connect(self._refresh_dirty_state)
         self.window_height.valueChanged.connect(self._refresh_dirty_state)
         self.fullscreen.toggled.connect(self._refresh_dirty_state)
-        self.offline_multiplayer.toggled.connect(self._refresh_dirty_state)
+        self.lan_auth_mode.currentIndexChanged.connect(self._refresh_dirty_state)
+        self.lan_connection_provider.currentIndexChanged.connect(self._refresh_dirty_state)
         self.block_modrinth_failure.toggled.connect(self._refresh_dirty_state)
         self.jvm_arguments.textChanged.connect(self._refresh_dirty_state)
         self.game_arguments.textChanged.connect(self._refresh_dirty_state)
@@ -293,7 +342,8 @@ class InstanceSettingsPage(BasePage):
             "width": 1280,
             "height": 720,
             "fullscreen": False,
-            "offline_multiplayer_enabled": False,
+            "lan_auth_mode": "microsoft_only",
+            "lan_connection_provider": "manual",
             "block_launch_on_modrinth_failure": True,
             "jvm_arguments": [],
             "game_arguments": [],
@@ -305,8 +355,10 @@ class InstanceSettingsPage(BasePage):
         self.window_width.setValue(int(data.get("width", 1280)))
         self.window_height.setValue(int(data.get("height", 720)))
         self.fullscreen.setChecked(bool(data.get("fullscreen", False)))
-        self.offline_multiplayer.setChecked(bool(data.get("offline_multiplayer_enabled", False)))
+        self._set_combo_data(self.lan_auth_mode, str(data.get("lan_auth_mode", "microsoft_only")))
+        self._set_combo_data(self.lan_connection_provider, str(data.get("lan_connection_provider", "manual")))
         self.block_modrinth_failure.setChecked(bool(data.get("block_launch_on_modrinth_failure", True)))
+        self._update_lan_help()
         self.jvm_arguments.setPlainText("\n".join(data.get("jvm_arguments", [])))
         self.game_arguments.setPlainText("\n".join(data.get("game_arguments", [])))
 
@@ -378,6 +430,25 @@ class InstanceSettingsPage(BasePage):
         slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         slider.setMinimumHeight(34)
         return slider
+
+
+    def _update_lan_help(self, *_args) -> None:
+        auth_mode = str(self.lan_auth_mode.currentData() or "microsoft_only")
+        provider = str(self.lan_connection_provider.currentData() or "manual")
+        if auth_mode == "friends":
+            auth_text = tr("lan.hosting.friends.warning")
+        else:
+            auth_text = tr("lan.hosting.microsoft_only.help")
+        if provider == "e4mc":
+            provider_text = tr("lan.hosting.connection.e4mc.help")
+        else:
+            provider_text = tr("lan.hosting.connection.manual.help")
+        self.lan_security_label.setText(f"{auth_text}\n\n{provider_text}")
+
+    @staticmethod
+    def _set_combo_data(combo: QComboBox, value: str) -> None:
+        index = combo.findData(str(value))
+        combo.setCurrentIndex(index if index >= 0 else 0)
 
     @staticmethod
     def _lines(text: str) -> list[str]:

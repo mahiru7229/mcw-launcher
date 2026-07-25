@@ -3,16 +3,31 @@ from src.models.instance.settings import InstanceSettings
 from src.models.account.account_source import AccountSource
 from src.models.account.account import Account
 from src.core.minecraft.library_rule_manager import LibraryRuleManager
+import os
 import shlex
 
 
 class ArgumentBuilder:
-    OFFLINE_MULTIPLAYER_ARGUMENTS = [
-        "-Dminecraft.api.auth.host=https://nope.invalid",
-        "-Dminecraft.api.account.host=https://nope.invalid",
-        "-Dminecraft.api.session.host=https://nope.invalid",
-        "-Dminecraft.api.services.host=https://nope.invalid",
-    ]
+    # MCW Launcher previously redirected Mojang service hosts to ``nope.invalid``
+    # when the legacy offline multiplayer option was enabled. Offline accounts
+    # do not need this redirect to launch or join offline-mode servers, and Forge
+    # interprets it as an authentication outage. Keep the persisted setting for
+    # backwards compatibility, but never emit or retain those JVM properties.
+    UNSAFE_OFFLINE_AUTH_HOST_PREFIXES = (
+        "-Dminecraft.api.auth.host=",
+        "-Dminecraft.api.account.host=",
+        "-Dminecraft.api.session.host=",
+        "-Dminecraft.api.services.host=",
+    )
+    OFFLINE_IDENTITY_ARGUMENTS = (
+        "--username",
+        "--uuid",
+        "--accessToken",
+        "--userType",
+        "--clientId",
+        "--xuid",
+    )
+    OFFLINE_OMITTED_ARGUMENTS = {"--clientId", "--xuid"}
     DEFAULT_ARGUMENT_FEATURES = {
         "is_demo_user": False,
         "has_custom_resolution": False,
@@ -55,10 +70,55 @@ class ArgumentBuilder:
                 if argument not in jvm_args:
                     jvm_args.append(argument)
 
-        if account.account_type == AccountSource.OFFLINE and settings.offline_multiplayer_enabled:
-            jvm_args.extend(ArgumentBuilder.OFFLINE_MULTIPLAYER_ARGUMENTS)
+        if account.account_type == AccountSource.OFFLINE:
+            jvm_args = ArgumentBuilder._remove_unsafe_offline_auth_overrides(jvm_args)
+            game_args = ArgumentBuilder._normalize_offline_identity_arguments(game_args, context)
 
         return jvm_args, game_args
+
+    @staticmethod
+    def _remove_unsafe_offline_auth_overrides(arguments: list[str]) -> list[str]:
+        return [
+            argument
+            for argument in arguments
+            if not any(argument.startswith(prefix) for prefix in ArgumentBuilder.UNSAFE_OFFLINE_AUTH_HOST_PREFIXES)
+        ]
+
+    @staticmethod
+    def _normalize_offline_identity_arguments(arguments: list[str], context: dict) -> list[str]:
+        canonical_values = {
+            "--username": str(context.get("auth_player_name") or "").strip(),
+            "--uuid": str(context.get("auth_uuid") or "").replace("-", "").strip(),
+            "--accessToken": "0",
+            "--userType": "legacy",
+        }
+
+        normalized: list[str] = []
+        seen: set[str] = set()
+        index = 0
+
+        while index < len(arguments):
+            argument = str(arguments[index])
+            matched_flag = next((flag for flag in ArgumentBuilder.OFFLINE_IDENTITY_ARGUMENTS if argument == flag or argument.startswith(flag + "=")), None)
+            if matched_flag is None:
+                normalized.append(argument)
+                index += 1
+                continue
+
+            inline_value = argument.startswith(matched_flag + "=")
+            index += 1 if inline_value else 2
+
+            if matched_flag in seen or matched_flag in ArgumentBuilder.OFFLINE_OMITTED_ARGUMENTS:
+                continue
+
+            value = canonical_values.get(matched_flag, "")
+            if not value:
+                continue
+
+            normalized.extend((matched_flag, value))
+            seen.add(matched_flag)
+
+        return normalized
 
     @staticmethod
     def _resolve_argument_entry(argument: object, context: dict) -> list[str]:
@@ -97,7 +157,21 @@ class ArgumentBuilder:
         return allowed
 
     @staticmethod
-    def resolve(value: str, context: dict):
+    def resolve(value: str, context: dict) -> str:
+        value = ArgumentBuilder._resolve_library_directory(value, context)
         for key, replacement in context.items():
+            if key == "library_directory":
+                continue
             value = value.replace("${" + key + "}", str(replacement))
         return value
+
+    @staticmethod
+    def _resolve_library_directory(value: str, context: dict) -> str:
+        token = "${library_directory}"
+        if token not in value or "library_directory" not in context:
+            return value
+
+        library_directory = os.path.normpath(str(context["library_directory"]))
+        value = value.replace(token + "/", library_directory + os.sep)
+        value = value.replace(token + "\\", library_directory + os.sep)
+        return value.replace(token, library_directory)

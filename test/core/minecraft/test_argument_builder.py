@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -232,6 +233,37 @@ def test_build_resolves_game_placeholders():
     ]
 
 
+def test_build_resolves_forge_module_path_placeholders(tmp_path: Path):
+    libraries = tmp_path / "libraries"
+    module_a = libraries / "bootstraplauncher.jar"
+    module_b = libraries / "securejarhandler.jar"
+    version = make_version(
+        jvm_arguments=[
+            "-p",
+            "${library_directory}/bootstraplauncher.jar${classpath_separator}${library_directory}/securejarhandler.jar",
+            "--add-modules",
+            "ALL-MODULE-PATH",
+        ]
+    )
+
+    jvm_args, _ = ArgumentBuilder.build(
+        version=version,
+        context={
+            "library_directory": str(libraries),
+            "classpath_separator": os.pathsep,
+        },
+        settings=make_settings(),
+        account=make_account(),
+    )
+
+    assert jvm_args[-4:] == [
+        "-p",
+        os.pathsep.join((str(module_a), str(module_b))),
+        "--add-modules",
+        "ALL-MODULE-PATH",
+    ]
+
+
 def test_build_keeps_unknown_placeholder_unchanged():
     version = make_version(
         game_arguments=[
@@ -301,61 +333,66 @@ def test_build_supports_rule_based_game_entries():
     )
 
 
-def test_offline_multiplayer_arguments_are_added_for_offline_account():
+def test_deprecated_offline_multiplayer_setting_does_not_redirect_auth_services():
+    version = make_version()
+    settings = make_settings(offline_multiplayer_enabled=True)
+
+    jvm_args, _ = ArgumentBuilder.build(
+        version=version,
+        context={},
+        settings=settings,
+        account=make_account(AccountSource.OFFLINE),
+    )
+
+    assert not any("nope.invalid" in argument for argument in jvm_args)
+    assert not any(
+        argument.startswith(prefix)
+        for argument in jvm_args
+        for prefix in ArgumentBuilder.UNSAFE_OFFLINE_AUTH_HOST_PREFIXES
+    )
+
+
+def test_offline_account_removes_unsafe_custom_auth_host_overrides():
     version = make_version()
     settings = make_settings(
-        offline_multiplayer_enabled=True
+        jvm_arguments=[
+            "-Dsafe.option=true",
+            "-Dminecraft.api.auth.host=https://nope.invalid",
+            "-Dminecraft.api.account.host=https://nope.invalid",
+            "-Dminecraft.api.session.host=https://nope.invalid",
+            "-Dminecraft.api.services.host=https://nope.invalid",
+        ],
     )
 
     jvm_args, _ = ArgumentBuilder.build(
         version=version,
         context={},
         settings=settings,
-        account=make_account(
-            AccountSource.OFFLINE
-        ),
+        account=make_account(AccountSource.OFFLINE),
     )
 
-    for argument in ArgumentBuilder.OFFLINE_MULTIPLAYER_ARGUMENTS:
-        assert argument in jvm_args
+    assert "-Dsafe.option=true" in jvm_args
+    assert not any("nope.invalid" in argument for argument in jvm_args)
+    assert not any(
+        argument.startswith(prefix)
+        for argument in jvm_args
+        for prefix in ArgumentBuilder.UNSAFE_OFFLINE_AUTH_HOST_PREFIXES
+    )
 
 
-def test_offline_multiplayer_arguments_are_not_added_when_disabled():
+def test_microsoft_account_keeps_explicit_auth_host_overrides():
+    override = "-Dminecraft.api.auth.host=https://example.invalid"
     version = make_version()
-    settings = make_settings(
-        offline_multiplayer_enabled=False
-    )
+    settings = make_settings(jvm_arguments=[override])
 
     jvm_args, _ = ArgumentBuilder.build(
         version=version,
         context={},
         settings=settings,
-        account=make_account(
-            AccountSource.OFFLINE
-        ),
+        account=make_account(AccountSource.MICROSOFT),
     )
 
-    for argument in ArgumentBuilder.OFFLINE_MULTIPLAYER_ARGUMENTS:
-        assert argument not in jvm_args
-
-
-def test_offline_multiplayer_arguments_are_not_added_for_microsoft_account():
-    version = make_version()
-    settings = make_settings(
-        offline_multiplayer_enabled=True
-    )
-
-    jvm_args, _ = ArgumentBuilder.build(
-        version=version,
-        context={},
-        settings=settings,
-        account=make_account(
-            AccountSource.MICROSOFT
-        ),
-    )
-
-    for argument in ArgumentBuilder.OFFLINE_MULTIPLAYER_ARGUMENTS:
-        assert argument not in jvm_args
+    assert override in jvm_args
 
 
 @pytest.mark.parametrize(
@@ -532,3 +569,130 @@ def test_build_respects_last_matching_argument_rule():
     jvm_args, _ = ArgumentBuilder.build(version=version, context={}, settings=make_settings(), account=make_account())
 
     assert "-Dblocked=true" not in jvm_args
+
+
+def test_offline_account_normalizes_modern_launch_identity_arguments():
+    version = make_version(
+        game_arguments=[
+            "--username",
+            "${auth_player_name}",
+            "--uuid",
+            "${auth_uuid}",
+            "--accessToken",
+            "${auth_access_token}",
+            "--clientId",
+            "${clientid}",
+            "--xuid",
+            "${auth_xuid}",
+            "--userType",
+            "${user_type}",
+            "--versionType",
+            "release",
+        ]
+    )
+
+    _, game_args = ArgumentBuilder.build(
+        version=version,
+        context={
+            "auth_player_name": "OfflinePlayer",
+            "auth_uuid": "5627dd98-e6be-3c21-b8a8-e92344183641",
+            "auth_access_token": "stale-token",
+            "clientid": "stale-client-id",
+            "auth_xuid": "stale-xuid",
+            "user_type": "offline",
+        },
+        settings=make_settings(),
+        account=make_account(AccountSource.OFFLINE),
+    )
+
+    assert game_args[game_args.index("--username") + 1] == "OfflinePlayer"
+    assert game_args[game_args.index("--uuid") + 1] == "5627dd98e6be3c21b8a8e92344183641"
+    assert game_args[game_args.index("--accessToken") + 1] == "0"
+    assert game_args[game_args.index("--userType") + 1] == "legacy"
+    assert "--clientId" not in game_args
+    assert "--xuid" not in game_args
+    assert "--versionType" in game_args
+
+
+def test_offline_account_removes_duplicate_or_custom_identity_overrides():
+    version = make_version(
+        game_arguments=[
+            "--username",
+            "${auth_player_name}",
+            "--uuid",
+            "${auth_uuid}",
+            "--accessToken",
+            "${auth_access_token}",
+            "--userType",
+            "${user_type}",
+        ]
+    )
+    settings = make_settings(
+        game_arguments=[
+            "--uuid=invalid",
+            "--accessToken",
+            "invalid-token",
+            "--userType=msa",
+            "--clientId=secret",
+            "--xuid",
+            "secret-xuid",
+        ]
+    )
+
+    _, game_args = ArgumentBuilder.build(
+        version=version,
+        context={
+            "auth_player_name": "Steve",
+            "auth_uuid": "5627dd98e6be3c21b8a8e92344183641",
+            "auth_access_token": "0",
+            "user_type": "legacy",
+        },
+        settings=settings,
+        account=make_account(AccountSource.OFFLINE),
+    )
+
+    assert game_args.count("--uuid") == 1
+    assert game_args.count("--accessToken") == 1
+    assert game_args.count("--userType") == 1
+    assert game_args[game_args.index("--uuid") + 1] == "5627dd98e6be3c21b8a8e92344183641"
+    assert game_args[game_args.index("--accessToken") + 1] == "0"
+    assert game_args[game_args.index("--userType") + 1] == "legacy"
+    assert not any(value.startswith("--clientId") for value in game_args)
+    assert not any(value.startswith("--xuid") for value in game_args)
+
+
+def test_microsoft_account_keeps_modern_identity_arguments_unchanged():
+    version = make_version(
+        game_arguments=[
+            "--uuid",
+            "${auth_uuid}",
+            "--accessToken",
+            "${auth_access_token}",
+            "--clientId",
+            "${clientid}",
+            "--xuid",
+            "${auth_xuid}",
+            "--userType",
+            "${user_type}",
+        ]
+    )
+    context = {
+        "auth_uuid": "premium-uuid",
+        "auth_access_token": "premium-token",
+        "clientid": "premium-client-id",
+        "auth_xuid": "premium-xuid",
+        "user_type": "msa",
+    }
+
+    _, game_args = ArgumentBuilder.build(
+        version=version,
+        context=context,
+        settings=make_settings(),
+        account=make_account(AccountSource.MICROSOFT),
+    )
+
+    assert game_args[game_args.index("--uuid") + 1] == "premium-uuid"
+    assert game_args[game_args.index("--accessToken") + 1] == "premium-token"
+    assert game_args[game_args.index("--clientId") + 1] == "premium-client-id"
+    assert game_args[game_args.index("--xuid") + 1] == "premium-xuid"
+    assert game_args[game_args.index("--userType") + 1] == "msa"

@@ -1,0 +1,5 @@
+{
+  "note": "Configure up to five private gateway links in Launcher Settings. The real config is stored as DPAPI-protected data in config/private/curseforge_endpoints.json.",
+  "gateway_slots": 5,
+  "bundled_gateway_urls": []
+}
