@@ -808,7 +808,7 @@
     "lan.hosting.not_prepared": "Hosting support has not been prepared for the current selection.",
     "lan.hosting.prepare": "Prepare hosting support",
     "lan.hosting.microsoft_only.help": "Vanilla session verification remains enabled. Offline accounts cannot join the hosted world.",
-    "lan.hosting.friends.warning": "Friends mode allows Microsoft and Offline accounts, but usernames are no longer strongly verified. Only use it with people you trust and keep backups of the world.",
+    "lan.hosting.friends.warning": "Friends mode allows Microsoft and Offline accounts, but usernames are no longer strongly verified. Only use it with trusted people and keep backups of the world.",
     "lan.hosting.connection.manual.help": "The launcher does not install a tunnel. Connect through the local network, a private VPN, port forwarding, or another relay.",
     "lan.hosting.connection.e4mc.help": "The launcher installs e4mc on the host instance. e4mc only provides connectivity; the authentication policy is controlled separately.",
     "lan.hosting.warning.title": "Enable Offline-compatible LAN hosting?",
