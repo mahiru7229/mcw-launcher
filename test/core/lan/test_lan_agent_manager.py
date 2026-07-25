@@ -49,14 +49,17 @@ def test_install_copies_verified_agent_atomically(tmp_path: Path, monkeypatch: p
 def test_runtime_arguments_are_emitted_only_for_private_offline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     client = tmp_path / "client.jar"
     write_supported_client(client)
+
     installed = tmp_path / "mcw-lan-agent.jar"
+    agent_log = tmp_path / "logs" / LanAgentManager.AGENT_LOG_FILENAME
+
     monkeypatch.setattr(Paths, "client", staticmethod(lambda _version: client))
     monkeypatch.setattr(LanAgentManager, "install", classmethod(lambda cls: LanAgentInstallResult(installed, False)))
-
-    agent_log = tmp_path / "logs" / LanAgentManager.AGENT_LOG_FILENAME
-    monkeypatch.setattr(LanAgentManager, "prepare_log", classmethod(lambda cls, _instance: agent_log))
+    monkeypatch.setattr(LanAgentManager, "log_path", classmethod(lambda cls, _instance: agent_log))
+    monkeypatch.setattr(LanAgentManager, "prepare_log", classmethod(lambda cls, _instance, _auth_mode=None: agent_log))
 
     assert LanAgentManager.runtime_arguments(make_version(), "microsoft_only", make_instance()) == []
+
     arguments = LanAgentManager.runtime_arguments(make_version(), "private_offline", make_instance())
 
     assert arguments == [
