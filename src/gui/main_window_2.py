@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QMainWindow, QMessageBox
 
 from src.core.config.curseforge_config_manager import CurseForgeConfigManager
 from src.core.curseforge.curseforge_client import CurseForgeClient
-from src.core.curseforge.curseforge_content_manager import CurseForgeManagedFilesRequired
+from src.core.curseforge.curseforge_errors import CurseForgeManagedFilesRequired
 from src.core.curseforge.curseforge_pack_installer import CurseForgeModpackManualDownloadRequired
 from src.core.diagnostics.diagnostics_manager import DiagnosticsManager
 from src.core.fs.paths import Paths
