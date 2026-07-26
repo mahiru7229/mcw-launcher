@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, Signal
-from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QLabel, QLineEdit, QMessageBox, QPushButton
+from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton
 
 from src.core.config.curseforge_config_manager import CurseForgeConfigManager
 from src.core.language.language_manager import tr
@@ -35,6 +35,7 @@ class InstancesPage(BasePage):
     backup_requested = Signal(str, str)
     restore_backup_requested = Signal(str, object)
     open_backups_requested = Signal(str)
+    open_instance_folder_requested = Signal(str)
     scan_modpack_requested = Signal(str)
     repair_modpack_requested = Signal(str)
     check_modpack_update_requested = Signal(str)
@@ -62,11 +63,18 @@ class InstancesPage(BasePage):
         self.instance_combo.currentTextChanged.connect(self._instance_selected)
         self.instance_info = QLabel("No instance selected")
         self.instance_info.setObjectName("MutedLabel")
-        refresh_button = set_theme_icon(QPushButton("Refresh instances"), "icon.action.refresh")
-        refresh_button.clicked.connect(self.refresh_requested.emit)
+        self.open_instance_folder_button = set_theme_icon(QPushButton(tr("instances.open_folder")), "icon.action.folder")
+        self.open_instance_folder_button.setEnabled(False)
+        self.open_instance_folder_button.clicked.connect(lambda: self.open_instance_folder_requested.emit(self.current_instance_name()))
+        self.refresh_instances_button = set_theme_icon(QPushButton("Refresh instances"), "icon.action.refresh")
+        self.refresh_instances_button.clicked.connect(self.refresh_requested.emit)
+        selected_actions = QHBoxLayout()
+        selected_actions.addWidget(self.open_instance_folder_button)
+        selected_actions.addWidget(self.refresh_instances_button)
+        selected_actions.addStretch()
         selected_card.layout.addWidget(self.instance_combo)
         selected_card.layout.addWidget(self.instance_info)
-        selected_card.layout.addWidget(refresh_button)
+        selected_card.layout.addLayout(selected_actions)
         self.root_layout.addWidget(selected_card)
 
         create_card = CardWidget("Create instance", "Choose Vanilla, Fabric, or Forge. Automatic mode selects a compatible loader version.")
@@ -132,8 +140,8 @@ class InstancesPage(BasePage):
         self.export_forge_diagnostics_button.setToolTip("Export Forge profile, logs, mod metadata, and pre-launch results without accounts, tokens, worlds, or mod JAR contents.")
         self.export_forge_diagnostics_button.clicked.connect(lambda: self.export_forge_diagnostics_requested.emit(self.current_instance_name()))
         self.export_forge_diagnostics_button.setEnabled(False)
-        self.repair_instance_button = set_theme_icon(QPushButton("Repair instance"), "icon.action.repair")
-        self.repair_instance_button.setToolTip("Verify the client, libraries, assets, natives, mod loader, and Java without changing worlds or mods.")
+        self.repair_instance_button = set_theme_icon(QPushButton(tr("repair.center.button")), "icon.action.repair")
+        self.repair_instance_button.setToolTip(tr("repair.center.tooltip"))
         self.repair_instance_button.clicked.connect(self._request_instance_repair)
         self.repair_instance_button.setEnabled(False)
 
@@ -308,6 +316,7 @@ class InstancesPage(BasePage):
             self.target_name_input.clear()
             self._set_manage_loader_available(False)
             self.manage_loader_status.setText(tr("Select an instance to manage its mod loader."))
+            self.open_instance_folder_button.setEnabled(False)
             self.manage_mods_button.setEnabled(False)
             self.repair_loader_button.setEnabled(False)
             self.restore_forge_button.setEnabled(False)
@@ -335,6 +344,7 @@ class InstancesPage(BasePage):
         self.manage_loader_combo.blockSignals(True)
         self.manage_loader_combo.setCurrentIndex(max(0, self.manage_loader_combo.findData(loader_name)))
         self.manage_loader_combo.blockSignals(False)
+        self.open_instance_folder_button.setEnabled(True)
         self.manage_mods_button.setEnabled(loader_name in {"fabric", "forge"})
         self.repair_loader_button.setEnabled(loader_name in {"fabric", "forge"})
         is_forge = loader_name == "forge"
@@ -567,10 +577,7 @@ class InstancesPage(BasePage):
 
     def _request_instance_repair(self) -> None:
         name = self.current_instance_name()
-        if not name:
-            return
-        answer = QMessageBox.question(self, tr("Repair instance"), tr("Fully verify and repair '{name}'? Worlds, mods, resource packs, and settings will be kept.", name=name), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if answer == QMessageBox.StandardButton.Yes:
+        if name:
             self.repair_instance_requested.emit(name)
 
     def _confirm_delete(self) -> None:
@@ -598,6 +605,8 @@ class InstancesPage(BasePage):
             self.export_requested.emit(name, output_path, self.include_saves_checkbox.isChecked())
 
     def retranslate_dynamic(self) -> None:
+        self.open_instance_folder_button.setText(tr("instances.open_folder"))
+        self.refresh_instances_button.setText(tr("instances.refresh"))
         self.browse_modpacks_button.setText(tr("modrinth.modpack.browse"))
         self.browse_curseforge_modpacks_button.setText(tr("curseforge.modpack.browse"))
         self.restore_forge_button.setText(tr("forge.restore_previous"))

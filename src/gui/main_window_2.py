@@ -8,11 +8,15 @@ from PySide6.QtGui import QCloseEvent, QDesktopServices, QGuiApplication, QScree
 from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget
 
 from src.core.config.curseforge_config_manager import CurseForgeConfigManager
+from src.core.curseforge.curseforge_client import CurseForgeClient
+from src.core.curseforge.curseforge_content_manager import CurseForgeManagedFilesRequired
+from src.core.curseforge.curseforge_pack_installer import CurseForgeModpackManualDownloadRequired
 from src.core.diagnostics.diagnostics_manager import DiagnosticsManager
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.language.language_manager import language_manager, tr
+from src.core.lan.lan_agent_manager import LanAgentManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.network.download_pause import is_download_paused
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
@@ -38,8 +42,10 @@ from src.gui.controllers.update_controller import UpdateController
 from src.gui.dialogs.compatible_instance_dialog import CompatibleInstanceDialog
 from src.gui.dialogs.curseforge_browser_dialog import CurseForgeBrowserDialog
 from src.gui.dialogs.curseforge_manual_download_dialog import CurseForgeManualDownloadDialog
+from src.gui.dialogs.lan_agent_log_dialog import LanAgentLogDialog
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
+from src.gui.dialogs.repair_center_dialog import RepairCenterDialog
 from src.gui.dialogs.update_dialog import UpdateDialog
 from src.gui.dialogs.unsaved_changes_dialog import UnsavedChangesDecision, prompt_unsaved_changes
 from src.gui.display_profile import DisplayProfile, select_display_profile
@@ -54,12 +60,15 @@ from src.gui.pages.logs_page import LogsPage
 from src.gui.pages.mods_page import ModsPage
 from src.gui.presenters.launch_error_presenter import LaunchErrorPresenter
 from src.gui.style import APP_STYLE
+from src.gui.task_progress import task_progress_profile
 from src.gui.task_runner import TaskRunner
 from src.gui.theme.runtime import ThemeRuntime
 from src.gui.widget.launch_control_style import LAUNCH_CONTROL_STYLE
 from src.gui.widget.launch_control_widget import LaunchControlWidget
 from src.gui.widget.right_panel_widget import RightPanelWidget
 from src.gui.widget.sidebar_widget import SidebarWidget
+from src.models.progress.progress_event import ProgressEvent
+from src.models.progress.progress_state import ProgressState
 from src.models.update.update_info import PreparedUpdate, UpdateInfo
 
 
@@ -104,6 +113,7 @@ class MainWindow(QMainWindow):
         self._restoring_instance_selection = False
         self._pending_mod_install_after_create: dict[str, object] | None = None
         self._curseforge_manual_instance_name = ""
+        self._curseforge_pending_modpack_install: CurseForgeModpackManualDownloadRequired | None = None
         self.running_instances_timer.setInterval(1000)
 
         self._build_ui()
@@ -192,6 +202,7 @@ class MainWindow(QMainWindow):
         self.curseforge_mod_dialog = CurseForgeBrowserDialog("mod", self)
         self.curseforge_modpack_dialog = CurseForgeBrowserDialog("modpack", self)
         self.curseforge_manual_dialog = CurseForgeManualDownloadDialog(self)
+        self.repair_center_dialog = RepairCenterDialog(self)
 
         self.pages = {
             "home": self.home_page,
@@ -244,7 +255,9 @@ class MainWindow(QMainWindow):
         self.instances_page.restore_forge_requested.connect(self.instance_controller.restore_previous_forge)
         self.instances_page.open_forge_logs_requested.connect(self._open_forge_logs)
         self.instances_page.export_forge_diagnostics_requested.connect(self._export_forge_diagnostics)
-        self.instances_page.repair_instance_requested.connect(self.instance_controller.repair_instance)
+        self.instances_page.repair_instance_requested.connect(self._open_repair_center)
+        self.repair_center_dialog.scan_requested.connect(self.instance_controller.scan_repair_center)
+        self.repair_center_dialog.repair_requested.connect(self.instance_controller.execute_repair_plan)
         self.instances_page.manage_mods_requested.connect(self._open_mod_manager)
         self.instances_page.browse_modpacks_requested.connect(self._open_modrinth_modpacks)
         self.instances_page.browse_curseforge_modpacks_requested.connect(self._open_curseforge_modpacks)
@@ -256,6 +269,7 @@ class MainWindow(QMainWindow):
         self.instances_page.backup_requested.connect(self.backup_controller.create)
         self.instances_page.restore_backup_requested.connect(self.backup_controller.restore)
         self.instances_page.open_backups_requested.connect(self._open_backups_folder)
+        self.instances_page.open_instance_folder_requested.connect(self._open_instance_folder)
         self.instances_page.scan_modpack_requested.connect(self.modpack_lifecycle_controller.scan)
         self.instances_page.repair_modpack_requested.connect(self.modpack_lifecycle_controller.repair)
         self.instances_page.check_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.check_update(name, self.modrinth_modpack_dialog.allowed_version_types, force_refresh=True))
@@ -279,6 +293,7 @@ class MainWindow(QMainWindow):
         self.instance_settings_page.load_requested.connect(self._request_instance_settings_load)
         self.instance_settings_page.save_requested.connect(self.instance_settings_controller.save)
         self.instance_settings_page.lan_prepare_requested.connect(self._request_lan_hosting_prepare)
+        self.instance_settings_page.lan_agent_log_requested.connect(self._open_lan_agent_log)
         self.instance_settings_page.dirty_changed.connect(lambda dirty: self.sidebar.set_page_dirty("instance_settings", dirty))
 
         self.launcher_settings_page.save_requested.connect(self.gui_settings_controller.save)
@@ -364,7 +379,7 @@ class MainWindow(QMainWindow):
         self.curseforge_mod_dialog.clear_cache_requested.connect(self.curseforge_controller.clear_cache)
         self.curseforge_modpack_dialog.clear_cache_requested.connect(self.curseforge_controller.clear_cache)
         self.curseforge_mod_dialog.install_mod_requested.connect(self._install_curseforge_mod)
-        self.curseforge_modpack_dialog.install_modpack_requested.connect(self.curseforge_controller.install_modpack)
+        self.curseforge_modpack_dialog.install_modpack_requested.connect(self._install_curseforge_modpack)
         self.curseforge_mod_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.curseforge_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.curseforge_controller.search_results_changed.connect(self._set_curseforge_results)
@@ -377,13 +392,16 @@ class MainWindow(QMainWindow):
         self.curseforge_controller.cache_cleared.connect(lambda _info: QMessageBox.information(self, tr("curseforge.title"), tr("curseforge.cache.cleared")))
         self.curseforge_controller.mod_installed.connect(self._curseforge_mod_installed)
         self.curseforge_controller.manual_file_installed.connect(self._curseforge_manual_file_installed)
+        self.curseforge_controller.manual_files_installed.connect(self._curseforge_manual_files_installed)
         self.curseforge_controller.modpack_installed.connect(self._curseforge_modpack_installed)
-        self.curseforge_manual_dialog.file_selected.connect(self._install_manual_curseforge_file)
+        self.curseforge_controller.modpack_manual_download_required.connect(self._curseforge_modpack_manual_download_required)
+        self.curseforge_manual_dialog.files_selected.connect(self._install_manual_curseforge_files)
 
         self.launch_controller.progress_received.connect(self._on_progress)
         self.modrinth_controller.progress_received.connect(self._on_progress)
         self.curseforge_controller.progress_received.connect(self._on_progress)
         self.mod_controller.progress_received.connect(self._on_progress)
+        self.java_controller.progress_received.connect(self._on_progress)
         self.modpack_lifecycle_controller.progress_received.connect(self._on_progress)
         self.update_controller.progress_received.connect(self._on_progress)
         self.lan_hosting_controller.progress_received.connect(self._on_progress)
@@ -394,9 +412,13 @@ class MainWindow(QMainWindow):
         self.launch_controller.pause_requested.connect(self.launch_control.set_pause_pending)
         self.launch_controller.launch_paused.connect(self._on_launch_paused)
         self.instance_controller.repair_progress.connect(self._on_progress)
+        self.instance_controller.repair_progress.connect(self.repair_center_dialog.set_progress)
         self.instance_controller.loader_progress.connect(self._on_progress)
         self.instance_controller.package_progress.connect(self._on_progress)
         self.instance_controller.repair_finished.connect(self._on_repair_finished)
+        self.instance_controller.repair_scan_finished.connect(self.repair_center_dialog.set_report)
+        self.instance_controller.repair_execution_finished.connect(self.repair_center_dialog.set_repair_result)
+        self.instance_controller.repair_center_failed.connect(self.repair_center_dialog.set_error)
 
         self.update_controller.update_available.connect(self._on_update_available)
         self.update_controller.no_update_available.connect(self._on_no_update_available)
@@ -533,6 +555,21 @@ class MainWindow(QMainWindow):
     def _request_launch(self) -> None:
         if self._confirm_all_unsaved_settings():
             self.launch_controller.launch()
+
+    def _open_repair_center(self, instance_name: str) -> None:
+        name = str(instance_name or "").strip()
+        if not name:
+            QMessageBox.information(self, tr("repair.center.title"), tr("repair.center.no_instance"))
+            return
+        try:
+            InstanceManager.load(name)
+        except Exception as error:
+            self._show_error(tr("repair.center.title"), str(error))
+            return
+        self.repair_center_dialog.set_instance(name)
+        self.repair_center_dialog.show()
+        self.repair_center_dialog.raise_()
+        self.repair_center_dialog.activateWindow()
 
     def _open_mod_manager(self, instance_name: str) -> None:
         instance_name = instance_name.strip()
@@ -678,6 +715,7 @@ class MainWindow(QMainWindow):
                 int(pending.get("project_id", 0) or 0),
                 int(pending.get("file_id", 0) or 0),
                 allowed_version_types,
+                allow_unverified=bool(pending.get("allow_unverified", False)),
             )
             title = tr("curseforge.mod.install")
         else:
@@ -845,7 +883,11 @@ class MainWindow(QMainWindow):
         if instance is None:
             QMessageBox.information(self, tr("curseforge.title"), tr("curseforge.mod.no_instance"))
             return
-        self.curseforge_controller.install_mod(instance.name, int(project_id), int(file_id), tuple(allowed_release_types))
+        file = self.curseforge_mod_dialog.selected_file()
+        allow_unverified = self._confirm_curseforge_unverified_install(file, instance)
+        if allow_unverified is None:
+            return
+        self.curseforge_controller.install_mod(instance.name, int(project_id), int(file_id), tuple(allowed_release_types), allow_unverified=allow_unverified)
 
     def _choose_instance_for_curseforge_install(self, file: object, loader: str, allowed_release_types: tuple[str, ...]) -> None:
         try:
@@ -857,6 +899,9 @@ class MainWindow(QMainWindow):
         if not dialog.exec():
             return
         if dialog.requested_instance_creation:
+            allow_unverified = self._confirm_curseforge_unverified_install(file, str(loader))
+            if allow_unverified is None:
+                return
             self._pending_mod_install_after_create = {
                 "provider": "curseforge",
                 "instance_name": dialog.created_instance_name,
@@ -864,6 +909,7 @@ class MainWindow(QMainWindow):
                 "file_id": int(getattr(file, "file_id", 0) or 0),
                 "loader": str(loader).strip().lower(),
                 "allowed_version_types": tuple(allowed_release_types),
+                "allow_unverified": allow_unverified,
             }
             started = self.instance_controller.create(dialog.created_instance_name, dialog.created_game_version, loader, ModLoaderManager.AUTO)
             if not started:
@@ -877,12 +923,49 @@ class MainWindow(QMainWindow):
         except Exception as error:
             self._show_error(tr("mods.instance_dialog.title"), str(error))
             return
+        allow_unverified = self._confirm_curseforge_unverified_install(file, target_instance)
+        if allow_unverified is None:
+            return
         self.mod_controller.set_instance(target_instance, refresh=False)
         self.curseforge_controller.install_mod(
             instance_name,
             int(getattr(file, "project_id", 0) or 0),
             int(getattr(file, "file_id", 0) or 0),
             tuple(allowed_release_types),
+            allow_unverified=allow_unverified,
+        )
+
+    def _confirm_curseforge_unverified_install(self, file: object | None, instance_or_loader: object) -> bool | None:
+        if file is None:
+            return False
+        if isinstance(instance_or_loader, str):
+            loader = CurseForgeClient.normalize_loader(instance_or_loader)
+        else:
+            loader, _ = ModLoaderManager.normalize(getattr(instance_or_loader, "mod_loader", ""))
+        status = CurseForgeClient.loader_compatibility(file, loader)
+        if status in {"compatible", "universal"}:
+            return False
+        answer = QMessageBox.warning(
+            self,
+            tr("curseforge.mod.unverified_warning.title"),
+            tr(
+                "curseforge.mod.unverified_warning.message",
+                file=str(getattr(file, "file_name", "") or getattr(file, "display_name", "")),
+                loader=loader.title(),
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        return True if answer == QMessageBox.StandardButton.Yes else None
+
+    def _install_curseforge_modpack(self, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: object) -> None:
+        self._curseforge_pending_modpack_install = None
+        self.curseforge_controller.install_modpack(
+            int(project_id),
+            int(file_id),
+            str(instance_name),
+            bool(install_optional_files),
+            tuple(allowed_release_types) if isinstance(allowed_release_types, (list, tuple, set)) else ("release",),
         )
 
     def _set_curseforge_results(self, project_type: str, result: object) -> None:
@@ -909,7 +992,13 @@ class MainWindow(QMainWindow):
             message += "\n\n" + tr("curseforge.manual.pending", count=len(manual_downloads))
         QMessageBox.information(self, tr("curseforge.mod.install"), message)
         if manual_downloads:
+            self._curseforge_pending_modpack_install = None
             self._curseforge_manual_instance_name = str(getattr(result, "instance_name", ""))
+            try:
+                manual_instance = InstanceManager.load(self._curseforge_manual_instance_name)
+                self.curseforge_manual_dialog.set_instance_context(manual_instance.name, manual_instance.instance_dir)
+            except Exception:
+                self.curseforge_manual_dialog.set_instance_context(self._curseforge_manual_instance_name, None)
             self.curseforge_manual_dialog.set_requirements(manual_downloads)
             self.curseforge_manual_dialog.show()
             self.curseforge_manual_dialog.raise_()
@@ -921,15 +1010,87 @@ class MainWindow(QMainWindow):
             return
         self.curseforge_controller.install_manual_file(self._curseforge_manual_instance_name, requirement, Path(source))
 
+    def _install_manual_curseforge_files(self, sources: object) -> None:
+        paths = [Path(source) for source in sources] if isinstance(sources, (list, tuple)) else []
+        if not paths:
+            return
+        if self._curseforge_pending_modpack_install is not None:
+            if len(paths) != 1:
+                QMessageBox.warning(self, tr("curseforge.manual.modpack_archive_title"), tr("curseforge.manual.modpack_single_file"))
+                return
+            self.curseforge_controller.install_manual_modpack(self._curseforge_pending_modpack_install, paths[0])
+            return
+        if not self._curseforge_manual_instance_name:
+            QMessageBox.warning(self, tr("curseforge.manual.title"), tr("curseforge.mod.no_instance"))
+            return
+        self.curseforge_controller.install_manual_files(
+            self._curseforge_manual_instance_name,
+            self.curseforge_manual_dialog.remaining_requirements,
+            paths,
+        )
+
     def _curseforge_manual_file_installed(self, instance_name: str, requirement: object, installed_name: str) -> None:
         self.curseforge_manual_dialog.mark_installed(requirement)
         if self.mod_controller.current_instance is not None and self.mod_controller.current_instance.name == instance_name:
             self.mod_controller.refresh()
-        QMessageBox.information(self, tr("curseforge.manual.title"), tr("curseforge.manual.imported", name=installed_name))
+        message = tr("curseforge.manual.imported", name=installed_name)
+        if self.curseforge_manual_dialog.remaining_count == 0:
+            message += "\n\n" + tr("curseforge.manual.all_imported")
+        QMessageBox.information(self, tr("curseforge.manual.title"), message)
+
+    def _curseforge_manual_files_installed(self, instance_name: str, result: object) -> None:
+        imported = tuple(getattr(result, "imported", ()) or ())
+        added_mods = tuple(getattr(result, "added_mods", ()) or ())
+        rejected = tuple(getattr(result, "rejected", ()) or ())
+        for item in imported:
+            requirement = getattr(item, "requirement", None)
+            if requirement is not None:
+                self.curseforge_manual_dialog.mark_installed(requirement)
+        if self.mod_controller.current_instance is not None and self.mod_controller.current_instance.name == instance_name:
+            self.mod_controller.refresh()
+
+        lines: list[str] = []
+        if imported:
+            lines.append(tr("curseforge.manual.batch_imported", count=len(imported)))
+        if added_mods:
+            lines.append(tr("curseforge.manual.batch_added", count=len(added_mods)))
+        if rejected:
+            lines.append(tr("curseforge.manual.batch_rejected", count=len(rejected)))
+            lines.append("\n".join(f"- {message}" for message in rejected[:12]))
+            if len(rejected) > 12:
+                lines.append(tr("curseforge.manual.batch_more_rejected", count=len(rejected) - 12))
+        if self.curseforge_manual_dialog.remaining_count == 0:
+            lines.append(tr("curseforge.manual.all_imported"))
+        elif imported:
+            lines.append(tr("curseforge.manual.remaining", count=self.curseforge_manual_dialog.remaining_count))
+        if not lines:
+            lines.append(tr("curseforge.manual.batch_no_files"))
+
+        message = "\n\n".join(lines)
+        if rejected:
+            QMessageBox.warning(self, tr("curseforge.manual.title"), message)
+        else:
+            QMessageBox.information(self, tr("curseforge.manual.title"), message)
+
+    def _curseforge_modpack_manual_download_required(self, request: object) -> None:
+        if not isinstance(request, CurseForgeModpackManualDownloadRequired):
+            self._show_error(tr("curseforge.modpack.install"), tr("curseforge.manual.modpack_request_invalid"))
+            return
+        self._curseforge_pending_modpack_install = request
+        self._curseforge_manual_instance_name = ""
+        self.curseforge_manual_dialog.set_instance_context(request.instance_name, None)
+        self.curseforge_manual_dialog.set_requirements([request.requirement])
+        self.curseforge_manual_dialog.show()
+        self.curseforge_manual_dialog.raise_()
+        self.curseforge_manual_dialog.activateWindow()
 
     def _curseforge_modpack_installed(self, result: object) -> None:
         instance = getattr(result, "instance", None)
         selected_name = str(getattr(instance, "name", ""))
+        if self._curseforge_pending_modpack_install is not None:
+            self.curseforge_manual_dialog.mark_installed(self._curseforge_pending_modpack_install.requirement)
+            self.curseforge_manual_dialog.close()
+            self._curseforge_pending_modpack_install = None
         self.instance_controller.refresh(selected_name=selected_name)
         self.curseforge_modpack_dialog.close()
         QMessageBox.information(self, tr("curseforge.modpack.install"), tr("curseforge.modpack.installed", name=selected_name))
@@ -941,7 +1102,7 @@ class MainWindow(QMainWindow):
             if self.instance_settings_page.is_dirty:
                 return
 
-        if str(auth_mode) == "friends":
+        if str(auth_mode) in {"private_offline", "friends"}:
             answer = QMessageBox.warning(
                 self,
                 tr("lan.hosting.warning.title"),
@@ -954,6 +1115,19 @@ class MainWindow(QMainWindow):
 
         self.instance_settings_page.set_lan_prepare_status(tr("lan.hosting.preparing"))
         self.lan_hosting_controller.prepare(instance_name, auth_mode, connection_provider)
+
+    def _open_lan_agent_log(self, instance_name: str) -> None:
+        name = str(instance_name).strip()
+        if not name:
+            QMessageBox.information(self, tr("lan.agent.log.title"), tr("lan.agent.log.select_instance"))
+            return
+        try:
+            instance = InstanceManager.load(name)
+            log_path = LanAgentManager.log_path(instance)
+        except Exception as error:
+            self._show_error(tr("lan.agent.log.title"), str(error))
+            return
+        LanAgentLogDialog(log_path, self).exec()
 
     def _on_lan_hosting_prepared(self, result: object) -> None:
         installed = tuple(getattr(result, "installed_projects", ()) or ())
@@ -970,8 +1144,8 @@ class MainWindow(QMainWindow):
             lines.append(tr("lan.hosting.prepared.reused", projects=", ".join(reused)))
         if disabled:
             lines.append(tr("lan.hosting.prepared.disabled", projects=", ".join(disabled)))
-        if auth_mode == "friends":
-            lines.append(tr("lan.hosting.prepared.friends_steps"))
+        if auth_mode == "private_offline":
+            lines.append(tr("lan.hosting.prepared.private_offline_steps"))
         else:
             lines.append(tr("lan.hosting.prepared.microsoft_steps"))
         if connection_provider == "e4mc":
@@ -995,6 +1169,20 @@ class MainWindow(QMainWindow):
         directory = executable.parent.parent if executable.parent.name.casefold() == "bin" else executable.parent
         if not directory.exists():
             self._show_error(tr("Java installations"), tr("The selected Java directory no longer exists."))
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory.resolve())))
+
+    def _open_instance_folder(self, instance_name: str) -> None:
+        name = str(instance_name).strip()
+        if not name:
+            QMessageBox.information(self, tr("Instances"), tr("Select an instance first."))
+            return
+        try:
+            instance = InstanceManager.load(name)
+            directory = Path(instance.instance_dir)
+            directory.mkdir(parents=True, exist_ok=True)
+        except Exception as error:
+            self._show_error(tr("Instances"), str(error))
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory.resolve())))
 
@@ -1249,71 +1437,66 @@ class MainWindow(QMainWindow):
             self.curseforge_mod_dialog,
             self.curseforge_modpack_dialog,
             self.curseforge_manual_dialog,
+            self.repair_center_dialog,
         ):
             retranslate_dynamic = getattr(widget, "retranslate_dynamic", None)
             if callable(retranslate_dynamic):
                 retranslate_dynamic()
         self.theme_runtime.reapply_assets(self)
 
-    def _on_task_started(self, _task_id: str, message: str, blocking: bool) -> None:
+    def _on_task_started(self, task_id: str, message: str, blocking: bool) -> None:
         if blocking:
             self._suppress_loader_progress = False
-        if _task_id == self.launch_controller.TASK_ID:
+        if task_id == self.launch_controller.TASK_ID:
             self._set_launch_active(True)
-        if _task_id == "mods.update.check":
+
+        profile = task_progress_profile(task_id)
+        if profile is not None:
+            self._on_progress(ProgressEvent(stage=profile.stage, message=message))
+
+        if task_id == "mods.update.check":
             self.mod_manager_dialog.set_update_checking(True)
-            return
-        if _task_id.startswith("modpack."):
+        if task_id.startswith("modpack."):
             self.instances_page.set_modpack_busy(True)
-        if _task_id.startswith("update."):
+        if task_id.startswith("update."):
             self.launcher_settings_page.set_update_busy(True)
             self.launcher_settings_page.set_update_status(message)
-        if _task_id.startswith("modrinth."):
-            self._modrinth_tasks.add(_task_id)
+        if task_id.startswith("modrinth."):
+            self._modrinth_tasks.add(task_id)
             self.modrinth_mod_dialog.set_busy(True)
             self.modrinth_modpack_dialog.set_busy(True)
-        if _task_id.startswith("mod_catalog."):
-            self._mod_catalog_tasks.add(_task_id)
+        if task_id.startswith("mod_catalog."):
+            self._mod_catalog_tasks.add(task_id)
             self.mods_page.set_busy(True)
-        if _task_id.startswith("curseforge."):
-            self._curseforge_tasks.add(_task_id)
+        if task_id.startswith("curseforge."):
+            self._curseforge_tasks.add(task_id)
             self.curseforge_mod_dialog.set_busy(True)
             self.curseforge_modpack_dialog.set_busy(True)
-            if ".catalog." in _task_id or _task_id.endswith(".catalog"):
-                self._curseforge_catalog_tasks.add(_task_id)
+            if ".catalog." in task_id or task_id.endswith(".catalog"):
+                self._curseforge_catalog_tasks.add(task_id)
                 self.mods_page.set_busy(True)
-        if blocking or not self.task_runner.is_busy:
+        if profile is None and (blocking or not self.task_runner.is_busy):
             self._set_status(message)
 
     def _on_task_succeeded(self, task_id: str, _result: object) -> None:
         completion_messages = {
-            self.instance_controller.CREATE_TASK_ID: (
-                "loader.progress.instance_ready",
-                "loader.progress.instance_ready_detail",
-            ),
-            self.instance_controller.LOADER_CHANGE_TASK_ID: (
-                "loader.progress.ready",
-                "loader.progress.ready_detail",
-            ),
-            self.instance_controller.LOADER_REPAIR_TASK_ID: (
-                "loader.progress.repaired",
-                "loader.progress.repaired_detail",
-            ),
-            self.instance_controller.FORGE_RESTORE_TASK_ID: (
-                "loader.progress.restored",
-                "loader.progress.restored_detail",
-            ),
+            self.instance_controller.CREATE_TASK_ID: ("loader.progress.instance_ready", "loader.progress.instance_ready_detail"),
+            self.instance_controller.LOADER_CHANGE_TASK_ID: ("loader.progress.ready", "loader.progress.ready_detail"),
+            self.instance_controller.LOADER_REPAIR_TASK_ID: ("loader.progress.repaired", "loader.progress.repaired_detail"),
+            self.instance_controller.FORGE_RESTORE_TASK_ID: ("loader.progress.restored", "loader.progress.restored_detail"),
         }
         completion = completion_messages.get(task_id)
-        if completion is None:
+        if completion is not None:
+            self._suppress_loader_progress = True
+            status, detail = completion
+            QTimer.singleShot(0, lambda: self.launch_control.set_operation_completed(status, detail))
             return
 
-        # A few final worker-thread progress signals may still be queued after
-        # the success signal. Suppress only loader stages until the next
-        # blocking task and publish an explicit terminal 100% state.
-        self._suppress_loader_progress = True
-        status, detail = completion
-        QTimer.singleShot(0, lambda: self.launch_control.set_operation_completed(status, detail))
+        profile = task_progress_profile(task_id)
+        if profile is None or task_id == self.launch_controller.TASK_ID:
+            return
+        event = ProgressEvent(stage=profile.stage, message=profile.success_message, state=ProgressState.SUCCEEDED, detail=profile.success_detail)
+        QTimer.singleShot(0, lambda event=event: self._on_progress(event))
 
     def _on_task_completed(self, task_id: str, _result: object) -> None:
         if task_id == self.launch_controller.TASK_ID:
@@ -1351,6 +1534,20 @@ class MainWindow(QMainWindow):
                 self._on_launch_paused()
                 self.instance_controller.refresh_running(force=True)
                 return
+            if isinstance(error, CurseForgeManagedFilesRequired):
+                self._curseforge_pending_modpack_install = None
+                self._curseforge_manual_instance_name = error.instance_name
+                self.curseforge_manual_dialog.set_instance_context(error.instance_name, error.instance_dir)
+                self.curseforge_manual_dialog.set_requirements(error.requirements)
+                status = tr("curseforge.manual.launch_blocked", count=len(error.requirements))
+                self.launch_control.set_failed(status, tr("curseforge.manual.launch_blocked_detail"))
+                self.home_page.set_status(status)
+                self.right_panel.set_status(status)
+                self.curseforge_manual_dialog.show()
+                self.curseforge_manual_dialog.raise_()
+                self.curseforge_manual_dialog.activateWindow()
+                self.instance_controller.refresh_running(force=True)
+                return
             view = LaunchErrorPresenter.present(error)
             self.launch_control.set_failed(view.status, view.progress_detail)
             self.home_page.set_status(view.status)
@@ -1370,6 +1567,12 @@ class MainWindow(QMainWindow):
             self.launch_control.set_failed(status, tr("launch.error.logs_hint"))
             self.home_page.set_status(status)
             self.right_panel.set_status(status)
+            return
+
+        profile = task_progress_profile(task_id)
+        if profile is None:
+            return
+        self._on_progress(ProgressEvent(stage=profile.stage, message=profile.failure_message, state=ProgressState.FAILED, detail=str(error)))
 
     def _on_launch_paused(self) -> None:
         self.launch_control.set_paused()
@@ -1389,7 +1592,7 @@ class MainWindow(QMainWindow):
 
         self.launch_control.set_progress_event(event)
 
-        message = str(getattr(event, "message", "Working..."))
+        message = tr(str(getattr(event, "message", "Working...")))
         self.home_page.set_status(message)
         self.right_panel.set_status(message)
 

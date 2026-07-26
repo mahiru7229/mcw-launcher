@@ -11,6 +11,7 @@ from src.core.minecraft.library_rule_manager import LibraryRuleManager
 from src.core.network.httpx_downloader import HttpDownloader
 from src.core.progress.file_batch_progress import FileBatchProgress
 from src.core.progress.progress_reporter import ProgressReporter
+from src.core.repair.verification_cache import VerificationCache
 from src.models.minecraft.library import DownloadLibrary
 from src.models.minecraft.version import Version
 from src.models.progress.progress_stage import ProgressStage
@@ -25,6 +26,8 @@ class DownloadLibraryManager:
     def load(
         version: Version,
         reporter: ProgressReporter | None = None,
+        verification_cache: VerificationCache | None = None,
+        fast_verify: bool = False,
     ) -> list[Path]:
         library_data = DownloadLibraryManager._load_download(
             version.path
@@ -52,7 +55,17 @@ class DownloadLibraryManager:
                 for library in libraries:
                     token = object()
                     child_reporter = batch_progress.reporter_for(token)
-                    future = executor.submit(DownloadLibraryManager._download_single_library, library, version) if child_reporter is None else executor.submit(DownloadLibraryManager._download_single_library, library, version, child_reporter)
+                    if verification_cache is None and not fast_verify:
+                        future = executor.submit(DownloadLibraryManager._download_single_library, library, version) if child_reporter is None else executor.submit(DownloadLibraryManager._download_single_library, library, version, child_reporter)
+                    else:
+                        future = executor.submit(
+                            DownloadLibraryManager._download_single_library,
+                            library,
+                            version,
+                            child_reporter,
+                            verification_cache,
+                            fast_verify,
+                        )
                     future_to_library[future] = (library, token)
 
                 for future in concurrent.futures.as_completed(
@@ -83,23 +96,33 @@ class DownloadLibraryManager:
         library: DownloadLibrary,
         version: Version,
         reporter: ProgressReporter | None = None,
+        verification_cache: VerificationCache | None = None,
+        fast_verify: bool = False,
     ) -> Path:
         library_path = Paths.libraries() / library.path
 
-        if (
-            library_path.exists()
-            and HttpDownloader.verify_sha1(
-                library_path,
-                library.sha1,
-            )
-        ):
+        valid = False
+        if library_path.exists():
+            if verification_cache is not None:
+                verification = verification_cache.verify(
+                    "library:" + library.path.as_posix(),
+                    library_path,
+                    library.size,
+                    library.sha1,
+                    "sha1",
+                    force_hash=not fast_verify,
+                )
+                valid = verification.valid
+            else:
+                valid = HttpDownloader.verify_sha1(library_path, library.sha1)
+
+        if valid:
             if library.is_native:
                 DownloadLibraryManager._extract_native(
                     native_path=library_path,
                     version=version,
                     sha1=library.sha1,
                 )
-
             return library_path
 
         HttpDownloader.delete_file(library_path)
@@ -108,6 +131,15 @@ class DownloadLibraryManager:
         if reporter is not None:
             kwargs.update({"reporter": reporter, "progress_stage": ProgressStage.DOWNLOADING_LIBRARIES, "progress_message": f"Downloading library {library_path.name}..."})
         downloaded_path = HttpDownloader.download(**kwargs)
+        if verification_cache is not None:
+            verification_cache.verify(
+                "library:" + library.path.as_posix(),
+                downloaded_path,
+                library.size,
+                library.sha1,
+                "sha1",
+                force_hash=True,
+            )
 
         if library.is_native:
             DownloadLibraryManager._extract_native(

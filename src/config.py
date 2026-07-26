@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-VERSION = "v0.7.3 Beta 1"
-VERSION_ID = "0.7.3-beta.1"
+VERSION = "v0.9.0 Beta 1"
+VERSION_ID = "0.9.0-beta.1"
 VERSION_TAG = f"v{VERSION_ID}"
 UPDATE_CHANNEL = "beta"
 GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
@@ -11,8 +11,10 @@ LAUNCHER_NAME = f"MCW LAUNCHER {VERSION}"
 MODRINTH_USER_AGENT = f"{DEVELOPER_NAME}/{LAUNCHER_SLUG}/{VERSION_ID} (https://github.com/{GITHUB_REPOSITORY})"
 CURSEFORGE_USER_AGENT = MODRINTH_USER_AGENT
 
-# CurseForge gateway links are supplied externally per installation.
-# No private gateway URL is bundled into the launcher or release package.
+# Public CurseForge gateway used by default on fresh installations. Custom
+# HTTPS gateways configured by the user or deployment environment still take
+# priority and the CurseForge API credential remains server-side.
+CURSEFORGE_DEFAULT_GATEWAY_URL = "https://mcw-curseforge-gateway.vercel.app/api/curseforge"
 CURSEFORGE_CACHE_MAX_BYTES = 10 * 1024 * 1024
 CURSEFORGE_MANUAL_REFRESH_COOLDOWN_SECONDS = 60
 
