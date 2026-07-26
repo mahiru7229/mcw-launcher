@@ -27,6 +27,7 @@ from src.models.progress.progress_stage import ProgressStage
 
 class FakeRunLock:
     def __init__(self) -> None:
+        self.token = "test-launch-lock-token"
         self.tracked_process = None
         self.released = False
 
@@ -896,8 +897,9 @@ def test_run_uses_per_instance_modrinth_failure_policy_and_returns_non_blocking_
 
     monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
 
-    def fake_ensure(instance, reporter, block_launch_on_failure=True):
+    def fake_ensure(instance, reporter, block_launch_on_failure=True, launch_lock_token=None):
         received["block_launch_on_failure"] = block_launch_on_failure
+        received["launch_lock_token"] = launch_lock_token
         return ("mods/example.jar must be installed manually",)
 
     monkeypatch.setattr(ModrinthContentManager, "ensure", fake_ensure)
@@ -905,6 +907,7 @@ def test_run_uses_per_instance_modrinth_failure_policy_and_returns_non_blocking_
     result = MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object())
 
     assert received["block_launch_on_failure"] is False
+    assert received["launch_lock_token"] == "test-launch-lock-token"
     assert result["warnings"] == ("mods/example.jar must be installed manually",)
 
 

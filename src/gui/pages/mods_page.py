@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtCore import QTimer, Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem
 
 from src.core.curseforge.curseforge_client import CurseForgeClient
@@ -171,11 +172,16 @@ class ModsPage(BasePage):
         install_row = QHBoxLayout()
         self.version_combo = QComboBox()
         self.version_combo.currentIndexChanged.connect(self._version_selected)
+        self.open_browser_button = QPushButton()
+        self.open_browser_button.setVisible(False)
+        self.open_browser_button.setEnabled(False)
+        self.open_browser_button.clicked.connect(self._open_selected_project)
         self.install_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.install_button.setObjectName("PrimaryButton")
         self.install_button.setEnabled(False)
         self.install_button.clicked.connect(self._request_install)
         install_row.addWidget(self.version_combo, 1)
+        install_row.addWidget(self.open_browser_button)
         install_row.addWidget(self.install_button)
         browser_card.layout.addLayout(install_row)
 
@@ -316,10 +322,11 @@ class ModsPage(BasePage):
         self.version_combo.blockSignals(True)
         self.version_combo.clear()
         for file in self._curseforge_files:
-            games = ", ".join(file.game_versions[:4])
+            games = ", ".join(file.game_versions[:4]) or tr("common.unknown")
             if len(file.game_versions) > 4:
                 games += ", …"
-            self.version_combo.addItem(f"{file.display_name} • {file.release_type} • Minecraft {games}", file.file_id)
+            loader_status = self._curseforge_loader_status_text(file)
+            self.version_combo.addItem(f"{file.display_name} • {file.release_type} • {loader_status} • Minecraft {games}", file.file_id)
         self.version_combo.blockSignals(False)
         self.install_button.setEnabled(not self._busy and bool(self._curseforge_files))
         self._update_channel_summary()
@@ -346,6 +353,7 @@ class ModsPage(BasePage):
         self.include_beta_checkbox.setEnabled(not self._busy)
         self.include_alpha_checkbox.setEnabled(not self._busy)
         self.clear_cache_button.setEnabled(not self._busy)
+        self.open_browser_button.setEnabled(not self._busy and self._has_selected_curseforge_url())
         self.install_button.setEnabled(not self._busy and self._has_installable_items())
         self._update_pagination_buttons()
         self._render_cache_status()
@@ -397,6 +405,7 @@ class ModsPage(BasePage):
         self._versions = []
         self._curseforge_files = []
         self.version_combo.clear()
+        self.open_browser_button.setEnabled(not self._busy and isinstance(project, CurseForgeProject) and bool(project.project_url))
         self.install_button.setEnabled(False)
         if isinstance(project, CurseForgeProject):
             self.details_label.setText(tr("curseforge.project.loading_files", name=project.name))
@@ -415,6 +424,7 @@ class ModsPage(BasePage):
         self._versions = []
         self._curseforge_files = []
         self.version_combo.clear()
+        self.open_browser_button.setEnabled(False)
         self.install_button.setEnabled(False)
         self.details_label.setText(message)
 
@@ -458,7 +468,8 @@ class ModsPage(BasePage):
             if file is None or not isinstance(project, CurseForgeProject):
                 return
             distribution = tr("curseforge.file.manual_required") if not file.download_url or not file.is_available else tr("curseforge.file.automatic")
-            self.details_label.setText(tr("curseforge.project.details", name=project.name, authors=", ".join(project.authors) or tr("common.unknown"), version=file.display_name, release_type=file.release_type, downloads=f"{project.download_count:,}", description=f"{project.summary}\n{distribution}"))
+            loader_status = self._curseforge_loader_status_text(file, detailed=True)
+            self.details_label.setText(tr("curseforge.project.details", name=project.name, authors=", ".join(project.authors) or tr("common.unknown"), version=file.display_name, release_type=file.release_type, downloads=f"{project.download_count:,}", description=f"{project.summary}\n{distribution}\n{loader_status}"))
             return
         version = self.selected_version()
         project = self._selected_project
@@ -468,6 +479,25 @@ class ModsPage(BasePage):
         if len(version.game_versions) > 8:
             game_versions += ", …"
         self.details_label.setText(tr("mods.catalog.details", title=project.title, author=project.author or tr("common.unknown"), version=version.version_number, release_type=version.version_type, minecraft=game_versions, loader=self.selected_loader.title(), description=project.description))
+
+    def _has_selected_curseforge_url(self) -> bool:
+        return isinstance(self._selected_project, CurseForgeProject) and bool(self._selected_project.project_url)
+
+    def _open_selected_project(self) -> None:
+        project = self._selected_project
+        if isinstance(project, CurseForgeProject) and project.project_url:
+            QDesktopServices.openUrl(QUrl(project.project_url))
+
+    def _curseforge_loader_status_text(self, file: CurseForgeFile, detailed: bool = False) -> str:
+        status = CurseForgeClient.loader_compatibility(file, self.selected_loader)
+        if status == "compatible":
+            return tr("curseforge.file.loader.compatible", loader=self.selected_loader.title())
+        if status == "universal":
+            return tr("curseforge.file.loader.universal")
+        if status == "unknown":
+            return tr("curseforge.file.loader.unknown")
+        key = "curseforge.file.loader.unverified_detail" if detailed else "curseforge.file.loader.unverified"
+        return tr(key, loader=self.selected_loader.title())
 
     def _request_install(self) -> None:
         if self.selected_provider == "curseforge":
@@ -608,6 +638,8 @@ class ModsPage(BasePage):
         self.cache_status_label.setVisible(is_curseforge)
         self.refresh_button.setVisible(is_curseforge)
         self.clear_cache_button.setVisible(is_curseforge)
+        self.open_browser_button.setVisible(is_curseforge)
+        self.open_browser_button.setEnabled(not self._busy and is_curseforge and self._has_selected_curseforge_url())
         self._configure_sort_combo()
         self._update_channel_summary()
         self.results_table.setHorizontalHeaderLabels(
@@ -690,6 +722,7 @@ class ModsPage(BasePage):
         self.clear_cache_button.setText(tr("curseforge.cache.clear"))
         self.previous_button.setText(tr("common.previous"))
         self.next_button.setText(tr("common.next"))
+        self.open_browser_button.setText(tr("curseforge.open_in_browser"))
         self.install_button.setText(tr("mods.catalog.choose_instance"))
         self.include_beta_checkbox.setText(tr("modrinth.channel.beta"))
         self.include_alpha_checkbox.setText(tr("modrinth.channel.alpha"))

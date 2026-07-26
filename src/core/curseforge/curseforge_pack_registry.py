@@ -58,6 +58,10 @@ class CurseForgePackRegistry:
                 "displayName": str(raw.get("displayName") or filename).strip(),
                 "pendingDownload": bool(raw.get("pendingDownload", False)),
                 "lastDownloadError": str(raw.get("lastDownloadError") or "").strip(),
+                "retryableDownload": bool(raw.get("retryableDownload", True)),
+                "acceptedUnverified": bool(raw.get("acceptedUnverified", False)),
+                "compatibilityWarning": str(raw.get("compatibilityWarning") or "").strip(),
+                "manualImport": bool(raw.get("manualImport", False)),
             })
         output = dict(data)
         output["schemaVersion"] = CurseForgePackRegistry.SCHEMA_VERSION

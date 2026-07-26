@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Event, Lock
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 import json
 import re
 
@@ -37,6 +37,17 @@ class CurseForgeClient:
     BATCH_TTL_SECONDS = 30 * 60
     REQUEST_TIMEOUT_SECONDS = 15.0
     FAILOVER_STATUS_CODES = frozenset({404, 408, 425, 429,*range(500, 600),})
+    PERMANENT_GATEWAY_CODES = frozenset({
+        # Legacy gateway codes kept for compatibility with older deployments.
+        "CURSEFORGE_CREDENTIALS_UNAVAILABLE",
+        "FILE_UNAVAILABLE",
+        "THIRD_PARTY_DISTRIBUTION_DISABLED",
+        # Gateway v0.1.1 structured error codes.
+        "MANUAL_DOWNLOAD_REQUIRED",
+        "GATEWAY_CREDENTIALS_REJECTED",
+        "UPSTREAM_FORBIDDEN",
+        "UPSTREAM_REJECTED_REQUEST",
+    })
 
     _inflight: dict[str, _InFlightRequest] = {}
     _inflight_guard = Lock()
@@ -98,8 +109,6 @@ class CurseForgeClient:
         }
         if game_version:
             params["gameVersion"] = str(game_version).strip()
-        if normalized_loader and game_version:
-            params["loader"] = normalized_loader
         lookup = CurseForgeClient._request_json(
             "GET",
             "/search",
@@ -114,16 +123,16 @@ class CurseForgeClient:
         data = payload.get("data", []) if isinstance(payload, dict) else []
         pagination = payload.get("pagination", {}) if isinstance(payload, dict) and isinstance(payload.get("pagination"), dict) else {}
         projects = tuple(CurseForgeClient._parse_project(item) for item in data if isinstance(item, dict))
-        # CurseForge requires gameVersion when modLoaderType is used by the
-        # project-search endpoint. Catalog mode intentionally has no game
-        # version yet, so filter the current page using latestFilesIndexes.
-        # Projects without index metadata remain visible to avoid false
-        # negatives; their file list is still filtered by the files endpoint.
-        if normalized_loader and not game_version:
-            projects = tuple(
-                project for project in projects
-                if not project.loaders or normalized_loader in project.loaders
-            )
+        # Loader metadata is advisory. Universal JARs are sometimes indexed
+        # under only one loader, so filtering projects here can hide a valid
+        # Fabric/Forge build before the launcher has inspected the JAR. Keep
+        # every search result and rank likely matches first instead.
+        if normalized_loader:
+            projects = tuple(sorted(
+                enumerate(projects),
+                key=lambda pair: (CurseForgeClient._loader_rank(pair[1].loaders, normalized_loader), pair[0]),
+            ))
+            projects = tuple(project for _, project in projects)
         return CurseForgeSearchResult(
             projects=projects,
             total_count=int(pagination.get("totalCount", len(projects)) or 0),
@@ -183,11 +192,10 @@ class CurseForgeClient:
         }
         if game_version:
             params["gameVersion"] = str(game_version).strip()
-        # Unlike project search, CurseForge's files endpoint supports loader
-        # filtering without requiring a Minecraft version. Catalog mode uses
-        # this path before the user chooses or creates an instance.
-        if normalized_loader:
-            params["loader"] = normalized_loader
+        # Do not send a strict loader filter. CurseForge metadata can label a
+        # dual-loader JAR as only Fabric or only Forge. The selected loader is
+        # therefore used for ranking and UI warnings; the downloaded JAR is the
+        # final authority and is validated by ModManager before installation.
         lookup = CurseForgeClient._request_json(
             "GET",
             "/files",
@@ -200,11 +208,16 @@ class CurseForgeClient:
         )
         data = lookup.payload.get("data", []) if isinstance(lookup.payload, dict) else []
         allowed = set(CurseForgeClient.normalize_release_types(release_types))
+        normalized_game_version = str(game_version).strip()
         files = [CurseForgeClient._parse_file(item) for item in data if isinstance(item, dict)]
-        files = [item for item in files if item.release_type in allowed]
-        if normalized_loader:
-            files = [item for item in files if not item.loaders or normalized_loader in item.loaders]
+        files = [
+            item for item in files
+            if item.release_type in allowed
+            and (not normalized_game_version or not item.game_versions or normalized_game_version in item.game_versions)
+        ]
         files.sort(key=lambda item: item.file_date, reverse=True)
+        if normalized_loader:
+            files.sort(key=lambda item: CurseForgeClient._loader_rank(item.loaders, normalized_loader))
         return CurseForgeFileListResult(files=tuple(files), cache_info=lookup.cache_info)
 
     @staticmethod
@@ -290,6 +303,47 @@ class CurseForgeClient:
         if normalized in {"forge", "fabric", "quilt", "neoforge"}:
             return normalized
         return ""
+
+    @staticmethod
+    def loader_compatibility(file: CurseForgeFile, loader: str) -> str:
+        return CurseForgeClient._loader_compatibility(file.loaders, loader)
+
+    @staticmethod
+    def is_permanent_error(error: BaseException) -> bool:
+        code = str(getattr(error, "gateway_error_code", "") or "").strip().upper()
+        if code in CurseForgeClient.PERMANENT_GATEWAY_CODES:
+            return True
+        status = int(getattr(error, "gateway_status", 0) or 0)
+        if status in {400, 401, 403, 404}:
+            return True
+        message = str(error).casefold()
+        return any(
+            marker in message
+            for marker in (
+                "credentials are unavailable",
+                "third-party distribution",
+                "must be downloaded manually",
+                "manual download required",
+                "gateway credentials",
+            )
+        )
+
+    @staticmethod
+    def _loader_compatibility(loaders: tuple[str, ...] | list[str] | set[str], loader: str) -> str:
+        normalized_loader = CurseForgeClient.normalize_loader(loader)
+        normalized = {str(value).strip().casefold() for value in loaders if str(value).strip()}
+        if {"fabric", "forge"}.issubset(normalized):
+            return "universal"
+        if normalized_loader and normalized_loader in normalized:
+            return "compatible"
+        if not normalized:
+            return "unknown"
+        return "unverified"
+
+    @staticmethod
+    def _loader_rank(loaders: tuple[str, ...] | list[str] | set[str], loader: str) -> int:
+        status = CurseForgeClient._loader_compatibility(loaders, loader)
+        return {"compatible": 0, "universal": 1, "unknown": 2, "unverified": 3}.get(status, 4)
 
     @staticmethod
     def normalize_release_types(release_types: tuple[str, ...] | list[str] | set[str] | None = None) -> tuple[str, ...]:
@@ -441,7 +495,7 @@ class CurseForgeClient:
         links = data.get("links") if isinstance(data.get("links"), dict) else {}
         project_id = int(data.get("id", 0) or 0)
         slug = str(data.get("slug") or "").strip()
-        project_url = str(links.get("websiteUrl") or "").strip()
+        project_url = CurseForgeClient._safe_project_url(links.get("websiteUrl"))
         loader_names = {0: "any", 1: "forge", 2: "cauldron", 3: "liteloader", 4: "fabric", 5: "quilt", 6: "neoforge"}
         indexes = data.get("latestFilesIndexes", []) if isinstance(data.get("latestFilesIndexes"), list) else []
         game_versions = tuple(dict.fromkeys(
@@ -455,7 +509,8 @@ class CurseForgeClient:
             if isinstance(item, dict) and loader_names.get(int(item.get("modLoader", -1) or -1), "") not in {"", "any"}
         ))
         if not project_url and slug:
-            project_url = f"https://www.curseforge.com/minecraft/mc-mods/{quote(slug, safe='-')}"
+            category = "modpacks" if int(data.get("classId", 0) or 0) == CurseForgeClient.CLASS_MODPACKS else "mc-mods"
+            project_url = f"https://www.curseforge.com/minecraft/{category}/{quote(slug, safe='-')}"
         return CurseForgeProject(
             project_id=project_id,
             name=str(data.get("name") or "Unknown project").strip(),
@@ -470,6 +525,21 @@ class CurseForgeClient:
             game_versions=game_versions,
             loaders=loaders,
         )
+
+    @staticmethod
+    def _safe_project_url(value: object) -> str:
+        raw = str(value or "").strip()
+        if not raw:
+            return ""
+        parsed = urlparse(raw)
+        hostname = str(parsed.hostname or "").casefold()
+        if parsed.scheme.casefold() != "https":
+            return ""
+        if hostname != "curseforge.com" and not hostname.endswith(".curseforge.com"):
+            return ""
+        if parsed.username or parsed.password:
+            return ""
+        return raw
 
     @staticmethod
     def _parse_file(data: dict) -> CurseForgeFile:

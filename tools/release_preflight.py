@@ -13,7 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.config import UPDATE_CHANNEL, VERSION, VERSION_ID, VERSION_TAG
+from src.config import CURSEFORGE_DEFAULT_GATEWAY_URL, UPDATE_CHANNEL, VERSION, VERSION_ID, VERSION_TAG
 from src.core.lan.lan_agent_manager import LanAgentManager
 
 TEXT_SUFFIXES = {".json", ".md", ".ps1", ".py", ".txt", ".yml", ".yaml"}
@@ -97,14 +97,37 @@ def audit_language_packs(project_root: Path) -> list[str]:
 
 
 def audit_private_gateway_bundling(project_root: Path) -> list[str]:
+    """Ensure the bundled gateway is public configuration, never a secret.
+
+    The launcher may ship the public MCW gateway URL, but it must not contain a
+    CurseForge API key, embedded URL credentials, or an unexpected private
+    endpoint. Custom endpoints remain stored outside the release package.
+    """
+
     errors: list[str] = []
     config_path = project_root / "src" / "config.py"
     try:
         config_text = config_path.read_text(encoding="utf-8")
     except OSError as error:
         return [f"Unable to inspect src/config.py: {error}"]
-    if re.search(r"^CURSEFORGE_GATEWAY_URL\s*=", config_text, flags=re.MULTILINE):
-        errors.append("Private CurseForge gateway URL must not be bundled in src/config.py")
+
+    legacy_match = re.search(r'^CURSEFORGE_GATEWAY_URL\s*=\s*[\'"]([^\'"]+)', config_text, flags=re.MULTILINE)
+    if legacy_match is not None:
+        errors.append("Use CURSEFORGE_DEFAULT_GATEWAY_URL for the public gateway; legacy private gateway constants are not allowed")
+
+    default_match = re.search(r'^CURSEFORGE_DEFAULT_GATEWAY_URL\s*=\s*[\'"]([^\'"]+)', config_text, flags=re.MULTILINE)
+    if default_match is None:
+        errors.append("src/config.py must define the public CurseForge default gateway")
+    elif default_match.group(1).rstrip("/") != CURSEFORGE_DEFAULT_GATEWAY_URL.rstrip("/"):
+        errors.append("src/config.py contains an unexpected CurseForge default gateway URL")
+
+    secret_patterns = (
+        r'^CURSEFORGE_API_KEY\s*=',
+        r'^CURSEFORGE_X_API_KEY\s*=',
+        r'[\'"]x-api-key[\'"]\s*:\s*[\'"][^\'"]+[\'"]',
+    )
+    if any(re.search(pattern, config_text, flags=re.MULTILINE | re.IGNORECASE) for pattern in secret_patterns):
+        errors.append("CurseForge API credentials must not be bundled in src/config.py")
 
     example_path = project_root / "config" / "curseforge.example.json"
     try:
@@ -112,9 +135,12 @@ def audit_private_gateway_bundling(project_root: Path) -> list[str]:
     except (OSError, json.JSONDecodeError) as error:
         errors.append(f"CurseForge config template error: {error}")
     else:
+        default_url = str(example.get("default_gateway_url") or "").rstrip("/") if isinstance(example, dict) else ""
+        if default_url != CURSEFORGE_DEFAULT_GATEWAY_URL.rstrip("/"):
+            errors.append("config/curseforge.example.json must document the public default gateway URL")
         bundled = example.get("bundled_gateway_urls") if isinstance(example, dict) else None
-        if bundled != []:
-            errors.append("config/curseforge.example.json must not contain bundled gateway URLs")
+        if bundled is not None and bundled != [] and bundled != ():
+            errors.append("config/curseforge.example.json must not contain additional bundled gateway URLs")
 
     gitignore_path = project_root / ".gitignore"
     try:

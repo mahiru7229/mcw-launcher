@@ -52,8 +52,9 @@ class MinecraftExecutor:
                 LanAgentManager.append_log_path(lan_log_path, "Legacy LAN authentication bridges were checked and disabled if present.")
             download_pause_controller.raise_if_requested()
             block_managed_failure = bool(getattr(settings, "block_launch_on_modrinth_failure", True))
-            modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_managed_failure)
-            curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_managed_failure)
+            launch_lock_token = getattr(run_lock, "token", None)
+            modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_managed_failure, launch_lock_token=launch_lock_token)
+            curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_managed_failure, launch_lock_token=launch_lock_token)
 
             download_pause_controller.raise_if_requested()
             VersionManifestManager.get()

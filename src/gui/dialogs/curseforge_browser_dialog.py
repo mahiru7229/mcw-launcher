@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import re
 
-from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtCore import QTimer, Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
 from src.core.curseforge.curseforge_client import CurseForgeClient
@@ -46,6 +47,7 @@ class CurseForgeBrowserDialog(QDialog):
         self._pending_channel_preferences = (False, False)
         self._cache_info = CurseForgeClient.cache_status()
         self._refresh_files_after_search = False
+        self._busy = False
         self._channel_change_timer = QTimer(self)
         self._channel_change_timer.setSingleShot(True)
         self._channel_change_timer.setInterval(25)
@@ -145,6 +147,9 @@ class CurseForgeBrowserDialog(QDialog):
         self.instance_name_input.textEdited.connect(self._instance_name_edited)
         self.optional_checkbox = QCheckBox()
         self.optional_checkbox.setChecked(True)
+        self.open_browser_button = QPushButton()
+        self.open_browser_button.setEnabled(False)
+        self.open_browser_button.clicked.connect(self._open_selected_project)
         self.install_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.install_button.setObjectName("PrimaryButton")
         self.install_button.setEnabled(False)
@@ -153,6 +158,7 @@ class CurseForgeBrowserDialog(QDialog):
         if self.project_type == "modpack":
             selection_row.addWidget(self.instance_name_input, 2)
             selection_row.addWidget(self.optional_checkbox)
+        selection_row.addWidget(self.open_browser_button)
         selection_row.addWidget(self.install_button)
         root.addLayout(selection_row)
 
@@ -207,6 +213,7 @@ class CurseForgeBrowserDialog(QDialog):
         self._instance_name_customized = False
         self.results_table.setRowCount(0)
         self.file_combo.clear()
+        self.open_browser_button.setEnabled(False)
         self.install_button.setEnabled(False)
         if self.project_type == "modpack":
             self.instance_name_input.clear()
@@ -258,10 +265,11 @@ class CurseForgeBrowserDialog(QDialog):
         self.file_combo.blockSignals(True)
         self.file_combo.clear()
         for file in self._files:
-            games = ", ".join(file.game_versions[:3])
-            self.file_combo.addItem(f"{file.display_name} • {file.release_type} • {games}", file.file_id)
+            games = ", ".join(file.game_versions[:3]) or tr("common.unknown")
+            loader_status = self._loader_status_text(file)
+            self.file_combo.addItem(f"{file.display_name} • {file.release_type} • {loader_status} • {games}", file.file_id)
         self.file_combo.blockSignals(False)
-        self.install_button.setEnabled(bool(self._files))
+        self.install_button.setEnabled(not self._busy and bool(self._files))
         if self._files:
             self._file_selected()
         else:
@@ -280,15 +288,17 @@ class CurseForgeBrowserDialog(QDialog):
         self._render_cache_status()
 
     def set_busy(self, busy: bool) -> None:
-        self.search_button.setEnabled(not busy)
-        self.results_table.setEnabled(not busy)
-        self.file_combo.setEnabled(not busy)
-        self.include_beta_checkbox.setEnabled(not busy)
-        self.include_alpha_checkbox.setEnabled(not busy)
-        self.clear_cache_button.setEnabled(not busy)
-        self.install_button.setEnabled(not busy and bool(self._files))
-        self.previous_button.setEnabled(not busy and self._result is not None and self._result.index > 0)
-        self.next_button.setEnabled(not busy and self._result is not None and self._result.index + self._result.page_size < self._result.total_count)
+        self._busy = bool(busy)
+        self.search_button.setEnabled(not self._busy)
+        self.results_table.setEnabled(not self._busy)
+        self.file_combo.setEnabled(not self._busy)
+        self.include_beta_checkbox.setEnabled(not self._busy)
+        self.include_alpha_checkbox.setEnabled(not self._busy)
+        self.clear_cache_button.setEnabled(not self._busy)
+        self.open_browser_button.setEnabled(not self._busy and self._has_selected_project_url())
+        self.install_button.setEnabled(not self._busy and bool(self._files))
+        self.previous_button.setEnabled(not self._busy and self._result is not None and self._result.index > 0)
+        self.next_button.setEnabled(not self._busy and self._result is not None and self._result.index + self._result.page_size < self._result.total_count)
         self._render_cache_status()
 
     def _channels_changed(self, _checked: bool) -> None:
@@ -337,6 +347,7 @@ class CurseForgeBrowserDialog(QDialog):
         self._selected_project = project
         self._files = []
         self.file_combo.clear()
+        self.open_browser_button.setEnabled(not self._busy and bool(project.project_url))
         self.install_button.setEnabled(False)
         if self.project_type == "modpack" and (not self._instance_name_customized or not self.instance_name_input.text().strip() or self.instance_name_input.text() == self._suggested_instance_name):
             self._suggested_instance_name = InstanceManager.next_available_name(self._safe_instance_name(project.name))
@@ -353,6 +364,7 @@ class CurseForgeBrowserDialog(QDialog):
         self._selected_project = None
         self._files = []
         self.file_combo.clear()
+        self.open_browser_button.setEnabled(False)
         self.install_button.setEnabled(False)
         self.details_label.setText(message)
 
@@ -362,7 +374,27 @@ class CurseForgeBrowserDialog(QDialog):
         if file is None or project is None:
             return
         distribution = tr("curseforge.file.manual_required") if not file.download_url or not file.is_available else tr("curseforge.file.automatic")
-        self.details_label.setText(tr("curseforge.project.details", name=project.name, authors=", ".join(project.authors) or tr("common.unknown"), version=file.display_name, release_type=file.release_type, downloads=f"{project.download_count:,}", description=f"{project.summary}\n{distribution}"))
+        loader_status = self._loader_status_text(file, detailed=True)
+        self.details_label.setText(tr("curseforge.project.details", name=project.name, authors=", ".join(project.authors) or tr("common.unknown"), version=file.display_name, release_type=file.release_type, downloads=f"{project.download_count:,}", description=f"{project.summary}\n{distribution}\n{loader_status}"))
+
+    def _has_selected_project_url(self) -> bool:
+        return bool(self._selected_project is not None and self._selected_project.project_url)
+
+    def _open_selected_project(self) -> None:
+        project = self._selected_project
+        if project is not None and project.project_url:
+            QDesktopServices.openUrl(QUrl(project.project_url))
+
+    def _loader_status_text(self, file: CurseForgeFile, detailed: bool = False) -> str:
+        status = CurseForgeClient.loader_compatibility(file, self.loader)
+        if status == "compatible":
+            return tr("curseforge.file.loader.compatible", loader=self.loader.title())
+        if status == "universal":
+            return tr("curseforge.file.loader.universal")
+        if status == "unknown":
+            return tr("curseforge.file.loader.unknown")
+        key = "curseforge.file.loader.unverified_detail" if detailed else "curseforge.file.loader.unverified"
+        return tr(key, loader=self.loader.title())
 
     def _instance_name_edited(self, text: str) -> None:
         self._instance_name_customized = bool(text.strip()) and text != self._suggested_instance_name
@@ -457,6 +489,7 @@ class CurseForgeBrowserDialog(QDialog):
         self.clear_cache_button.setText(tr("curseforge.cache.clear"))
         self.previous_button.setText(tr("common.previous"))
         self.next_button.setText(tr("common.next"))
+        self.open_browser_button.setText(tr("curseforge.open_in_browser"))
         self.install_button.setText(tr("curseforge.mod.install" if is_mod else "curseforge.modpack.install"))
         self.instance_name_input.setPlaceholderText(tr("curseforge.modpack.instance_name"))
         self.optional_checkbox.setText(tr("curseforge.modpack.optional_files"))

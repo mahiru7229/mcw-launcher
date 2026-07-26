@@ -24,7 +24,7 @@ class ModrinthContentManager:
     PROGRESS_EMIT_INTERVAL_SECONDS = 0.08
 
     @staticmethod
-    def ensure(instance: Instance, reporter: ProgressReporter | None = None, block_launch_on_failure: bool = True) -> tuple[str, ...]:
+    def ensure(instance: Instance, reporter: ProgressReporter | None = None, block_launch_on_failure: bool = True, launch_lock_token: str | None = None) -> tuple[str, ...]:
         if getattr(instance, "instance_dir", None) is None:
             return ()
 
@@ -61,8 +61,9 @@ class ModrinthContentManager:
                     ModrinthPackRegistry.save(instance.instance_dir, pack_registry)
                 return tuple(warnings)
 
+            ModManager.ensure_modifiable(instance, launch_lock_token)
             last_pack_errors = ModrinthContentManager._download_pack_round(missing_pack, reporter, round_number)
-            last_mod_errors = ModrinthContentManager._download_mod_round(instance, missing_mods, reporter, round_number)
+            last_mod_errors = ModrinthContentManager._download_mod_round(instance, missing_mods, reporter, round_number, launch_lock_token)
             if pack_registry:
                 pack_registry["lastDownloadFailures"] = ModrinthContentManager._pack_failure_payload(missing_pack, last_pack_errors)
                 ModrinthPackRegistry.save(instance.instance_dir, pack_registry)
@@ -257,7 +258,7 @@ class ModrinthContentManager:
         return errors
 
     @staticmethod
-    def _download_mod_round(instance: Instance, missing: list[dict], reporter: ProgressReporter | None, round_number: int) -> dict[str, str]:
+    def _download_mod_round(instance: Instance, missing: list[dict], reporter: ProgressReporter | None, round_number: int, launch_lock_token: str | None = None) -> dict[str, str]:
         total = len(missing)
         message = f"Downloading missing Modrinth mods (round {round_number}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS})..."
         batch_progress = FileBatchProgress(
@@ -326,7 +327,10 @@ class ModrinthContentManager:
                     entry, key, _cache_path, _urls, token, _child_reporter = future_map[future]
                     try:
                         downloaded_path = future.result()
-                        added = ModManager.add_mods(instance, [downloaded_path], replace=True)
+                        if launch_lock_token is None:
+                            added = ModManager.add_mods(instance, [downloaded_path], replace=True)
+                        else:
+                            added = ModManager.add_mods(instance, [downloaded_path], replace=True, launch_lock_token=launch_lock_token)
                         if not added:
                             raise RuntimeError("The downloaded mod could not be added to the instance.")
                         entry["fileName"] = added[0].file_name
