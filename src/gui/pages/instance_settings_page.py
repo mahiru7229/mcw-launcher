@@ -136,6 +136,21 @@ class InstanceSettingsPage(BasePage):
         window_card.layout.addStretch(1)
         runtime_section.add_card(window_card)
 
+        forge_preflight_card = CardWidget(
+            tr("forge_preflight.instance.title"),
+            tr("forge_preflight.instance.detail"),
+        )
+        self.forge_preflight_failure_label = QLabel(tr("forge_preflight.instance.label"))
+        self.forge_preflight_failure_policy = QComboBox()
+        self._populate_forge_preflight_policy_combo(self.forge_preflight_failure_policy)
+        self.forge_preflight_warning_label = QLabel(tr("forge_preflight.warning"))
+        self.forge_preflight_warning_label.setObjectName("CardSubtitle")
+        self.forge_preflight_warning_label.setWordWrap(True)
+        forge_preflight_card.layout.addWidget(self.forge_preflight_failure_label)
+        forge_preflight_card.layout.addWidget(self.forge_preflight_failure_policy)
+        forge_preflight_card.layout.addWidget(self.forge_preflight_warning_label)
+        runtime_section.add_card(forge_preflight_card, span=2)
+
         hosting_card = CardWidget(
             "LAN hosting",
             "Authentication policy and connection transport are configured separately. Private LAN uses the bundled MCW LAN Agent; no custom authentication service is used.",
@@ -265,6 +280,7 @@ class InstanceSettingsPage(BasePage):
                     "lan_connection_provider": str(getattr(settings, "lan_connection_provider", "manual") or "manual"),
                     "modrinth_failure_policy": self._settings_failure_policy(settings, "modrinth"),
                     "curseforge_failure_policy": self._settings_failure_policy(settings, "curseforge"),
+                    "forge_preflight_failure_policy": self._settings_failure_policy(settings, "forge_preflight"),
                     "jvm_arguments": list(getattr(settings, "jvm_arguments", [])),
                     "game_arguments": list(getattr(settings, "game_arguments", [])),
                 })
@@ -285,6 +301,7 @@ class InstanceSettingsPage(BasePage):
             "lan_connection_provider": str(self.lan_connection_provider.currentData() or "manual"),
             "modrinth_failure_policy": str(self.modrinth_failure_policy.currentData() or ManagedContentPolicy.INHERIT),
             "curseforge_failure_policy": str(self.curseforge_failure_policy.currentData() or ManagedContentPolicy.INHERIT),
+            "forge_preflight_failure_policy": str(self.forge_preflight_failure_policy.currentData() or ManagedContentPolicy.INHERIT),
             "jvm_arguments": self._lines(self.jvm_arguments.toPlainText()),
             "game_arguments": self._lines(self.game_arguments.toPlainText()),
         }
@@ -324,6 +341,7 @@ class InstanceSettingsPage(BasePage):
         self.lan_connection_provider.setEnabled(enabled)
         self.modrinth_failure_policy.setEnabled(enabled)
         self.curseforge_failure_policy.setEnabled(enabled)
+        self.forge_preflight_failure_policy.setEnabled(enabled)
         self.save_button.setEnabled(enabled)
         self.lan_prepare_button.setEnabled(enabled)
         self.lan_agent_log_button.setEnabled(enabled)
@@ -335,8 +353,11 @@ class InstanceSettingsPage(BasePage):
         self._update_lan_help()
         self.modrinth_failure_label.setText(tr("managed_content.modrinth.label"))
         self.curseforge_failure_label.setText(tr("managed_content.curseforge.label"))
+        self.forge_preflight_failure_label.setText(tr("forge_preflight.instance.label"))
+        self.forge_preflight_warning_label.setText(tr("forge_preflight.warning"))
         self._retranslate_failure_policy_combo(self.modrinth_failure_policy)
         self._retranslate_failure_policy_combo(self.curseforge_failure_policy)
+        self._retranslate_forge_preflight_policy_combo(self.forge_preflight_failure_policy)
 
     def _connect_dirty_tracking(self) -> None:
         self.java_path_input.textChanged.connect(self._refresh_dirty_state)
@@ -351,6 +372,7 @@ class InstanceSettingsPage(BasePage):
         self.lan_connection_provider.currentIndexChanged.connect(self._refresh_dirty_state)
         self.modrinth_failure_policy.currentIndexChanged.connect(self._refresh_dirty_state)
         self.curseforge_failure_policy.currentIndexChanged.connect(self._refresh_dirty_state)
+        self.forge_preflight_failure_policy.currentIndexChanged.connect(self._refresh_dirty_state)
         self.jvm_arguments.textChanged.connect(self._refresh_dirty_state)
         self.game_arguments.textChanged.connect(self._refresh_dirty_state)
 
@@ -393,6 +415,7 @@ class InstanceSettingsPage(BasePage):
             "lan_connection_provider": "manual",
             "modrinth_failure_policy": ManagedContentPolicy.INHERIT,
             "curseforge_failure_policy": ManagedContentPolicy.INHERIT,
+            "forge_preflight_failure_policy": ManagedContentPolicy.INHERIT,
             "jvm_arguments": [],
             "game_arguments": [],
         })
@@ -407,6 +430,7 @@ class InstanceSettingsPage(BasePage):
         self._set_combo_data(self.lan_connection_provider, str(data.get("lan_connection_provider", "manual")))
         self._set_combo_data(self.modrinth_failure_policy, ManagedContentPolicy.normalize_instance(data.get("modrinth_failure_policy")))
         self._set_combo_data(self.curseforge_failure_policy, ManagedContentPolicy.normalize_instance(data.get("curseforge_failure_policy")))
+        self._set_combo_data(self.forge_preflight_failure_policy, ManagedContentPolicy.normalize_instance(data.get("forge_preflight_failure_policy")))
         self._update_lan_help()
         self.jvm_arguments.setPlainText("\n".join(data.get("jvm_arguments", [])))
         self.game_arguments.setPlainText("\n".join(data.get("game_arguments", [])))
@@ -435,6 +459,21 @@ class InstanceSettingsPage(BasePage):
         current = str(combo.currentData() or ManagedContentPolicy.INHERIT)
         with QSignalBlocker(combo):
             InstanceSettingsPage._populate_failure_policy_combo(combo)
+            index = combo.findData(current)
+            combo.setCurrentIndex(max(0, index))
+
+    @staticmethod
+    def _populate_forge_preflight_policy_combo(combo: QComboBox) -> None:
+        combo.clear()
+        combo.addItem(tr("forge_preflight.policy.inherit"), ManagedContentPolicy.INHERIT)
+        combo.addItem(tr("forge_preflight.policy.block"), ManagedContentPolicy.BLOCK)
+        combo.addItem(tr("forge_preflight.policy.allow"), ManagedContentPolicy.ALLOW)
+
+    @staticmethod
+    def _retranslate_forge_preflight_policy_combo(combo: QComboBox) -> None:
+        current = str(combo.currentData() or ManagedContentPolicy.INHERIT)
+        with QSignalBlocker(combo):
+            InstanceSettingsPage._populate_forge_preflight_policy_combo(combo)
             index = combo.findData(current)
             combo.setCurrentIndex(max(0, index))
 

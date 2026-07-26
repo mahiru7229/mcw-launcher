@@ -14,7 +14,7 @@ from src.core.fs.paths import Paths
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 7
+    SCHEMA_VERSION = 8
     UPDATE_CHANNEL_POLICY_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
@@ -41,6 +41,7 @@ class LauncherSettingsManager:
         "managed_content": {
             "modrinth_failure_policy": "block",
             "curseforge_failure_policy": "block",
+            "forge_preflight_failure_policy": "block",
         },
         "network": {
             "download_limit_mbps": 0.0,
@@ -182,6 +183,7 @@ class LauncherSettingsManager:
         managed_content = normalized.setdefault("managed_content", {})
         managed_content["modrinth_failure_policy"] = ManagedContentPolicy.normalize_global(managed_content.get("modrinth_failure_policy"))
         managed_content["curseforge_failure_policy"] = ManagedContentPolicy.normalize_global(managed_content.get("curseforge_failure_policy"))
+        managed_content["forge_preflight_failure_policy"] = ManagedContentPolicy.normalize_global(managed_content.get("forge_preflight_failure_policy"))
 
         network = normalized.setdefault("network", {})
         network["download_limit_mbps"] = self._as_download_limit(network.get("download_limit_mbps"))

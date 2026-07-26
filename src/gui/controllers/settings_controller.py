@@ -69,6 +69,7 @@ class InstanceSettingsController(BaseController):
                 raise ValueError(tr("Unsupported LAN connection provider."))
             settings.modrinth_failure_policy = ManagedContentPolicy.normalize_instance(data.get("modrinth_failure_policy"))
             settings.curseforge_failure_policy = ManagedContentPolicy.normalize_instance(data.get("curseforge_failure_policy"))
+            settings.forge_preflight_failure_policy = ManagedContentPolicy.normalize_instance(data.get("forge_preflight_failure_policy"))
             settings.jvm_arguments = list(data["jvm_arguments"])
             settings.game_arguments = list(data["game_arguments"])
             SettingsManager.save(instance, settings)

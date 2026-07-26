@@ -33,6 +33,7 @@ class SettingsManager:
             "lan_connection_provider": "manual",
             "modrinth_failure_policy": "inherit",
             "curseforge_failure_policy": "inherit",
+            "forge_preflight_failure_policy": "inherit",
         },
     }
 
@@ -135,6 +136,7 @@ class SettingsManager:
             lan_connection_provider=lan_connection_provider,
             modrinth_failure_policy=SettingsManager._failure_policy(launch, "modrinth"),
             curseforge_failure_policy=SettingsManager._failure_policy(launch, "curseforge"),
+            forge_preflight_failure_policy=SettingsManager._failure_policy(launch, "forge_preflight"),
         )
 
     @staticmethod
@@ -158,6 +160,7 @@ class SettingsManager:
                 "lan_connection_provider": SettingsManager._as_choice(settings.lan_connection_provider, {"manual", "e4mc"}, "manual"),
                 "modrinth_failure_policy": ManagedContentPolicy.normalize_instance(settings.modrinth_failure_policy),
                 "curseforge_failure_policy": ManagedContentPolicy.normalize_instance(settings.curseforge_failure_policy),
+                "forge_preflight_failure_policy": ManagedContentPolicy.normalize_instance(settings.forge_preflight_failure_policy),
             },
         }
 
@@ -170,7 +173,7 @@ class SettingsManager:
 
         # v0.8.0/v0.8.1 used one Modrinth-named boolean for both providers.
         # Preserve that explicit per-instance choice while migrating to source-specific policies.
-        if "block_launch_on_modrinth_failure" in launch:
+        if provider in {"modrinth", "curseforge"} and "block_launch_on_modrinth_failure" in launch:
             return ManagedContentPolicy.from_legacy_bool(launch.get("block_launch_on_modrinth_failure"))
         return ManagedContentPolicy.INHERIT
 

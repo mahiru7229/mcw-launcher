@@ -56,6 +56,7 @@ class MinecraftExecutor:
             launcher_settings = LauncherSettingsManager().load()
             block_modrinth_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "modrinth")
             block_curseforge_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "curseforge")
+            block_forge_preflight_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "forge_preflight")
             launch_lock_token = getattr(run_lock, "token", None)
             modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
             curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
@@ -68,7 +69,10 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             forge_preflight = ForgePreflightManager.scan(instance, version, verify_files=False)
-            ForgePreflightManager.raise_for_errors(forge_preflight)
+            if block_forge_preflight_failure:
+                ForgePreflightManager.raise_for_errors(forge_preflight)
+            else:
+                ForgePreflightManager.raise_for_errors(forge_preflight, False)
 
             reporter.status(stage=ProgressStage.DOWNLOADING_CLIENT, message="Checking Minecraft client...")
             DownloadClientManager.load(version=version, reporter=reporter)

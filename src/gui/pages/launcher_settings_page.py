@@ -158,6 +158,19 @@ class LauncherSettingsPage(BasePage):
         java_card.layout.addWidget(self.open_java_button)
         runtime_section.add_card(java_card)
 
+        forge_preflight_card = CardWidget(
+            tr("forge_preflight.launcher.title"),
+            tr("forge_preflight.launcher.detail"),
+        )
+        self.allow_forge_preflight_failure = QCheckBox(tr("forge_preflight.launcher.allow"))
+        self.allow_forge_preflight_failure.setChecked(False)
+        self.forge_preflight_warning_label = QLabel(tr("forge_preflight.warning"))
+        self.forge_preflight_warning_label.setObjectName("MutedLabel")
+        self.forge_preflight_warning_label.setWordWrap(True)
+        forge_preflight_card.layout.addWidget(self.allow_forge_preflight_failure)
+        forge_preflight_card.layout.addWidget(self.forge_preflight_warning_label)
+        runtime_section.add_card(forge_preflight_card)
+
         update_card = CardWidget("Launcher updates", "Stable updates are used by default. Join the tester program only when you want to receive experimental builds.")
         current_version_label = QLabel(f"Current version: {VERSION}")
         current_version_label.setObjectName("ValueLabel")
@@ -216,6 +229,7 @@ class LauncherSettingsPage(BasePage):
         self.modrinth_include_alpha.toggled.connect(self._refresh_dirty_state)
         self.block_modrinth_failure.toggled.connect(self._refresh_dirty_state)
         self.block_curseforge_failure.toggled.connect(self._refresh_dirty_state)
+        self.allow_forge_preflight_failure.toggled.connect(self._refresh_dirty_state)
         for field in self.curseforge_gateway_inputs:
             field.textChanged.connect(self._refresh_dirty_state)
         self.auto_check_updates.toggled.connect(self._refresh_dirty_state)
@@ -313,6 +327,7 @@ class LauncherSettingsPage(BasePage):
             "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
             "block_launch_on_modrinth_failure": self.block_modrinth_failure.isChecked(),
             "block_launch_on_curseforge_failure": self.block_curseforge_failure.isChecked(),
+            "allow_launch_on_forge_preflight_failure": self.allow_forge_preflight_failure.isChecked(),
             "curseforge_gateway_urls": [field.text().strip() for field in self.curseforge_gateway_inputs],
             "download_limit_mbps": self.download_limit_mbps.value() if self.limit_download_speed.isChecked() else 0.0,
         }
@@ -351,6 +366,8 @@ class LauncherSettingsPage(BasePage):
         self.curseforge_gateway_security.setText(tr("curseforge.gateway.security.note"))
         self.block_modrinth_failure.setText(tr("managed_content.modrinth.block"))
         self.block_curseforge_failure.setText(tr("managed_content.curseforge.block"))
+        self.allow_forge_preflight_failure.setText(tr("forge_preflight.launcher.allow"))
+        self.forge_preflight_warning_label.setText(tr("forge_preflight.warning"))
         self._update_save_button_text()
 
     def _apply_form_data(self, settings: dict) -> None:
@@ -364,6 +381,7 @@ class LauncherSettingsPage(BasePage):
             self.modrinth_include_alpha,
             self.block_modrinth_failure,
             self.block_curseforge_failure,
+            self.allow_forge_preflight_failure,
             self.limit_download_speed,
             self.download_limit_mbps,
             self.join_tester_program,
@@ -383,6 +401,7 @@ class LauncherSettingsPage(BasePage):
         self.modrinth_include_alpha.setChecked(bool(settings.get("modrinth_include_alpha", False)))
         self.block_modrinth_failure.setChecked(bool(settings.get("block_launch_on_modrinth_failure", True)))
         self.block_curseforge_failure.setChecked(bool(settings.get("block_launch_on_curseforge_failure", True)))
+        self.allow_forge_preflight_failure.setChecked(bool(settings.get("allow_launch_on_forge_preflight_failure", False)))
         gateway_urls = list(settings.get("curseforge_gateway_urls", ()) or ())[:5]
         gateway_urls.extend([""] * (5 - len(gateway_urls)))
         for field, value in zip(self.curseforge_gateway_inputs, gateway_urls):

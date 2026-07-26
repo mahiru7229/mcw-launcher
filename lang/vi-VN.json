@@ -965,7 +965,17 @@
         "managed_content.curseforge.label": "Cách xử lý lỗi CurseForge",
         "managed_content.policy.inherit": "Dùng thiết lập launcher",
         "managed_content.policy.block": "Dừng khởi chạy",
-        "managed_content.policy.allow": "Tiếp tục khởi chạy kèm cảnh báo"
+        "managed_content.policy.allow": "Tiếp tục khởi chạy kèm cảnh báo",
+        "forge_preflight.launcher.title": "Tương thích trước khi chạy Forge",
+        "forge_preflight.launcher.detail": "Chọn việc lỗi tương thích mod được phát hiện trước khi chạy Forge có chặn game hay không. File runtime Forge bị hỏng vẫn luôn bị chặn.",
+        "forge_preflight.launcher.allow": "Cho phép chạy Forge khi kiểm tra tương thích mod báo lỗi",
+        "forge_preflight.instance.title": "Tương thích trước khi chạy Forge",
+        "forge_preflight.instance.detail": "Thiết lập của instance được ưu tiên hơn Launcher Settings. Tùy chọn này chỉ bỏ qua lỗi tương thích mod, không bỏ qua file runtime Forge bị hỏng.",
+        "forge_preflight.instance.label": "Cách xử lý lỗi tương thích Forge",
+        "forge_preflight.warning": "Cho phép chạy chỉ bỏ qua lỗi tương thích như dependency mod bị thiếu hoặc sai phiên bản. File runtime Forge bị hỏng vẫn bị chặn và Minecraft vẫn có thể tự từ chối bộ mod.",
+        "forge_preflight.policy.inherit": "Dùng thiết lập launcher",
+        "forge_preflight.policy.block": "Dừng chạy khi phát hiện lỗi tương thích",
+        "forge_preflight.policy.allow": "Cho phép chạy và bỏ qua lỗi tương thích"
     },
     "aliases": {
         "Show static text over themed controls": "launcher_settings.theme.show_static_text",

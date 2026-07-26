@@ -965,7 +965,17 @@
         "managed_content.curseforge.label": "CurseForge failure behavior",
         "managed_content.policy.inherit": "Use launcher setting",
         "managed_content.policy.block": "Stop launch",
-        "managed_content.policy.allow": "Continue launch with warnings"
+        "managed_content.policy.allow": "Continue launch with warnings",
+        "forge_preflight.launcher.title": "Forge pre-launch compatibility",
+        "forge_preflight.launcher.detail": "Controls whether mod compatibility errors found before a Forge launch stop the game. Broken Forge runtime files are always blocked.",
+        "forge_preflight.launcher.allow": "Allow Forge to launch when mod compatibility checks report errors",
+        "forge_preflight.instance.title": "Forge pre-launch compatibility",
+        "forge_preflight.instance.detail": "This instance setting takes priority over Launcher Settings. It only bypasses mod compatibility errors, not damaged Forge runtime files.",
+        "forge_preflight.instance.label": "Forge compatibility error behavior",
+        "forge_preflight.warning": "Allowing launch only skips compatibility errors such as missing or version-mismatched mod dependencies. Damaged Forge runtime files remain blocked, and Minecraft may still reject the mod set itself.",
+        "forge_preflight.policy.inherit": "Use launcher setting",
+        "forge_preflight.policy.block": "Stop launch when compatibility errors are found",
+        "forge_preflight.policy.allow": "Allow launch and ignore compatibility errors"
     },
     "aliases": {
         "MCW Launcher": "app.name",

@@ -184,14 +184,17 @@ def test_managed_content_failure_defaults_are_source_specific_and_persisted(tmp_
     assert manager.load()["managed_content"] == {
         "modrinth_failure_policy": "block",
         "curseforge_failure_policy": "block",
+        "forge_preflight_failure_policy": "block",
     }
 
     manager.update_section("managed_content", {
         "modrinth_failure_policy": "allow",
         "curseforge_failure_policy": "invalid",
+        "forge_preflight_failure_policy": "allow",
     })
 
     assert manager.load()["managed_content"] == {
         "modrinth_failure_policy": "allow",
         "curseforge_failure_policy": "block",
+        "forge_preflight_failure_policy": "allow",
     }

@@ -18,6 +18,7 @@ from src.core.minecraft.launcher_manager import LauncherManager
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.minecraft.minecraft_executor import MinecraftExecutor
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManager
 from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.minecraft.version_manager import VersionManager
@@ -982,3 +983,23 @@ def test_private_lan_attaches_agent_and_disables_legacy_auth_bridge(monkeypatch:
     assert events[0] == ("cleanup", instance)
     assert events[1] == ("agent", pipeline["version"], "private_offline", instance)
     assert events[2] == ("command", runtime_arguments)
+
+
+def test_run_allows_forge_compatibility_errors_when_instance_policy_allows(monkeypatch: pytest.MonkeyPatch):
+    pipeline = patch_pipeline(monkeypatch)
+    settings = SimpleNamespace(
+        forge_preflight_failure_policy="allow",
+        modrinth_failure_policy="inherit",
+        curseforge_failure_policy="inherit",
+    )
+    issue = SimpleNamespace(severity="error", code="dependency-missing", message="Create requires missing dependency 'flywheel'.")
+    report = SimpleNamespace(errors=(issue,), warnings=(), warning_count=0)
+
+    monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
+    monkeypatch.setattr(ForgePreflightManager, "scan", lambda instance, version, verify_files=False: report)
+    monkeypatch.setattr(ForgePreflightManager, "validate_runtime_files", lambda instance, version: ())
+
+    result = MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object())
+
+    assert result["minecraftVersion"] == pipeline["version"].id
+    assert "warnings" not in result

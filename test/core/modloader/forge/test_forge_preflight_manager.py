@@ -65,3 +65,24 @@ def test_non_forge_instance_is_skipped(tmp_path: Path):
 
     assert report.can_launch
     assert report.issues == ()
+
+
+def test_compatibility_errors_can_be_allowed() -> None:
+    report = SimpleNamespace(
+        errors=(ModIssue(severity="error", code="dependency-missing", message="Flywheel is missing."),),
+        warnings=(),
+        warning_count=0,
+    )
+
+    ForgePreflightManager.raise_for_errors(report, block_compatibility_errors=False)
+
+
+def test_broken_forge_installation_still_blocks_when_compatibility_errors_are_allowed() -> None:
+    report = SimpleNamespace(
+        errors=(ModIssue(severity="error", code="forge-installation", message="Forge profile is broken."),),
+        warnings=(),
+        warning_count=0,
+    )
+
+    with pytest.raises(RuntimeError, match="Forge pre-launch check failed"):
+        ForgePreflightManager.raise_for_errors(report, block_compatibility_errors=False)

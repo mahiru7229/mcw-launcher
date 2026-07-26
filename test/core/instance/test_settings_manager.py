@@ -23,6 +23,7 @@ def test_legacy_settings_without_failure_choice_inherit_launcher_defaults(tmp_pa
 
     assert settings.modrinth_failure_policy == "inherit"
     assert settings.curseforge_failure_policy == "inherit"
+    assert settings.forge_preflight_failure_policy == "inherit"
 
 
 def test_failure_policies_are_saved_per_instance(tmp_path: Path) -> None:
@@ -30,15 +31,18 @@ def test_failure_policies_are_saved_per_instance(tmp_path: Path) -> None:
     settings = SettingsManager.load(instance)
     settings.modrinth_failure_policy = "allow"
     settings.curseforge_failure_policy = "block"
+    settings.forge_preflight_failure_policy = "allow"
 
     SettingsManager.save(instance, settings)
 
     saved = json.loads((instance.instance_dir / "settings.json").read_text(encoding="utf-8"))
     assert saved["launch"]["modrinth_failure_policy"] == "allow"
     assert saved["launch"]["curseforge_failure_policy"] == "block"
+    assert saved["launch"]["forge_preflight_failure_policy"] == "allow"
     reloaded = SettingsManager.load(instance)
     assert reloaded.modrinth_failure_policy == "allow"
     assert reloaded.curseforge_failure_policy == "block"
+    assert reloaded.forge_preflight_failure_policy == "allow"
 
 
 def test_legacy_modrinth_boolean_is_migrated_for_both_sources(tmp_path: Path) -> None:
@@ -168,3 +172,14 @@ def test_legacy_friends_auth_mode_is_migrated_when_loaded_and_saved(tmp_path: Pa
     saved = json.loads((instance.instance_dir / "settings.json").read_text(encoding="utf-8"))
     assert settings.lan_auth_mode == "private_offline"
     assert saved["launch"]["lan_auth_mode"] == "private_offline"
+
+
+def test_legacy_modrinth_boolean_does_not_change_forge_preflight_policy(tmp_path: Path) -> None:
+    instance = make_instance(tmp_path)
+    (instance.instance_dir / "settings.json").write_text(json.dumps({
+        "launch": {"block_launch_on_modrinth_failure": False},
+    }), encoding="utf-8")
+
+    settings = SettingsManager.load(instance)
+
+    assert settings.forge_preflight_failure_policy == "inherit"

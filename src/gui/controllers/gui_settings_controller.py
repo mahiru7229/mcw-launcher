@@ -28,6 +28,7 @@ class GuiSettingsController(BaseController):
         "modrinth_include_alpha": False,
         "block_launch_on_modrinth_failure": True,
         "block_launch_on_curseforge_failure": True,
+        "allow_launch_on_forge_preflight_failure": False,
         "curseforge_gateway_urls": (),
         "download_limit_mbps": 0.0,
     }
@@ -72,6 +73,7 @@ class GuiSettingsController(BaseController):
             "modrinth_include_alpha": bool(modrinth.get("include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
             "block_launch_on_modrinth_failure": ManagedContentPolicy.normalize_global(managed_content.get("modrinth_failure_policy")) == ManagedContentPolicy.BLOCK,
             "block_launch_on_curseforge_failure": ManagedContentPolicy.normalize_global(managed_content.get("curseforge_failure_policy")) == ManagedContentPolicy.BLOCK,
+            "allow_launch_on_forge_preflight_failure": ManagedContentPolicy.normalize_global(managed_content.get("forge_preflight_failure_policy")) == ManagedContentPolicy.ALLOW,
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": float(network.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]) or 0.0),
         }
@@ -104,6 +106,7 @@ class GuiSettingsController(BaseController):
             "modrinth_include_alpha": bool(data.get("modrinth_include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
             "block_launch_on_modrinth_failure": bool(data.get("block_launch_on_modrinth_failure", self.DEFAULTS["block_launch_on_modrinth_failure"])),
             "block_launch_on_curseforge_failure": bool(data.get("block_launch_on_curseforge_failure", self.DEFAULTS["block_launch_on_curseforge_failure"])),
+            "allow_launch_on_forge_preflight_failure": bool(data.get("allow_launch_on_forge_preflight_failure", self.DEFAULTS["allow_launch_on_forge_preflight_failure"])),
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": download_limit_mbps,
         }
@@ -127,6 +130,7 @@ class GuiSettingsController(BaseController):
             "managed_content": {
                 "modrinth_failure_policy": ManagedContentPolicy.BLOCK if self._current["block_launch_on_modrinth_failure"] else ManagedContentPolicy.ALLOW,
                 "curseforge_failure_policy": ManagedContentPolicy.BLOCK if self._current["block_launch_on_curseforge_failure"] else ManagedContentPolicy.ALLOW,
+                "forge_preflight_failure_policy": ManagedContentPolicy.ALLOW if self._current["allow_launch_on_forge_preflight_failure"] else ManagedContentPolicy.BLOCK,
             },
             "network": {"download_limit_mbps": self._current["download_limit_mbps"]},
         })

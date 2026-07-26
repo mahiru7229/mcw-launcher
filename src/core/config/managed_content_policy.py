@@ -7,7 +7,7 @@ class ManagedContentPolicy:
     INHERIT = "inherit"
     BLOCK = "block"
     ALLOW = "allow"
-    PROVIDERS = {"modrinth", "curseforge"}
+    PROVIDERS = {"modrinth", "curseforge", "forge_preflight"}
 
     @classmethod
     def normalize_instance(cls, value: object, default: str = INHERIT) -> str:
