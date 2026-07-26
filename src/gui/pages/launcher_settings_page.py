@@ -103,6 +103,18 @@ class LauncherSettingsPage(BasePage):
         modrinth_card.layout.addWidget(self.modrinth_include_alpha)
         downloads_section.add_card(modrinth_card)
 
+        managed_checks_card = CardWidget(
+            tr("managed_content.launcher.title"),
+            tr("managed_content.launcher.detail"),
+        )
+        self.block_modrinth_failure = QCheckBox(tr("managed_content.modrinth.block"))
+        self.block_curseforge_failure = QCheckBox(tr("managed_content.curseforge.block"))
+        self.block_modrinth_failure.setChecked(True)
+        self.block_curseforge_failure.setChecked(True)
+        managed_checks_card.layout.addWidget(self.block_modrinth_failure)
+        managed_checks_card.layout.addWidget(self.block_curseforge_failure)
+        downloads_section.add_card(managed_checks_card, span=2)
+
         curseforge_card = CardWidget(
             "Private CurseForge gateways",
             "Configure up to five private HTTPS gateway links. They are stored outside the launcher settings file and protected with Windows DPAPI. Requests try each link in order when an earlier gateway is unavailable.",
@@ -202,6 +214,8 @@ class LauncherSettingsPage(BasePage):
         self.language_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.modrinth_include_beta.toggled.connect(self._refresh_dirty_state)
         self.modrinth_include_alpha.toggled.connect(self._refresh_dirty_state)
+        self.block_modrinth_failure.toggled.connect(self._refresh_dirty_state)
+        self.block_curseforge_failure.toggled.connect(self._refresh_dirty_state)
         for field in self.curseforge_gateway_inputs:
             field.textChanged.connect(self._refresh_dirty_state)
         self.auto_check_updates.toggled.connect(self._refresh_dirty_state)
@@ -297,6 +311,8 @@ class LauncherSettingsPage(BasePage):
             "show_static_text": self.show_static_text.isChecked(),
             "modrinth_include_beta": self.modrinth_include_beta.isChecked(),
             "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
+            "block_launch_on_modrinth_failure": self.block_modrinth_failure.isChecked(),
+            "block_launch_on_curseforge_failure": self.block_curseforge_failure.isChecked(),
             "curseforge_gateway_urls": [field.text().strip() for field in self.curseforge_gateway_inputs],
             "download_limit_mbps": self.download_limit_mbps.value() if self.limit_download_speed.isChecked() else 0.0,
         }
@@ -333,6 +349,8 @@ class LauncherSettingsPage(BasePage):
             label.setText(tr("curseforge.gateway.slot", index=index))
         self.reveal_curseforge_gateways.setText(tr("curseforge.gateway.reveal.toggle"))
         self.curseforge_gateway_security.setText(tr("curseforge.gateway.security.note"))
+        self.block_modrinth_failure.setText(tr("managed_content.modrinth.block"))
+        self.block_curseforge_failure.setText(tr("managed_content.curseforge.block"))
         self._update_save_button_text()
 
     def _apply_form_data(self, settings: dict) -> None:
@@ -344,6 +362,8 @@ class LauncherSettingsPage(BasePage):
             self.auto_check_updates,
             self.modrinth_include_beta,
             self.modrinth_include_alpha,
+            self.block_modrinth_failure,
+            self.block_curseforge_failure,
             self.limit_download_speed,
             self.download_limit_mbps,
             self.join_tester_program,
@@ -361,6 +381,8 @@ class LauncherSettingsPage(BasePage):
         self.auto_check_updates.setChecked(bool(settings.get("auto_check_updates", True)))
         self.modrinth_include_beta.setChecked(bool(settings.get("modrinth_include_beta", False)))
         self.modrinth_include_alpha.setChecked(bool(settings.get("modrinth_include_alpha", False)))
+        self.block_modrinth_failure.setChecked(bool(settings.get("block_launch_on_modrinth_failure", True)))
+        self.block_curseforge_failure.setChecked(bool(settings.get("block_launch_on_curseforge_failure", True)))
         gateway_urls = list(settings.get("curseforge_gateway_urls", ()) or ())[:5]
         gateway_urls.extend([""] * (5 - len(gateway_urls)))
         for field, value in zip(self.curseforge_gateway_inputs, gateway_urls):

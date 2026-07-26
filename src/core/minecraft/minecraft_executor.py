@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime, timezone
 
+from src.core.config.launcher_settings_manager import LauncherSettingsManager
+from src.core.config.managed_content_policy import ManagedContentPolicy
 from src.core.fs.paths import Paths
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.instance.settings_manager import SettingsManager
@@ -51,10 +53,12 @@ class MinecraftExecutor:
                 LanHostingManager.disable_legacy_auth_bridges(instance)
                 LanAgentManager.append_log_path(lan_log_path, "Legacy LAN authentication bridges were checked and disabled if present.")
             download_pause_controller.raise_if_requested()
-            block_managed_failure = bool(getattr(settings, "block_launch_on_modrinth_failure", True))
+            launcher_settings = LauncherSettingsManager().load()
+            block_modrinth_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "modrinth")
+            block_curseforge_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "curseforge")
             launch_lock_token = getattr(run_lock, "token", None)
-            modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_managed_failure, launch_lock_token=launch_lock_token)
-            curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_managed_failure, launch_lock_token=launch_lock_token)
+            modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
+            curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
 
             download_pause_controller.raise_if_requested()
             VersionManifestManager.get()

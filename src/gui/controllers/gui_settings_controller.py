@@ -4,6 +4,7 @@ from PySide6.QtCore import QByteArray, Signal
 
 from src.core.config.curseforge_config_manager import CurseForgeConfigManager
 from src.core.config.launcher_settings_manager import LauncherSettingsManager
+from src.core.config.managed_content_policy import ManagedContentPolicy
 from src.core.language.language_manager import tr
 from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
 from src.gui.controllers.base_controller import BaseController
@@ -25,6 +26,8 @@ class GuiSettingsController(BaseController):
         "show_static_text": False,
         "modrinth_include_beta": False,
         "modrinth_include_alpha": False,
+        "block_launch_on_modrinth_failure": True,
+        "block_launch_on_curseforge_failure": True,
         "curseforge_gateway_urls": (),
         "download_limit_mbps": 0.0,
     }
@@ -48,6 +51,7 @@ class GuiSettingsController(BaseController):
         updates = data.get("updates", {})
         appearance = data.get("appearance", {})
         modrinth = data.get("modrinth", {})
+        managed_content = data.get("managed_content", {})
         network = data.get("network", {})
         try:
             curseforge_gateway_urls = CurseForgeConfigManager.gateway_urls()
@@ -66,6 +70,8 @@ class GuiSettingsController(BaseController):
             "show_static_text": bool(appearance.get("show_static_text", self.DEFAULTS["show_static_text"])),
             "modrinth_include_beta": bool(modrinth.get("include_beta", self.DEFAULTS["modrinth_include_beta"])),
             "modrinth_include_alpha": bool(modrinth.get("include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
+            "block_launch_on_modrinth_failure": ManagedContentPolicy.normalize_global(managed_content.get("modrinth_failure_policy")) == ManagedContentPolicy.BLOCK,
+            "block_launch_on_curseforge_failure": ManagedContentPolicy.normalize_global(managed_content.get("curseforge_failure_policy")) == ManagedContentPolicy.BLOCK,
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": float(network.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]) or 0.0),
         }
@@ -96,6 +102,8 @@ class GuiSettingsController(BaseController):
             "show_static_text": bool(data.get("show_static_text", self.DEFAULTS["show_static_text"])),
             "modrinth_include_beta": bool(data.get("modrinth_include_beta", self.DEFAULTS["modrinth_include_beta"])),
             "modrinth_include_alpha": bool(data.get("modrinth_include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
+            "block_launch_on_modrinth_failure": bool(data.get("block_launch_on_modrinth_failure", self.DEFAULTS["block_launch_on_modrinth_failure"])),
+            "block_launch_on_curseforge_failure": bool(data.get("block_launch_on_curseforge_failure", self.DEFAULTS["block_launch_on_curseforge_failure"])),
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": download_limit_mbps,
         }
@@ -115,6 +123,10 @@ class GuiSettingsController(BaseController):
             "modrinth": {
                 "include_beta": self._current["modrinth_include_beta"],
                 "include_alpha": self._current["modrinth_include_alpha"],
+            },
+            "managed_content": {
+                "modrinth_failure_policy": ManagedContentPolicy.BLOCK if self._current["block_launch_on_modrinth_failure"] else ManagedContentPolicy.ALLOW,
+                "curseforge_failure_policy": ManagedContentPolicy.BLOCK if self._current["block_launch_on_curseforge_failure"] else ManagedContentPolicy.ALLOW,
             },
             "network": {"download_limit_mbps": self._current["download_limit_mbps"]},
         })

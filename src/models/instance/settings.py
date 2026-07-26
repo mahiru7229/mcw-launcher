@@ -15,7 +15,8 @@ class InstanceSettings:
     offline_multiplayer_enabled: bool = False
     lan_auth_mode: str = "microsoft_only"
     lan_connection_provider: str = "manual"
-    block_launch_on_modrinth_failure: bool = True
+    modrinth_failure_policy: str = "inherit"
+    curseforge_failure_policy: str = "inherit"
 
     width: int = 854
     height: int = 480

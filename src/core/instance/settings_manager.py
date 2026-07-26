@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from src.core.config.managed_content_policy import ManagedContentPolicy
 from src.core.fs.paths import Paths
 from src.core.system.memory import MemoryAllocationPolicy
 from src.models.instance.instance import Instance
@@ -30,7 +31,8 @@ class SettingsManager:
             "offline_multiplayer_enabled": False,
             "lan_auth_mode": "microsoft_only",
             "lan_connection_provider": "manual",
-            "block_launch_on_modrinth_failure": True,
+            "modrinth_failure_policy": "inherit",
+            "curseforge_failure_policy": "inherit",
         },
     }
 
@@ -131,7 +133,8 @@ class SettingsManager:
             offline_multiplayer_enabled=legacy_offline_multiplayer,
             lan_auth_mode=lan_auth_mode,
             lan_connection_provider=lan_connection_provider,
-            block_launch_on_modrinth_failure=SettingsManager._as_bool(launch.get("block_launch_on_modrinth_failure"), True),
+            modrinth_failure_policy=SettingsManager._failure_policy(launch, "modrinth"),
+            curseforge_failure_policy=SettingsManager._failure_policy(launch, "curseforge"),
         )
 
     @staticmethod
@@ -153,9 +156,23 @@ class SettingsManager:
                 "offline_multiplayer_enabled": False,
                 "lan_auth_mode": SettingsManager._normalize_lan_auth_mode(settings.lan_auth_mode, "microsoft_only"),
                 "lan_connection_provider": SettingsManager._as_choice(settings.lan_connection_provider, {"manual", "e4mc"}, "manual"),
-                "block_launch_on_modrinth_failure": bool(settings.block_launch_on_modrinth_failure),
+                "modrinth_failure_policy": ManagedContentPolicy.normalize_instance(settings.modrinth_failure_policy),
+                "curseforge_failure_policy": ManagedContentPolicy.normalize_instance(settings.curseforge_failure_policy),
             },
         }
+
+
+    @staticmethod
+    def _failure_policy(launch: dict, provider: str) -> str:
+        key = f"{provider}_failure_policy"
+        if key in launch:
+            return ManagedContentPolicy.normalize_instance(launch.get(key))
+
+        # v0.8.0/v0.8.1 used one Modrinth-named boolean for both providers.
+        # Preserve that explicit per-instance choice while migrating to source-specific policies.
+        if "block_launch_on_modrinth_failure" in launch:
+            return ManagedContentPolicy.from_legacy_bool(launch.get("block_launch_on_modrinth_failure"))
+        return ManagedContentPolicy.INHERIT
 
     @staticmethod
     def _write(path: Path, data: dict[str, Any]) -> None:

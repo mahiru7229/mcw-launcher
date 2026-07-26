@@ -7,6 +7,7 @@ from PySide6.QtCore import Signal
 from src.core.language.language_manager import tr
 from src.core.system.memory import MemoryAllocationPolicy
 from src.core.instance.instance_manager import InstanceManager
+from src.core.config.managed_content_policy import ManagedContentPolicy
 from src.core.instance.settings_manager import SettingsManager
 from src.gui.controllers.base_controller import BaseController
 
@@ -66,7 +67,8 @@ class InstanceSettingsController(BaseController):
                 raise ValueError(tr("Unsupported LAN authentication policy."))
             if settings.lan_connection_provider not in {"manual", "e4mc"}:
                 raise ValueError(tr("Unsupported LAN connection provider."))
-            settings.block_launch_on_modrinth_failure = bool(data.get("block_launch_on_modrinth_failure", True))
+            settings.modrinth_failure_policy = ManagedContentPolicy.normalize_instance(data.get("modrinth_failure_policy"))
+            settings.curseforge_failure_policy = ManagedContentPolicy.normalize_instance(data.get("curseforge_failure_policy"))
             settings.jvm_arguments = list(data["jvm_arguments"])
             settings.game_arguments = list(data["game_arguments"])
             SettingsManager.save(instance, settings)

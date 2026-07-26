@@ -21,9 +21,10 @@ class CurseForgeManualInstaller:
     def install(instance: Instance, requirement: CurseForgeManualDownload, source: Path) -> str:
         path = Path(source)
         if InstanceRunLock.is_active(instance):
-            raise RuntimeError("Close Minecraft before importing a manually downloaded mod.")
+            raise RuntimeError("Close Minecraft before importing a manually downloaded file.")
         if not path.is_file():
             raise RuntimeError("The selected CurseForge file does not exist.")
+        CurseForgeManualInstaller._verify_extension(path, requirement)
         if requirement.file_size > 0 and path.stat().st_size != requirement.file_size:
             raise RuntimeError(
                 f"The selected file has the wrong size. Expected {requirement.file_size} bytes, got {path.stat().st_size} bytes."
@@ -32,6 +33,12 @@ class CurseForgeManualInstaller:
             digest = CurseForgeManualInstaller._sha1(path)
             if digest.casefold() != requirement.sha1.casefold():
                 raise RuntimeError("The selected file does not match the expected CurseForge SHA-1 checksum.")
+
+        if requirement.managed_kind == "pack":
+            return CurseForgeManualInstaller._install_pack_file(instance, requirement, path)
+
+        if path.suffix.casefold() != ".jar":
+            raise RuntimeError("A standalone mod must be a .jar file.")
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         metadata = ModManager.read_mod(path, preferred_loader=loader_name)
         compatibility_warning = ModManager.compatibility_warning(instance, metadata)
@@ -39,16 +46,13 @@ class CurseForgeManualInstaller:
         if not added:
             raise RuntimeError("The selected file could not be added to the instance.")
         installed_name = added[0].file_name
-        if requirement.managed_kind == "pack":
-            CurseForgeManualInstaller._save_pack_file(instance, requirement, installed_name, compatibility_warning)
-        else:
-            CurseForgeManualInstaller._save_mod_file(instance, requirement, installed_name, compatibility_warning)
+        CurseForgeManualInstaller._save_mod_file(instance, requirement, installed_name, compatibility_warning)
         return installed_name
 
     @staticmethod
     def install_many(instance: Instance, requirements: tuple[CurseForgeManualDownload, ...] | list[CurseForgeManualDownload], sources: tuple[Path, ...] | list[Path]) -> CurseForgeManualImportResult:
         if InstanceRunLock.is_active(instance):
-            raise RuntimeError("Close Minecraft before adding downloaded mod files.")
+            raise RuntimeError("Close Minecraft before adding downloaded files.")
 
         pending = list(requirements)
         imported: list[CurseForgeManualImportedFile] = []
@@ -66,8 +70,8 @@ class CurseForgeManualInstaller:
                 continue
             seen_sources.add(resolved)
 
-            if not source.is_file() or source.suffix.casefold() != ".jar":
-                rejected.append(f"{source.name}: The selected file is not a readable .jar file.")
+            if not source.is_file():
+                rejected.append(f"{source.name}: The selected file is not readable.")
                 continue
 
             size = source.stat().st_size
@@ -83,13 +87,28 @@ class CurseForgeManualInstaller:
                 pending.remove(requirement)
                 continue
 
+            checksum_requirement = next(
+                (item for item in pending if item.sha1 and item.sha1.casefold() == digest.casefold()),
+                None,
+            )
+            if checksum_requirement is not None:
+                expected = CurseForgeManualInstaller._expected_extension(checksum_requirement) or "the expected extension"
+                rejected.append(f"{source.name}: The file content matches, but the extension must be {expected}.")
+                continue
+
             filename_requirement = next((item for item in pending if item.file_name.casefold() == source.name.casefold()), None)
             if filename_requirement is not None:
                 rejected.append(
                     f"{source.name}: The filename matches a required CurseForge file, but its size or SHA-1 checksum is different."
                 )
                 continue
-            extras.append(source)
+
+            if source.suffix.casefold() == ".jar":
+                extras.append(source)
+            else:
+                rejected.append(
+                    f"{source.name}: This file is not listed by the modpack. Only unmatched .jar files can be added as extra mods."
+                )
 
         added_mod_names: list[str] = []
         for source in extras:
@@ -111,14 +130,15 @@ class CurseForgeManualInstaller:
 
     @staticmethod
     def _match_requirement(source: Path, size: int, digest: str, requirements: list[CurseForgeManualDownload]) -> CurseForgeManualDownload | None:
-        checksum_matches = [item for item in requirements if item.sha1 and item.sha1.casefold() == digest.casefold()]
+        compatible = [item for item in requirements if CurseForgeManualInstaller._extension_matches(source, item)]
+        checksum_matches = [item for item in compatible if item.sha1 and item.sha1.casefold() == digest.casefold()]
         if checksum_matches:
             exact_name = next((item for item in checksum_matches if item.file_name.casefold() == source.name.casefold()), None)
             return exact_name or checksum_matches[0]
 
         name_matches = [
             item
-            for item in requirements
+            for item in compatible
             if not item.sha1
             and item.file_name.casefold() == source.name.casefold()
             and (item.file_size <= 0 or item.file_size == size)
@@ -126,23 +146,51 @@ class CurseForgeManualInstaller:
         return name_matches[0] if len(name_matches) == 1 else None
 
     @staticmethod
-    def _save_pack_file(instance: Instance, requirement: CurseForgeManualDownload, installed_name: str, compatibility_warning: str) -> None:
+    def _install_pack_file(instance: Instance, requirement: CurseForgeManualDownload, source: Path) -> str:
+        target, relative = CurseForgePackRegistry.managed_path(
+            instance,
+            requirement.managed_path,
+            requirement.file_name,
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_suffix(target.suffix + ".part")
+        shutil.copy2(source, temporary)
+        temporary.replace(target)
+
+        compatibility_warning = ""
+        if target.suffix.casefold() == ".jar":
+            try:
+                loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
+                metadata = ModManager.read_mod(target, preferred_loader=loader_name)
+                compatibility_warning = ModManager.compatibility_warning(instance, metadata)
+            except Exception as error:
+                compatibility_warning = f"Managed modpack file accepted without loader verification: {error}"
+
+        CurseForgeManualInstaller._save_pack_file(instance, requirement, relative, compatibility_warning)
+        return target.name
+
+    @staticmethod
+    def _save_pack_file(instance: Instance, requirement: CurseForgeManualDownload, installed_relative: str, compatibility_warning: str) -> None:
         pack = CurseForgePackRegistry.load(instance)
         managed = pack.get("managedFiles", [])
         updated = False
+        new_path, safe_relative = CurseForgePackRegistry.managed_path(instance, installed_relative, requirement.file_name)
         for entry in managed:
             if not isinstance(entry, dict):
                 continue
             if int(entry.get("projectId") or 0) != requirement.project_id or int(entry.get("fileId") or 0) != requirement.file_id:
                 continue
-            old_relative = str(entry.get("path") or requirement.managed_path or "")
-            old_path = Path(instance.instance_dir) / old_relative if old_relative else None
-            if old_path is not None and old_path.name.casefold() != installed_name.casefold():
+            old_relative = CurseForgePackRegistry.safe_relative_path(
+                str(entry.get("path") or requirement.managed_path or ""),
+                str(entry.get("fileName") or requirement.file_name),
+            )
+            old_path, _ = CurseForgePackRegistry.managed_path(instance, old_relative, requirement.file_name)
+            if old_path != new_path:
                 old_path.unlink(missing_ok=True)
                 old_path.with_name(old_path.name + ModManager.DISABLED_SUFFIX).unlink(missing_ok=True)
             entry.update({
-                "fileName": installed_name,
-                "path": f"mods/{installed_name}",
+                "fileName": new_path.name,
+                "path": safe_relative,
                 "sha1": requirement.sha1,
                 "size": requirement.file_size,
                 "pendingDownload": False,
@@ -155,6 +203,7 @@ class CurseForgeManualInstaller:
             updated = True
             break
         if not updated:
+            new_path.unlink(missing_ok=True)
             raise RuntimeError("The selected file is no longer listed in this CurseForge modpack.")
         pack["lastDownloadFailures"] = [
             item for item in pack.get("lastDownloadFailures", [])
@@ -196,6 +245,22 @@ class CurseForgeManualInstaller:
             "updatedAt": datetime.now(timezone.utc).isoformat(),
         }
         CurseForgeRegistry.save(instance, registry)
+
+    @staticmethod
+    def _expected_extension(requirement: CurseForgeManualDownload) -> str:
+        expected_name = Path(requirement.managed_path or requirement.file_name).name
+        return Path(expected_name).suffix.casefold()
+
+    @staticmethod
+    def _extension_matches(source: Path, requirement: CurseForgeManualDownload) -> bool:
+        expected = CurseForgeManualInstaller._expected_extension(requirement)
+        return not expected or source.suffix.casefold() == expected
+
+    @staticmethod
+    def _verify_extension(source: Path, requirement: CurseForgeManualDownload) -> None:
+        expected = CurseForgeManualInstaller._expected_extension(requirement)
+        if expected and source.suffix.casefold() != expected:
+            raise RuntimeError(f"The selected file must use the {expected} extension.")
 
     @staticmethod
     def copy_to_cache(source: Path, destination: Path) -> Path:

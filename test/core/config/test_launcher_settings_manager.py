@@ -176,3 +176,22 @@ def test_rc_tester_channel_is_forced_to_stable_for_first_stable_release(tmp_path
 
     assert updates["channel"] == "stable"
     assert updates["channel_policy_version"] == 2
+
+
+def test_managed_content_failure_defaults_are_source_specific_and_persisted(tmp_path: Path) -> None:
+    manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
+
+    assert manager.load()["managed_content"] == {
+        "modrinth_failure_policy": "block",
+        "curseforge_failure_policy": "block",
+    }
+
+    manager.update_section("managed_content", {
+        "modrinth_failure_policy": "allow",
+        "curseforge_failure_policy": "invalid",
+    })
+
+    assert manager.load()["managed_content"] == {
+        "modrinth_failure_policy": "allow",
+        "curseforge_failure_policy": "block",
+    }

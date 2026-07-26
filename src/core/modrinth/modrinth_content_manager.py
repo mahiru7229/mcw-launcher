@@ -105,8 +105,8 @@ class ModrinthContentManager:
         if block_launch_on_failure:
             raise RuntimeError(
                 f"Could not download {count} required Modrinth file(s) after {ModrinthContentManager.MAX_DOWNLOAD_ROUNDS} rounds: {details}. "
-                "To launch anyway and install the missing files manually, open Instance Settings > Modrinth downloads for this instance and turn off "
-                "'Stop launch when required Modrinth files are missing'."
+                "To launch anyway and install the missing files manually, open Instance Settings > Managed modpack file checks and set "
+                "Modrinth failure behavior to 'Continue launch with warnings'."
             )
 
         ModrinthContentManager._append_warning(
@@ -115,7 +115,7 @@ class ModrinthContentManager:
         )
         ModrinthContentManager._append_warning(
             warnings,
-            "Automatic blocking is disabled for this instance. Re-enable it under Instance Settings > Modrinth downloads.",
+            "Automatic Modrinth blocking is disabled by the resolved launcher/instance policy. Re-enable it under Managed modpack file checks.",
         )
         return tuple(warnings)
 

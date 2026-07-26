@@ -11,7 +11,7 @@ def make_instance(tmp_path: Path) -> Instance:
     return Instance(instance_id="id", name="Settings", version_id="1.20.1", instance_dir=instance_dir, mod_loader=("fabric", "0.16.0"))
 
 
-def test_legacy_settings_default_to_blocking_modrinth_failures(tmp_path: Path) -> None:
+def test_legacy_settings_without_failure_choice_inherit_launcher_defaults(tmp_path: Path) -> None:
     instance = make_instance(tmp_path)
     (instance.instance_dir / "settings.json").write_text(json.dumps({
         "java": {"path": "", "min_memory": 1024, "max_memory": 2048, "arguments": []},
@@ -21,19 +21,36 @@ def test_legacy_settings_default_to_blocking_modrinth_failures(tmp_path: Path) -
 
     settings = SettingsManager.load(instance)
 
-    assert settings.block_launch_on_modrinth_failure is True
+    assert settings.modrinth_failure_policy == "inherit"
+    assert settings.curseforge_failure_policy == "inherit"
 
 
-def test_modrinth_failure_policy_is_saved_per_instance(tmp_path: Path) -> None:
+def test_failure_policies_are_saved_per_instance(tmp_path: Path) -> None:
     instance = make_instance(tmp_path)
     settings = SettingsManager.load(instance)
-    settings.block_launch_on_modrinth_failure = False
+    settings.modrinth_failure_policy = "allow"
+    settings.curseforge_failure_policy = "block"
 
     SettingsManager.save(instance, settings)
 
     saved = json.loads((instance.instance_dir / "settings.json").read_text(encoding="utf-8"))
-    assert saved["launch"]["block_launch_on_modrinth_failure"] is False
-    assert SettingsManager.load(instance).block_launch_on_modrinth_failure is False
+    assert saved["launch"]["modrinth_failure_policy"] == "allow"
+    assert saved["launch"]["curseforge_failure_policy"] == "block"
+    reloaded = SettingsManager.load(instance)
+    assert reloaded.modrinth_failure_policy == "allow"
+    assert reloaded.curseforge_failure_policy == "block"
+
+
+def test_legacy_modrinth_boolean_is_migrated_for_both_sources(tmp_path: Path) -> None:
+    instance = make_instance(tmp_path)
+    (instance.instance_dir / "settings.json").write_text(json.dumps({
+        "launch": {"block_launch_on_modrinth_failure": False},
+    }), encoding="utf-8")
+
+    settings = SettingsManager.load(instance)
+
+    assert settings.modrinth_failure_policy == "allow"
+    assert settings.curseforge_failure_policy == "allow"
 
 
 def test_invalid_setting_types_fall_back_without_crashing(tmp_path: Path) -> None:
@@ -56,7 +73,8 @@ def test_invalid_setting_types_fall_back_without_crashing(tmp_path: Path) -> Non
     assert settings.offline_multiplayer_enabled is True
     assert settings.lan_auth_mode == "private_offline"
     assert settings.lan_connection_provider == "manual"
-    assert settings.block_launch_on_modrinth_failure is False
+    assert settings.modrinth_failure_policy == "allow"
+    assert settings.curseforge_failure_policy == "allow"
 
 
 def test_broken_settings_are_backed_up_and_recreated(tmp_path: Path) -> None:
@@ -69,7 +87,9 @@ def test_broken_settings_are_backed_up_and_recreated(tmp_path: Path) -> None:
     assert settings.min_memory == 1024
     assert settings_path.is_file()
     assert (instance.instance_dir / "settings.json.broken").read_text(encoding="utf-8") == "{broken-json"
-    assert json.loads(settings_path.read_text(encoding="utf-8"))["launch"]["block_launch_on_modrinth_failure"] is True
+    launch = json.loads(settings_path.read_text(encoding="utf-8"))["launch"]
+    assert launch["modrinth_failure_policy"] == "inherit"
+    assert launch["curseforge_failure_policy"] == "inherit"
 
 
 def test_save_uses_atomic_temporary_file(tmp_path: Path) -> None:

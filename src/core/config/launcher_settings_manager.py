@@ -9,11 +9,12 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from src.core.config.managed_content_policy import ManagedContentPolicy
 from src.core.fs.paths import Paths
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 6
+    SCHEMA_VERSION = 7
     UPDATE_CHANNEL_POLICY_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
@@ -36,6 +37,10 @@ class LauncherSettingsManager:
         "modrinth": {
             "include_beta": False,
             "include_alpha": False,
+        },
+        "managed_content": {
+            "modrinth_failure_policy": "block",
+            "curseforge_failure_policy": "block",
         },
         "network": {
             "download_limit_mbps": 0.0,
@@ -173,6 +178,10 @@ class LauncherSettingsManager:
         modrinth = normalized.setdefault("modrinth", {})
         modrinth["include_beta"] = self._as_bool(modrinth.get("include_beta"), False)
         modrinth["include_alpha"] = self._as_bool(modrinth.get("include_alpha"), False)
+
+        managed_content = normalized.setdefault("managed_content", {})
+        managed_content["modrinth_failure_policy"] = ManagedContentPolicy.normalize_global(managed_content.get("modrinth_failure_policy"))
+        managed_content["curseforge_failure_policy"] = ManagedContentPolicy.normalize_global(managed_content.get("curseforge_failure_policy"))
 
         network = normalized.setdefault("network", {})
         network["download_limit_mbps"] = self._as_download_limit(network.get("download_limit_mbps"))
