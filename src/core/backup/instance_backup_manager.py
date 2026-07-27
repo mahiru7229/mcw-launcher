@@ -140,7 +140,7 @@ class InstanceBackupManager:
                 if scope == InstanceBackupManager.SCOPE_WORLDS and source.name != "saves":
                     continue
                 target = instance_root / source.name
-                source.rename(target)
+                InstanceBackupManager._install_staged_path(source, target)
                 installed_new.append(source.name)
         except Exception:
             for name in installed_new:
@@ -153,6 +153,30 @@ class InstanceBackupManager:
                 source = rollback / name
                 if source.exists() or source.is_symlink():
                     source.rename(instance_root / name)
+            raise
+
+    @staticmethod
+    def _install_staged_path(source: Path, target: Path) -> None:
+        try:
+            source.rename(target)
+            return
+        except PermissionError:
+            if target.exists() or target.is_symlink():
+                raise
+
+        # Windows can deny renaming a recently extracted directory while still
+        # allowing its contents to be copied. The staging tree is removed after
+        # the complete restore, so a successful copy is equivalent here.
+        try:
+            if source.is_dir():
+                shutil.copytree(source, target)
+            else:
+                shutil.copy2(source, target)
+        except Exception:
+            if target.is_dir() and not target.is_symlink():
+                shutil.rmtree(target, ignore_errors=True)
+            else:
+                target.unlink(missing_ok=True)
             raise
 
     @staticmethod

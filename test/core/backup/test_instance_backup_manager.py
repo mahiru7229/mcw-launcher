@@ -49,6 +49,30 @@ def test_full_backup_restore_is_transactional_and_preserves_protected_files(inst
     assert json.loads((instance.instance_dir / "instance.json").read_text(encoding="utf-8"))["new"] is True
 
 
+def test_full_restore_copies_staged_directory_when_windows_blocks_rename(instance: Instance, monkeypatch: pytest.MonkeyPatch) -> None:
+    fabric_dir = instance.instance_dir / ".fabric"
+    fabric_dir.mkdir()
+    fabric_state = fabric_dir / "state.json"
+    fabric_state.write_text('{"state":"backup"}', encoding="utf-8")
+    backup = InstanceBackupManager.create(instance, "full").backup.path
+    fabric_state.write_text('{"state":"current"}', encoding="utf-8")
+    original_rename = Path.rename
+    blocked_paths: list[Path] = []
+
+    def deny_staging_fabric_rename(source: Path, target: Path) -> Path:
+        if source.name == ".fabric" and "staging" in source.parts and not source.parent.name.startswith("rollback-"):
+            blocked_paths.append(source)
+            raise PermissionError(13, "Access is denied", str(source), str(target))
+        return original_rename(source, target)
+
+    monkeypatch.setattr(Path, "rename", deny_staging_fabric_rename)
+
+    InstanceBackupManager.restore(instance, backup, create_safety_backup=False)
+
+    assert blocked_paths
+    assert fabric_state.read_text(encoding="utf-8") == '{"state":"backup"}'
+
+
 def test_world_backup_only_restores_saves(instance: Instance) -> None:
     backup = InstanceBackupManager.create(instance, "worlds").backup.path
     (instance.instance_dir / "saves" / "World" / "level.dat").write_bytes(b"world-v2")
