@@ -142,6 +142,15 @@ class RepairPlan:
     def can_repair(self) -> bool:
         return bool(self.repairable_issues)
 
+    @property
+    def requires_safety_backup(self) -> bool:
+        instance_components = {
+            RepairComponent.MOD_LOADER,
+            RepairComponent.MODPACK,
+            RepairComponent.SETTINGS,
+        }
+        return any(issue.repairable and issue.component in instance_components for issue in self.issues)
+
     def to_dict(self) -> dict:
         return {
             "instance_name": self.instance_name,
@@ -149,6 +158,7 @@ class RepairPlan:
             "issues": [issue.to_dict() for issue in self.issues],
             "estimated_download_bytes": self.estimated_download_bytes,
             "requires_manual_action": self.requires_manual_action,
+            "requires_safety_backup": self.requires_safety_backup,
         }
 
 
@@ -163,6 +173,9 @@ class RepairExecutionResult:
     repaired_issues: int
     completed_at: str
     report_path: Path
+    backup_path: Path | None = None
+    rolled_back: bool = False
+    rollback_error: str = ""
 
     @property
     def succeeded(self) -> bool:
@@ -179,5 +192,8 @@ class RepairExecutionResult:
             "repaired_issues": self.repaired_issues,
             "completed_at": self.completed_at,
             "report_path": str(self.report_path),
+            "backup_path": str(self.backup_path) if self.backup_path is not None else None,
+            "rolled_back": self.rolled_back,
+            "rollback_error": self.rollback_error,
             "succeeded": self.succeeded,
         }

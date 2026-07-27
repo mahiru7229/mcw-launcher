@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 
+from src.core.backup.instance_backup_manager import InstanceBackupManager
 from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
 from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
 from src.core.fs.paths import Paths
@@ -46,6 +47,11 @@ from src.models.repair.repair_models import (
 class RepairService:
     REPORT_SCHEMA_VERSION = 1
     DEFAULT_COMPONENTS = tuple(RepairComponent)
+    INSTANCE_SCOPED_COMPONENTS = frozenset({
+        RepairComponent.MOD_LOADER,
+        RepairComponent.MODPACK,
+        RepairComponent.SETTINGS,
+    })
 
     @classmethod
     def scan(cls, instance: Instance, mode: RepairMode | str = RepairMode.QUICK, components: Iterable[RepairComponent | str] | None = None, on_progress: ProgressCallback | None = None) -> RepairReport:
@@ -132,22 +138,58 @@ class RepairService:
         repaired: list[RepairComponent] = []
         failed: list[RepairComponent] = []
         warnings: list[str] = []
-        repaired_issues = 0
+        backup_path: Path | None = None
+        rolled_back = False
+        rollback_error = ""
+        repairable_components = {issue.component for issue in plan.repairable_issues}
+        protected_components = set(selected) & repairable_components & set(cls.INSTANCE_SCOPED_COMPONENTS)
+
+        if protected_components:
+            reporter.steps(
+                ProgressStage.APPLYING_REPAIR,
+                f"Creating a recovery point for '{instance.name}'...",
+                0,
+                max(1, len(selected)),
+            )
+            backup_path = InstanceBackupManager.create(
+                instance,
+                InstanceBackupManager.SCOPE_FULL,
+                reason="pre-repair-center",
+            ).backup.path
 
         for index, component in enumerate(selected, start=1):
             component_issues = tuple(issue for issue in plan.issues if issue.component is component)
             if not component_issues:
                 reporter.steps(ProgressStage.APPLYING_REPAIR, f"Skipping healthy {component.value.replace('_', ' ')}.", index, len(selected))
                 continue
+            repairable_issues = tuple(issue for issue in component_issues if issue.repairable)
+            if not repairable_issues:
+                warnings.extend(issue.message for issue in component_issues)
+                reporter.steps(
+                    ProgressStage.APPLYING_REPAIR,
+                    f"Skipping {component.value.replace('_', ' ')}; manual action is required.",
+                    index,
+                    len(selected),
+                )
+                continue
             reporter.steps(ProgressStage.APPLYING_REPAIR, f"Repairing {component.value.replace('_', ' ')}...", index - 1, len(selected))
             try:
                 cls._repair_component(instance, component, reporter)
                 repaired.append(component)
-                repaired_issues += sum(1 for issue in component_issues if issue.repairable)
             except Exception as error:
                 failed.append(component)
                 warnings.append(f"{component.value}: {error}")
             reporter.steps(ProgressStage.APPLYING_REPAIR, f"Processed {component.value.replace('_', ' ')}.", index, len(selected))
+
+        if backup_path is not None and any(component in protected_components for component in failed):
+            try:
+                InstanceBackupManager.restore(instance, backup_path, create_safety_backup=False)
+                rolled_back = True
+                repaired = [component for component in repaired if component not in protected_components]
+                warnings.append("Instance-scoped repair changes were rolled back to the recovery point.")
+            except Exception as error:
+                rollback_error = str(error)
+                warnings.append(f"Recovery point restore failed: {error}")
 
         # Re-check only repaired components. Full verification confirms that the
         # downloader did not merely recreate a same-sized corrupted file.
@@ -169,9 +211,16 @@ class RepairService:
             failed_components=tuple(dict.fromkeys(failed)),
             warnings=tuple(dict.fromkeys(warnings)),
             checked_files=verification.checked_files if verification is not None else plan.report.checked_files,
-            repaired_issues=repaired_issues,
+            repaired_issues=sum(
+                1
+                for issue in plan.repairable_issues
+                if issue.component in repaired and issue.component not in failed
+            ),
             completed_at=cls._now(),
             report_path=report_path,
+            backup_path=backup_path,
+            rolled_back=rolled_back,
+            rollback_error=rollback_error,
         )
         cls._write_json(report_path, {"schema_version": cls.REPORT_SCHEMA_VERSION, **result.to_dict()})
         if result.failed_components:

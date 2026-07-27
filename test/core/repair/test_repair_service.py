@@ -14,7 +14,15 @@ from src.core.minecraft.version_manager import VersionManager
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.core.repair.repair_service import RepairService
-from src.models.repair.repair_models import RepairComponent, RepairMode, RepairStatus
+from src.models.repair.repair_models import (
+    RepairComponent,
+    RepairComponentResult,
+    RepairIssue,
+    RepairMode,
+    RepairReport,
+    RepairSeverity,
+    RepairStatus,
+)
 
 
 @pytest.fixture
@@ -132,3 +140,90 @@ def test_scan_is_blocked_while_game_runs(monkeypatch: pytest.MonkeyPatch, repair
     monkeypatch.setattr(InstanceRunLock, "is_active", classmethod(lambda cls, received: True))
     with pytest.raises(RuntimeError, match="Close Minecraft"):
         RepairService.scan(repair_fixture.instance)
+
+
+def test_instance_repair_failure_restores_recovery_point(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    root = tmp_path / "instance"
+    root.mkdir()
+    settings_path = root / "settings.json"
+    settings_path.write_text('{"state":"original"}', encoding="utf-8")
+    instance = SimpleNamespace(
+        instance_id="recovery-id",
+        name="Recovery",
+        version_id="1.20.1",
+        instance_dir=root,
+        mod_loader=("fabric", "0.15"),
+    )
+    settings_issue = RepairIssue(
+        component=RepairComponent.SETTINGS,
+        code="settings_invalid",
+        message="Settings need repair.",
+        severity=RepairSeverity.ERROR,
+        repairable=True,
+        path=settings_path,
+    )
+    modpack_issue = RepairIssue(
+        component=RepairComponent.MODPACK,
+        code="modpack_missing",
+        message="A managed file is missing.",
+        severity=RepairSeverity.ERROR,
+        repairable=True,
+        path=root / "mods" / "missing.jar",
+    )
+    report = RepairReport(
+        instance_name=instance.name,
+        mode=RepairMode.FULL,
+        components=(
+            RepairComponentResult(RepairComponent.SETTINGS, RepairStatus.BROKEN, issues=(settings_issue,)),
+            RepairComponentResult(RepairComponent.MODPACK, RepairStatus.BROKEN, issues=(modpack_issue,)),
+        ),
+        started_at="2026-01-01T00:00:00+00:00",
+        completed_at="2026-01-01T00:00:01+00:00",
+    )
+    plan = RepairService.build_plan(report)
+    assert plan.requires_safety_backup
+
+    monkeypatch.setattr(InstanceRunLock, "is_active", classmethod(lambda cls, received: False))
+    monkeypatch.setattr(Paths, "BACKUPS_ROOT", tmp_path / "backups")
+    monkeypatch.setattr(Paths, "CACHE_ROOT", tmp_path / "cache")
+    monkeypatch.setattr(Paths, "instance_repair_execution_report", staticmethod(lambda received: root / ".mcw" / "repair-result.json"))
+
+    def fake_repair(cls, received_instance, component, reporter):
+        if component is RepairComponent.SETTINGS:
+            settings_path.write_text('{"state":"changed"}', encoding="utf-8")
+            return
+        if component is RepairComponent.MODPACK:
+            raise RuntimeError("simulated modpack failure")
+
+    monkeypatch.setattr(RepairService, "_repair_component", classmethod(fake_repair))
+
+    result = RepairService.repair(instance, plan)
+
+    assert result.rolled_back
+    assert result.backup_path is not None and result.backup_path.is_file()
+    assert result.failed_components == (RepairComponent.MODPACK,)
+    assert result.repaired_components == ()
+    assert result.repaired_issues == 0
+    assert settings_path.read_text(encoding="utf-8") == '{"state":"original"}'
+    saved = json.loads(result.report_path.read_text(encoding="utf-8"))
+    assert saved["rolled_back"] is True
+    assert saved["backup_path"] == str(result.backup_path)
+
+
+def test_cache_only_repair_plan_does_not_require_safety_backup() -> None:
+    issue = RepairIssue(
+        component=RepairComponent.CLIENT,
+        code="client_missing",
+        message="Client is missing.",
+        severity=RepairSeverity.ERROR,
+        repairable=True,
+    )
+    report = RepairReport(
+        instance_name="Cache",
+        mode=RepairMode.QUICK,
+        components=(RepairComponentResult(RepairComponent.CLIENT, RepairStatus.BROKEN, issues=(issue,)),),
+        started_at="2026-01-01T00:00:00+00:00",
+        completed_at="2026-01-01T00:00:01+00:00",
+    )
+
+    assert RepairService.build_plan(report).requires_safety_backup is False

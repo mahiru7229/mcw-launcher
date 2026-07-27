@@ -142,10 +142,23 @@ class RepairCenterDialog(QDialog):
         self.progress_bar.setValue(100)
         repaired = len(tuple(getattr(result, "repaired_components", ()) or ()))
         failed = len(tuple(getattr(result, "failed_components", ()) or ()))
-        if failed:
+        if bool(getattr(result, "rolled_back", False)):
+            self.progress_label.setText(
+                tr(
+                    "repair.center.repair_rolled_back",
+                    repaired=repaired,
+                    failed=failed,
+                    path=getattr(result, "backup_path", ""),
+                )
+            )
+        elif failed:
             self.progress_label.setText(tr("repair.center.repair_partial", repaired=repaired, failed=failed))
         else:
-            self.progress_label.setText(tr("repair.center.repair_complete", repaired=repaired))
+            message = tr("repair.center.repair_complete", repaired=repaired)
+            backup_path = getattr(result, "backup_path", None)
+            if backup_path:
+                message += "\n" + tr("repair.center.recovery_point", path=backup_path)
+            self.progress_label.setText(message)
         self.set_busy(False)
 
     def set_error(self, error: Exception | str) -> None:
@@ -220,6 +233,8 @@ class RepairCenterDialog(QDialog):
             note = "\n\n" + tr("repair.center.manual_note")
         else:
             note = ""
+        if plan.requires_safety_backup:
+            note += "\n\n" + tr("repair.center.confirm_backup")
         size_mb = plan.estimated_download_bytes / (1024 * 1024)
         message = tr("repair.center.confirm", issues=len(plan.repairable_issues), size=f"{size_mb:.1f} MB") + note
         answer = QMessageBox.question(self, tr("repair.center.title"), message, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
