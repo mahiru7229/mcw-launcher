@@ -29,6 +29,7 @@ def test_selecting_instance_before_launch_does_not_require_prior_state_change(ap
 
 def test_launch_controls_support_pause_resume_and_cancel(app):
     widget = LaunchControlWidget()
+    widget.show()
 
     assert widget.launch_button.text() == "Launch"
     assert widget.cancel_button.isVisible() is False
@@ -65,6 +66,7 @@ def test_launch_controls_support_pause_resume_and_cancel(app):
 
 def test_paused_state_keeps_progress_and_invites_resume(app):
     widget = LaunchControlWidget()
+    widget.show()
     event = ProgressEvent(stage=ProgressStage.DOWNLOADING_ASSETS, message="Downloading assets...", current=1, total=2)
 
     widget.set_launch_active(True)

@@ -7,7 +7,6 @@ from threading import BoundedSemaphore, RLock
 from time import monotonic
 from urllib.parse import urlsplit
 import hashlib
-import os
 import re
 
 import httpx
@@ -17,14 +16,15 @@ from src.core.network.download_journal import download_journal
 from src.core.network.download_models import DownloadRequest, DownloadResult, DownloadState
 from src.core.network.download_pause import DownloadCancelledError, DownloadPausedError, download_pause_controller
 from src.core.network.network_errors import DownloadChecksumMismatchError, DownloadFailedError, DownloadSizeMismatchError, DownloadValidationError
-from src.core.network.network_session import network_session
+from src.core.network.network_session import DEFAULT_MAX_CONCURRENT_DOWNLOADS, MAX_CONCURRENT_DOWNLOADS, network_session
 from src.core.network.retry_policy import DownloadRetryPolicy
 from src.core.progress.download_rate_meter import DownloadRateMeter
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.progress.progress_stage import ProgressStage
 
 
-CHUNK_SIZE = 512 * 1024
+CHUNK_SIZE = 1024 * 1024
+DEFAULT_PER_HOST_LIMIT = 8
 CONTENT_RANGE_PATTERN = re.compile(r"^bytes\s+(\d+)-(\d+)/(\d+|\*)$", re.IGNORECASE)
 
 
@@ -32,11 +32,10 @@ class DownloadManager:
     def __init__(self) -> None:
         self._lock = RLock()
         self._global_limit = network_session.max_concurrent_downloads
-        self._per_host_limit = min(3, self._global_limit)
+        self._per_host_limit = min(DEFAULT_PER_HOST_LIMIT, self._global_limit)
         self._global_semaphore = BoundedSemaphore(self._global_limit)
         self._host_semaphores: dict[str, BoundedSemaphore] = defaultdict(lambda: BoundedSemaphore(self._per_host_limit))
         self._path_locks: dict[Path, RLock] = {}
-        self._journal_progress: dict[str, tuple[int, float]] = {}
 
     @property
     def max_concurrent_downloads(self) -> int:
@@ -48,16 +47,19 @@ class DownloadManager:
         with self._lock:
             return self._per_host_limit
 
-    def configure(self, max_concurrent_downloads: object = 6, per_host_limit: object = 3) -> tuple[int, int]:
+    def configure(self, max_concurrent_downloads: object = DEFAULT_MAX_CONCURRENT_DOWNLOADS, per_host_limit: object | None = None) -> tuple[int, int]:
         try:
             total = int(max_concurrent_downloads)
         except (TypeError, ValueError):
-            total = 6
-        try:
-            per_host = int(per_host_limit)
-        except (TypeError, ValueError):
-            per_host = 3
-        total = min(max(total, 1), 16)
+            total = DEFAULT_MAX_CONCURRENT_DOWNLOADS
+        total = min(max(total, 1), MAX_CONCURRENT_DOWNLOADS)
+        if per_host_limit is None:
+            per_host = min(DEFAULT_PER_HOST_LIMIT, total)
+        else:
+            try:
+                per_host = int(per_host_limit)
+            except (TypeError, ValueError):
+                per_host = min(DEFAULT_PER_HOST_LIMIT, total)
         per_host = min(max(per_host, 1), total)
         with self._lock:
             if total != self._global_limit or per_host != self._per_host_limit:
@@ -111,7 +113,6 @@ class DownloadManager:
                     try:
                         with self._slot(host):
                             resumed_from, response = self._stream(request, url, reporter, progress_stage, progress_message, client_provider)
-                        download_journal.update(request, DownloadState.VERIFYING, downloaded_bytes=self._safe_size(request.temporary_path))
                         actual_hashes = self.calculate_hashes(request.temporary_path, request.hashes)
                         self._validate_file(request, actual_hashes)
                         request.temporary_path.replace(request.destination)
@@ -186,7 +187,9 @@ class DownloadManager:
             if existing > 0:
                 headers["Range"] = f"bytes={existing}-"
             client = client_factory()
-            download_journal.start(request, existing)
+            if existing > 0:
+                download_journal.start(request, existing)
+            journal_progress = (existing, monotonic())
             with client.stream("GET", url, headers=headers, timeout=request.timeout) as response:
                 status = int(getattr(response, "status_code", 200) or 200)
                 if status == 416 and existing > 0 and not force_full:
@@ -224,14 +227,13 @@ class DownloadManager:
                             raise DownloadSizeMismatchError(f"Downloaded file '{request.display_name}' is larger than expected.")
                         if request.max_bytes > 0 and downloaded > request.max_bytes:
                             raise DownloadSizeMismatchError(f"Downloaded file '{request.display_name}' exceeds the allowed size limit.")
-                        self._update_journal_progress(request, downloaded)
+                        journal_progress = self._update_journal_progress(request, downloaded, journal_progress)
                         if total > 0:
                             percentage = min(int(downloaded * 100 / total), 100)
                             if percentage != last_percentage:
                                 last_percentage = percentage
                                 self._report(reporter, stage, message, downloaded, total, rate_meter.update(downloaded))
                     output.flush()
-                    os.fsync(output.fileno())
                 if content_length > 0 and response_bytes != content_length:
                     raise DownloadSizeMismatchError(f"Incomplete HTTP response for '{request.display_name}': received {response_bytes} of {content_length} bytes.")
                 if request.expected_size > 0 and downloaded != request.expected_size:
@@ -307,13 +309,14 @@ class DownloadManager:
         if was_paused:
             download_journal.update(request, DownloadState.DOWNLOADING, downloaded_bytes=downloaded)
 
-    def _update_journal_progress(self, request: DownloadRequest, downloaded: int) -> None:
+    @staticmethod
+    def _update_journal_progress(request: DownloadRequest, downloaded: int, previous: tuple[int, float]) -> tuple[int, float]:
         now = monotonic()
-        last_bytes, last_time = self._journal_progress.get(request.request_id, (0, 0.0))
+        last_bytes, last_time = previous
         if downloaded - last_bytes < 4 * 1024 * 1024 and now - last_time < 1.0:
-            return
-        self._journal_progress[request.request_id] = (downloaded, now)
+            return previous
         download_journal.update(request, DownloadState.DOWNLOADING, downloaded_bytes=downloaded)
+        return downloaded, now
 
     @staticmethod
     def _report(reporter: ProgressReporter | None, stage: ProgressStage | None, message: str | None, current: int, total: int, bytes_per_second: float | None = None) -> None:

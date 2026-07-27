@@ -80,6 +80,13 @@ def test_download_uses_part_file_verifies_and_atomically_replaces(manager: Downl
     assert destination.read_bytes() == content
     assert destination.with_name("file.jar.part").exists() is False
     assert client.ranges == [None]
+    assert (tmp_path / "journal.json").exists() is False
+
+
+def test_auto_concurrency_does_not_bottleneck_single_download_host(manager: DownloadManager) -> None:
+    assert manager.configure() == (8, 8)
+    assert manager.configure(12) == (12, 8)
+    assert manager.configure(4) == (4, 4)
 
 
 def test_download_resumes_valid_partial_with_range(manager: DownloadManager, tmp_path: Path) -> None:

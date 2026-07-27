@@ -44,7 +44,12 @@ class DownloadJournal:
             self._write(payload)
 
     def complete(self, request: DownloadRequest, size: int) -> None:
-        self.update(request, DownloadState.COMPLETED, downloaded_bytes=size, error="")
+        with self._lock:
+            payload = self._read()
+            entries = payload.setdefault("entries", {})
+            if entries.pop(request.request_id, None) is None:
+                return
+            self._write(payload)
 
     def remove(self, request_id: str) -> None:
         with self._lock:
@@ -78,6 +83,12 @@ class DownloadJournal:
         payload["schema_version"] = self.SCHEMA_VERSION
         if not isinstance(payload.get("entries"), dict):
             payload["entries"] = {}
+        else:
+            payload["entries"] = {
+                key: value
+                for key, value in payload["entries"].items()
+                if isinstance(value, dict) and value.get("state") != DownloadState.COMPLETED.value
+            }
         return payload
 
     def _write(self, payload: dict) -> None:

@@ -7,23 +7,27 @@ import httpx
 from src.config import MODRINTH_USER_AGENT
 
 
+DEFAULT_MAX_CONCURRENT_DOWNLOADS = 8
+MAX_CONCURRENT_DOWNLOADS = 16
+
+
 class NetworkSession:
     def __init__(self) -> None:
         self._lock = RLock()
         self._client: httpx.Client | None = None
-        self._max_concurrent_downloads = 6
+        self._max_concurrent_downloads = DEFAULT_MAX_CONCURRENT_DOWNLOADS
 
     @property
     def max_concurrent_downloads(self) -> int:
         with self._lock:
             return self._max_concurrent_downloads
 
-    def configure(self, max_concurrent_downloads: object = 6) -> int:
+    def configure(self, max_concurrent_downloads: object = DEFAULT_MAX_CONCURRENT_DOWNLOADS) -> int:
         try:
             parsed = int(max_concurrent_downloads)
         except (TypeError, ValueError):
-            parsed = 6
-        normalized = min(max(parsed, 1), 16)
+            parsed = DEFAULT_MAX_CONCURRENT_DOWNLOADS
+        normalized = min(max(parsed, 1), MAX_CONCURRENT_DOWNLOADS)
         with self._lock:
             changed = normalized != self._max_concurrent_downloads
             self._max_concurrent_downloads = normalized

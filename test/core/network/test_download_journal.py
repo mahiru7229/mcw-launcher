@@ -40,6 +40,7 @@ def test_journal_is_atomic_sanitized_and_recoverable(tmp_path: Path) -> None:
 
     journal.complete(request, size=10)
     assert journal.recoverable_entries() == []
+    assert json.loads(journal_path.read_text(encoding="utf-8"))["entries"] == {}
 
     journal.clear_completed()
     assert json.loads(journal_path.read_text(encoding="utf-8"))["entries"] == {}

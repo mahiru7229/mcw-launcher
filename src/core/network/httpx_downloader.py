@@ -212,7 +212,6 @@ class HttpDownloader:
                     progress_stage=progress_stage,
                     progress_message=progress_message,
                 )
-                download_journal.update(request, DownloadState.VERIFYING, downloaded_bytes=download_manager._safe_size(temp_path))
                 if not HttpDownloader.verify_sha1(temp_path, download_info.sha1):
                     HttpDownloader.delete_file(temp_path)
                     raise DownloadChecksumMismatchError(path.name, "sha1")

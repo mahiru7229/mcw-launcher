@@ -134,7 +134,7 @@ def test_cancel_role_uses_default_theme_png_fallback(tmp_path: Path, app: QAppli
     }), encoding="utf-8")
 
     root, button = build_root()
-    button.setObjectName("PrimaryButton")
+    button.setObjectName("SecondaryButton")
     button.setProperty("themeRole", "cancel")
     button.setProperty("themeStaticTextRole", "control.cancel")
     button.setProperty("themeStaticTextFallback", "Cancel")
@@ -145,5 +145,6 @@ def test_cancel_role_uses_default_theme_png_fallback(tmp_path: Path, app: QAppli
 
     assert selected_theme == "custom"
     assert "cancel.png" in stylesheet
+    assert 'QPushButton#SecondaryButton[themeRole="cancel"]' in stylesheet
     assert button.text() == ""
     assert button.property("themeStaticTextHidden") is True

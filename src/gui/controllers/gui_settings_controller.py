@@ -8,6 +8,7 @@ from src.core.config.managed_content_policy import ManagedContentPolicy
 from src.core.language.language_manager import tr
 from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
 from src.core.network.download_manager import download_manager
+from src.core.network.network_session import DEFAULT_MAX_CONCURRENT_DOWNLOADS
 from src.gui.controllers.base_controller import BaseController
 
 
@@ -81,7 +82,7 @@ class GuiSettingsController(BaseController):
             "download_concurrency": int(network.get("download_concurrency", self.DEFAULTS["download_concurrency"]) or 0),
         }
         download_bandwidth_limiter.configure_mbps(self._current["download_limit_mbps"])
-        download_manager.configure(self._current["download_concurrency"] or 6, min(3, self._current["download_concurrency"] or 6))
+        download_manager.configure(self._current["download_concurrency"] or DEFAULT_MAX_CONCURRENT_DOWNLOADS)
         self.settings_changed.emit(dict(self._current))
         return dict(self._current)
 
@@ -98,7 +99,7 @@ class GuiSettingsController(BaseController):
         except (TypeError, ValueError):
             download_concurrency = 0
         download_concurrency = 0 if download_concurrency <= 0 else min(download_concurrency, 16)
-        download_manager.configure(download_concurrency or 6, min(3, download_concurrency or 6))
+        download_manager.configure(download_concurrency or DEFAULT_MAX_CONCURRENT_DOWNLOADS)
         tester_mode = bool(data.get("tester_mode", self.DEFAULTS["tester_mode"]))
         update_channel = "beta" if tester_mode else "stable"
         self._current = {
