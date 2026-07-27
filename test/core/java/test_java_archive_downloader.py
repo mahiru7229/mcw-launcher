@@ -29,8 +29,8 @@ def test_java_download_uses_shared_bandwidth_limiter(tmp_path: Path, monkeypatch
     assert sum(throttled) == len(content)
 
 
-def test_java_download_pause_keeps_partial_and_resumes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.core.network.download_pause import DownloadPausedError, download_pause_controller
+def test_java_download_cancel_keeps_partial_and_resumes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.core.network.download_pause import DownloadCancelledError, download_pause_controller
 
     content = b"java-archive"
     release = JavaRelease(major=21, url="https://example.com/java.zip", sha256=hashlib.sha256(content).hexdigest(), size=len(content), filename="java.zip", release_name="test")
@@ -55,7 +55,7 @@ def test_java_download_pause_keeps_partial_and_resumes(tmp_path: Path, monkeypat
         def iter_bytes(self, chunk_size: int):
             if phase["value"] == 1:
                 yield b"java-"
-                download_pause_controller.request_pause()
+                download_pause_controller.request_cancel()
                 yield b"archive"
                 return
             yield b"archive"
@@ -67,7 +67,7 @@ def test_java_download_pause_keeps_partial_and_resumes(tmp_path: Path, monkeypat
 
     monkeypatch.setattr(HttpDownloader, "get_client", lambda: Client())
     download_pause_controller.begin()
-    with pytest.raises(DownloadPausedError):
+    with pytest.raises(DownloadCancelledError):
         JavaArchiveDownloader.download(release, destination, max_retry=1)
 
     partial = destination.with_name(destination.name + ".part")

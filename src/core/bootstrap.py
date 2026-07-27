@@ -7,6 +7,7 @@ from src.core.account.database.account_database import AccountDatabase
 from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.fs.paths import Paths
 from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
+from src.core.network.download_manager import download_manager
 from src.core.security.account_security_manager import AccountSecurityManager
 
 BootstrapProgressCallback = Callable[[int, str], None]
@@ -28,7 +29,10 @@ def initialize_application(progress_callback: BootstrapProgressCallback | None =
     settings = settings_manager.load()
 
     _report(progress_callback, 42, "startup.configuring_downloads")
-    download_bandwidth_limiter.configure_mbps(settings.get("network", {}).get("download_limit_mbps", 0.0))
+    network_settings = settings.get("network", {})
+    download_bandwidth_limiter.configure_mbps(network_settings.get("download_limit_mbps", 0.0))
+    configured_concurrency = int(network_settings.get("download_concurrency", 0) or 0)
+    download_manager.configure(configured_concurrency or 6, min(3, configured_concurrency or 6))
 
     _report(progress_callback, 62, "startup.preparing_accounts")
     AccountDatabase.initialize()

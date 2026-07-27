@@ -54,45 +54,42 @@ class AssetManager:
         if total == 0:
             return Paths.asset_index_dir()
 
-        try:
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=MAX_WORKERS
-            ) as executor:
-                future_to_asset = {}
-                for asset in assets:
-                    token = object()
-                    child_reporter = batch_progress.reporter_for(token)
-                    if verification_cache is None and not fast_verify:
-                        future = executor.submit(AssetManager._download_single_asset, asset) if child_reporter is None else executor.submit(AssetManager._download_single_asset, asset, child_reporter)
-                    else:
-                        future = executor.submit(
-                            AssetManager._download_single_asset,
-                            asset,
-                            child_reporter,
-                            verification_cache,
-                            fast_verify,
-                        )
-                    future_to_asset[future] = (asset, token)
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=MAX_WORKERS
+        ) as executor:
+            future_to_asset = {}
+            for asset in assets:
+                token = object()
+                child_reporter = batch_progress.reporter_for(token)
+                if verification_cache is None and not fast_verify:
+                    future = executor.submit(AssetManager._download_single_asset, asset) if child_reporter is None else executor.submit(AssetManager._download_single_asset, asset, child_reporter)
+                else:
+                    future = executor.submit(
+                        AssetManager._download_single_asset,
+                        asset,
+                        child_reporter,
+                        verification_cache,
+                        fast_verify,
+                    )
+                future_to_asset[future] = (asset, token)
 
-                for future in concurrent.futures.as_completed(
-                    future_to_asset
-                ):
-                    asset, token = future_to_asset[future]
+            for future in concurrent.futures.as_completed(
+                future_to_asset
+            ):
+                asset, token = future_to_asset[future]
 
-                    try:
-                        future.result()
+                try:
+                    future.result()
 
-                    except Exception as error:
-                        batch_progress.discard(token)
-                        raise RuntimeError(
-                            "Failed to download asset: "
-                            f"{asset.logical_name}"
-                        ) from error
+                except Exception as error:
+                    batch_progress.discard(token)
+                    raise RuntimeError(
+                        "Failed to download asset: "
+                        f"{asset.logical_name}"
+                    ) from error
 
-                    batch_progress.complete(token)
+                batch_progress.complete(token)
 
-        finally:
-            HttpDownloader.close_client()
 
         return Paths.asset_index_dir()
 

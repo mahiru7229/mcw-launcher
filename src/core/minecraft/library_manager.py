@@ -47,47 +47,44 @@ class DownloadLibraryManager:
         if total == 0:
             return downloaded_paths
 
-        try:
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=MAX_WORKERS
-            ) as executor:
-                future_to_library = {}
-                for library in libraries:
-                    token = object()
-                    child_reporter = batch_progress.reporter_for(token)
-                    if verification_cache is None and not fast_verify:
-                        future = executor.submit(DownloadLibraryManager._download_single_library, library, version) if child_reporter is None else executor.submit(DownloadLibraryManager._download_single_library, library, version, child_reporter)
-                    else:
-                        future = executor.submit(
-                            DownloadLibraryManager._download_single_library,
-                            library,
-                            version,
-                            child_reporter,
-                            verification_cache,
-                            fast_verify,
-                        )
-                    future_to_library[future] = (library, token)
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=MAX_WORKERS
+        ) as executor:
+            future_to_library = {}
+            for library in libraries:
+                token = object()
+                child_reporter = batch_progress.reporter_for(token)
+                if verification_cache is None and not fast_verify:
+                    future = executor.submit(DownloadLibraryManager._download_single_library, library, version) if child_reporter is None else executor.submit(DownloadLibraryManager._download_single_library, library, version, child_reporter)
+                else:
+                    future = executor.submit(
+                        DownloadLibraryManager._download_single_library,
+                        library,
+                        version,
+                        child_reporter,
+                        verification_cache,
+                        fast_verify,
+                    )
+                future_to_library[future] = (library, token)
 
-                for future in concurrent.futures.as_completed(
-                    future_to_library
-                ):
-                    library, token = future_to_library[future]
+            for future in concurrent.futures.as_completed(
+                future_to_library
+            ):
+                library, token = future_to_library[future]
 
-                    try:
-                        library_path = future.result()
-                        downloaded_paths.append(library_path)
+                try:
+                    library_path = future.result()
+                    downloaded_paths.append(library_path)
 
-                    except Exception as error:
-                        batch_progress.discard(token)
-                        raise RuntimeError(
-                            "Failed to download library: "
-                            f"{library.path}"
-                        ) from error
+                except Exception as error:
+                    batch_progress.discard(token)
+                    raise RuntimeError(
+                        "Failed to download library: "
+                        f"{library.path}"
+                    ) from error
 
-                    batch_progress.complete(token)
+                batch_progress.complete(token)
 
-        finally:
-            HttpDownloader.close_client()
 
         return downloaded_paths
 

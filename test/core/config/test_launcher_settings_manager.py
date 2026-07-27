@@ -147,7 +147,7 @@ def test_theme_and_modrinth_channels_are_created_and_persisted(tmp_path: Path) -
 def test_download_limit_is_unlimited_by_default_and_normalized(tmp_path: Path) -> None:
     manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
 
-    assert manager.load()["network"] == {"download_limit_mbps": 0.0}
+    assert manager.load()["network"] == {"download_limit_mbps": 0.0, "download_concurrency": 0}
 
     manager.update_section("network", {"download_limit_mbps": "12.5"})
     assert manager.load()["network"]["download_limit_mbps"] == 12.5
@@ -157,6 +157,15 @@ def test_download_limit_is_unlimited_by_default_and_normalized(tmp_path: Path) -
 
     manager.update_section("network", {"download_limit_mbps": 5000})
     assert manager.load()["network"]["download_limit_mbps"] == 1024.0
+
+    manager.update_section("network", {"download_concurrency": "8"})
+    assert manager.load()["network"]["download_concurrency"] == 8
+
+    manager.update_section("network", {"download_concurrency": -1})
+    assert manager.load()["network"]["download_concurrency"] == 0
+
+    manager.update_section("network", {"download_concurrency": 99})
+    assert manager.load()["network"]["download_concurrency"] == 16
 
 
 def test_rc_tester_channel_is_forced_to_stable_for_first_stable_release(tmp_path: Path) -> None:

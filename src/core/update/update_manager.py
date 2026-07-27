@@ -2,20 +2,19 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from pathlib import Path, PurePosixPath
 import shutil
 import stat
-import time
 import uuid
 import zipfile
 
 import httpx
 
 from src.core.fs.paths import Paths
-from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
+from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter  # shared singleton; compatibility export
+from src.core.network.download_manager import download_manager
+from src.core.network.download_models import DownloadRequest
 from src.core.network.httpx_downloader import HttpDownloader
-from src.core.progress.download_rate_meter import DownloadRateMeter
 from src.core.progress.progress_reporter import ProgressReporter
 from src.core.update.github_release_client import GitHubReleaseClient
 from src.core.update.versioning import LauncherVersion
@@ -87,65 +86,37 @@ class UpdateManager:
             raise RuntimeError(f"The update package does not contain the declared executable: {executable_name}")
 
     def _download_archive(self, info: UpdateInfo, archive_path: Path, reporter: ProgressReporter | None = None, max_retry: int = 3) -> None:
-        expected_sha256 = info.asset.sha256
-        if archive_path.is_file() and self._archive_matches(archive_path, info.asset.size, expected_sha256):
+        expected_sha256 = str(info.asset.sha256 or "").strip().lower()
+        if archive_path.is_file() and self._archive_matches(archive_path, info.asset.size, expected_sha256 or None):
             size = info.asset.size if info.asset.size > 0 else archive_path.stat().st_size
             if reporter is not None:
                 reporter.bytes(stage=ProgressStage.DOWNLOADING_UPDATE, message="Using cached launcher update...", current=size, total=size)
             return
 
-        archive_path.parent.mkdir(parents=True, exist_ok=True)
-        temporary_path = archive_path.with_name(f"{archive_path.name}.part")
-        last_error: Exception | None = None
-
-        for attempt in range(1, max_retry + 1):
-            temporary_path.unlink(missing_ok=True)
-            sha256 = hashlib.sha256()
-            downloaded = 0
-            try:
-                client = HttpDownloader.get_client()
-                with client.stream("GET", info.asset.download_url, headers={"User-Agent": f"mahiru7229/mcw-launcher/{info.current_version}"}, timeout=httpx.Timeout(connect=20.0, read=120.0, write=30.0, pool=30.0)) as response:
-                    response.raise_for_status()
-                    total = info.asset.size if info.asset.size > 0 else self._response_size(response)
-                    last_percentage = -1
-                    rate_meter = DownloadRateMeter(downloaded)
-                    if reporter is not None:
-                        reporter.bytes(stage=ProgressStage.DOWNLOADING_UPDATE, message=f"Downloading launcher update {info.version}...", current=0, total=total)
-                    with temporary_path.open("wb") as file:
-                        for chunk in response.iter_bytes(chunk_size=256 * 1024):
-                            if not chunk:
-                                continue
-                            download_bandwidth_limiter.throttle(len(chunk))
-                            downloaded += len(chunk)
-                            if downloaded > self.MAX_ARCHIVE_BYTES:
-                                raise RuntimeError("The update archive is larger than the allowed limit.")
-                            sha256.update(chunk)
-                            file.write(chunk)
-                            if reporter is not None and total > 0:
-                                percentage = min(int(downloaded * 100 / total), 100)
-                                if percentage != last_percentage:
-                                    last_percentage = percentage
-                                    reporter.bytes(stage=ProgressStage.DOWNLOADING_UPDATE, message=f"Downloading launcher update {info.version}...", current=downloaded, total=total, bytes_per_second=rate_meter.update(downloaded))
-                        file.flush()
-                        os.fsync(file.fileno())
-
-                if info.asset.size > 0 and downloaded != info.asset.size:
-                    raise RuntimeError(f"The update download is incomplete ({downloaded} of {info.asset.size} bytes).")
-                actual_sha256 = sha256.hexdigest().lower()
-                if expected_sha256 is not None and actual_sha256 != expected_sha256.lower():
-                    raise RuntimeError("The update archive failed SHA-256 verification.")
-                temporary_path.replace(archive_path)
-                final_size = info.asset.size if info.asset.size > 0 else downloaded
-                if reporter is not None:
-                    reporter.bytes(stage=ProgressStage.DOWNLOADING_UPDATE, message=f"Downloaded launcher update {info.version}.", current=final_size, total=final_size)
-                return
-            except (httpx.HTTPError, OSError, RuntimeError) as error:
-                last_error = error
-                temporary_path.unlink(missing_ok=True)
-                if attempt < max_retry:
-                    time.sleep(min(2 ** (attempt - 1), 8))
-
-        raise RuntimeError(f"Failed to download launcher update after {max_retry} attempts.") from last_error
+        request = DownloadRequest(
+            urls=(info.asset.download_url,),
+            destination=archive_path,
+            expected_size=max(0, int(info.asset.size or 0)),
+            hashes={"sha256": expected_sha256} if expected_sha256 else {},
+            source="launcher_update",
+            display_name=info.asset.name or archive_path.name,
+            max_attempts=max_retry,
+            timeout=httpx.Timeout(connect=20.0, read=120.0, write=30.0, pool=30.0),
+            headers={"User-Agent": f"mahiru7229/mcw-launcher/{info.current_version}"},
+            allow_unverified=not bool(expected_sha256),
+            max_bytes=self.MAX_ARCHIVE_BYTES,
+            operation_id=f"launcher-update:{info.version}",
+        )
+        download_manager.download(
+            request,
+            reporter=reporter,
+            progress_stage=ProgressStage.DOWNLOADING_UPDATE,
+            progress_message=f"Downloading launcher update {info.version}...",
+            client_provider=HttpDownloader.get_client,
+        )
+        if not self._archive_matches(archive_path, info.asset.size, expected_sha256 or None):
+            archive_path.unlink(missing_ok=True)
+            raise RuntimeError("The downloaded launcher update archive failed validation.")
 
     @staticmethod
     def _response_size(response: httpx.Response) -> int:

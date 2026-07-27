@@ -99,6 +99,12 @@ class Paths:
         return Paths.logs_root() / f"MCW-Diagnostics-{timestamp}.txt"
 
     @staticmethod
+    def download_journal_path() -> Path:
+        directory = Paths.CACHE_ROOT / "downloads"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory / "journal.json"
+
+    @staticmethod
     def update_root() -> Path:
         directory = Paths.CACHE_ROOT / "updates"
         directory.mkdir(parents=True, exist_ok=True)

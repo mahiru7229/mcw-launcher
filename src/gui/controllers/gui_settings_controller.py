@@ -7,6 +7,7 @@ from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.config.managed_content_policy import ManagedContentPolicy
 from src.core.language.language_manager import tr
 from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
+from src.core.network.download_manager import download_manager
 from src.gui.controllers.base_controller import BaseController
 
 
@@ -31,6 +32,7 @@ class GuiSettingsController(BaseController):
         "allow_launch_on_forge_preflight_failure": False,
         "curseforge_gateway_urls": (),
         "download_limit_mbps": 0.0,
+        "download_concurrency": 0,
     }
 
     def __init__(self) -> None:
@@ -76,8 +78,10 @@ class GuiSettingsController(BaseController):
             "allow_launch_on_forge_preflight_failure": ManagedContentPolicy.normalize_global(managed_content.get("forge_preflight_failure_policy")) == ManagedContentPolicy.ALLOW,
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": float(network.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]) or 0.0),
+            "download_concurrency": int(network.get("download_concurrency", self.DEFAULTS["download_concurrency"]) or 0),
         }
         download_bandwidth_limiter.configure_mbps(self._current["download_limit_mbps"])
+        download_manager.configure(self._current["download_concurrency"] or 6, min(3, self._current["download_concurrency"] or 6))
         self.settings_changed.emit(dict(self._current))
         return dict(self._current)
 
@@ -89,6 +93,12 @@ class GuiSettingsController(BaseController):
             self._emit_error(tr("curseforge.gateway.save.error.title"), error)
             return
         download_limit_mbps = download_bandwidth_limiter.configure_mbps(data.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]))
+        try:
+            download_concurrency = int(data.get("download_concurrency", self.DEFAULTS["download_concurrency"]) or 0)
+        except (TypeError, ValueError):
+            download_concurrency = 0
+        download_concurrency = 0 if download_concurrency <= 0 else min(download_concurrency, 16)
+        download_manager.configure(download_concurrency or 6, min(3, download_concurrency or 6))
         tester_mode = bool(data.get("tester_mode", self.DEFAULTS["tester_mode"]))
         update_channel = "beta" if tester_mode else "stable"
         self._current = {
@@ -109,6 +119,7 @@ class GuiSettingsController(BaseController):
             "allow_launch_on_forge_preflight_failure": bool(data.get("allow_launch_on_forge_preflight_failure", self.DEFAULTS["allow_launch_on_forge_preflight_failure"])),
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": download_limit_mbps,
+            "download_concurrency": download_concurrency,
         }
         self._settings.save({
             "gui": {
@@ -132,7 +143,10 @@ class GuiSettingsController(BaseController):
                 "curseforge_failure_policy": ManagedContentPolicy.BLOCK if self._current["block_launch_on_curseforge_failure"] else ManagedContentPolicy.ALLOW,
                 "forge_preflight_failure_policy": ManagedContentPolicy.ALLOW if self._current["allow_launch_on_forge_preflight_failure"] else ManagedContentPolicy.BLOCK,
             },
-            "network": {"download_limit_mbps": self._current["download_limit_mbps"]},
+            "network": {
+                "download_limit_mbps": self._current["download_limit_mbps"],
+                "download_concurrency": self._current["download_concurrency"],
+            },
         })
         self.settings_changed.emit(dict(self._current))
         self.status_changed.emit(tr("Launcher settings saved"))

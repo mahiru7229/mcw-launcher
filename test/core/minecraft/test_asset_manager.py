@@ -557,7 +557,7 @@ def test_load_downloads_all_assets(
     )
 
     assert result == objects_dir
-    assert closed == [True]
+    assert closed == []
 
 
 def test_load_reports_initial_and_completed_progress(
@@ -637,7 +637,7 @@ def test_load_reports_initial_and_completed_progress(
     )
 
 
-def test_load_wraps_asset_error_and_closes_client(
+def test_load_wraps_asset_error_and_keeps_shared_client_open(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ):
@@ -692,7 +692,7 @@ def test_load_wraps_asset_error_and_closes_client(
         error.value.__cause__,
         OSError,
     )
-    assert closed == [True]
+    assert closed == []
 
 
 def test_load_uses_configured_worker_count(

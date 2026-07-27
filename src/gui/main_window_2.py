@@ -17,7 +17,7 @@ from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.language.language_manager import language_manager, tr
 from src.core.lan.lan_agent_manager import LanAgentManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
-from src.core.network.download_pause import is_download_paused
+from src.core.network.download_pause import is_download_cancelled, is_download_paused
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.core.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
 from src.gui.application import create_application
@@ -309,6 +309,7 @@ class MainWindow(QMainWindow):
         self.logs_page.open_latest_crash_report_requested.connect(self._open_latest_crash_report)
 
         self.launch_control.launch_clicked.connect(self._request_launch)
+        self.launch_control.cancel_clicked.connect(self.launch_controller.cancel)
 
         self.version_controller.versions_changed.connect(self.instances_page.set_versions)
         self.version_controller.versions_changed.connect(lambda versions: self.home_page.set_manifest_count(len(versions)))
@@ -410,6 +411,9 @@ class MainWindow(QMainWindow):
         self.launch_controller.game_exited.connect(self._on_game_exited)
         self.launch_controller.pause_requested.connect(self.launch_control.set_pause_pending)
         self.launch_controller.launch_paused.connect(self._on_launch_paused)
+        self.launch_controller.launch_resumed.connect(self._on_launch_resumed)
+        self.launch_controller.cancel_requested.connect(self._on_launch_cancel_requested)
+        self.launch_controller.launch_cancelled.connect(self._on_launch_cancelled)
         self.instance_controller.repair_progress.connect(self._on_progress)
         self.instance_controller.repair_progress.connect(self.repair_center_dialog.set_progress)
         self.instance_controller.loader_progress.connect(self._on_progress)
@@ -1529,6 +1533,10 @@ class MainWindow(QMainWindow):
         if task_id == "mods.update.check":
             self.mod_manager_dialog.set_update_error(str(error))
         if task_id == self.launch_controller.TASK_ID:
+            if is_download_cancelled(error):
+                self._on_launch_cancelled()
+                self.instance_controller.refresh_running(force=True)
+                return
             if is_download_paused(error):
                 self._on_launch_paused()
                 self.instance_controller.refresh_running(force=True)
@@ -1576,6 +1584,24 @@ class MainWindow(QMainWindow):
     def _on_launch_paused(self) -> None:
         self.launch_control.set_paused()
         message = tr("launch.paused")
+        self.home_page.set_status(message)
+        self.right_panel.set_status(message)
+
+    def _on_launch_resumed(self) -> None:
+        self.launch_control.set_resumed()
+        message = tr("launch.resumed")
+        self.home_page.set_status(message)
+        self.right_panel.set_status(message)
+
+    def _on_launch_cancel_requested(self) -> None:
+        self.launch_control.set_cancel_pending()
+        message = tr("launch.cancel_requested")
+        self.home_page.set_status(message)
+        self.right_panel.set_status(message)
+
+    def _on_launch_cancelled(self) -> None:
+        self.launch_control.set_cancelled("launch.cancelled", "launch.cancelled_detail")
+        message = tr("launch.cancelled")
         self.home_page.set_status(message)
         self.right_panel.set_status(message)
 

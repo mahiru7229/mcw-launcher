@@ -27,29 +27,39 @@ def test_selecting_instance_before_launch_does_not_require_prior_state_change(ap
     assert widget.launch_button.isEnabled() is True
 
 
-def test_launch_button_switches_to_cancel_during_launch_and_back(app):
+def test_launch_controls_support_pause_resume_and_cancel(app):
     widget = LaunchControlWidget()
 
     assert widget.launch_button.text() == "Launch"
-    assert widget.launch_button.property("themeRole") == "launch"
+    assert widget.cancel_button.isVisible() is False
 
     widget.set_busy(True)
     assert widget.launch_button.isEnabled() is False
 
     widget.set_launch_active(True)
-    assert widget.launch_button.text() == "Cancel"
-    assert widget.launch_button.property("themeRole") == "cancel"
+    assert widget.launch_button.text() == "Pause"
+    assert widget.cancel_button.isVisible() is True
     assert widget.launch_button.isEnabled() is True
 
-    widget.set_pause_pending()
-    assert widget.launch_button.text() == "Cancel"
+    widget.set_paused()
+    assert widget.launch_button.text() == "Resume"
+    assert widget.cancel_button.isVisible() is True
+    assert widget.stage_label.text() == "PAUSED"
+    assert "Press Resume" in widget.detail_label.text()
+
+    widget.set_resumed()
+    assert widget.launch_button.text() == "Pause"
+    assert widget.stage_label.text() == "RUNNING"
+
+    widget.set_cancel_pending()
     assert widget.launch_button.isEnabled() is False
-    assert widget.stage_label.text() == "PAUSING"
+    assert widget.cancel_button.isEnabled() is False
+    assert widget.stage_label.text() == "CANCELLING"
 
     widget.set_launch_active(False)
     widget.set_busy(False)
     assert widget.launch_button.text() == "Launch"
-    assert widget.launch_button.property("themeRole") == "launch"
+    assert widget.cancel_button.isVisible() is False
     assert widget.launch_button.isEnabled() is True
 
 
@@ -62,10 +72,10 @@ def test_paused_state_keeps_progress_and_invites_resume(app):
     widget.set_paused()
 
     assert widget.stage_label.text() == "PAUSED"
-    assert "Press Launch" in widget.detail_label.text()
-    assert widget.launch_button.text() == "Launch"
+    assert "Press Resume" in widget.detail_label.text()
+    assert widget.launch_button.text() == "Resume"
+    assert widget.cancel_button.isVisible() is True
     assert widget.stage_label.property("state") == "warning"
-
 
 def test_exit_result_shows_instance_and_restores_launch_button(app):
     widget = LaunchControlWidget()

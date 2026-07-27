@@ -810,7 +810,7 @@ def test_download_and_verify_retries_sha1_mismatch(
     assert sleeps == [1]
 
 
-def test_download_and_verify_cleans_part_file_after_final_failure(
+def test_download_and_verify_preserves_part_file_after_retryable_final_failure(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ):
@@ -850,7 +850,7 @@ def test_download_and_verify_cleans_part_file_after_final_failure(
             timeout=20.0,
         )
 
-    assert not temp_path.exists()
+    assert temp_path.read_bytes() == b"partial"
     assert not path.exists()
 
 
