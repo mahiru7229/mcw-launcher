@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -49,6 +50,10 @@ def test_missing_download_url_is_resolved_shortly_before_download(monkeypatch, t
         "src.core.curseforge.curseforge_downloader.CurseForgeClient.get_download_url",
         staticmethod(lambda project_id, file_id, force_refresh=False: "https://cdn.example/example.jar"),
     )
+    monkeypatch.setattr(
+        "src.core.curseforge.curseforge_downloader.CurseForgeDownloadFallback.find_exact_hash_mirror",
+        staticmethod(lambda *args, **kwargs: None),
+    )
 
     def fake_download(source, target, **kwargs):
         calls["url"] = source.download_url
@@ -71,6 +76,42 @@ def test_forbidden_download_url_endpoint_uses_manual_fallback(monkeypatch, tmp_p
         raise error
 
     monkeypatch.setattr("src.core.curseforge.curseforge_downloader.CurseForgeClient.get_download_url", staticmethod(fail))
+    monkeypatch.setattr(
+        "src.core.curseforge.curseforge_downloader.CurseForgeDownloadFallback.find_exact_hash_mirror",
+        staticmethod(lambda *args, **kwargs: None),
+    )
 
     with pytest.raises(CurseForgeManualDownloadRequired):
         CurseForgeDownloader.download_file(make_file(download_url="", is_available=True), tmp_path / "example.jar")
+
+
+def test_gateway_failure_uses_exact_modrinth_sha1_mirror(monkeypatch, tmp_path: Path) -> None:
+    gateway_error = RuntimeError("The CurseForge gateway credentials are unavailable.")
+    setattr(gateway_error, "gateway_error_code", "CURSEFORGE_CREDENTIALS_UNAVAILABLE")
+    monkeypatch.setattr(
+        "src.core.curseforge.curseforge_downloader.CurseForgeClient.get_download_url",
+        staticmethod(lambda *args, **kwargs: (_ for _ in ()).throw(gateway_error)),
+    )
+    monkeypatch.setattr(
+        "src.core.curseforge.curseforge_downloader.CurseForgeDownloadFallback.find_exact_hash_mirror",
+        staticmethod(lambda *args, **kwargs: SimpleNamespace(url="https://cdn.modrinth.com/example.jar", file_name="mirror.jar", size=10)),
+    )
+    captured = {}
+
+    def fake_download(source, destination, **kwargs):
+        captured["url"] = source.download_url
+        captured["sha1"] = source.sha1
+        captured["destination"] = destination
+        return destination
+
+    monkeypatch.setattr("src.core.curseforge.curseforge_downloader.HttpDownloader.download", staticmethod(fake_download))
+    destination = tmp_path / "example.jar"
+
+    result = CurseForgeDownloader.download_file(make_file(download_url=""), destination)
+
+    assert result == destination
+    assert captured == {
+        "url": "https://cdn.modrinth.com/example.jar",
+        "sha1": "a" * 40,
+        "destination": destination,
+    }

@@ -31,7 +31,7 @@ class LaunchErrorPresenter:
         if "required modrinth file" in normalized or ("modrinth" in normalized and "after 3 rounds" in normalized):
             return cls._build(
                 title="Required Modrinth files are missing",
-                summary="The launcher could not download every required Modrinth file after three rounds. Retry the launch, install the listed files manually, or open Instance Settings > Modrinth downloads for this instance to allow launch with missing files.",
+                summary="The launcher could not download every required Modrinth file after three rounds. Retry the launch, install the listed files manually, or set Modrinth failure behavior to Continue launch with warnings under Instance Settings > Managed modpack file checks.",
                 status="Modrinth files missing",
                 technical_message=technical_message,
             )

@@ -180,8 +180,8 @@ def test_failed_pack_file_raises_after_three_complete_rounds(tmp_path, monkeypat
 
     assert attempts == [1, 1, 1]
     assert "mods/example.jar" in str(error.value)
-    assert "Instance Settings > Modrinth downloads" in str(error.value)
-    assert "Stop launch when required Modrinth files are missing" in str(error.value)
+    assert "Instance Settings > Managed modpack file checks" in str(error.value)
+    assert "Continue launch with warnings" in str(error.value)
     assert not (instance.instance_dir / "mods" / "example.jar").exists()
     registry = ModrinthPackRegistry.load(instance)
     assert registry["lastDownloadFailures"] == [{"path": "mods/example.jar", "error": "temporary CDN failure"}]
@@ -229,7 +229,7 @@ def test_failed_pack_file_can_continue_for_manual_install_when_instance_option_i
     assert attempts == [1, 1, 1]
     assert any("Launching with 1 missing Modrinth file(s)" in warning for warning in warnings)
     assert any("mods/example.jar" in warning for warning in warnings)
-    assert any("Instance Settings > Modrinth downloads" in warning for warning in warnings)
+    assert any("Managed modpack file checks" in warning for warning in warnings)
     registry = ModrinthPackRegistry.load(instance)
     assert registry["lastDownloadFailures"] == [{"path": "mods/example.jar", "error": "temporary CDN failure"}]
 

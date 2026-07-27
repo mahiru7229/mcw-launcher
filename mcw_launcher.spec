@@ -12,6 +12,7 @@ from PyInstaller.utils.win32.versioninfo import FixedFileInfo, StringFileInfo, S
 PROJECT_ROOT = Path(SPECPATH).resolve()
 ENTRY_POINT = PROJECT_ROOT / "launcher.py"
 LANGUAGE_ROOT = PROJECT_ROOT / "lang"
+LAN_AGENT_PATH = PROJECT_ROOT / "runtime" / "mcw-lan-agent.jar"
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -28,6 +29,8 @@ if not ENTRY_POINT.is_file():
     raise FileNotFoundError(f"Launcher entry point not found: {ENTRY_POINT}")
 if not LANGUAGE_ROOT.is_dir():
     raise FileNotFoundError(f"Language directory not found: {LANGUAGE_ROOT}")
+if not LAN_AGENT_PATH.is_file():
+    raise FileNotFoundError(f"MCW LAN Agent not found: {LAN_AGENT_PATH}")
 
 
 NUMERIC_VERSION = _numeric_version(VERSION_ID)
@@ -36,7 +39,7 @@ IS_PRERELEASE = any(marker in VERSION_ID.casefold() for marker in ("alpha", "bet
 # Keep the default language packs inside the one-file executable so the GUI can
 # still start when the external release payload is incomplete. External packs
 # beside the executable remain supported and override bundled packs.
-DATAS = [(str(LANGUAGE_ROOT), "lang")]
+DATAS = [(str(LANGUAGE_ROOT), "lang"), (str(LAN_AGENT_PATH), "runtime")]
 
 # HTTPX/Requests use certifi for HTTPS certificate validation. PyInstaller has a
 # certifi hook, but collecting the data explicitly makes the release contract

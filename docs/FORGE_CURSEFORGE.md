@@ -1,6 +1,6 @@
 # CurseForge Gateway integration
 
-MCW Launcher `v0.7.0` provides CurseForge browsing and installation without bundling a CurseForge API key or a private gateway URL in the source, EXE, or updater package.
+MCW Launcher `v0.8.1` provides CurseForge browsing and installation through the public MCW gateway without bundling a CurseForge API key in the source, EXE, or updater package.
 
 ## Architecture
 
@@ -8,19 +8,25 @@ MCW Launcher `v0.7.0` provides CurseForge browsing and installation without bund
 MCW Launcher
     │ HTTPS JSON
     ▼
-Private CurseForge Gateway 1
-    │ unavailable? try Gateway 2 → 3 → 4 → 5
+MCW public CurseForge Gateway
+    │ unavailable? try configured custom gateways
     ▼
 CurseForge API
 ```
 
-The real CurseForge API key remains on the gateway server. Mod files are not proxied through the gateway: it returns metadata or download URLs and MCW Launcher's normal downloader fetches the file directly, reports progress, retries, and verifies SHA-1.
+The CurseForge API key remains on the gateway server. Mod files are not proxied through the gateway: it returns metadata or download URLs and MCW Launcher's downloader fetches the file directly, reports progress, retries, and verifies SHA-1.
 
-## Private endpoint configuration
+## Default and custom endpoints
 
-No gateway is configured by default. Open **Launcher Settings → Private CurseForge gateways** and enter up to five HTTPS endpoints in priority order.
+Fresh installations use:
 
-The launcher stores them in:
+```text
+https://mcw-curseforge-gateway.vercel.app/api/curseforge
+```
+
+Custom HTTPS endpoints can still be configured in **Launcher Settings → CurseForge gateways**. Environment or locally protected configuration takes priority over the public default.
+
+The launcher stores local overrides in:
 
 ```text
 config/private/curseforge_endpoints.json
@@ -28,9 +34,7 @@ config/private/curseforge_endpoints.json
 
 Values are protected with Windows DPAPI and can only be decrypted by the Windows account that saved them. The file is excluded from Git and is not copied into release packages.
 
-All five fields are masked by default. Enabling **Reveal protected gateway links** opens a localized warning message. The confirmation button remains disabled for five seconds before the links may be shown.
-
-For managed deployments, these environment variables are also supported:
+For managed deployments, these environment variables are supported:
 
 ```text
 MCW_CURSEFORGE_GATEWAY_URL_1
@@ -43,7 +47,46 @@ MCW_CURSEFORGE_CLIENT_TOKEN
 
 The legacy single variable `MCW_CURSEFORGE_GATEWAY_URL` remains readable for compatibility.
 
-> DPAPI protects values at rest and masking reduces accidental on-screen exposure. A desktop client cannot make an endpoint permanently secret from someone who controls the same Windows account or can inspect its network traffic.
+## Loader compatibility policy
+
+CurseForge loader labels are treated as **advisory metadata**, not final proof that a JAR is incompatible.
+
+The launcher now:
+
+1. Requests files by Minecraft version without a strict Fabric/Forge filter.
+2. Ranks files declared for the selected loader first.
+3. Keeps universal, unknown, and differently labelled files visible.
+4. Downloads the selected JAR.
+5. Inspects the real metadata inside the archive before adding it to the instance.
+
+A JAR containing both:
+
+```text
+fabric.mod.json
+META-INF/mods.toml
+```
+
+is recognized as a Fabric/Forge universal mod. For a Fabric instance the launcher reads `fabric.mod.json`; for a Forge instance it reads `META-INF/mods.toml`.
+
+A differently labelled file is allowed to reach JAR validation. For a standalone mod, MCW Launcher shows a clear warning and requires explicit confirmation before installing it. For a managed modpack, the pack declaration is preserved and the file is installed as **unverified** so the launcher does not silently rewrite the pack or retry the same file forever.
+
+This behavior also applies to managed files inside CurseForge modpacks, fixing packs whose universal dependencies are indexed under only one loader.
+
+Forge language providers and managed libraries may not contain `mods.toml`. MCW Launcher additionally recognizes these `META-INF/MANIFEST.MF` values:
+
+```text
+FMLModType: LANGPROVIDER
+FMLModType: LIBRARY
+FMLModType: GAMELIBRARY
+```
+
+Unknown JARs remain blocked by default. They are copied only when the user explicitly accepts the standalone-mod warning or when an exact, checksum-verified file is declared by a managed modpack.
+
+## Open in browser
+
+The CurseForge browser and Mods page expose an **Open in browser** action for the selected project.
+
+Only HTTPS links on `curseforge.com` or its subdomains are accepted. Invalid or unsafe URLs returned by a gateway are ignored; the launcher falls back to an official CurseForge project URL generated from the project slug.
 
 ## Failover policy
 
@@ -53,12 +96,26 @@ Requests use endpoints in the configured order. The launcher tries the next endp
 - invalid JSON/invalid response data;
 - HTTP `404`, `408`, `425`, `429`, or `5xx` status.
 
-Authentication and request errors such as HTTP `400`, `401`, or `403` are not sprayed across every endpoint. This avoids unnecessary traffic when the same credentials or request would fail everywhere.
+Authentication and request errors such as HTTP `400`, `401`, or `403` are not repeated across every endpoint.
+
+Download failures are also classified by retryability. Missing gateway credentials, unavailable files, disabled third-party distribution, and manual-download requirements are treated as permanent for the current run and are not retried three times.
+
+## Download fallback order
+
+For a managed file, the launcher uses this order:
+
+1. Reuse a verified file already present in the shared CurseForge cache.
+2. Use the `downloadUrl` already stored in the instance registry.
+3. Ask the configured CurseForge gateway for the official file/download URL.
+4. When a SHA-1 is known, query Modrinth for a file with the **same SHA-1** and use its direct URL only when the hash and expected size match.
+5. Open the CurseForge project in the browser and let the user import the exact file manually.
+
+The launcher does not construct undocumented CurseForge CDN paths. Every automatic or manual result is verified against the expected SHA-1 when one is available.
 
 ## Supported workflow
 
-- Search CurseForge projects through the private gateway.
-- Filter compatible files by Minecraft version, Fabric/Forge loader, and release channel.
+- Search CurseForge projects through the gateway.
+- Filter by Minecraft version and release channel while ranking loader compatibility.
 - Fetch project/file metadata in batches where possible.
 - Install required CurseForge mod dependencies.
 - Download automatically when `downloadUrl` is available and third-party distribution is permitted.
@@ -70,7 +127,7 @@ The manual-download flow is implemented for mods. CurseForge modpack handling re
 
 ## Local JSON cache
 
-CurseForge responses are stored under the launcher cache directory:
+CurseForge responses are stored under:
 
 ```text
 cache/content/curseforge/api-v2/
@@ -83,21 +140,16 @@ Policy:
 - Maximum disk size: `10 MiB`.
 - Cleanup target: `8 MiB`.
 - Eviction: least recently used entries first.
-- Search TTL: 30 minutes.
-- File lists: 1 hour.
-- Project metadata: 12 hours.
-- File metadata: 24 hours.
 - Download URLs are resolved at install time and are not retained as permanent download authority.
 - Cache writes use temporary files and atomic replacement.
 - Invalid cache schema/data is discarded safely.
 
-If every configured gateway is temporarily unavailable, stale cached data may remain visible instead of clearing the page.
+If every gateway is temporarily unavailable, stale cached data may remain visible instead of clearing the page.
 
 ## Security and privacy
 
 The cache and diagnostics must never contain:
 
-- private gateway URLs;
 - CurseForge API keys;
 - client authorization tokens;
 - Microsoft access or refresh tokens;

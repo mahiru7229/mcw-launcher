@@ -49,21 +49,45 @@ def test_current_release_notes_exist() -> None:
     assert (project_root / "docs" / f"RELEASE-{VERSION_TAG}.md").is_file()
 
 
-def test_private_gateway_audit_rejects_bundled_url(tmp_path: Path) -> None:
+def test_private_gateway_audit_rejects_unexpected_or_secret_configuration(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "config.py").write_text(
-        'CURSEFORGE_GATEWAY_URL = "https://private.example/api/curseforge"\n',
+        'CURSEFORGE_GATEWAY_URL = "https://private.example/api/curseforge"\n'
+        'CURSEFORGE_DEFAULT_GATEWAY_URL = "https://private.example/api/curseforge"\n'
+        'CURSEFORGE_API_KEY = "secret"\n',
         encoding="utf-8",
     )
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "curseforge.example.json").write_text(
-        json.dumps({"bundled_gateway_urls": ["https://private.example/api/curseforge"]}),
+        json.dumps({
+            "default_gateway_url": "https://private.example/api/curseforge",
+            "bundled_gateway_urls": ["https://another-private.example/api/curseforge"],
+        }),
         encoding="utf-8",
     )
     (tmp_path / ".gitignore").write_text("", encoding="utf-8")
 
     errors = audit_private_gateway_bundling(tmp_path)
 
-    assert "Private CurseForge gateway URL must not be bundled in src/config.py" in errors
-    assert "config/curseforge.example.json must not contain bundled gateway URLs" in errors
+    assert any("legacy private gateway constants" in error for error in errors)
+    assert "src/config.py contains an unexpected CurseForge default gateway URL" in errors
+    assert "CurseForge API credentials must not be bundled in src/config.py" in errors
+    assert "config/curseforge.example.json must document the public default gateway URL" in errors
+    assert "config/curseforge.example.json must not contain additional bundled gateway URLs" in errors
     assert ".gitignore must exclude config/private/" in errors
+
+
+def test_private_gateway_audit_accepts_public_default(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "config.py").write_text(
+        'CURSEFORGE_DEFAULT_GATEWAY_URL = "https://mcw-curseforge-gateway.vercel.app/api/curseforge"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "curseforge.example.json").write_text(
+        json.dumps({"default_gateway_url": "https://mcw-curseforge-gateway.vercel.app/api/curseforge"}),
+        encoding="utf-8",
+    )
+    (tmp_path / ".gitignore").write_text("config/private/\n", encoding="utf-8")
+
+    assert audit_private_gateway_bundling(tmp_path) == []

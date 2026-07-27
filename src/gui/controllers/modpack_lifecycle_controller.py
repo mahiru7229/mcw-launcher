@@ -36,7 +36,8 @@ class ModpackLifecycleController(BaseController):
         name = str(instance_name).strip()
         if not name:
             return
-        self._task_runner.run("modpack.update.check", lambda: ModrinthPackUpdateManager.check(InstanceManager.load(name), allowed_version_types, force_refresh=force_refresh), tr("Checking modpack updates for '{name}'...", name=name), blocking=False)
+        reporter = ProgressReporter(self.progress_received.emit)
+        self._task_runner.run("modpack.update.check", lambda: ModrinthPackUpdateManager.check(InstanceManager.load(name), allowed_version_types, force_refresh=force_refresh, reporter=reporter), tr("Checking modpack updates for '{name}'...", name=name), blocking=False)
 
     def update(self, instance_name: str, allowed_version_types: tuple[str, ...]) -> None:
         name = str(instance_name).strip()

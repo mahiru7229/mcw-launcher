@@ -162,3 +162,28 @@ def test_concurrent_acquire_allows_only_one_owner(tmp_path: Path):
 
     assert len(acquired) == 1
     acquired[0].release()
+
+
+def test_preparing_lock_can_authorize_managed_content_changes(tmp_path: Path):
+    instance = make_instance(tmp_path)
+    run_lock = InstanceRunLock.acquire(instance)
+
+    assert InstanceRunLock.owns_preparing_lock(instance, run_lock.token) is True
+    assert InstanceRunLock.owns_preparing_lock(instance, "wrong-token") is False
+    assert InstanceRunLock.owns_preparing_lock(instance, None) is False
+
+    run_lock.release()
+
+
+def test_running_lock_cannot_authorize_mod_changes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    instance = make_instance(tmp_path)
+    process = ControlledProcess()
+    run_lock = InstanceRunLock.acquire(instance)
+    monkeypatch.setattr(InstanceRunLock, "_is_process_alive", staticmethod(lambda pid: pid in {os.getpid(), process.pid}))
+
+    assert run_lock.track_process(process) is True
+    assert process.wait_started.wait(timeout=1)
+    assert InstanceRunLock.owns_preparing_lock(instance, run_lock.token) is False
+
+    process.exit_requested.set()
+    wait_until_missing(run_lock.lock_path)

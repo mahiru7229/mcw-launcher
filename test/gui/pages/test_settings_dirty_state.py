@@ -21,7 +21,8 @@ def _instance_settings() -> SimpleNamespace:
         offline_multiplayer_enabled=False,
         lan_auth_mode="microsoft_only",
         lan_connection_provider="manual",
-        block_launch_on_modrinth_failure=True,
+        modrinth_failure_policy="inherit",
+        curseforge_failure_policy="inherit",
         jvm_arguments=[],
         game_arguments=[],
     )
@@ -41,6 +42,8 @@ def _launcher_settings() -> dict:
         "show_static_text": False,
         "modrinth_include_beta": False,
         "modrinth_include_alpha": False,
+        "block_launch_on_modrinth_failure": True,
+        "block_launch_on_curseforge_failure": True,
         "curseforge_gateway_urls": ("https://one.example/api/curseforge",),
         "download_limit_mbps": 0.0,
     }

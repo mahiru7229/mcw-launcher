@@ -1,19 +1,22 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QSignalBlocker, Qt, Signal
-from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QLabel, QLineEdit, QPushButton, QSlider, QSpinBox, QTextEdit
+from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSlider, QSpinBox, QTextEdit, QVBoxLayout
 
+from src.core.config.managed_content_policy import ManagedContentPolicy
 from src.core.language.language_manager import tr
 from src.core.system.memory import MemoryAllocationPolicy, SystemMemory
 from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
+from src.gui.widget.settings_section import SettingsSection
 
 
 class InstanceSettingsPage(BasePage):
     load_requested = Signal(str)
     save_requested = Signal(str, dict)
     lan_prepare_requested = Signal(str, str, str)
+    lan_agent_log_requested = Signal(str)
     dirty_changed = Signal(bool)
 
     def __init__(self, total_memory_mb: int | None = None) -> None:
@@ -38,6 +41,13 @@ class InstanceSettingsPage(BasePage):
         self.unsaved_label.setVisible(False)
         self.root_layout.addWidget(self.unsaved_label)
 
+        target_section = SettingsSection("instance.settings.section.target", "instance.settings.section.target_detail")
+        runtime_section = SettingsSection("instance.settings.section.runtime", "instance.settings.section.runtime_detail")
+        multiplayer_section = SettingsSection("instance.settings.section.multiplayer", "instance.settings.section.multiplayer_detail")
+        advanced_section = SettingsSection("instance.settings.section.advanced", "instance.settings.section.advanced_detail")
+        for section in (target_section, runtime_section, multiplayer_section, advanced_section):
+            self.root_layout.addWidget(section)
+
         selector_card = CardWidget("Target instance")
         self.instance_combo = QComboBox()
         self.instance_combo.currentTextChanged.connect(self.load_requested.emit)
@@ -45,7 +55,7 @@ class InstanceSettingsPage(BasePage):
         reload_button.clicked.connect(lambda: self.load_requested.emit(self.current_instance_name()))
         selector_card.layout.addWidget(self.instance_combo)
         selector_card.layout.addWidget(reload_button)
-        self.root_layout.addWidget(selector_card)
+        target_section.add_card(selector_card, span=2)
 
         java_card = CardWidget("Java and memory")
         self.java_path_input = QLineEdit()
@@ -92,31 +102,62 @@ class InstanceSettingsPage(BasePage):
         java_card.layout.addWidget(self.java_path_input)
         java_card.layout.addWidget(browse_button)
         java_card.layout.addLayout(memory_grid)
-        self.root_layout.addWidget(java_card)
+        runtime_section.add_card(java_card)
         self._apply_memory_values(MemoryAllocationPolicy.DEFAULT_MIN_MEMORY_MB, MemoryAllocationPolicy.DEFAULT_MAX_MEMORY_MB)
 
         window_card = CardWidget("Game window")
-        window_grid = QGridLayout()
         self.window_width = QSpinBox()
         self.window_height = QSpinBox()
         for spin_box in (self.window_width, self.window_height):
             spin_box.setRange(320, 7680)
+
+        self.window_width_label = QLabel("Width")
+        self.window_height_label = QLabel("Height")
+        width_field = QVBoxLayout()
+        width_field.setContentsMargins(0, 0, 0, 0)
+        width_field.setSpacing(6)
+        width_field.addWidget(self.window_width_label)
+        width_field.addWidget(self.window_width)
+        height_field = QVBoxLayout()
+        height_field.setContentsMargins(0, 0, 0, 0)
+        height_field.setSpacing(6)
+        height_field.addWidget(self.window_height_label)
+        height_field.addWidget(self.window_height)
+
+        self.window_size_row = QHBoxLayout()
+        self.window_size_row.setContentsMargins(0, 0, 0, 0)
+        self.window_size_row.setSpacing(10)
+        self.window_size_row.addLayout(width_field, 1)
+        self.window_size_row.addLayout(height_field, 1)
+
         self.fullscreen = QCheckBox("Launch in fullscreen")
-        window_grid.addWidget(QLabel("Width"), 0, 0)
-        window_grid.addWidget(self.window_width, 1, 0)
-        window_grid.addWidget(QLabel("Height"), 0, 1)
-        window_grid.addWidget(self.window_height, 1, 1)
-        window_card.layout.addLayout(window_grid)
+        window_card.layout.addLayout(self.window_size_row)
         window_card.layout.addWidget(self.fullscreen)
-        self.root_layout.addWidget(window_card)
+        window_card.layout.addStretch(1)
+        runtime_section.add_card(window_card)
+
+        forge_preflight_card = CardWidget(
+            tr("forge_preflight.instance.title"),
+            tr("forge_preflight.instance.detail"),
+        )
+        self.forge_preflight_failure_label = QLabel(tr("forge_preflight.instance.label"))
+        self.forge_preflight_failure_policy = QComboBox()
+        self._populate_forge_preflight_policy_combo(self.forge_preflight_failure_policy)
+        self.forge_preflight_warning_label = QLabel(tr("forge_preflight.warning"))
+        self.forge_preflight_warning_label.setObjectName("CardSubtitle")
+        self.forge_preflight_warning_label.setWordWrap(True)
+        forge_preflight_card.layout.addWidget(self.forge_preflight_failure_label)
+        forge_preflight_card.layout.addWidget(self.forge_preflight_failure_policy)
+        forge_preflight_card.layout.addWidget(self.forge_preflight_warning_label)
+        runtime_section.add_card(forge_preflight_card, span=2)
 
         hosting_card = CardWidget(
             "LAN hosting",
-            "Authentication policy and connection transport are configured separately. No MCW authentication service is used.",
+            "Authentication policy and connection transport are configured separately. Private LAN uses the bundled MCW LAN Agent; no custom authentication service is used.",
         )
         self.lan_auth_mode = QComboBox()
         self.lan_auth_mode.addItem("Microsoft accounts only", "microsoft_only")
-        self.lan_auth_mode.addItem("Friends — Microsoft and Offline accounts", "friends")
+        self.lan_auth_mode.addItem("Private group — Microsoft and Offline accounts", "private_offline")
         self.lan_connection_provider = QComboBox()
         self.lan_connection_provider.addItem("Manual connection — LAN, VPN, direct port, or custom relay", "manual")
         self.lan_connection_provider.addItem("e4mc tunnel", "e4mc")
@@ -127,7 +168,9 @@ class InstanceSettingsPage(BasePage):
         self.lan_prepare_status.setObjectName("CardSubtitle")
         self.lan_prepare_status.setWordWrap(True)
         self.lan_prepare_button = set_theme_icon(QPushButton("Prepare hosting support"), "icon.action.download")
+        self.lan_agent_log_button = set_theme_icon(QPushButton("View MCW Agent log"), "icon.action.folder")
         self.lan_prepare_button.clicked.connect(self.request_lan_prepare)
+        self.lan_agent_log_button.clicked.connect(self.request_lan_agent_log)
         hosting_card.layout.addWidget(QLabel("Authentication policy"))
         hosting_card.layout.addWidget(self.lan_auth_mode)
         hosting_card.layout.addWidget(QLabel("Connection provider"))
@@ -135,22 +178,27 @@ class InstanceSettingsPage(BasePage):
         hosting_card.layout.addWidget(self.lan_security_label)
         hosting_card.layout.addWidget(self.lan_prepare_status)
         hosting_card.layout.addWidget(self.lan_prepare_button)
-        self.root_layout.addWidget(hosting_card)
+        hosting_card.layout.addWidget(self.lan_agent_log_button)
+        multiplayer_section.add_card(hosting_card, span=2)
         self.lan_auth_mode.currentIndexChanged.connect(self._update_lan_help)
         self.lan_connection_provider.currentIndexChanged.connect(self._update_lan_help)
         self._update_lan_help()
 
-        modrinth_card = CardWidget(
-            "Modrinth downloads",
-            "Recommended: keep this enabled. Turn it off only when you plan to download failed modpack files manually.",
+        managed_checks_card = CardWidget(
+            tr("managed_content.instance.title"),
+            tr("managed_content.instance.detail"),
         )
-        self.block_modrinth_failure = QCheckBox("Stop launch when required Modrinth files are missing")
-        self.block_modrinth_failure.setChecked(True)
-        self.block_modrinth_failure.setToolTip(
-            "This option belongs to the selected instance. Disable it to let Minecraft launch after three failed download rounds, then place the missing files manually in the paths shown by the launcher."
-        )
-        modrinth_card.layout.addWidget(self.block_modrinth_failure)
-        self.root_layout.addWidget(modrinth_card)
+        self.modrinth_failure_label = QLabel(tr("managed_content.modrinth.label"))
+        self.modrinth_failure_policy = QComboBox()
+        self.curseforge_failure_label = QLabel(tr("managed_content.curseforge.label"))
+        self.curseforge_failure_policy = QComboBox()
+        self._populate_failure_policy_combo(self.modrinth_failure_policy)
+        self._populate_failure_policy_combo(self.curseforge_failure_policy)
+        managed_checks_card.layout.addWidget(self.modrinth_failure_label)
+        managed_checks_card.layout.addWidget(self.modrinth_failure_policy)
+        managed_checks_card.layout.addWidget(self.curseforge_failure_label)
+        managed_checks_card.layout.addWidget(self.curseforge_failure_policy)
+        multiplayer_section.add_card(managed_checks_card, span=2)
 
         arguments_card = CardWidget("Custom arguments", "Enter one argument per line.")
         self.jvm_arguments = QTextEdit()
@@ -165,7 +213,7 @@ class InstanceSettingsPage(BasePage):
         arguments_card.layout.addWidget(self.jvm_arguments)
         arguments_card.layout.addWidget(QLabel("Game arguments"))
         arguments_card.layout.addWidget(self.game_arguments)
-        self.root_layout.addWidget(arguments_card)
+        advanced_section.add_card(arguments_card, span=2)
 
         self.save_button = set_theme_icon(QPushButton("Save instance settings"), "icon.action.save")
         self.save_button.setObjectName("PrimaryButton")
@@ -230,7 +278,9 @@ class InstanceSettingsPage(BasePage):
                     "fullscreen": bool(getattr(settings, "fullscreen", False)),
                     "lan_auth_mode": str(getattr(settings, "lan_auth_mode", "microsoft_only") or "microsoft_only"),
                     "lan_connection_provider": str(getattr(settings, "lan_connection_provider", "manual") or "manual"),
-                    "block_launch_on_modrinth_failure": bool(getattr(settings, "block_launch_on_modrinth_failure", True)),
+                    "modrinth_failure_policy": self._settings_failure_policy(settings, "modrinth"),
+                    "curseforge_failure_policy": self._settings_failure_policy(settings, "curseforge"),
+                    "forge_preflight_failure_policy": self._settings_failure_policy(settings, "forge_preflight"),
                     "jvm_arguments": list(getattr(settings, "jvm_arguments", [])),
                     "game_arguments": list(getattr(settings, "game_arguments", [])),
                 })
@@ -249,7 +299,9 @@ class InstanceSettingsPage(BasePage):
             "fullscreen": self.fullscreen.isChecked(),
             "lan_auth_mode": str(self.lan_auth_mode.currentData() or "microsoft_only"),
             "lan_connection_provider": str(self.lan_connection_provider.currentData() or "manual"),
-            "block_launch_on_modrinth_failure": self.block_modrinth_failure.isChecked(),
+            "modrinth_failure_policy": str(self.modrinth_failure_policy.currentData() or ManagedContentPolicy.INHERIT),
+            "curseforge_failure_policy": str(self.curseforge_failure_policy.currentData() or ManagedContentPolicy.INHERIT),
+            "forge_preflight_failure_policy": str(self.forge_preflight_failure_policy.currentData() or ManagedContentPolicy.INHERIT),
             "jvm_arguments": self._lines(self.jvm_arguments.toPlainText()),
             "game_arguments": self._lines(self.game_arguments.toPlainText()),
         }
@@ -264,6 +316,10 @@ class InstanceSettingsPage(BasePage):
             str(self.lan_auth_mode.currentData() or "microsoft_only"),
             str(self.lan_connection_provider.currentData() or "manual"),
         )
+
+    def request_lan_agent_log(self) -> None:
+        instance_name = self._loaded_instance_name or self.current_instance_name()
+        self.lan_agent_log_requested.emit(instance_name)
 
     def set_lan_prepare_status(self, message: str) -> None:
         self.lan_prepare_status.setText(str(message))
@@ -283,14 +339,25 @@ class InstanceSettingsPage(BasePage):
         self.instance_combo.setEnabled(enabled)
         self.lan_auth_mode.setEnabled(enabled)
         self.lan_connection_provider.setEnabled(enabled)
+        self.modrinth_failure_policy.setEnabled(enabled)
+        self.curseforge_failure_policy.setEnabled(enabled)
+        self.forge_preflight_failure_policy.setEnabled(enabled)
         self.save_button.setEnabled(enabled)
         self.lan_prepare_button.setEnabled(enabled)
+        self.lan_agent_log_button.setEnabled(enabled)
 
     def retranslate_dynamic(self) -> None:
         self._update_memory_labels()
         self.unsaved_label.setText(tr("settings.unsaved.banner"))
         self._update_save_button_text()
         self._update_lan_help()
+        self.modrinth_failure_label.setText(tr("managed_content.modrinth.label"))
+        self.curseforge_failure_label.setText(tr("managed_content.curseforge.label"))
+        self.forge_preflight_failure_label.setText(tr("forge_preflight.instance.label"))
+        self.forge_preflight_warning_label.setText(tr("forge_preflight.warning"))
+        self._retranslate_failure_policy_combo(self.modrinth_failure_policy)
+        self._retranslate_failure_policy_combo(self.curseforge_failure_policy)
+        self._retranslate_forge_preflight_policy_combo(self.forge_preflight_failure_policy)
 
     def _connect_dirty_tracking(self) -> None:
         self.java_path_input.textChanged.connect(self._refresh_dirty_state)
@@ -303,7 +370,9 @@ class InstanceSettingsPage(BasePage):
         self.fullscreen.toggled.connect(self._refresh_dirty_state)
         self.lan_auth_mode.currentIndexChanged.connect(self._refresh_dirty_state)
         self.lan_connection_provider.currentIndexChanged.connect(self._refresh_dirty_state)
-        self.block_modrinth_failure.toggled.connect(self._refresh_dirty_state)
+        self.modrinth_failure_policy.currentIndexChanged.connect(self._refresh_dirty_state)
+        self.curseforge_failure_policy.currentIndexChanged.connect(self._refresh_dirty_state)
+        self.forge_preflight_failure_policy.currentIndexChanged.connect(self._refresh_dirty_state)
         self.jvm_arguments.textChanged.connect(self._refresh_dirty_state)
         self.game_arguments.textChanged.connect(self._refresh_dirty_state)
 
@@ -344,7 +413,9 @@ class InstanceSettingsPage(BasePage):
             "fullscreen": False,
             "lan_auth_mode": "microsoft_only",
             "lan_connection_provider": "manual",
-            "block_launch_on_modrinth_failure": True,
+            "modrinth_failure_policy": ManagedContentPolicy.INHERIT,
+            "curseforge_failure_policy": ManagedContentPolicy.INHERIT,
+            "forge_preflight_failure_policy": ManagedContentPolicy.INHERIT,
             "jvm_arguments": [],
             "game_arguments": [],
         })
@@ -357,10 +428,54 @@ class InstanceSettingsPage(BasePage):
         self.fullscreen.setChecked(bool(data.get("fullscreen", False)))
         self._set_combo_data(self.lan_auth_mode, str(data.get("lan_auth_mode", "microsoft_only")))
         self._set_combo_data(self.lan_connection_provider, str(data.get("lan_connection_provider", "manual")))
-        self.block_modrinth_failure.setChecked(bool(data.get("block_launch_on_modrinth_failure", True)))
+        self._set_combo_data(self.modrinth_failure_policy, ManagedContentPolicy.normalize_instance(data.get("modrinth_failure_policy")))
+        self._set_combo_data(self.curseforge_failure_policy, ManagedContentPolicy.normalize_instance(data.get("curseforge_failure_policy")))
+        self._set_combo_data(self.forge_preflight_failure_policy, ManagedContentPolicy.normalize_instance(data.get("forge_preflight_failure_policy")))
         self._update_lan_help()
         self.jvm_arguments.setPlainText("\n".join(data.get("jvm_arguments", [])))
         self.game_arguments.setPlainText("\n".join(data.get("game_arguments", [])))
+
+    @staticmethod
+    def _settings_failure_policy(settings: object, provider: str) -> str:
+        value = getattr(settings, f"{provider}_failure_policy", None)
+        if value is not None:
+            return ManagedContentPolicy.normalize_instance(value)
+        legacy = getattr(settings, f"block_launch_on_{provider}_failure", None)
+        if legacy is None and provider == "curseforge":
+            legacy = getattr(settings, "block_launch_on_modrinth_failure", None)
+        if legacy is not None:
+            return ManagedContentPolicy.from_legacy_bool(legacy)
+        return ManagedContentPolicy.INHERIT
+
+    @staticmethod
+    def _populate_failure_policy_combo(combo: QComboBox) -> None:
+        combo.clear()
+        combo.addItem(tr("managed_content.policy.inherit"), ManagedContentPolicy.INHERIT)
+        combo.addItem(tr("managed_content.policy.block"), ManagedContentPolicy.BLOCK)
+        combo.addItem(tr("managed_content.policy.allow"), ManagedContentPolicy.ALLOW)
+
+    @staticmethod
+    def _retranslate_failure_policy_combo(combo: QComboBox) -> None:
+        current = str(combo.currentData() or ManagedContentPolicy.INHERIT)
+        with QSignalBlocker(combo):
+            InstanceSettingsPage._populate_failure_policy_combo(combo)
+            index = combo.findData(current)
+            combo.setCurrentIndex(max(0, index))
+
+    @staticmethod
+    def _populate_forge_preflight_policy_combo(combo: QComboBox) -> None:
+        combo.clear()
+        combo.addItem(tr("forge_preflight.policy.inherit"), ManagedContentPolicy.INHERIT)
+        combo.addItem(tr("forge_preflight.policy.block"), ManagedContentPolicy.BLOCK)
+        combo.addItem(tr("forge_preflight.policy.allow"), ManagedContentPolicy.ALLOW)
+
+    @staticmethod
+    def _retranslate_forge_preflight_policy_combo(combo: QComboBox) -> None:
+        current = str(combo.currentData() or ManagedContentPolicy.INHERIT)
+        with QSignalBlocker(combo):
+            InstanceSettingsPage._populate_forge_preflight_policy_combo(combo)
+            index = combo.findData(current)
+            combo.setCurrentIndex(max(0, index))
 
     def _apply_memory_values(self, min_memory_mb: object, max_memory_mb: object) -> None:
         minimum, maximum = MemoryAllocationPolicy.normalize(min_memory_mb, max_memory_mb, self._memory_limit_mb)
@@ -435,8 +550,8 @@ class InstanceSettingsPage(BasePage):
     def _update_lan_help(self, *_args) -> None:
         auth_mode = str(self.lan_auth_mode.currentData() or "microsoft_only")
         provider = str(self.lan_connection_provider.currentData() or "manual")
-        if auth_mode == "friends":
-            auth_text = tr("lan.hosting.friends.warning")
+        if auth_mode == "private_offline":
+            auth_text = tr("lan.hosting.private_offline.warning")
         else:
             auth_text = tr("lan.hosting.microsoft_only.help")
         if provider == "e4mc":

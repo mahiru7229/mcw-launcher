@@ -58,7 +58,7 @@ def test_search_projects_uses_gateway_filters_and_safe_headers(monkeypatch, tmp_
     assert "x-api-key" not in request.headers
     assert request.url.params["query"] == "example"
     assert request.url.params["classId"] == "6"
-    assert request.url.params["loader"] == "forge"
+    assert "loader" not in request.url.params
     assert request.url.params["gameVersion"] == "1.20.1"
     assert result.projects[0].project_id == 101
     assert result.projects[0].authors == ("Mahiru",)
@@ -136,6 +136,14 @@ def test_parse_file_includes_sha1_dependencies_loader_and_distribution_state() -
     assert file.is_available is False
     assert file.game_versions == ("1.20.1",)
     assert file.loaders == ("forge",)
+
+
+def test_credentials_unavailable_is_a_permanent_gateway_error() -> None:
+    error = RuntimeError("The CurseForge gateway credentials are unavailable.")
+    setattr(error, "gateway_error_code", "CURSEFORGE_CREDENTIALS_UNAVAILABLE")
+    setattr(error, "gateway_status", 503)
+
+    assert CurseForgeClient.is_permanent_error(error) is True
 
 
 def test_gateway_failure_returns_stale_cache_with_error_state(monkeypatch, tmp_path: Path) -> None:
@@ -226,8 +234,8 @@ def test_catalog_search_filters_projects_by_latest_file_loader(monkeypatch, tmp_
     }
 
     def handler(request: httpx.Request) -> httpx.Response:
-        # Project search cannot send loader without a game version, so the
-        # launcher must filter this page using latestFilesIndexes.
+        # Loader metadata is advisory, so search does not let the upstream API
+        # remove potentially universal projects. Likely matches are ranked first.
         assert "loader" not in request.url.params
         return httpx.Response(200, request=request, json=payload)
 
@@ -236,27 +244,35 @@ def test_catalog_search_filters_projects_by_latest_file_loader(monkeypatch, tmp_
 
     result = CurseForgeClient.search_projects("mod", query="hunter", loader="fabric", force_refresh=True)
 
-    assert [project.project_id for project in result.projects] == [102]
+    assert [project.project_id for project in result.projects] == [102, 101]
     assert result.projects[0].loaders == ("fabric",)
     assert result.projects[0].game_versions == ("1.20.1",)
     client.close()
 
 
-def test_catalog_file_list_sends_loader_without_game_version(monkeypatch, tmp_path: Path) -> None:
+def test_catalog_file_list_does_not_strictly_filter_loader_metadata(monkeypatch, tmp_path: Path) -> None:
     captured = {}
+    payload = {
+        "data": [
+            {"id": 1, "modId": 1515343, "displayName": "Fabric-labelled", "fileName": "universal.jar", "releaseType": 1, "fileDate": "2026-07-22T00:00:00Z", "gameVersions": ["1.20.1", "Fabric"]},
+            {"id": 2, "modId": 1515343, "displayName": "Forge", "fileName": "forge.jar", "releaseType": 1, "fileDate": "2026-07-20T00:00:00Z", "gameVersions": ["1.20.1", "Forge"]},
+            {"id": 3, "modId": 1515343, "displayName": "Universal", "fileName": "both.jar", "releaseType": 1, "fileDate": "2026-07-21T00:00:00Z", "gameVersions": ["1.20.1", "Fabric", "Forge"]},
+        ]
+    }
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured["request"] = request
-        return httpx.Response(200, request=request, json={"data": []})
+        return httpx.Response(200, request=request, json=payload)
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
     configure_gateway(monkeypatch, tmp_path, client)
 
-    result = CurseForgeClient.list_files_result(1515343, loader="forge", force_refresh=True)
+    result = CurseForgeClient.list_files_result(1515343, game_version="1.20.1", loader="forge", force_refresh=True)
 
-    assert result.files == ()
-    assert captured["request"].url.params["loader"] == "forge"
-    assert "gameVersion" not in captured["request"].url.params
+    assert [file.file_id for file in result.files] == [2, 3, 1]
+    assert "loader" not in captured["request"].url.params
+    assert captured["request"].url.params["gameVersion"] == "1.20.1"
+    assert CurseForgeClient.loader_compatibility(result.files[-1], "forge") == "unverified"
     client.close()
 
 
@@ -323,3 +339,82 @@ def test_non_transient_gateway_error_does_not_fail_over(monkeypatch, tmp_path: P
 
     assert requested_hosts == ["primary.example"]
     client.close()
+
+
+def test_parse_file_recognizes_declared_fabric_and_forge_as_universal() -> None:
+    file = CurseForgeClient._parse_file({
+        "id": 33,
+        "modId": 11,
+        "fileName": "universal.jar",
+        "gameVersions": ["1.20.1", "Fabric", "Forge"],
+    })
+
+    assert file.loaders == ("fabric", "forge")
+    assert CurseForgeClient.loader_compatibility(file, "fabric") == "universal"
+    assert CurseForgeClient.loader_compatibility(file, "forge") == "universal"
+
+
+def test_modpack_fallback_project_url_uses_modpacks_path() -> None:
+    project = CurseForgeClient._parse_project({
+        "id": 77,
+        "name": "Example Pack",
+        "slug": "example-pack",
+        "classId": CurseForgeClient.CLASS_MODPACKS,
+    })
+
+    assert project.project_url == "https://www.curseforge.com/minecraft/modpacks/example-pack"
+
+
+def test_project_url_rejects_untrusted_scheme_and_uses_safe_fallback() -> None:
+    project = CurseForgeClient._parse_project({
+        "id": 88,
+        "name": "Safe Project",
+        "slug": "safe-project",
+        "classId": CurseForgeClient.CLASS_MODS,
+        "links": {"websiteUrl": "file:///C:/Windows/System32/calc.exe"},
+    })
+
+    assert project.project_url == "https://www.curseforge.com/minecraft/mc-mods/safe-project"
+
+
+def test_file_list_keeps_unknown_game_version_metadata_for_runtime_validation(monkeypatch, tmp_path: Path) -> None:
+    payload = {
+        "data": [{
+            "id": 9,
+            "modId": 7,
+            "displayName": "Universal metadata-light build",
+            "fileName": "universal.jar",
+            "releaseType": 1,
+            "fileDate": "2026-07-25T00:00:00Z",
+            "gameVersions": ["Fabric"],
+        }]
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, request=request, json=payload)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    configure_gateway(monkeypatch, tmp_path, client)
+
+    result = CurseForgeClient.list_files_result(7, game_version="1.20.1", loader="forge", force_refresh=True)
+
+    assert [file.file_id for file in result.files] == [9]
+    assert result.files[0].game_versions == ()
+    assert CurseForgeClient.loader_compatibility(result.files[0], "forge") == "unverified"
+    client.close()
+
+
+def test_gateway_v011_manual_download_error_is_permanent():
+    error = RuntimeError("This CurseForge file must be downloaded manually because third-party distribution is unavailable.")
+    setattr(error, "gateway_error_code", "manual_download_required")
+    setattr(error, "gateway_status", 409)
+
+    assert CurseForgeClient.is_permanent_error(error) is True
+
+
+def test_gateway_v011_credentials_rejected_is_permanent():
+    error = RuntimeError("CurseForge rejected the gateway credentials.")
+    setattr(error, "gateway_error_code", "gateway_credentials_rejected")
+    setattr(error, "gateway_status", 503)
+
+    assert CurseForgeClient.is_permanent_error(error) is True

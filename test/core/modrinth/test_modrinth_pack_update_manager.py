@@ -5,6 +5,7 @@ from pathlib import Path
 from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.core.modrinth.modrinth_pack_update_manager import ModrinthPackUpdateManager
+from src.core.progress.progress_reporter import ProgressReporter
 from src.models.instance.instance import Instance
 from src.models.modrinth.project import ModrinthProject
 from src.models.modrinth.version import ModrinthVersion
@@ -166,3 +167,18 @@ def test_check_uses_loader_saved_by_forge_modpack(monkeypatch, tmp_path: Path) -
 
     assert info is not None
     assert seen == [("forge", "1.20.1")]
+
+
+def test_check_reports_each_metadata_stage(monkeypatch, tmp_path: Path) -> None:
+    instance = Instance(instance_id="id", name="Pack", version_id="1.21.1", instance_dir=tmp_path, mod_loader=("fabric", "0.16"))
+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {"projectId": "pack", "versionId": "v1", "versionNumber": "1.0"})
+    monkeypatch.setattr(ModrinthClient, "get_project", lambda *args, **kwargs: ModrinthProject(project_id="pack", slug="pack", title="Pack", description="", project_type="modpack"))
+    monkeypatch.setattr(ModrinthClient, "get_version", lambda *args, **kwargs: make_version("v1", "1.0", "2026-01-01T00:00:00Z"))
+    monkeypatch.setattr(ModrinthClient, "list_project_versions", lambda *args, **kwargs: [])
+    events = []
+
+    ModrinthPackUpdateManager.check(instance, ("release",), reporter=ProgressReporter(events.append))
+
+    assert [event.current for event in events] == [0, 1, 2, 3, 4, 5]
+    assert all(event.total == 5 for event in events)
+    assert events[-1].message == "modpack.update_check.checked"

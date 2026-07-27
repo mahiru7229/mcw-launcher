@@ -82,6 +82,9 @@ class CurseForgeRegistry:
                 "releaseType": str(item.get("releaseType") or "release").strip().lower(),
                 "pendingDownload": bool(item.get("pendingDownload", False)),
                 "lastDownloadError": str(item.get("lastDownloadError") or "").strip(),
+                "retryableDownload": bool(item.get("retryableDownload", True)),
+                "acceptedUnverified": bool(item.get("acceptedUnverified", False)),
+                "compatibilityWarning": str(item.get("compatibilityWarning") or "").strip(),
                 "source": "curseforge",
             })
             mods[key] = item

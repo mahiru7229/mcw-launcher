@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt
 from src.gui.pages.instance_settings_page import InstanceSettingsPage
 
 
-def make_settings(block_launch_on_modrinth_failure: bool) -> SimpleNamespace:
+def make_settings(modrinth_failure_policy: str = "inherit", curseforge_failure_policy: str = "inherit") -> SimpleNamespace:
     return SimpleNamespace(
         java_path="",
         min_memory=1024,
@@ -21,25 +21,29 @@ def make_settings(block_launch_on_modrinth_failure: bool) -> SimpleNamespace:
         offline_multiplayer_enabled=False,
         lan_auth_mode="microsoft_only",
         lan_connection_provider="manual",
-        block_launch_on_modrinth_failure=block_launch_on_modrinth_failure,
+        modrinth_failure_policy=modrinth_failure_policy,
+        curseforge_failure_policy=curseforge_failure_policy,
         jvm_arguments=[],
         game_arguments=[],
     )
 
 
-def test_modrinth_failure_option_is_enabled_by_default(gui_app) -> None:
+def test_managed_content_failure_options_inherit_launcher_by_default(gui_app) -> None:
     page = InstanceSettingsPage()
 
-    assert page.block_modrinth_failure.isChecked() is True
+    assert page.modrinth_failure_policy.currentData() == "inherit"
+    assert page.curseforge_failure_policy.currentData() == "inherit"
 
 
-def test_modrinth_failure_option_loads_and_serializes_per_instance(gui_app) -> None:
+def test_managed_content_failure_options_load_and_serialize_per_instance(gui_app) -> None:
     page = InstanceSettingsPage()
 
-    page.set_settings("Pack", make_settings(False))
+    page.set_settings("Pack", make_settings("allow", "block"))
 
-    assert page.block_modrinth_failure.isChecked() is False
-    assert page.form_data()["block_launch_on_modrinth_failure"] is False
+    assert page.modrinth_failure_policy.currentData() == "allow"
+    assert page.curseforge_failure_policy.currentData() == "block"
+    assert page.form_data()["modrinth_failure_policy"] == "allow"
+    assert page.form_data()["curseforge_failure_policy"] == "block"
 
 
 def test_memory_sliders_are_limited_by_physical_ram(gui_app) -> None:
@@ -64,7 +68,7 @@ def test_lowering_maximum_memory_clamps_minimum_memory(gui_app) -> None:
 
 def test_loaded_memory_above_physical_ram_is_clamped(gui_app) -> None:
     page = InstanceSettingsPage(total_memory_mb=8192)
-    settings = make_settings(True)
+    settings = make_settings()
     settings.min_memory = 12288
     settings.max_memory = 16384
 
@@ -106,14 +110,33 @@ def test_memory_number_inputs_are_left_aligned(gui_app) -> None:
     assert page.max_memory_input.alignment() & Qt.AlignmentFlag.AlignLeft
 
 
+def test_game_window_labels_are_grouped_directly_above_inputs(gui_app) -> None:
+    page = InstanceSettingsPage()
+
+    assert page.window_width_label.parentWidget() is page.window_width.parentWidget()
+    assert page.window_height_label.parentWidget() is page.window_height.parentWidget()
+    assert page.window_size_row.spacing() == 10
+
+
 def test_lan_hosting_profile_serializes_auth_and_connection_separately(gui_app) -> None:
     page = InstanceSettingsPage()
-    page.set_settings("Pack", make_settings(True))
+    page.set_settings("Pack", make_settings())
 
-    page.lan_auth_mode.setCurrentIndex(page.lan_auth_mode.findData("friends"))
+    page.lan_auth_mode.setCurrentIndex(page.lan_auth_mode.findData("private_offline"))
     page.lan_connection_provider.setCurrentIndex(page.lan_connection_provider.findData("e4mc"))
 
     data = page.form_data()
-    assert data["lan_auth_mode"] == "friends"
+    assert data["lan_auth_mode"] == "private_offline"
     assert data["lan_connection_provider"] == "e4mc"
     assert "trusted" in page.lan_security_label.text().lower()
+
+
+def test_lan_agent_log_button_emits_loaded_instance(gui_app) -> None:
+    page = InstanceSettingsPage()
+    page.set_settings("Pack", make_settings())
+    emitted: list[str] = []
+    page.lan_agent_log_requested.connect(emitted.append)
+
+    page.lan_agent_log_button.click()
+
+    assert emitted == ["Pack"]

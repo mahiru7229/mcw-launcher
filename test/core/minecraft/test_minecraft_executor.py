@@ -3,9 +3,12 @@ from types import SimpleNamespace
 
 import pytest
 
+from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.fs.paths import Paths
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.instance.settings_manager import SettingsManager
+from src.core.lan.lan_agent_manager import LanAgentManager
+from src.core.lan.lan_hosting_manager import LanHostingManager
 from src.core.java.java_runtime import JavaRuntime
 from src.core.java.java_selector import JavaSelector
 from src.core.minecraft.asset_manager import AssetManager
@@ -15,6 +18,8 @@ from src.core.minecraft.launcher_manager import LauncherManager
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.minecraft.minecraft_executor import MinecraftExecutor
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManager
+from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.minecraft.version_manifest_manager import (
@@ -25,6 +30,7 @@ from src.models.progress.progress_stage import ProgressStage
 
 class FakeRunLock:
     def __init__(self) -> None:
+        self.token = "test-launch-lock-token"
         self.tracked_process = None
         self.released = False
 
@@ -39,6 +45,16 @@ class FakeRunLock:
 @pytest.fixture(autouse=True)
 def patch_instance_run_lock(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(InstanceRunLock, "acquire", lambda instance: FakeRunLock())
+    monkeypatch.setattr(
+        LauncherSettingsManager,
+        "load",
+        lambda self: {
+            "managed_content": {
+                "modrinth_failure_policy": "block",
+                "curseforge_failure_policy": "block",
+            }
+        },
+    )
 
 
 def make_instance(
@@ -887,21 +903,103 @@ def test_fabric_instance_uses_resolved_knot_client(monkeypatch: pytest.MonkeyPat
     assert result["minecraftVersion"] == "fabric-loader-0.19.3-1.21.1"
     assert result["minecraftJavaMajorVersion"] == 21
 
-def test_run_uses_per_instance_modrinth_failure_policy_and_returns_non_blocking_warnings(monkeypatch: pytest.MonkeyPatch):
+def test_run_uses_instance_failure_policies_before_launcher_defaults(monkeypatch: pytest.MonkeyPatch):
     patch_pipeline(monkeypatch)
-    settings = SimpleNamespace(block_launch_on_modrinth_failure=False)
+    settings = SimpleNamespace(
+        modrinth_failure_policy="allow",
+        curseforge_failure_policy="block",
+    )
     received = {}
 
     monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
 
-    def fake_ensure(instance, reporter, block_launch_on_failure=True):
-        received["block_launch_on_failure"] = block_launch_on_failure
+    def fake_modrinth_ensure(instance, reporter, block_launch_on_failure=True, launch_lock_token=None):
+        received["modrinth_block"] = block_launch_on_failure
+        received["launch_lock_token"] = launch_lock_token
         return ("mods/example.jar must be installed manually",)
 
-    monkeypatch.setattr(ModrinthContentManager, "ensure", fake_ensure)
+    def fake_curseforge_ensure(instance, reporter, block_launch_on_failure=True, launch_lock_token=None):
+        received["curseforge_block"] = block_launch_on_failure
+        return ()
+
+    monkeypatch.setattr(ModrinthContentManager, "ensure", fake_modrinth_ensure)
+    monkeypatch.setattr(CurseForgeContentManager, "ensure", fake_curseforge_ensure)
 
     result = MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object())
 
-    assert received["block_launch_on_failure"] is False
+    assert received["modrinth_block"] is False
+    assert received["curseforge_block"] is True
+    assert received["launch_lock_token"] == "test-launch-lock-token"
     assert result["warnings"] == ("mods/example.jar must be installed manually",)
 
+
+def test_run_inherits_source_specific_launcher_failure_policies(monkeypatch: pytest.MonkeyPatch):
+    patch_pipeline(monkeypatch)
+    settings = SimpleNamespace(
+        modrinth_failure_policy="inherit",
+        curseforge_failure_policy="inherit",
+    )
+    received = {}
+
+    monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
+    monkeypatch.setattr(
+        LauncherSettingsManager,
+        "load",
+        lambda self: {
+            "managed_content": {
+                "modrinth_failure_policy": "block",
+                "curseforge_failure_policy": "allow",
+            }
+        },
+    )
+    monkeypatch.setattr(ModrinthContentManager, "ensure", lambda instance, reporter, block_launch_on_failure=True, launch_lock_token=None: received.update(modrinth=block_launch_on_failure) or ())
+    monkeypatch.setattr(CurseForgeContentManager, "ensure", lambda instance, reporter, block_launch_on_failure=True, launch_lock_token=None: received.update(curseforge=block_launch_on_failure) or ())
+
+    MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object())
+
+    assert received == {"modrinth": True, "curseforge": False}
+
+
+
+def test_private_lan_attaches_agent_and_disables_legacy_auth_bridge(monkeypatch: pytest.MonkeyPatch):
+    pipeline = patch_pipeline(monkeypatch)
+    settings = SimpleNamespace(lan_auth_mode="private_offline", block_launch_on_modrinth_failure=True)
+    instance = make_instance()
+    events: list[object] = []
+    runtime_arguments = ["-Dmcw.lan.offline=true", "-javaagent:C:/cache/mcw-lan-agent.jar"]
+
+    monkeypatch.setattr(SettingsManager, "load", lambda _instance: settings)
+    monkeypatch.setattr(LanHostingManager, "disable_legacy_auth_bridges", staticmethod(lambda received: events.append(("cleanup", received)) or ()))
+    monkeypatch.setattr(LanAgentManager, "runtime_arguments", classmethod(lambda cls, version, mode, received_instance, reporter=None: events.append(("agent", version, mode, received_instance)) or runtime_arguments))
+
+    def build(version, context, received_settings, account, runtime_jvm_arguments=None):
+        events.append(("command", runtime_jvm_arguments))
+        return pipeline["command"]
+
+    monkeypatch.setattr(LauncherManager, "build", build)
+
+    MinecraftExecutor.run(instance=instance, authentication=object(), account=object())
+
+    assert events[0] == ("cleanup", instance)
+    assert events[1] == ("agent", pipeline["version"], "private_offline", instance)
+    assert events[2] == ("command", runtime_arguments)
+
+
+def test_run_allows_forge_compatibility_errors_when_instance_policy_allows(monkeypatch: pytest.MonkeyPatch):
+    pipeline = patch_pipeline(monkeypatch)
+    settings = SimpleNamespace(
+        forge_preflight_failure_policy="allow",
+        modrinth_failure_policy="inherit",
+        curseforge_failure_policy="inherit",
+    )
+    issue = SimpleNamespace(severity="error", code="dependency-missing", message="Create requires missing dependency 'flywheel'.")
+    report = SimpleNamespace(errors=(issue,), warnings=(), warning_count=0)
+
+    monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
+    monkeypatch.setattr(ForgePreflightManager, "scan", lambda instance, version, verify_files=False: report)
+    monkeypatch.setattr(ForgePreflightManager, "validate_runtime_files", lambda instance, version: ())
+
+    result = MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object())
+
+    assert result["minecraftVersion"] == pipeline["version"].id
+    assert "warnings" not in result

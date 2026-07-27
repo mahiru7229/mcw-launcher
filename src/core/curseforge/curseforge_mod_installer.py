@@ -21,7 +21,7 @@ class CurseForgeModInstaller:
     MAX_DEPENDENCIES = 64
 
     @staticmethod
-    def install(instance: Instance, project_id: int, file_id: int, install_dependencies: bool = True, allowed_release_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> CurseForgeModInstallResult:
+    def install(instance: Instance, project_id: int, file_id: int, install_dependencies: bool = True, allowed_release_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None, allow_unverified: bool = False) -> CurseForgeModInstallResult:
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
             raise RuntimeError("CurseForge mod installation requires a Fabric or Forge instance.")
@@ -53,6 +53,7 @@ class CurseForgeModInstaller:
                 "size": file.file_length,
                 "downloadUrl": file.download_url,
                 "releaseType": file.release_type,
+                "declaredLoaders": list(file.loaders),
                 "datePublished": file.file_date,
                 "source": "curseforge",
                 "updatedAt": datetime.now(timezone.utc).isoformat(),
@@ -66,7 +67,9 @@ class CurseForgeModInstaller:
                     message=f"Downloading {project.name}...",
                     project_name=project.name,
                 )
-                added = ModManager.add_mods(instance, [cache], replace=True)
+                metadata = ModManager.read_mod(cache, preferred_loader=loader_name)
+                compatibility_warning = ModManager.compatibility_warning(instance, metadata)
+                added = ModManager.add_mods(instance, [cache], replace=True, allow_unverified=allow_unverified)
                 if not added:
                     raise RuntimeError(f"'{project.name}' was downloaded but could not be added to the instance.")
                 old_name = str(previous.get("fileName") or "")
@@ -79,8 +82,13 @@ class CurseForgeModInstaller:
                 entry["fileName"] = new_name
                 entry["pendingDownload"] = False
                 entry["lastDownloadError"] = ""
+                entry["retryableDownload"] = True
+                entry["acceptedUnverified"] = bool(compatibility_warning)
+                entry["compatibilityWarning"] = compatibility_warning
                 installed_projects.append(project.name)
                 installed_files.append(new_name)
+                if compatibility_warning:
+                    warnings.append(f"{project.name}: installed with compatibility warning: {compatibility_warning}")
             except CurseForgeManualDownloadRequired as error:
                 requirement = CurseForgeManualDownload(
                     project_id=error.requirement.project_id,
@@ -94,11 +102,13 @@ class CurseForgeModInstaller:
                 )
                 entry["pendingDownload"] = True
                 entry["lastDownloadError"] = requirement.reason
+                entry["retryableDownload"] = False
                 manual_downloads.append(requirement)
                 warnings.append(f"{project.name}: manual download required")
             except Exception as error:
                 entry["pendingDownload"] = True
                 entry["lastDownloadError"] = str(error)
+                entry["retryableDownload"] = not CurseForgeClient.is_permanent_error(error)
                 warnings.append(f"{project.name}: {error}")
             mods[str(file.project_id)] = entry
 
@@ -125,10 +135,12 @@ class CurseForgeModInstaller:
                 raise RuntimeError("The CurseForge dependency graph is too large to install safely.")
             if file.release_type not in allowed_release_types:
                 raise RuntimeError(f"Required CurseForge file '{file.display_name}' uses the disabled {file.release_type} channel.")
-            if game_version and game_version not in file.game_versions:
+            if game_version and file.game_versions and game_version not in file.game_versions:
                 raise RuntimeError(f"CurseForge file '{file.display_name}' does not support Minecraft {game_version}.")
-            if normalized_loader and file.loaders and normalized_loader not in file.loaders:
-                raise RuntimeError(f"CurseForge file '{file.display_name}' does not support {normalized_loader.title()}.")
+            # CurseForge loader metadata is advisory. Some universal JARs are
+            # indexed as only Fabric or only Forge. The file is downloaded and
+            # ModManager validates its real metadata against the instance before
+            # it is added, so a genuinely wrong single-loader JAR is still rejected.
             if file.project_id in visiting:
                 return
             visiting.add(file.project_id)

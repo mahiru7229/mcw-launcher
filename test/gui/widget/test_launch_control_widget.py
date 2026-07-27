@@ -18,6 +18,15 @@ def app():
     return QApplication.instance() or QApplication([])
 
 
+def test_selecting_instance_before_launch_does_not_require_prior_state_change(app):
+    widget = LaunchControlWidget()
+
+    widget.set_selected_instance(SimpleNamespace(name="Pack"))
+
+    assert widget.launch_button.text() == "Launch"
+    assert widget.launch_button.isEnabled() is True
+
+
 def test_launch_button_switches_to_cancel_during_launch_and_back(app):
     widget = LaunchControlWidget()
 
