@@ -23,6 +23,17 @@ from src.models.curseforge.manual_download import CurseForgeManualDownload
 from src.models.progress.progress_stage import ProgressStage
 
 
+class CurseForgeModpackManualDownloadRequired(RuntimeError):
+    def __init__(self, requirement: CurseForgeManualDownload, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: tuple[str, ...]) -> None:
+        super().__init__(requirement.reason)
+        self.requirement = requirement
+        self.project_id = int(project_id)
+        self.file_id = int(file_id)
+        self.instance_name = str(instance_name)
+        self.install_optional_files = bool(install_optional_files)
+        self.allowed_release_types = tuple(allowed_release_types)
+
+
 class CurseForgePackInstaller:
     MANIFEST_NAME = "manifest.json"
     MAX_MANIFEST_BYTES = 4 * 1024 * 1024
