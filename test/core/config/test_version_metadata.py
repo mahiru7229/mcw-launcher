@@ -6,9 +6,9 @@ from src.gui.config import VERSION_ID as GUI_VERSION_ID
 
 
 def test_launcher_version_metadata_has_one_source_of_truth() -> None:
-    assert VERSION == "v0.9.0 Beta 6"
-    assert VERSION_ID == "0.9.0-beta.6"
-    assert VERSION_TAG == "v0.9.0-beta.6"
+    assert VERSION == "v0.9.0 RC 1"
+    assert VERSION_ID == "0.9.0-rc.1"
+    assert VERSION_TAG == "v0.9.0-rc.1"
     assert UPDATE_CHANNEL == "beta"
     assert GUI_VERSION == VERSION
     assert GUI_VERSION_ID == VERSION_ID
