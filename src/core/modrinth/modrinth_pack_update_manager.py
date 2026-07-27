@@ -18,7 +18,12 @@ from src.core.modrinth.modrinth_pack_installer import ModrinthPackInstaller
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.instance.instance import Instance
-from src.models.modrinth.pack_update import ModrinthPackUpdateInfo, ModrinthPackUpdateResult
+from src.models.modrinth.pack_update import (
+    ModrinthPackUpdateChange,
+    ModrinthPackUpdateInfo,
+    ModrinthPackUpdatePlan,
+    ModrinthPackUpdateResult,
+)
 from src.models.progress.progress_stage import ProgressStage
 
 
@@ -58,6 +63,155 @@ class ModrinthPackUpdateManager:
         if candidate is None:
             return ModrinthPackUpdateInfo(project_id=project_id, pack_name=project.title, current_version_id=current_version_id, current_version_number=current_number, target_version_id="", target_version_number="", target_version_type="", target_date_published="")
         return ModrinthPackUpdateInfo(project_id=project_id, pack_name=project.title, current_version_id=current_version_id, current_version_number=current_number, target_version_id=candidate.version_id, target_version_number=candidate.version_number, target_version_type=candidate.version_type, target_date_published=candidate.date_published)
+
+    @staticmethod
+    def preview(instance: Instance, target_version_id: str = "", allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> ModrinthPackUpdatePlan:
+        registry = ModrinthPackRegistry.load(instance)
+        project_id = str(registry.get("projectId") or "").strip()
+        current_version_id = str(registry.get("versionId") or "").strip()
+        if not project_id or not current_version_id:
+            raise RuntimeError("This instance is not managed by a Modrinth modpack.")
+
+        target_id = str(target_version_id or "").strip()
+        if not target_id:
+            update_info = ModrinthPackUpdateManager.check(instance, allowed_version_types, force_refresh=True, reporter=reporter)
+            if update_info is None or not update_info.available:
+                raise RuntimeError("This Modrinth modpack is already up to date.")
+            target_id = update_info.target_version_id
+
+        project = ModrinthClient.get_project(project_id)
+        target_version = ModrinthClient.get_version(target_id, force_refresh=True)
+        if target_version.project_id != project_id:
+            raise RuntimeError("The selected update does not belong to this Modrinth modpack.")
+        allowed_types = ModrinthClient.normalize_version_types(allowed_version_types)
+        if target_version.version_type not in allowed_types:
+            raise RuntimeError(f"The selected modpack update uses the disabled {target_version.version_type} channel.")
+
+        pack_file = target_version.primary_file(".mrpack")
+        pack_path = Paths.modrinth_pack_cache(project_id, target_version.version_id, pack_file.filename)
+        if reporter is None:
+            ModrinthDownloader.download_file(pack_file, pack_path)
+        else:
+            ModrinthDownloader.download_file(
+                pack_file,
+                pack_path,
+                reporter=reporter,
+                progress_stage=ProgressStage.DOWNLOADING_MODPACK,
+                progress_message=f"Downloading {project.title} update preview...",
+            )
+
+        staging = Paths.modrinth_staging_root() / f"update-preview-{uuid4().hex}"
+        staging.mkdir(parents=True, exist_ok=False)
+        try:
+            with zipfile.ZipFile(pack_path, "r") as archive:
+                index = ModrinthPackInstaller._read_index(archive)
+                minecraft_version, loader_name, loader_version = ModrinthPackInstaller._parse_dependencies(index)
+                selected_files, _, _ = ModrinthPackInstaller._selected_files(index, bool(registry.get("installOptionalFiles", True)))
+                managed_files = {
+                    entry["path"].casefold(): entry
+                    for entry in ModrinthPackInstaller._managed_download_entries(selected_files)
+                }
+                for entry in ModrinthPackInstaller._extract_layer(archive, "overrides", staging):
+                    managed_files[entry["path"].casefold()] = entry
+                for entry in ModrinthPackInstaller._extract_layer(archive, "client-overrides", staging):
+                    managed_files[entry["path"].casefold()] = entry
+
+            blockers: list[str] = []
+            current_loader = ModrinthPackUpdateManager._registry_loader(registry)
+            if loader_name != current_loader:
+                blockers.append(
+                    f"This update changes the modpack loader from {current_loader.title()} "
+                    f"to {loader_name.title()}, which is not supported automatically."
+                )
+            if InstanceRunLock.is_active(instance):
+                blockers.append("Close Minecraft before updating this modpack.")
+
+            root = Path(instance.instance_dir)
+            old_files = {
+                str(item.get("path") or "").casefold(): item
+                for item in registry.get("managedFiles", [])
+                if isinstance(item, dict) and str(item.get("path") or "").strip()
+            }
+            verification_cache = ModrinthPackRegistry._normalize_verification_cache(
+                registry.get("verificationCache", {}),
+                registry.get("managedFiles", []),
+            )
+            changes: dict[str, ModrinthPackUpdateChange] = {}
+            preserved: dict[str, str] = {}
+            old_unmodified: set[str] = set()
+
+            for key, entry in old_files.items():
+                path = ModrinthPackUpdateManager._target(root, str(entry.get("path") or ""))
+                verified, _, _ = ModrinthPackRegistry.verify_entry(root, entry, cache=verification_cache)
+                if verified:
+                    old_unmodified.add(key)
+                elif path.exists():
+                    preserved[key] = "modified-by-user"
+
+            for key, entry in managed_files.items():
+                target = ModrinthPackUpdateManager._target(root, str(entry["path"]))
+                if key not in old_files and target.exists():
+                    verified, _, _ = ModrinthPackRegistry.verify_entry(root, entry, cache=verification_cache)
+                    if not verified:
+                        preserved[key] = "unmanaged-existing-file"
+
+            for key, reason in preserved.items():
+                entry = managed_files.get(key) or old_files.get(key) or {}
+                changes[key] = ModrinthPackUpdateChange(
+                    path=str(entry.get("path") or key),
+                    action="preserve",
+                    reason=reason,
+                )
+
+            for key, entry in old_files.items():
+                if key in managed_files or key not in old_unmodified:
+                    continue
+                target = ModrinthPackUpdateManager._target(root, str(entry.get("path") or ""))
+                if target.is_file():
+                    changes[key] = ModrinthPackUpdateChange(
+                        path=str(entry.get("path") or key),
+                        action="remove",
+                        reason="removed-by-pack-update",
+                    )
+
+            selected_by_path = {
+                str(item.get("path") or "").replace("\\", "/").casefold(): item
+                for item in selected_files
+            }
+            for key, entry in managed_files.items():
+                if key in preserved:
+                    continue
+                target = ModrinthPackUpdateManager._target(root, str(entry["path"]))
+                verified, _, _ = ModrinthPackRegistry.verify_entry(root, entry, cache=verification_cache)
+                if verified:
+                    action = "unchanged"
+                    reason = "already-matches-target"
+                else:
+                    action = "replace" if target.exists() else "add"
+                    reason = "target-version-file"
+                item = selected_by_path.get(key, {})
+                download_bytes = int(item.get("fileSize", 0) or 0) if action in {"add", "replace"} else 0
+                changes[key] = ModrinthPackUpdateChange(
+                    path=str(entry.get("path") or key),
+                    action=action,
+                    reason=reason,
+                    download_bytes=max(0, download_bytes),
+                )
+
+            return ModrinthPackUpdatePlan(
+                instance_name=instance.name,
+                pack_name=project.title,
+                current_version=str(registry.get("versionNumber") or current_version_id),
+                target_version=target_version.version_number,
+                target_version_id=target_version.version_id,
+                minecraft_version=minecraft_version,
+                loader=loader_name,
+                loader_version=loader_version,
+                changes=tuple(sorted(changes.values(), key=lambda change: change.path.casefold())),
+                blockers=tuple(blockers),
+            )
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
 
     @staticmethod
     def update(instance: Instance, target_version_id: str = "", allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> ModrinthPackUpdateResult:

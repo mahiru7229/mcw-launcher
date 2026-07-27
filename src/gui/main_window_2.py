@@ -272,7 +272,7 @@ class MainWindow(QMainWindow):
         self.instances_page.scan_modpack_requested.connect(self.modpack_lifecycle_controller.scan)
         self.instances_page.repair_modpack_requested.connect(self.modpack_lifecycle_controller.repair)
         self.instances_page.check_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.check_update(name, self.modrinth_modpack_dialog.allowed_version_types, force_refresh=True))
-        self.instances_page.apply_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.update(name, self.modrinth_modpack_dialog.allowed_version_types))
+        self.instances_page.apply_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.preview_update(name, self.modrinth_modpack_dialog.allowed_version_types))
 
         self.mods_page.search_requested.connect(self.mod_catalog_controller.search)
         self.mods_page.versions_requested.connect(self.mod_catalog_controller.load_versions)
@@ -325,6 +325,7 @@ class MainWindow(QMainWindow):
         self.backup_controller.restore_finished.connect(self._on_backup_restored)
         self.modpack_lifecycle_controller.state_changed.connect(self.instances_page.set_modpack_state)
         self.modpack_lifecycle_controller.update_checked.connect(self._on_modpack_update_checked)
+        self.modpack_lifecycle_controller.update_previewed.connect(self._on_modpack_update_previewed)
         self.modpack_lifecycle_controller.update_finished.connect(self._on_modpack_updated)
         self.modpack_lifecycle_controller.repair_finished.connect(self._on_modpack_repaired)
 
@@ -1219,6 +1220,41 @@ class MainWindow(QMainWindow):
         self.instances_page.set_modpack_update_info(info)
         if info is not None and getattr(info, "available", False):
             self.logs_page.append(tr("Modpack update available: {current} → {target}", current=getattr(info, "current_version_number", "?"), target=getattr(info, "target_version_number", "?")))
+
+    def _on_modpack_update_previewed(self, plan: object) -> None:
+        blockers = tuple(getattr(plan, "blockers", ()) or ())
+        if blockers:
+            QMessageBox.warning(
+                self,
+                tr("modpack.preview.title"),
+                tr("modpack.preview.blocked", reasons="\n".join(f"• {reason}" for reason in blockers)),
+            )
+            return
+        download_mib = float(getattr(plan, "estimated_download_bytes", 0) or 0) / (1024 * 1024)
+        message = tr(
+            "modpack.preview.confirm",
+            name=getattr(plan, "instance_name", "?"),
+            current=getattr(plan, "current_version", "?"),
+            target=getattr(plan, "target_version", "?"),
+            added=getattr(plan, "added_files", 0),
+            replaced=getattr(plan, "replaced_files", 0),
+            removed=getattr(plan, "removed_files", 0),
+            preserved=len(tuple(getattr(plan, "preserved_files", ()) or ())),
+            unchanged=getattr(plan, "unchanged_files", 0),
+            download=download_mib,
+        )
+        answer = QMessageBox.question(
+            self,
+            tr("modpack.preview.title"),
+            message,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.modpack_lifecycle_controller.update(
+                str(getattr(plan, "instance_name", "")),
+                self.modrinth_modpack_dialog.allowed_version_types,
+                target_version_id=str(getattr(plan, "target_version_id", "")),
+            )
 
     def _on_modpack_updated(self, result: object) -> None:
         name = str(getattr(result, "instance_name", ""))

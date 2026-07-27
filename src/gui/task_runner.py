@@ -98,8 +98,8 @@ class TaskRunner(QObject):
         context = self._contexts.pop(task_id, None)
         if context is None:
             return
-        self.task_succeeded.emit(task_id, result)
         self._finish_context(context)
+        self.task_succeeded.emit(task_id, result)
         self.task_settled.emit(task_id, True, result)
 
     @Slot(str, object)
@@ -107,8 +107,8 @@ class TaskRunner(QObject):
         context = self._contexts.pop(task_id, None)
         if context is None:
             return
-        self.task_failed.emit(task_id, error)
         self._finish_context(context)
+        self.task_failed.emit(task_id, error)
         self.task_settled.emit(task_id, False, error)
 
     def _finish_context(self, context: TaskContext) -> None:

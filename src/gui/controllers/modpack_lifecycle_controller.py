@@ -15,6 +15,7 @@ from src.gui.task_runner import TaskRunner
 class ModpackLifecycleController(BaseController):
     state_changed = Signal(object)
     update_checked = Signal(object)
+    update_previewed = Signal(object)
     update_finished = Signal(object)
     repair_finished = Signal(object)
     progress_received = Signal(object)
@@ -39,12 +40,37 @@ class ModpackLifecycleController(BaseController):
         reporter = ProgressReporter(self.progress_received.emit)
         self._task_runner.run("modpack.update.check", lambda: ModrinthPackUpdateManager.check(InstanceManager.load(name), allowed_version_types, force_refresh=force_refresh, reporter=reporter), tr("Checking modpack updates for '{name}'...", name=name), blocking=False)
 
-    def update(self, instance_name: str, allowed_version_types: tuple[str, ...]) -> None:
+    def preview_update(self, instance_name: str, allowed_version_types: tuple[str, ...], target_version_id: str = "") -> None:
         name = str(instance_name).strip()
         if not name:
             return
         reporter = ProgressReporter(self.progress_received.emit)
-        self._task_runner.run("modpack.update.apply", lambda: ModrinthPackUpdateManager.update(InstanceManager.load(name), allowed_version_types=allowed_version_types, reporter=reporter), tr("Updating Modrinth modpack for '{name}'...", name=name))
+        self._task_runner.run(
+            "modpack.update.preview",
+            lambda: ModrinthPackUpdateManager.preview(
+                InstanceManager.load(name),
+                target_version_id=target_version_id,
+                allowed_version_types=allowed_version_types,
+                reporter=reporter,
+            ),
+            tr("modpack.preview.preparing", name=name),
+        )
+
+    def update(self, instance_name: str, allowed_version_types: tuple[str, ...], target_version_id: str = "") -> None:
+        name = str(instance_name).strip()
+        if not name:
+            return
+        reporter = ProgressReporter(self.progress_received.emit)
+        self._task_runner.run(
+            "modpack.update.apply",
+            lambda: ModrinthPackUpdateManager.update(
+                InstanceManager.load(name),
+                target_version_id=target_version_id,
+                allowed_version_types=allowed_version_types,
+                reporter=reporter,
+            ),
+            tr("Updating Modrinth modpack for '{name}'...", name=name),
+        )
 
     def repair(self, instance_name: str) -> None:
         name = str(instance_name).strip()
@@ -60,6 +86,9 @@ class ModpackLifecycleController(BaseController):
             return
         if task_id == "modpack.update.check":
             self.update_checked.emit(result)
+            return
+        if task_id == "modpack.update.preview":
+            self.update_previewed.emit(result)
             return
         if task_id == "modpack.update.apply":
             self.update_finished.emit(result)

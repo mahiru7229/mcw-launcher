@@ -182,3 +182,136 @@ def test_check_reports_each_metadata_stage(monkeypatch, tmp_path: Path) -> None:
     assert [event.current for event in events] == [0, 1, 2, 3, 4, 5]
     assert all(event.total == 5 for event in events)
     assert events[-1].message == "modpack.update_check.checked"
+
+
+def test_preview_reports_exact_changes_without_mutating_instance(monkeypatch, tmp_path: Path) -> None:
+    import hashlib
+    import json
+    import shutil
+    import zipfile
+
+    from src.core.fs.paths import Paths
+    from src.core.instance.instance_run_lock import InstanceRunLock
+    from src.core.modrinth.modrinth_downloader import ModrinthDownloader
+    from src.models.modrinth.version import ModrinthFile
+
+    instance_dir = tmp_path / "instances" / "Preview Pack"
+    (instance_dir / "config").mkdir(parents=True)
+    (instance_dir / "mods").mkdir()
+    (instance_dir / "config" / "user.cfg").write_bytes(b"USER")
+    (instance_dir / "mods" / "remove.jar").write_bytes(b"REMOVE")
+    (instance_dir / "mods" / "same.jar").write_bytes(b"SAME")
+    instance = Instance(
+        instance_id="preview-id",
+        name="Preview Pack",
+        version_id="1.20.1",
+        instance_dir=instance_dir,
+        mod_loader=("fabric", "0.15"),
+    )
+
+    def sha1(data: bytes) -> str:
+        return hashlib.sha1(data, usedforsecurity=False).hexdigest()
+
+    ModrinthPackRegistry.save(
+        instance_dir,
+        {
+            "projectId": "pack",
+            "versionId": "v1",
+            "versionNumber": "1.0",
+            "minecraftVersion": "1.20.1",
+            "loader": "fabric",
+            "loaderVersion": "0.15",
+            "installOptionalFiles": True,
+            "managedFiles": [
+                {"path": "config/user.cfg", "sha1": sha1(b"OLD"), "size": 3, "source": "overrides"},
+                {"path": "mods/remove.jar", "sha1": sha1(b"REMOVE"), "size": 6, "source": "download"},
+                {"path": "mods/same.jar", "sha1": sha1(b"SAME"), "size": 4, "source": "download"},
+            ],
+        },
+    )
+
+    new_bytes = b"NEW"
+    pack_source = tmp_path / "preview.mrpack"
+    index = {
+        "formatVersion": 1,
+        "game": "minecraft",
+        "versionId": "v2",
+        "name": "Preview Pack",
+        "files": [
+            {
+                "path": "mods/new.jar",
+                "hashes": {"sha1": sha1(new_bytes), "sha512": hashlib.sha512(new_bytes).hexdigest()},
+                "downloads": ["https://cdn.modrinth.com/new.jar"],
+                "fileSize": len(new_bytes),
+                "env": {"client": "required", "server": "required"},
+            },
+            {
+                "path": "mods/same.jar",
+                "hashes": {"sha1": sha1(b"SAME"), "sha512": hashlib.sha512(b"SAME").hexdigest()},
+                "downloads": ["https://cdn.modrinth.com/same.jar"],
+                "fileSize": 4,
+                "env": {"client": "required", "server": "required"},
+            },
+        ],
+        "dependencies": {"minecraft": "1.21.1", "fabric-loader": "0.16.0"},
+    }
+    with zipfile.ZipFile(pack_source, "w") as archive:
+        archive.writestr("modrinth.index.json", json.dumps(index))
+        archive.writestr("overrides/config/user.cfg", b"PACK")
+
+    target = ModrinthVersion(
+        version_id="v2",
+        project_id="pack",
+        name="2.0",
+        version_number="2.0",
+        version_type="release",
+        game_versions=("1.21.1",),
+        loaders=("fabric",),
+        files=(
+            ModrinthFile(
+                url="https://cdn.modrinth.com/preview.mrpack",
+                filename="preview.mrpack",
+                sha1="a",
+                sha512="b",
+                size=1,
+                primary=True,
+            ),
+        ),
+        date_published="2026-02-01T00:00:00Z",
+    )
+    project = ModrinthProject(
+        project_id="pack",
+        slug="pack",
+        title="Preview Pack",
+        description="",
+        project_type="modpack",
+    )
+
+    monkeypatch.setattr(Paths, "CACHE_ROOT", tmp_path / "cache")
+    monkeypatch.setattr(InstanceRunLock, "is_active", lambda _instance: False)
+    monkeypatch.setattr(ModrinthClient, "get_project", lambda *args, **kwargs: project)
+    monkeypatch.setattr(ModrinthClient, "get_version", lambda *args, **kwargs: target)
+    monkeypatch.setattr(
+        ModrinthDownloader,
+        "download_file",
+        lambda _file, destination, **_kwargs: destination.parent.mkdir(parents=True, exist_ok=True)
+        or shutil.copy2(pack_source, destination),
+    )
+
+    plan = ModrinthPackUpdateManager.preview(
+        instance,
+        target_version_id="v2",
+        allowed_version_types=("release",),
+    )
+
+    assert plan.can_apply
+    assert plan.added_files == 1
+    assert plan.replaced_files == 0
+    assert plan.removed_files == 1
+    assert plan.preserved_files == ("config/user.cfg",)
+    assert plan.unchanged_files == 1
+    assert plan.estimated_download_bytes == len(new_bytes)
+    assert (instance_dir / "config" / "user.cfg").read_bytes() == b"USER"
+    assert (instance_dir / "mods" / "remove.jar").read_bytes() == b"REMOVE"
+    assert not (instance_dir / "mods" / "new.jar").exists()
+    assert tuple(Paths.modrinth_staging_root().iterdir()) == ()

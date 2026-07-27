@@ -524,9 +524,7 @@ class InstancesPage(BasePage):
         info = self._modpack_update_info
         if not name or info is None or not getattr(info, "available", False):
             return
-        answer = QMessageBox.question(self, tr("Update Modrinth modpack"), tr("Update '{name}' from {current} to {target}? A full safety backup will be created and user-modified files will be preserved.", name=name, current=getattr(info, "current_version_number", "?"), target=getattr(info, "target_version_number", "?")), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if answer == QMessageBox.StandardButton.Yes:
-            self.apply_modpack_update_requested.emit(name)
+        self.apply_modpack_update_requested.emit(name)
 
     def _confirm_modpack_repair(self) -> None:
         name = self.current_instance_name()

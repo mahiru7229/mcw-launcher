@@ -22,6 +22,7 @@ def task_progress_profile(task_id: str) -> TaskProgressProfile | None:
         "mods.update.apply": TaskProgressProfile(ProgressStage.DOWNLOADING_MODS, "mods.update.completed", "mods.update.completed_detail", "mods.update.failed"),
         "modpack.scan": TaskProgressProfile(ProgressStage.CHECKING_MODPACK, "modpack.scan.completed", "modpack.scan.completed_detail", "modpack.scan.failed"),
         "modpack.update.check": TaskProgressProfile(ProgressStage.CHECKING_MODPACK, "modpack.update_check.completed", "modpack.update_check.completed_detail", "modpack.update_check.failed"),
+        "modpack.update.preview": TaskProgressProfile(ProgressStage.CHECKING_MODPACK, "modpack.preview.completed", "modpack.preview.completed_detail", "modpack.preview.failed"),
         "modpack.update.apply": TaskProgressProfile(ProgressStage.DOWNLOADING_MODPACK, "modpack.update.completed", "modpack.update.completed_detail", "modpack.update.failed"),
         "modpack.repair": TaskProgressProfile(ProgressStage.CHECKING_MODPACK, "modpack.repair.completed", "modpack.repair.completed_detail", "modpack.repair.failed"),
         "backup.create": TaskProgressProfile(ProgressStage.EXPORTING_INSTANCE, "backup.create.completed", "backup.create.completed_detail", "backup.create.failed"),
