@@ -8,6 +8,7 @@ from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.fs.paths import Paths
 from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
 from src.core.network.download_manager import download_manager
+from src.core.network.download_recovery import download_recovery_manager
 from src.core.network.network_session import DEFAULT_MAX_CONCURRENT_DOWNLOADS
 from src.core.security.account_security_manager import AccountSecurityManager
 
@@ -34,6 +35,9 @@ def initialize_application(progress_callback: BootstrapProgressCallback | None =
     download_bandwidth_limiter.configure_mbps(network_settings.get("download_limit_mbps", 0.0))
     configured_concurrency = int(network_settings.get("download_concurrency", 0) or 0)
     download_manager.configure(configured_concurrency or DEFAULT_MAX_CONCURRENT_DOWNLOADS)
+
+    _report(progress_callback, 52, "startup.recovering_downloads")
+    download_recovery_manager.reconcile(delete_invalid_parts=True)
 
     _report(progress_callback, 62, "startup.preparing_accounts")
     AccountDatabase.initialize()

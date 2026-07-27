@@ -56,17 +56,39 @@ class DownloadJournal:
     def remove(self, request_id: str) -> None:
         with self._lock:
             payload = self._read()
-            payload.setdefault("entries", {}).pop(str(request_id), None)
-            self._write(payload)
+            removed = payload.setdefault("entries", {}).pop(str(request_id), None)
+            if removed is not None:
+                self._write(payload)
 
-    def recoverable_entries(self) -> list[dict]:
+    def remove_many(self, request_ids: object) -> int:
+        normalized = {str(request_id).strip() for request_id in request_ids or () if str(request_id).strip()}
+        if not normalized:
+            return 0
+        with self._lock:
+            payload = self._read()
+            entries = payload.setdefault("entries", {})
+            removed = sum(1 for request_id in normalized if entries.pop(request_id, None) is not None)
+            if removed:
+                self._write(payload)
+            return removed
+
+    def snapshot(self) -> tuple[dict, ...]:
         with self._lock:
             entries = self._read().get("entries", {})
-            recoverable = []
-            for entry in entries.values():
-                if entry.get("state") in {DownloadState.DOWNLOADING.value, DownloadState.PAUSED.value, DownloadState.CANCELLED.value, DownloadState.FAILED.value}:
-                    recoverable.append(dict(entry))
-            return sorted(recoverable, key=lambda item: str(item.get("updated_at", "")), reverse=True)
+            return tuple(dict(entry) for entry in entries.values())
+
+    def recoverable_entries(self) -> list[dict]:
+        recoverable = [
+            entry
+            for entry in self.snapshot()
+            if entry.get("state") in {
+                DownloadState.DOWNLOADING.value,
+                DownloadState.PAUSED.value,
+                DownloadState.CANCELLED.value,
+                DownloadState.FAILED.value,
+            }
+        ]
+        return sorted(recoverable, key=lambda item: str(item.get("updated_at", "")), reverse=True)
 
     def clear_completed(self) -> None:
         with self._lock:

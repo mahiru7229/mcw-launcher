@@ -721,6 +721,7 @@
         "startup.preparing_directories": "Preparing launcher folders...",
         "startup.loading_settings": "Loading launcher settings...",
         "startup.configuring_downloads": "Configuring downloads...",
+        "startup.recovering_downloads": "Recovering interrupted downloads...",
         "startup.preparing_accounts": "Preparing account data...",
         "startup.protecting_accounts": "Checking account security...",
         "startup.core_ready": "Launcher core is ready.",

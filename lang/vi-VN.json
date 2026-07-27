@@ -721,6 +721,7 @@
         "startup.preparing_directories": "Đang chuẩn bị thư mục launcher...",
         "startup.loading_settings": "Đang tải cài đặt launcher...",
         "startup.configuring_downloads": "Đang cấu hình hệ thống tải xuống...",
+        "startup.recovering_downloads": "Đang khôi phục các lượt tải bị gián đoạn...",
         "startup.preparing_accounts": "Đang chuẩn bị dữ liệu tài khoản...",
         "startup.protecting_accounts": "Đang kiểm tra bảo mật tài khoản...",
         "startup.core_ready": "Core launcher đã sẵn sàng.",
