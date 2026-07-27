@@ -3,9 +3,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime, timezone
 
+from src.core.config.launcher_settings_manager import LauncherSettingsManager
+from src.core.config.managed_content_policy import ManagedContentPolicy
 from src.core.fs.paths import Paths
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.instance.settings_manager import SettingsManager
+from src.core.lan.lan_agent_manager import LanAgentManager
+from src.core.lan.lan_hosting_manager import LanHostingManager
 from src.core.java.java_resolver import JavaResolver
 from src.core.java.java_runtime import JavaRuntime
 from src.core.minecraft.asset_manager import AssetManager
@@ -34,6 +38,7 @@ class MinecraftExecutor:
     def run(instance: Instance, authentication: Authentication, account: Account, debug_mode: bool = False, on_progress: ProgressCallback | None = None, on_exit: Callable[[GameExitResult], None] | None = None) -> dict:
         run_lock = InstanceRunLock.acquire(instance)
         process_started = False
+        lan_log_path = None
 
         try:
             reporter = ProgressReporter(on_progress)
@@ -41,10 +46,20 @@ class MinecraftExecutor:
             reporter.status(stage=ProgressStage.PREPARING, message="Preparing Minecraft...")
 
             settings = SettingsManager.load(instance)
+            lan_auth_mode = getattr(settings, "lan_auth_mode", "microsoft_only")
+            lan_log_path = LanAgentManager.prepare_log(instance, lan_auth_mode)
+            LanAgentManager.append_log_path(lan_log_path, "Launcher settings were loaded successfully.")
+            if LanAgentManager.is_enabled(lan_auth_mode):
+                LanHostingManager.disable_legacy_auth_bridges(instance)
+                LanAgentManager.append_log_path(lan_log_path, "Legacy LAN authentication bridges were checked and disabled if present.")
             download_pause_controller.raise_if_requested()
-            block_managed_failure = bool(getattr(settings, "block_launch_on_modrinth_failure", True))
-            modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_managed_failure)
-            curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_managed_failure)
+            launcher_settings = LauncherSettingsManager().load()
+            block_modrinth_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "modrinth")
+            block_curseforge_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "curseforge")
+            block_forge_preflight_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "forge_preflight")
+            launch_lock_token = getattr(run_lock, "token", None)
+            modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
+            curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
 
             download_pause_controller.raise_if_requested()
             VersionManifestManager.get()
@@ -54,7 +69,10 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             forge_preflight = ForgePreflightManager.scan(instance, version, verify_files=False)
-            ForgePreflightManager.raise_for_errors(forge_preflight)
+            if block_forge_preflight_failure:
+                ForgePreflightManager.raise_for_errors(forge_preflight)
+            else:
+                ForgePreflightManager.raise_for_errors(forge_preflight, False)
 
             reporter.status(stage=ProgressStage.DOWNLOADING_CLIENT, message="Checking Minecraft client...")
             DownloadClientManager.load(version=version, reporter=reporter)
@@ -78,18 +96,28 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.BUILDING_COMMAND, message="Building launch command...")
-            command = LauncherManager.build(version, context, settings, account)
+            lan_runtime_arguments = LanAgentManager.runtime_arguments(version, lan_auth_mode, instance, reporter)
+            if lan_runtime_arguments:
+                command = LauncherManager.build(version, context, settings, account, runtime_jvm_arguments=lan_runtime_arguments)
+            else:
+                command = LauncherManager.build(version, context, settings, account)
+            LanAgentManager.append_log_path(
+                lan_log_path,
+                f"Launch command built; agent attached: {bool(lan_runtime_arguments)}; main class: {getattr(version, 'main_class', 'unknown')}",
+            )
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.SELECTING_JAVA, message="Selecting Java runtime...")
             java_major = version.java_version.get("majorVersion") or 8
             java = JavaResolver.resolve(java_major, reporter)
+            LanAgentManager.append_log_path(lan_log_path, f"Java selected: {java} (major {java_major}).")
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.LAUNCHING, message=f"Launching Minecraft {version.id}...")
             started_at = datetime.now(timezone.utc)
             process = JavaRuntime.run(java, command, instance)
             process_started = True
+            LanAgentManager.append_log_path(lan_log_path, f"Minecraft process started; pid={getattr(process, 'pid', 'unknown')}.")
             run_lock.track_process(process)
             GameRuntimeManager.watch(process, instance, version.id, started_at, on_exit)
             reporter.status(stage=ProgressStage.FINISHED, message=f"Minecraft {version.id} launched successfully.")
@@ -111,7 +139,12 @@ class MinecraftExecutor:
             if warnings:
                 result["warnings"] = warnings
             return result
-        except Exception:
+        except Exception as error:
+            if lan_log_path is not None:
+                LanAgentManager.append_log_path(
+                    lan_log_path,
+                    f"Launcher aborted: {type(error).__name__}: {error}",
+                )
             if not process_started:
                 run_lock.release()
             raise

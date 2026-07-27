@@ -87,7 +87,7 @@ def test_empty_save_removes_private_config(monkeypatch, tmp_path: Path) -> None:
     CurseForgeConfigManager.save_local([], "")
 
     assert local.exists() is False
-    assert CurseForgeConfigManager.gateway_urls() == ()
+    assert CurseForgeConfigManager.gateway_urls() == CurseForgeConfigManager.DEFAULT_GATEWAY_URLS
 
 
 def test_gateway_requires_https_and_rejects_embedded_credentials() -> None:
@@ -126,3 +126,14 @@ def test_save_migrates_and_removes_legacy_plaintext_file(monkeypatch, tmp_path: 
     assert legacy.exists() is False
     assert CurseForgeConfigManager.gateway_urls() == ("https://new.example/api/curseforge",)
     assert CurseForgeConfigManager.client_token() == "legacy-token"
+
+
+def test_public_gateway_is_used_when_no_override_exists(monkeypatch, tmp_path: Path) -> None:
+    clear_environment(monkeypatch)
+    monkeypatch.setattr(CurseForgeConfigManager, "path", staticmethod(lambda: tmp_path / "private" / "curseforge_endpoints.json"))
+    monkeypatch.setattr(CurseForgeConfigManager, "legacy_path", staticmethod(lambda: tmp_path / "curseforge.json"))
+
+    assert CurseForgeConfigManager.gateway_urls() == (
+        "https://mcw-curseforge-gateway.vercel.app/api/curseforge",
+    )
+    assert CurseForgeConfigManager.is_configured() is True

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import json
 
 from src.core.fs.paths import Paths
@@ -31,6 +31,29 @@ class CurseForgePackRegistry:
         temp.replace(path)
 
     @staticmethod
+    def safe_relative_path(value: str, fallback_filename: str) -> str:
+        filename = Path(str(fallback_filename or "download.bin")).name or "download.bin"
+        fallback = f"mods/{filename}"
+        normalized = str(value or fallback).replace("\\", "/").strip().lstrip("/")
+        path = PurePosixPath(normalized)
+        if not normalized or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+            return fallback
+        if not path.parts or ":" in path.parts[0]:
+            return fallback
+        return path.as_posix()
+
+    @staticmethod
+    def managed_path(instance: Instance, value: str, fallback_filename: str) -> tuple[Path, str]:
+        relative = CurseForgePackRegistry.safe_relative_path(value, fallback_filename)
+        root = Path(instance.instance_dir).resolve()
+        target = root.joinpath(*PurePosixPath(relative).parts).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError as error:
+            raise RuntimeError("The managed CurseForge path escapes the instance folder.") from error
+        return target, relative
+
+    @staticmethod
     def _normalize(data: dict) -> dict:
         managed: list[dict] = []
         for raw in data.get("managedFiles", []):
@@ -44,8 +67,7 @@ class CurseForgePackRegistry:
             filename = Path(str(raw.get("fileName") or "")).name
             if project_id <= 0 or file_id <= 0 or not filename:
                 continue
-            raw_path = str(raw.get("path") or f"mods/{filename}").replace("\\", "/").lstrip("/")
-            safe_path = f"mods/{filename}" if raw_path != f"mods/{filename}" else raw_path
+            safe_path = CurseForgePackRegistry.safe_relative_path(str(raw.get("path") or ""), filename)
             managed.append({
                 "projectId": project_id,
                 "fileId": file_id,
@@ -58,6 +80,10 @@ class CurseForgePackRegistry:
                 "displayName": str(raw.get("displayName") or filename).strip(),
                 "pendingDownload": bool(raw.get("pendingDownload", False)),
                 "lastDownloadError": str(raw.get("lastDownloadError") or "").strip(),
+                "retryableDownload": bool(raw.get("retryableDownload", True)),
+                "acceptedUnverified": bool(raw.get("acceptedUnverified", False)),
+                "compatibilityWarning": str(raw.get("compatibilityWarning") or "").strip(),
+                "manualImport": bool(raw.get("manualImport", False)),
             })
         output = dict(data)
         output["schemaVersion"] = CurseForgePackRegistry.SCHEMA_VERSION

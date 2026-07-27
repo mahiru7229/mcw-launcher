@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace as dataclass_replace
 from pathlib import Path
 from typing import Iterable
 import json
@@ -18,7 +19,7 @@ from src.models.mod.mod_info import ModInfo
 
 class ModManager:
     DISABLED_SUFFIX = ".disabled"
-    _INVALID_STATUSES = {"Broken JAR", "Not a mod", "Broken metadata"}
+    _INVALID_STATUSES = {"Broken JAR", "Not a mod", "Broken metadata", "Unverified"}
 
     @staticmethod
     def mods_dir(instance: Instance) -> Path:
@@ -28,11 +29,12 @@ class ModManager:
     def list_mods(instance: Instance) -> list[ModInfo]:
         directory = ModManager.mods_dir(instance)
         paths = [path for path in directory.iterdir() if path.is_file() and ModManager._is_mod_file(path)]
-        return sorted((ModManager.read_mod(path) for path in paths), key=lambda mod: (not mod.enabled, mod.name.casefold(), mod.file_name.casefold()))
+        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
+        return sorted((ModManager.read_mod(path, preferred_loader=loader_name) for path in paths), key=lambda mod: (not mod.enabled, mod.name.casefold(), mod.file_name.casefold()))
 
     @staticmethod
-    def add_mods(instance: Instance, source_paths: Iterable[Path], replace: bool = False) -> list[ModInfo]:
-        ModManager._ensure_modifiable(instance)
+    def add_mods(instance: Instance, source_paths: Iterable[Path], replace: bool = False, launch_lock_token: str | None = None, allow_unverified: bool = False) -> list[ModInfo]:
+        ModManager._ensure_modifiable(instance, launch_lock_token)
         destination_dir = ModManager.mods_dir(instance)
         installed = ModManager.list_mods(instance)
         added: list[ModInfo] = []
@@ -42,8 +44,9 @@ class ModManager:
             if not source.is_file() or source.suffix.lower() != ".jar":
                 raise RuntimeError(f"Mod file must be a .jar file: {source.name}")
 
-            metadata = ModManager.read_mod(source)
-            ModManager._validate_mod_for_instance(instance, metadata)
+            loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
+            metadata = ModManager.read_mod(source, preferred_loader=loader_name)
+            ModManager._validate_mod_for_instance(instance, metadata, allow_unverified=allow_unverified)
 
             destination = destination_dir / source.name
             disabled_destination = destination.with_name(destination.name + ModManager.DISABLED_SUFFIX)
@@ -53,7 +56,7 @@ class ModManager:
             if source_resolved == destination_resolved:
                 if not replace:
                     raise FileExistsError(f"Mod already exists: {source.name}")
-                added.append(ModManager.read_mod(destination))
+                added.append(ModManager.read_mod(destination, preferred_loader=loader_name))
                 continue
 
             same_id = [
@@ -70,8 +73,8 @@ class ModManager:
             temporary_path = destination.with_name(destination.name + ".part")
             try:
                 shutil.copy2(source, temporary_path)
-                copied = ModManager.read_mod(temporary_path)
-                ModManager._validate_mod_for_instance(instance, copied)
+                copied = ModManager.read_mod(temporary_path, preferred_loader=loader_name)
+                ModManager._validate_mod_for_instance(instance, copied, allow_unverified=allow_unverified)
 
                 for conflict in same_id:
                     conflict.path.unlink(missing_ok=True)
@@ -81,7 +84,7 @@ class ModManager:
                 temporary_path.unlink(missing_ok=True)
 
             installed = [mod for mod in installed if mod.mod_id.casefold() != metadata.mod_id.casefold()]
-            installed_mod = ModManager.read_mod(destination)
+            installed_mod = ModManager.read_mod(destination, preferred_loader=loader_name)
             installed.append(installed_mod)
             added.append(installed_mod)
 
@@ -102,6 +105,7 @@ class ModManager:
     def set_enabled(instance: Instance, paths: Iterable[Path], enabled: bool) -> list[ModInfo]:
         ModManager._ensure_modifiable(instance)
         directory = ModManager.mods_dir(instance).resolve()
+        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         changed: list[ModInfo] = []
 
         for path in paths:
@@ -111,7 +115,7 @@ class ModManager:
 
             currently_enabled = not source.name.endswith(ModManager.DISABLED_SUFFIX)
             if currently_enabled == enabled:
-                changed.append(ModManager.read_mod(source))
+                changed.append(ModManager.read_mod(source, preferred_loader=loader_name))
                 continue
 
             target = source.with_name(source.name[:-len(ModManager.DISABLED_SUFFIX)]) if enabled else source.with_name(source.name + ModManager.DISABLED_SUFFIX)
@@ -119,36 +123,90 @@ class ModManager:
                 raise FileExistsError(f"Cannot change mod state because '{target.name}' already exists.")
 
             source.replace(target)
-            changed.append(ModManager.read_mod(target))
+            changed.append(ModManager.read_mod(target, preferred_loader=loader_name))
 
         return changed
 
     @staticmethod
-    def read_mod(path: Path) -> ModInfo:
+    def read_mod(path: Path, preferred_loader: str = "") -> ModInfo:
         path = Path(path)
         enabled = not path.name.endswith(ModManager.DISABLED_SUFFIX)
         file_name = path.name[:-len(ModManager.DISABLED_SUFFIX)] if not enabled else path.name
+        normalized_preference = str(preferred_loader).strip().casefold()
 
         try:
             with zipfile.ZipFile(path, "r") as archive:
                 names = set(archive.namelist())
-                if "fabric.mod.json" in names:
+                has_fabric = "fabric.mod.json" in names
+                has_forge = "META-INF/mods.toml" in names
+
+                if has_fabric and has_forge:
+                    return ModManager._read_universal_fabric_forge_mod(
+                        path,
+                        file_name,
+                        enabled,
+                        archive.read("fabric.mod.json"),
+                        archive.read("META-INF/mods.toml"),
+                        normalized_preference,
+                    )
+                if has_fabric:
                     return ModManager._read_fabric_mod(path, file_name, enabled, archive.read("fabric.mod.json"))
                 if "META-INF/neoforge.mods.toml" in names:
                     return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/neoforge.mods.toml"), loader="neoforge", metadata_format="neoforge.mods.toml")
-                if "META-INF/mods.toml" in names:
+                if has_forge:
                     return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/mods.toml"), loader="forge", metadata_format="mods.toml")
                 if "mcmod.info" in names:
                     return ModManager._read_legacy_forge_mod(path, file_name, enabled, archive.read("mcmod.info"))
+                manifest = ModManager._manifest_attributes(archive.read("META-INF/MANIFEST.MF")) if "META-INF/MANIFEST.MF" in names else {}
+                fml_mod_type = str(manifest.get("fmlmodtype") or "").strip().upper()
+                if fml_mod_type in {"LANGPROVIDER", "LIBRARY", "GAMELIBRARY"}:
+                    label = {
+                        "LANGPROVIDER": "Forge language provider",
+                        "LIBRARY": "Forge managed library",
+                        "GAMELIBRARY": "Forge game library",
+                    }[fml_mod_type]
+                    return ModInfo(
+                        path=path,
+                        file_name=file_name,
+                        enabled=enabled,
+                        mod_id="unknown",
+                        name=Path(file_name).stem,
+                        version=str(manifest.get("implementation-version") or manifest.get("specification-version") or "Unknown").strip(),
+                        loader="forge",
+                        metadata_format=f"MANIFEST.MF:FMLModType={fml_mod_type}",
+                        status="Ready",
+                        description=label,
+                    )
+                has_java_content = any(name.endswith(".class") for name in names)
+                status = "Unverified" if manifest or has_java_content else "Not a mod"
                 return ModManager._invalid_mod(
                     path,
                     file_name,
                     enabled,
-                    "Not a mod",
-                    "No fabric.mod.json, Forge META-INF/mods.toml, NeoForge metadata, or mcmod.info metadata was found.",
+                    status,
+                    "No fabric.mod.json, Forge META-INF/mods.toml, NeoForge metadata, mcmod.info, or recognized Forge library metadata was found.",
                 )
         except (OSError, zipfile.BadZipFile) as error:
             return ModManager._invalid_mod(path, file_name, enabled, "Broken JAR", str(error))
+
+    @staticmethod
+    def _read_universal_fabric_forge_mod(path: Path, file_name: str, enabled: bool, fabric_metadata: bytes, forge_metadata: bytes, preferred_loader: str) -> ModInfo:
+        if preferred_loader == ModLoaderManager.FORGE:
+            return ModManager._read_forge_mod(path, file_name, enabled, forge_metadata, loader="forge", metadata_format="mods.toml")
+        if preferred_loader == ModLoaderManager.FABRIC:
+            return ModManager._read_fabric_mod(path, file_name, enabled, fabric_metadata)
+
+        fabric = ModManager._read_fabric_mod(path, file_name, enabled, fabric_metadata)
+        forge = ModManager._read_forge_mod(path, file_name, enabled, forge_metadata, loader="forge", metadata_format="mods.toml")
+        fabric_valid = fabric.status not in ModManager._INVALID_STATUSES
+        forge_valid = forge.status not in ModManager._INVALID_STATUSES
+        if fabric_valid and forge_valid:
+            return dataclass_replace(fabric, loader="universal", metadata_format="fabric.mod.json + mods.toml")
+        if fabric_valid:
+            return fabric
+        if forge_valid:
+            return forge
+        return fabric
 
     @staticmethod
     def _read_fabric_mod(path: Path, file_name: str, enabled: bool, raw_metadata: bytes) -> ModInfo:
@@ -326,21 +384,34 @@ class ModManager:
         return required, optional
 
     @staticmethod
-    def _validate_mod_for_instance(instance: Instance, mod: ModInfo) -> None:
-        if mod.status in ModManager._INVALID_STATUSES:
+    def _validate_mod_for_instance(instance: Instance, mod: ModInfo, allow_unverified: bool = False) -> None:
+        if mod.status in ModManager._INVALID_STATUSES and not allow_unverified:
             raise RuntimeError(mod.error or f"'{mod.file_name}' is not a supported Minecraft mod.")
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if mod.loader not in {loader_name, "unknown", "universal"}:
+        if mod.loader not in {loader_name, "unknown", "universal"} and not allow_unverified:
             expected = loader_name.title()
             actual = mod.loader.title()
             raise RuntimeError(f"'{mod.file_name}' is a {actual} mod and cannot be added to this {expected} instance.")
 
     @staticmethod
-    def _ensure_modifiable(instance: Instance) -> None:
+    def compatibility_warning(instance: Instance, mod: ModInfo) -> str:
+        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
+        if mod.status in ModManager._INVALID_STATUSES:
+            return mod.error or f"'{mod.file_name}' has no supported mod metadata."
+        if mod.loader not in {loader_name, "unknown", "universal"}:
+            return f"'{mod.file_name}' declares {mod.loader.title()} metadata but is being installed into a {loader_name.title()} instance."
+        return ""
+
+    @staticmethod
+    def ensure_modifiable(instance: Instance, launch_lock_token: str | None = None) -> None:
+        ModManager._ensure_modifiable(instance, launch_lock_token)
+
+    @staticmethod
+    def _ensure_modifiable(instance: Instance, launch_lock_token: str | None = None) -> None:
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
             raise RuntimeError("This instance does not use Fabric or Forge.")
-        if InstanceRunLock.is_active(instance):
+        if InstanceRunLock.is_active(instance) and not InstanceRunLock.owns_preparing_lock(instance, launch_lock_token):
             raise InstanceModChangeBlockedError(instance.name)
 
     @staticmethod
@@ -371,6 +442,28 @@ class ModManager:
         if isinstance(value, list):
             return tuple(str(item).strip() for item in value if str(item).strip())
         return ()
+
+    @staticmethod
+    def _manifest_attributes(raw: bytes) -> dict[str, str]:
+        try:
+            text = raw.decode("utf-8-sig", errors="replace")
+        except (AttributeError, UnicodeError):
+            return {}
+        unfolded: list[str] = []
+        for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+            if line.startswith(" ") and unfolded:
+                unfolded[-1] += line[1:]
+            else:
+                unfolded.append(line)
+        attributes: dict[str, str] = {}
+        for line in unfolded:
+            if ":" not in line:
+                continue
+            key, value = line.split(":", 1)
+            normalized = key.strip().casefold()
+            if normalized:
+                attributes[normalized] = value.strip()
+        return attributes
 
     @staticmethod
     def _invalid_mod(path: Path, file_name: str, enabled: bool, status: str, error: str, loader: str = "unknown", metadata_format: str = "unknown") -> ModInfo:

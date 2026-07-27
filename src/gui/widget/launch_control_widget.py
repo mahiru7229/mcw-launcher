@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QPushBu
 
 from src.core.language.language_manager import tr
 from src.gui.presenters.progress_presenter import ProgressPresenter
+from src.models.progress.progress_state import ProgressState
 from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap, set_theme_static_text
 
 
@@ -27,12 +28,12 @@ class LaunchControlWidget(QFrame):
         self._last_completed_status = "Task completed"
         self._last_completed_detail = "Everything is ready."
         self._last_exit_result: object | None = None
-        self._busy = False
-        self._launch_active = False
-        self._pause_pending = False
         self._status_message = "Ready"
         self._detail_message = "Select an account and an instance, then launch."
         self._stage_state: str | None = None
+        self._busy = False
+        self._launch_active = False
+        self._pause_pending = False
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -104,10 +105,20 @@ class LaunchControlWidget(QFrame):
             self.detail_label.setText(tr(detail))
 
     def set_progress_event(self, event: object) -> None:
-        self._mode = "progress"
         self._last_event = event
         view = ProgressPresenter.present(event)
 
+        if view.state is ProgressState.FAILED:
+            self.set_failed(view.title, view.detail)
+            return
+        if view.state is ProgressState.CANCELLED:
+            self.set_cancelled(view.title, view.detail)
+            return
+        if view.state is ProgressState.SUCCEEDED:
+            self.set_operation_completed(view.title, view.detail)
+            return
+
+        self._mode = "progress"
         self.status_label.setText(view.title)
         self.detail_label.setText(view.detail)
         self.stage_label.setText(view.stage_text)
@@ -201,6 +212,19 @@ class LaunchControlWidget(QFrame):
         self._set_stage_state("error")
         self._refresh_launch_button()
 
+    def set_cancelled(self, status: str = "Task cancelled", detail: str | None = None) -> None:
+        self._mode = "cancelled"
+        self._last_error_status = status or "Task cancelled"
+        self._last_error_detail = detail or "progress.cancelled.detail"
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat(tr("CANCELLED"))
+        self.status_label.setText(tr(self._last_error_status))
+        self.detail_label.setText(tr(self._last_error_detail))
+        self.stage_label.setText(tr("CANCELLED"))
+        self._set_stage_state("warning")
+        self._refresh_launch_button()
+
     def set_busy(self, busy: bool) -> None:
         self._busy = bool(busy)
         self._refresh_launch_button()
@@ -277,6 +301,8 @@ class LaunchControlWidget(QFrame):
             self.set_failed(self._last_error_status, self._last_error_detail)
         elif self._mode == "paused":
             self.set_paused()
+        elif self._mode == "cancelled":
+            self.set_cancelled(self._last_error_status, self._last_error_detail)
         elif self._mode == "operation_completed":
             self.set_operation_completed(self._last_completed_status, self._last_completed_detail)
         elif self._mode == "exit" and self._last_exit_result is not None:

@@ -99,6 +99,23 @@ class InstanceRunLock:
         return snapshot is not None and cls._snapshot_is_active(snapshot)
 
     @classmethod
+    def owns_preparing_lock(cls, instance: Instance, token: str | None) -> bool:
+        if not isinstance(token, str) or not token:
+            return False
+
+        snapshot = cls._read_snapshot(cls.lock_path_for(instance))
+        if snapshot is None or snapshot.payload is None or not cls._snapshot_is_active(snapshot):
+            return False
+
+        payload = snapshot.payload
+        return (
+            payload.get("token") == token
+            and payload.get("state") == "preparing"
+            and cls._read_pid(payload.get("launcher_pid")) == os.getpid()
+            and cls._read_pid(payload.get("minecraft_pid")) is None
+        )
+
+    @classmethod
     def list_active(cls) -> list[RunningInstanceInfo]:
         Paths.INSTANCE_LOCKS_ROOT.mkdir(parents=True, exist_ok=True)
         running_instances: list[RunningInstanceInfo] = []

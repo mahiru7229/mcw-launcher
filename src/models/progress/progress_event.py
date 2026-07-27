@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from src.models.progress.progress_stage import ProgressStage
+from src.models.progress.progress_state import ProgressState
 from src.models.progress.progress_unit import ProgressUnit
 
 
@@ -14,6 +15,8 @@ class ProgressEvent:
 
     unit: ProgressUnit = ProgressUnit.NONE
     bytes_per_second: float | None = None
+    state: ProgressState = ProgressState.RUNNING
+    detail: str = ""
 
     @property
     def remaining(self) -> int | None:
@@ -32,10 +35,7 @@ class ProgressEvent:
 
         fraction = self.current / self.total
 
-        return min(
-            max(fraction, 0.0),
-            1.0,
-        )
+        return min(max(fraction, 0.0), 1.0)
 
     @property
     def percentage(self) -> float | None:
@@ -49,3 +49,7 @@ class ProgressEvent:
     @property
     def is_determinate(self) -> bool:
         return self.fraction is not None
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.state in {ProgressState.SUCCEEDED, ProgressState.FAILED, ProgressState.CANCELLED}

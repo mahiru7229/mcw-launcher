@@ -8,21 +8,29 @@ from src.core.modrinth.modrinth_registry import ModrinthRegistry
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.instance.instance import Instance
 from src.models.modrinth.update import ModrinthModUpdateEntry, ModrinthModUpdateReport, ModrinthModUpdateResult
+from src.models.progress.progress_stage import ProgressStage
 
 
 class ModrinthModUpdateManager:
     @staticmethod
-    def check(instance: Instance, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, force_refresh: bool = False) -> ModrinthModUpdateReport:
+    def check(instance: Instance, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, force_refresh: bool = False, reporter: ProgressReporter | None = None) -> ModrinthModUpdateReport:
         loader_name = ModrinthModUpdateManager._supported_loader(instance)
         allowed_types = ModrinthClient.normalize_version_types(allowed_version_types)
         registry = ModrinthRegistry.load(instance)
+        tracked = [(project_id, raw_entry) for project_id, raw_entry in registry.get("mods", {}).items() if isinstance(raw_entry, dict)]
         entries: list[ModrinthModUpdateEntry] = []
+        total = max(len(tracked), 1)
 
-        for project_id, raw_entry in registry.get("mods", {}).items():
-            if not isinstance(raw_entry, dict):
-                continue
+        if not tracked and reporter is not None:
+            reporter.steps(ProgressStage.CHECKING_MODS, "mods.update_check.no_tracked_mods", 1, 1)
+
+        for index, (project_id, raw_entry) in enumerate(tracked, start=1):
+            if reporter is not None:
+                reporter.steps(ProgressStage.CHECKING_MODS, "mods.update_check.checking_project", index - 1, total)
             entry = ModrinthModUpdateManager._check_entry(instance, str(project_id), raw_entry, loader_name, allowed_types, force_refresh)
             entries.append(entry)
+            if reporter is not None:
+                reporter.steps(ProgressStage.CHECKING_MODS, "mods.update_check.checked_project", index, total)
 
         entries.sort(key=lambda item: (not item.update_available, item.locked, item.title.casefold()))
         return ModrinthModUpdateReport(entries=tuple(entries))

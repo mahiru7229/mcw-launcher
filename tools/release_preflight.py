@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
 import sys
+import zipfile
 from typing import Iterable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.config import UPDATE_CHANNEL, VERSION, VERSION_ID, VERSION_TAG
+from src.config import CURSEFORGE_DEFAULT_GATEWAY_URL, UPDATE_CHANNEL, VERSION, VERSION_ID, VERSION_TAG
+from src.core.lan.lan_agent_manager import LanAgentManager
 
 TEXT_SUFFIXES = {".json", ".md", ".ps1", ".py", ".txt", ".yml", ".yaml"}
 IGNORED_DIRECTORIES = {".git", ".pytest_cache", ".venv", "__pycache__", "build", "cache", "dist", "release"}
@@ -94,14 +97,37 @@ def audit_language_packs(project_root: Path) -> list[str]:
 
 
 def audit_private_gateway_bundling(project_root: Path) -> list[str]:
+    """Ensure the bundled gateway is public configuration, never a secret.
+
+    The launcher may ship the public MCW gateway URL, but it must not contain a
+    CurseForge API key, embedded URL credentials, or an unexpected private
+    endpoint. Custom endpoints remain stored outside the release package.
+    """
+
     errors: list[str] = []
     config_path = project_root / "src" / "config.py"
     try:
         config_text = config_path.read_text(encoding="utf-8")
     except OSError as error:
         return [f"Unable to inspect src/config.py: {error}"]
-    if re.search(r"^CURSEFORGE_GATEWAY_URL\s*=", config_text, flags=re.MULTILINE):
-        errors.append("Private CurseForge gateway URL must not be bundled in src/config.py")
+
+    legacy_match = re.search(r'^CURSEFORGE_GATEWAY_URL\s*=\s*[\'"]([^\'"]+)', config_text, flags=re.MULTILINE)
+    if legacy_match is not None:
+        errors.append("Use CURSEFORGE_DEFAULT_GATEWAY_URL for the public gateway; legacy private gateway constants are not allowed")
+
+    default_match = re.search(r'^CURSEFORGE_DEFAULT_GATEWAY_URL\s*=\s*[\'"]([^\'"]+)', config_text, flags=re.MULTILINE)
+    if default_match is None:
+        errors.append("src/config.py must define the public CurseForge default gateway")
+    elif default_match.group(1).rstrip("/") != CURSEFORGE_DEFAULT_GATEWAY_URL.rstrip("/"):
+        errors.append("src/config.py contains an unexpected CurseForge default gateway URL")
+
+    secret_patterns = (
+        r'^CURSEFORGE_API_KEY\s*=',
+        r'^CURSEFORGE_X_API_KEY\s*=',
+        r'[\'"]x-api-key[\'"]\s*:\s*[\'"][^\'"]+[\'"]',
+    )
+    if any(re.search(pattern, config_text, flags=re.MULTILINE | re.IGNORECASE) for pattern in secret_patterns):
+        errors.append("CurseForge API credentials must not be bundled in src/config.py")
 
     example_path = project_root / "config" / "curseforge.example.json"
     try:
@@ -109,9 +135,12 @@ def audit_private_gateway_bundling(project_root: Path) -> list[str]:
     except (OSError, json.JSONDecodeError) as error:
         errors.append(f"CurseForge config template error: {error}")
     else:
+        default_url = str(example.get("default_gateway_url") or "").rstrip("/") if isinstance(example, dict) else ""
+        if default_url != CURSEFORGE_DEFAULT_GATEWAY_URL.rstrip("/"):
+            errors.append("config/curseforge.example.json must document the public default gateway URL")
         bundled = example.get("bundled_gateway_urls") if isinstance(example, dict) else None
-        if bundled != []:
-            errors.append("config/curseforge.example.json must not contain bundled gateway URLs")
+        if bundled is not None and bundled != [] and bundled != ():
+            errors.append("config/curseforge.example.json must not contain additional bundled gateway URLs")
 
     gitignore_path = project_root / ".gitignore"
     try:
@@ -121,6 +150,37 @@ def audit_private_gateway_bundling(project_root: Path) -> list[str]:
     else:
         if "config/private/" not in gitignore:
             errors.append(".gitignore must exclude config/private/")
+    return errors
+
+
+
+def audit_lan_agent(project_root: Path) -> list[str]:
+    errors: list[str] = []
+    agent_path = project_root / "runtime" / LanAgentManager.AGENT_FILENAME
+    if not agent_path.is_file():
+        return [f"Missing MCW LAN Agent: {agent_path.relative_to(project_root)}"]
+
+    digest = hashlib.sha256(agent_path.read_bytes()).hexdigest()
+    if digest != LanAgentManager.AGENT_SHA256:
+        errors.append(f"MCW LAN Agent SHA-256 mismatch: expected {LanAgentManager.AGENT_SHA256}, got {digest}")
+
+    try:
+        with zipfile.ZipFile(agent_path) as archive:
+            manifest = archive.read("META-INF/MANIFEST.MF").decode("utf-8", errors="replace")
+    except (OSError, KeyError, zipfile.BadZipFile) as error:
+        errors.append(f"MCW LAN Agent JAR is invalid: {error}")
+    else:
+        expected = "Premain-Class: org.mcwlauncher.lanagent.McwLanAgent"
+        if expected not in manifest:
+            errors.append("MCW LAN Agent manifest is missing the expected Premain-Class")
+
+    try:
+        spec_text = (project_root / "mcw_launcher.spec").read_text(encoding="utf-8")
+    except OSError as error:
+        errors.append(f"Unable to inspect mcw_launcher.spec for LAN Agent bundling: {error}")
+    else:
+        if LanAgentManager.AGENT_FILENAME not in spec_text:
+            errors.append("mcw_launcher.spec does not bundle the MCW LAN Agent")
     return errors
 
 def audit_version_metadata(project_root: Path) -> list[str]:
@@ -151,6 +211,7 @@ def run_preflight(project_root: Path = PROJECT_ROOT) -> list[str]:
     errors: list[str] = []
     errors.extend(audit_version_metadata(project_root))
     errors.extend(audit_private_gateway_bundling(project_root))
+    errors.extend(audit_lan_agent(project_root))
     errors.extend(find_merge_markers(project_root))
     errors.extend(audit_language_packs(project_root))
     return errors

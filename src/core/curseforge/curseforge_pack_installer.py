@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path, PurePosixPath
+import hashlib
 import json
 import re
 import shutil
@@ -8,7 +10,7 @@ import stat
 import zipfile
 
 from src.core.curseforge.curseforge_client import CurseForgeClient
-from src.core.curseforge.curseforge_downloader import CurseForgeDownloader
+from src.core.curseforge.curseforge_downloader import CurseForgeDownloader, CurseForgeManualDownloadRequired
 from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
@@ -16,7 +18,19 @@ from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.curseforge.install_result import CurseForgeModpackInstallResult
+from src.models.curseforge.manual_download import CurseForgeManualDownload
 from src.models.progress.progress_stage import ProgressStage
+
+
+class CurseForgeModpackManualDownloadRequired(RuntimeError):
+    def __init__(self, requirement: CurseForgeManualDownload, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: tuple[str, ...]) -> None:
+        super().__init__(requirement.reason)
+        self.requirement = requirement
+        self.project_id = int(project_id)
+        self.file_id = int(file_id)
+        self.instance_name = str(instance_name)
+        self.install_optional_files = bool(install_optional_files)
+        self.allowed_release_types = tuple(allowed_release_types)
 
 
 class CurseForgePackInstaller:
@@ -30,6 +44,47 @@ class CurseForgePackInstaller:
 
     @staticmethod
     def install(project_id: int, file_id: int, instance_name: str, install_optional_files: bool = True, allowed_release_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> CurseForgeModpackInstallResult:
+        name, allowed, project, file = CurseForgePackInstaller._prepare_install(project_id, file_id, instance_name, allowed_release_types)
+        pack_path = Paths.curseforge_pack_cache(project_id, file_id, file.file_name)
+        try:
+            CurseForgeDownloader.download_file(file, pack_path, reporter=reporter, stage=ProgressStage.DOWNLOADING_MODPACK, message=f"Downloading {project.name} manifest...", project_name=project.name)
+        except CurseForgeManualDownloadRequired as error:
+            requirement = replace(
+                error.requirement,
+                project_name=project.name,
+                project_url=CurseForgePackInstaller._file_page_url(project.project_url, project_id, file_id),
+                managed_kind="modpack_archive",
+            )
+            raise CurseForgeModpackManualDownloadRequired(requirement, project_id, file_id, name, install_optional_files, allowed) from error
+        return CurseForgePackInstaller._install_from_archive(project_id, file_id, name, install_optional_files, project, file, pack_path, reporter)
+
+    @staticmethod
+    def install_manual_archive(request: CurseForgeModpackManualDownloadRequired, source: Path, reporter: ProgressReporter | None = None) -> CurseForgeModpackInstallResult:
+        if not isinstance(request, CurseForgeModpackManualDownloadRequired):
+            raise RuntimeError("The pending CurseForge modpack request is invalid.")
+        name, _allowed, project, file = CurseForgePackInstaller._prepare_install(
+            request.project_id,
+            request.file_id,
+            request.instance_name,
+            request.allowed_release_types,
+        )
+        source_path = Path(source)
+        CurseForgePackInstaller._verify_manual_archive(source_path, request.requirement)
+        pack_path = Paths.curseforge_pack_cache(request.project_id, request.file_id, file.file_name)
+        CurseForgePackInstaller._copy_archive_to_cache(source_path, pack_path)
+        return CurseForgePackInstaller._install_from_archive(
+            request.project_id,
+            request.file_id,
+            name,
+            request.install_optional_files,
+            project,
+            file,
+            pack_path,
+            reporter,
+        )
+
+    @staticmethod
+    def _prepare_install(project_id: int, file_id: int, instance_name: str, allowed_release_types: tuple[str, ...] | list[str] | set[str] | None) -> tuple[str, tuple[str, ...], object, object]:
         name = CurseForgePackInstaller._validated_instance_name(instance_name)
         if InstanceManager.is_instance_exist(name):
             raise RuntimeError(f"Instance '{name}' already exists.")
@@ -38,10 +93,15 @@ class CurseForgePackInstaller:
         file = CurseForgeClient.get_file(project_id, file_id)
         if file.release_type not in allowed:
             raise RuntimeError(f"CurseForge modpack file '{file.display_name}' uses the disabled {file.release_type} channel.")
-        pack_path = Paths.curseforge_pack_cache(project_id, file_id, file.file_name)
-        CurseForgeDownloader.download_file(file, pack_path, reporter=reporter, stage=ProgressStage.DOWNLOADING_MODPACK, message=f"Downloading {project.name} manifest...", project_name=project.name)
+        return name, allowed, project, file
 
-        with zipfile.ZipFile(pack_path, "r") as archive:
+    @staticmethod
+    def _install_from_archive(project_id: int, file_id: int, name: str, install_optional_files: bool, project: object, file: object, pack_path: Path, reporter: ProgressReporter | None) -> CurseForgeModpackInstallResult:
+        try:
+            archive = zipfile.ZipFile(pack_path, "r")
+        except (OSError, zipfile.BadZipFile) as error:
+            raise RuntimeError("The selected CurseForge modpack archive is not a valid ZIP file.") from error
+        with archive:
             manifest = CurseForgePackInstaller._read_manifest(archive)
             minecraft_version, forge_version = CurseForgePackInstaller._parse_loader(manifest)
             entries, skipped = CurseForgePackInstaller._resolve_files(manifest, minecraft_version, install_optional_files, reporter)
@@ -67,6 +127,51 @@ class CurseForgePackInstaller:
                 InstanceManager.delete_instance(name)
                 raise
         return CurseForgeModpackInstallResult(instance=instance, pack_name=project.name, pack_version=file.display_name, managed_files=len(entries), skipped_optional_files=skipped)
+
+    @staticmethod
+    def _verify_manual_archive(source: Path, requirement: CurseForgeManualDownload) -> None:
+        if not source.is_file():
+            raise RuntimeError("The selected CurseForge modpack file does not exist.")
+        if source.suffix.casefold() != ".zip":
+            raise RuntimeError("Select the original CurseForge modpack ZIP archive.")
+        size = source.stat().st_size
+        if requirement.file_size > 0 and size != requirement.file_size:
+            raise RuntimeError(f"The selected modpack has the wrong size. Expected {requirement.file_size} bytes, got {size} bytes.")
+        if requirement.sha1:
+            digest = CurseForgePackInstaller._sha1(source)
+            if digest.casefold() != requirement.sha1.casefold():
+                raise RuntimeError("The selected modpack does not match the expected CurseForge SHA-1 checksum.")
+
+    @staticmethod
+    def _copy_archive_to_cache(source: Path, destination: Path) -> Path:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            if source.resolve() == destination.resolve():
+                return destination
+        except OSError:
+            pass
+        temporary = destination.with_suffix(destination.suffix + ".part")
+        temporary.unlink(missing_ok=True)
+        shutil.copy2(source, temporary)
+        temporary.replace(destination)
+        return destination
+
+    @staticmethod
+    def _sha1(path: Path) -> str:
+        digest = hashlib.sha1(usedforsecurity=False)
+        with path.open("rb") as input_file:
+            while chunk := input_file.read(1024 * 1024):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    @staticmethod
+    def _file_page_url(project_url: str, project_id: int, file_id: int) -> str:
+        base = str(project_url or "").strip().rstrip("/")
+        if not base:
+            base = f"https://www.curseforge.com/minecraft/modpacks/{int(project_id)}"
+        if re.search(r"/files/\d+$", base):
+            return base
+        return f"{base}/files/{int(file_id)}"
 
     @staticmethod
     def _read_manifest(archive: zipfile.ZipFile) -> dict:
@@ -125,7 +230,7 @@ class CurseForgePackInstaller:
             file = files.get(file_id)
             if file is None or file.project_id != project_id:
                 file = CurseForgeClient.get_file(project_id, file_id)
-            if game_version and game_version not in file.game_versions:
+            if game_version and file.game_versions and game_version not in file.game_versions:
                 raise RuntimeError(f"CurseForge file '{file.file_name}' does not support Minecraft {game_version}.")
             results.append({
                 "projectId": project_id,
@@ -136,6 +241,7 @@ class CurseForgePackInstaller:
                 "sha1": file.sha1,
                 "size": file.file_length,
                 "downloadUrl": file.download_url,
+                "declaredLoaders": list(file.loaders),
                 "required": required,
             })
             if reporter is not None:

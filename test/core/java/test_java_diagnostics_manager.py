@@ -4,6 +4,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from src.core.java.java_diagnostics_manager import JavaDiagnosticsManager
+from src.core.java.java_manager import JavaManager
+from src.core.progress.progress_reporter import ProgressReporter
 from src.models.java.java import JavaInstallation
 from src.models.java.java_source import JavaSource
 
@@ -28,3 +30,15 @@ openjdk version "21.0.8"
     assert diagnostic.architecture == "amd64"
     assert diagnostic.version_string == "21.0.8"
     assert "Eclipse Adoptium" in diagnostic.display_name
+
+
+def test_scan_reports_java_inspection_progress(monkeypatch, tmp_path: Path) -> None:
+    java = JavaInstallation(version=17, executable=tmp_path / "javaw.exe", source=JavaSource.PATH)
+    events = []
+    monkeypatch.setattr(JavaManager, "find_installation", lambda reporter=None: [java])
+    monkeypatch.setattr(JavaDiagnosticsManager, "inspect", lambda installation: SimpleNamespace(major_version=17, vendor="Vendor", executable=installation.executable))
+
+    JavaDiagnosticsManager.scan(ProgressReporter(events.append))
+
+    assert [event.current for event in events] == [0, 1]
+    assert events[-1].message == "java.scan.completed"

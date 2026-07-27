@@ -6,16 +6,18 @@ from urllib.parse import urlparse
 import json
 import os
 
+from src.config import CURSEFORGE_DEFAULT_GATEWAY_URL
 from src.core.fs.paths import Paths
 from src.core.security.token_cipher import TokenCipher
 
 
 class CurseForgeConfigManager:
-    """Loads private CurseForge gateway endpoints from external local config.
+    """Loads CurseForge gateway endpoints with safe local overrides.
 
-    No gateway URL is bundled with the launcher. Saved values are protected with
-    Windows DPAPI and can only be decrypted by the Windows account that saved
-    them. Environment variables remain available for managed deployments.
+    The public MCW gateway is the default on fresh installations. User-provided
+    overrides are protected with Windows DPAPI and environment variables remain
+    available for managed deployments. No CurseForge API credential is stored in
+    the launcher.
     """
 
     SCHEMA_VERSION = 3
@@ -26,6 +28,7 @@ class CurseForgeConfigManager:
     ENV_GATEWAY_URL = "MCW_CURSEFORGE_GATEWAY_URL"  # Legacy single endpoint.
     ENV_GATEWAY_URL_PREFIX = "MCW_CURSEFORGE_GATEWAY_URL_"
     ENV_CLIENT_TOKEN = "MCW_CURSEFORGE_CLIENT_TOKEN"
+    DEFAULT_GATEWAY_URLS = (CURSEFORGE_DEFAULT_GATEWAY_URL,)
 
     @staticmethod
     def path() -> Path:
@@ -59,9 +62,13 @@ class CurseForgeConfigManager:
         # rewrites them using DPAPI protection.
         legacy_values = data.get("gateway_urls")
         if isinstance(legacy_values, list):
-            return cls._normalize_urls(legacy_values)
+            normalized = cls._normalize_urls(legacy_values)
+            if normalized:
+                return normalized
         legacy_single = str(data.get("gateway_url") or "").strip()
-        return cls._normalize_urls([legacy_single]) if legacy_single else ()
+        if legacy_single:
+            return cls._normalize_urls([legacy_single])
+        return cls._normalize_urls(cls.DEFAULT_GATEWAY_URLS)
 
     @classmethod
     def gateway_url(cls) -> str:

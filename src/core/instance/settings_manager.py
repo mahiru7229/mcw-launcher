@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from src.core.config.managed_content_policy import ManagedContentPolicy
 from src.core.fs.paths import Paths
 from src.core.system.memory import MemoryAllocationPolicy
 from src.models.instance.instance import Instance
@@ -30,7 +31,9 @@ class SettingsManager:
             "offline_multiplayer_enabled": False,
             "lan_auth_mode": "microsoft_only",
             "lan_connection_provider": "manual",
-            "block_launch_on_modrinth_failure": True,
+            "modrinth_failure_policy": "inherit",
+            "curseforge_failure_policy": "inherit",
+            "forge_preflight_failure_policy": "inherit",
         },
     }
 
@@ -116,7 +119,7 @@ class SettingsManager:
         min_memory, max_memory = MemoryAllocationPolicy.normalize(min_memory, max_memory)
 
         legacy_offline_multiplayer = SettingsManager._as_bool(launch.get("offline_multiplayer_enabled"), False)
-        lan_auth_mode = SettingsManager._as_choice(launch.get("lan_auth_mode"), {"microsoft_only", "friends"}, "friends" if legacy_offline_multiplayer else "microsoft_only")
+        lan_auth_mode = SettingsManager._normalize_lan_auth_mode(launch.get("lan_auth_mode"), "private_offline" if legacy_offline_multiplayer else "microsoft_only")
         lan_connection_provider = SettingsManager._as_choice(launch.get("lan_connection_provider"), {"manual", "e4mc"}, "manual")
 
         return InstanceSettings(
@@ -131,7 +134,9 @@ class SettingsManager:
             offline_multiplayer_enabled=legacy_offline_multiplayer,
             lan_auth_mode=lan_auth_mode,
             lan_connection_provider=lan_connection_provider,
-            block_launch_on_modrinth_failure=SettingsManager._as_bool(launch.get("block_launch_on_modrinth_failure"), True),
+            modrinth_failure_policy=SettingsManager._failure_policy(launch, "modrinth"),
+            curseforge_failure_policy=SettingsManager._failure_policy(launch, "curseforge"),
+            forge_preflight_failure_policy=SettingsManager._failure_policy(launch, "forge_preflight"),
         )
 
     @staticmethod
@@ -151,11 +156,26 @@ class SettingsManager:
             "launch": {
                 "game_arguments": [str(argument) for argument in settings.game_arguments],
                 "offline_multiplayer_enabled": False,
-                "lan_auth_mode": SettingsManager._as_choice(settings.lan_auth_mode, {"microsoft_only", "friends"}, "microsoft_only"),
+                "lan_auth_mode": SettingsManager._normalize_lan_auth_mode(settings.lan_auth_mode, "microsoft_only"),
                 "lan_connection_provider": SettingsManager._as_choice(settings.lan_connection_provider, {"manual", "e4mc"}, "manual"),
-                "block_launch_on_modrinth_failure": bool(settings.block_launch_on_modrinth_failure),
+                "modrinth_failure_policy": ManagedContentPolicy.normalize_instance(settings.modrinth_failure_policy),
+                "curseforge_failure_policy": ManagedContentPolicy.normalize_instance(settings.curseforge_failure_policy),
+                "forge_preflight_failure_policy": ManagedContentPolicy.normalize_instance(settings.forge_preflight_failure_policy),
             },
         }
+
+
+    @staticmethod
+    def _failure_policy(launch: dict, provider: str) -> str:
+        key = f"{provider}_failure_policy"
+        if key in launch:
+            return ManagedContentPolicy.normalize_instance(launch.get(key))
+
+        # v0.8.0/v0.8.1 used one Modrinth-named boolean for both providers.
+        # Preserve that explicit per-instance choice while migrating to source-specific policies.
+        if provider in {"modrinth", "curseforge"} and "block_launch_on_modrinth_failure" in launch:
+            return ManagedContentPolicy.from_legacy_bool(launch.get("block_launch_on_modrinth_failure"))
+        return ManagedContentPolicy.INHERIT
 
     @staticmethod
     def _write(path: Path, data: dict[str, Any]) -> None:
@@ -185,6 +205,15 @@ class SettingsManager:
             path.replace(candidate)
         except OSError:
             return
+
+    @staticmethod
+    def _normalize_lan_auth_mode(value: object, default: str = "microsoft_only") -> str:
+        normalized = str(value or "").strip().lower()
+        if normalized == "friends":
+            return "private_offline"
+        if normalized in {"microsoft_only", "private_offline"}:
+            return normalized
+        return default
 
     @staticmethod
     def _as_positive_int(value: Any, default: int) -> int:

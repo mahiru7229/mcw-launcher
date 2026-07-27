@@ -696,3 +696,24 @@ def test_microsoft_account_keeps_modern_identity_arguments_unchanged():
     assert game_args[game_args.index("--clientId") + 1] == "premium-client-id"
     assert game_args[game_args.index("--xuid") + 1] == "premium-xuid"
     assert game_args[game_args.index("--userType") + 1] == "msa"
+
+
+def test_build_removes_user_overrides_for_mcw_lan_agent():
+    version = make_version()
+    settings = make_settings(
+        jvm_arguments=[
+            "-Dmcw.lan.offline=false",
+            "-Dmcw.lan.target.class=example/Unsafe",
+            "-javaagent:C:/cache/mcw-lan-agent.jar",
+            "-javaagent:C:/tools/other-agent.jar",
+            "-Dexample=true",
+        ]
+    )
+
+    jvm_args, _ = ArgumentBuilder.build(version=version, context={}, settings=settings, account=make_account())
+
+    assert "-Dmcw.lan.offline=false" not in jvm_args
+    assert "-Dmcw.lan.target.class=example/Unsafe" not in jvm_args
+    assert "-javaagent:C:/cache/mcw-lan-agent.jar" not in jvm_args
+    assert "-javaagent:C:/tools/other-agent.jar" in jvm_args
+    assert "-Dexample=true" in jvm_args

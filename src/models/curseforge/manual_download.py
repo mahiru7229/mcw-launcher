@@ -13,3 +13,5 @@ class CurseForgeManualDownload:
     sha1: str
     project_url: str
     reason: str
+    managed_kind: str = "mod"
+    managed_path: str = ""

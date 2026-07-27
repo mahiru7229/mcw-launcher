@@ -50,12 +50,17 @@ class ForgePreflightManager:
         )
 
     @staticmethod
-    def raise_for_errors(report: ForgePreflightReport) -> None:
-        if report.can_launch:
+    def raise_for_errors(report: ForgePreflightReport, block_compatibility_errors: bool = True) -> None:
+        blocking_errors = tuple(
+            issue
+            for issue in report.errors
+            if block_compatibility_errors or issue.code == "forge-installation"
+        )
+        if not blocking_errors:
             return
-        details = "\n".join(f"- {issue.message}" for issue in report.errors)
+        details = "\n".join(f"- {issue.message}" for issue in blocking_errors)
         raise RuntimeError(
             "Forge pre-launch check failed:\n"
-            f"{report.format_summary()}\n"
+            f"{len(blocking_errors)} blocking error(s), {getattr(report, 'warning_count', len(getattr(report, 'warnings', ())))} warning(s)\n"
             f"{details}"
         )

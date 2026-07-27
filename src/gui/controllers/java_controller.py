@@ -4,12 +4,14 @@ from PySide6.QtCore import Signal, Slot
 
 from src.core.java.java_diagnostics_manager import JavaDiagnosticsManager
 from src.core.language.language_manager import tr
+from src.core.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 
 
 class JavaController(BaseController):
     installations_changed = Signal(list)
+    progress_received = Signal(object)
 
     def __init__(self, task_runner: TaskRunner) -> None:
         super().__init__()
@@ -18,7 +20,8 @@ class JavaController(BaseController):
         self._task_runner.task_failed.connect(self._on_task_failed)
 
     def scan(self) -> None:
-        self._task_runner.run("java.scan", JavaDiagnosticsManager.scan, tr("Scanning Java installations..."), blocking=False)
+        reporter = ProgressReporter(self.progress_received.emit)
+        self._task_runner.run("java.scan", lambda: JavaDiagnosticsManager.scan(reporter=reporter), tr("Scanning Java installations..."), blocking=False)
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:

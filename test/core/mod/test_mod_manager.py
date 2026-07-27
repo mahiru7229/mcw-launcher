@@ -212,3 +212,108 @@ def test_rejects_duplicate_mod_id_with_different_filename(tmp_path):
 
     with pytest.raises(FileExistsError, match="Mod ID 'duplicate'"):
         ModManager.add_mods(instance, [make_forge_mod(tmp_path / "second.jar", mod_id="duplicate")])
+
+
+def test_launch_preparation_token_allows_managed_mod_install(tmp_path, monkeypatch):
+    instance = make_instance(tmp_path)
+    source = make_mod(tmp_path / "managed.jar", mod_id="managed")
+    monkeypatch.setattr(InstanceRunLock, "is_active", lambda current: True)
+    monkeypatch.setattr(InstanceRunLock, "owns_preparing_lock", lambda current, token: token == "owned-token")
+
+    added = ModManager.add_mods(instance, [source], launch_lock_token="owned-token")
+
+    assert added[0].mod_id == "managed"
+
+
+def test_wrong_launch_preparation_token_still_blocks_mod_install(tmp_path, monkeypatch):
+    instance = make_instance(tmp_path)
+    source = make_mod(tmp_path / "managed.jar", mod_id="managed")
+    monkeypatch.setattr(InstanceRunLock, "is_active", lambda current: True)
+    monkeypatch.setattr(InstanceRunLock, "owns_preparing_lock", lambda current, token: False)
+
+    with pytest.raises(InstanceModChangeBlockedError):
+        ModManager.add_mods(instance, [source], launch_lock_token="wrong-token")
+
+
+def make_universal_fabric_forge_mod(path: Path, mod_id="universal_example") -> Path:
+    fabric_metadata = {
+        "schemaVersion": 1,
+        "id": mod_id,
+        "name": "Universal Fabric View",
+        "version": "1.0.0",
+        "environment": "client",
+        "depends": {"fabricloader": ">=0.15.0", "minecraft": "1.20.1"},
+    }
+    forge_metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[47,)"\n'
+        'license="MIT"\n\n'
+        '[[mods]]\n'
+        f'modId="{mod_id}"\n'
+        'version="1.0.0"\n'
+        'displayName="Universal Forge View"\n'
+        'description="A dual-loader test mod."\n'
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("fabric.mod.json", json.dumps(fabric_metadata))
+        archive.writestr("META-INF/mods.toml", forge_metadata)
+    return path
+
+
+def test_read_mod_marks_dual_metadata_jar_as_universal_without_instance_context(tmp_path):
+    source = make_universal_fabric_forge_mod(tmp_path / "universal.jar")
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.loader == "universal"
+    assert mod.metadata_format == "fabric.mod.json + mods.toml"
+    assert mod.mod_id == "universal_example"
+
+
+def test_dual_metadata_jar_uses_forge_metadata_in_forge_instance(tmp_path):
+    instance = make_instance(tmp_path, loader=("forge", "47.3.0"))
+    source = make_universal_fabric_forge_mod(tmp_path / "universal.jar")
+
+    added = ModManager.add_mods(instance, [source])
+
+    assert added[0].loader == "forge"
+    assert added[0].name == "Universal Forge View"
+    assert added[0].dependencies["forge"] == "[47,)"
+    assert "fabricloader" not in added[0].dependencies
+
+
+def test_dual_metadata_jar_uses_fabric_metadata_in_fabric_instance(tmp_path):
+    instance = make_instance(tmp_path, loader=("fabric", "0.16.0"))
+    source = make_universal_fabric_forge_mod(tmp_path / "universal.jar")
+
+    added = ModManager.add_mods(instance, [source])
+
+    assert added[0].loader == "fabric"
+    assert added[0].name == "Universal Fabric View"
+    assert added[0].dependencies["fabricloader"] == ">=0.15.0"
+
+
+def test_reads_forge_language_provider_from_manifest(tmp_path):
+    source = tmp_path / "kotlinforforge.jar"
+    with zipfile.ZipFile(source, "w") as archive:
+        archive.writestr(
+            "META-INF/MANIFEST.MF",
+            "Manifest-Version: 1.0\nFMLModType: LANGPROVIDER\nImplementation-Version: 3.12.0\n",
+        )
+
+    mod = ModManager.read_mod(source, preferred_loader="forge")
+
+    assert mod.loader == "forge"
+    assert mod.status == "Ready"
+    assert mod.version == "3.12.0"
+    assert "LANGPROVIDER" in mod.metadata_format
+
+
+def test_allow_unverified_installs_fabric_jar_into_forge_instance(tmp_path):
+    instance = make_instance(tmp_path, loader=("forge", "47.3.0"))
+    source = make_mod(tmp_path / "fabric-api-port.jar")
+
+    added = ModManager.add_mods(instance, [source], allow_unverified=True)
+
+    assert added[0].loader == "fabric"
+    assert (ModManager.mods_dir(instance) / source.name).is_file()

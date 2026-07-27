@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from src.core.language.language_manager import tr
+from src.models.progress.progress_state import ProgressState
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,6 +13,7 @@ class ProgressView:
     stage_text: str
     button_text: str
     percentage: int | None
+    state: ProgressState
 
 
 class ProgressPresenter:
@@ -21,6 +23,7 @@ class ProgressPresenter:
         "importing_instance": "IMPORT",
         "exporting_instance": "EXPORT",
         "loading_version": "VERSION",
+        "downloading_mod_loader": "MOD LOADER",
         "installing_mod_loader": "MOD LOADER",
         "selecting_java": "JAVA CHECK",
         "downloading_java": "JAVA DOWNLOAD",
@@ -65,21 +68,16 @@ class ProgressPresenter:
 
     @classmethod
     def present(cls, event: object) -> ProgressView:
+        state = cls._state(event)
         stage_value = cls._stage_value(event)
-        stage_text = tr(cls._STAGE_LABELS.get(stage_value, stage_value.replace("_", " ").upper()))
+        stage_text = cls._stage_text(stage_value, state)
         raw_title = str(getattr(event, "message", "") or stage_text.title())
         title = tr(raw_title)
-        percentage = cls._percentage(event)
-        detail = cls._detail(event, stage_text, percentage)
+        percentage = cls._percentage(event, state)
+        detail = cls._detail(event, stage_text, percentage, state)
         button_text = tr(cls._BUTTON_TEXTS.get(stage_value, "WORKING..."))
 
-        return ProgressView(
-            title=title,
-            detail=detail,
-            stage_text=stage_text,
-            button_text=button_text,
-            percentage=percentage,
-        )
+        return ProgressView(title=title, detail=detail, stage_text=stage_text, button_text=button_text, percentage=percentage, state=state)
 
     @staticmethod
     def _stage_value(event: object) -> str:
@@ -87,19 +85,50 @@ class ProgressPresenter:
         return str(getattr(stage, "value", stage or "working"))
 
     @staticmethod
-    def _percentage(event: object) -> int | None:
+    def _state(event: object) -> ProgressState:
+        state = getattr(event, "state", ProgressState.RUNNING)
+        if isinstance(state, ProgressState):
+            return state
+        try:
+            return ProgressState(str(getattr(state, "value", state)))
+        except ValueError:
+            return ProgressState.RUNNING
+
+    @classmethod
+    def _stage_text(cls, stage_value: str, state: ProgressState) -> str:
+        if state is ProgressState.FAILED:
+            return tr("FAILED")
+        if state is ProgressState.CANCELLED:
+            return tr("CANCELLED")
+        if state is ProgressState.SUCCEEDED:
+            return tr("READY")
+        return tr(cls._STAGE_LABELS.get(stage_value, stage_value.replace("_", " ").upper()))
+
+    @staticmethod
+    def _percentage(event: object, state: ProgressState) -> int | None:
+        if state is ProgressState.SUCCEEDED:
+            return 100
+        if state in {ProgressState.FAILED, ProgressState.CANCELLED}:
+            return None
         if not bool(getattr(event, "is_determinate", False)):
             return None
 
         raw_percentage = getattr(event, "percentage", None)
-
         if raw_percentage is None:
             return None
-
         return max(0, min(round(float(raw_percentage)), 100))
 
     @classmethod
-    def _detail(cls, event: object, stage_text: str, percentage: int | None) -> str:
+    def _detail(cls, event: object, stage_text: str, percentage: int | None, state: ProgressState) -> str:
+        explicit_detail = str(getattr(event, "detail", "") or "").strip()
+        if explicit_detail:
+            return tr(explicit_detail)
+        if state is ProgressState.FAILED:
+            return tr("progress.failed.detail")
+        if state is ProgressState.CANCELLED:
+            return tr("progress.cancelled.detail")
+        if state is ProgressState.SUCCEEDED:
+            return tr("progress.completed.detail")
         if percentage is None:
             return stage_text.title()
 
@@ -125,39 +154,29 @@ class ProgressPresenter:
     def _format_quantity(cls, current: int, total: int, unit: str) -> str:
         if unit == "bytes":
             return f"{cls._format_bytes(current)} / {cls._format_bytes(total)}"
-
         if unit == "files":
             return tr("{current} / {total} files", current=f"{current:,}", total=f"{total:,}")
-
         if unit == "steps":
             return tr("{current} / {total} steps", current=f"{current:,}", total=f"{total:,}")
-
         return f"{current:,} / {total:,}"
 
     @classmethod
     def _format_remaining(cls, remaining: int, unit: str) -> str:
         if unit == "bytes":
             return tr("progress.remaining_bytes", remaining=cls._format_bytes(remaining))
-
         if unit == "files":
             return tr("progress.remaining_files", remaining=f"{remaining:,}")
-
         if unit == "steps":
             return tr("progress.remaining_steps", remaining=f"{remaining:,}")
-
         return tr("progress.remaining_items", remaining=f"{remaining:,}")
 
     @staticmethod
     def _format_bytes(value: int) -> str:
         size = float(max(value, 0))
-
         for suffix in ("B", "KB", "MB", "GB", "TB"):
             if size < 1024 or suffix == "TB":
                 if suffix == "B":
                     return f"{int(size)} {suffix}"
-
                 return f"{size:.1f} {suffix}"
-
             size /= 1024
-
         return f"{size:.1f} TB"

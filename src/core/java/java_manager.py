@@ -1,6 +1,9 @@
 from src.models.java.java import JavaInstallation
 from src.models.java.java_source import JavaSource
 from pathlib import Path
+
+from src.core.progress.progress_reporter import ProgressReporter
+from src.models.progress.progress_stage import ProgressStage
 import subprocess
 import re
 import os
@@ -37,14 +40,22 @@ class JavaManager:
 
 
     @staticmethod
-    def find_installation() -> list[JavaInstallation]:
+    def find_installation(reporter: ProgressReporter | None = None) -> list[JavaInstallation]:
         javas: list[JavaInstallation] = []
+        sources = (
+            ("java.scan.source.java_home", JavaManager._scan_java_home),
+            ("java.scan.source.path", JavaManager._scan_path),
+            ("java.scan.source.program_files", JavaManager._scan_program_files),
+            ("java.scan.source.registry", JavaManager._scan_registry),
+            ("java.scan.source.managed", JavaManager._scan_managed_runtimes),
+        )
+        for message, scanner in sources:
+            if reporter is not None:
+                reporter.status(ProgressStage.SELECTING_JAVA, message)
+            javas.extend(scanner())
 
-        javas.extend(JavaManager._scan_java_home())
-        javas.extend(JavaManager._scan_path())
-        javas.extend(JavaManager._scan_program_files())
-        javas.extend(JavaManager._scan_registry())
-        javas.extend(JavaManager._scan_managed_runtimes())
+        if reporter is not None:
+            reporter.status(ProgressStage.SELECTING_JAVA, "java.scan.sources_completed")
         return JavaManager._remove_duplicates(javas)
 
     @staticmethod

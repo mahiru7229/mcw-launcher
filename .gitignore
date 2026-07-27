@@ -7,7 +7,8 @@ downloads/
 instances/
 logs/
 profiles/
-/runtime/
+/runtime/*
+!/runtime/mcw-lan-agent.jar
 accounts/
 launcher.py
 build/
