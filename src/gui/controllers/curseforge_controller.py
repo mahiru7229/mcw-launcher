@@ -7,6 +7,7 @@ from PySide6.QtCore import Signal, Slot
 from src.core.curseforge.curseforge_client import CurseForgeClient
 from src.core.curseforge.curseforge_manual_installer import CurseForgeManualInstaller
 from src.core.curseforge.curseforge_mod_installer import CurseForgeModInstaller
+from src.core.curseforge.curseforge_errors import CurseForgeModpackManualDownloadRequired
 from src.core.curseforge.curseforge_pack_installer import CurseForgePackInstaller
 from src.core.instance.instance_manager import InstanceManager
 from src.core.progress.progress_reporter import ProgressReporter
@@ -26,7 +27,9 @@ class CurseForgeController(BaseController):
     catalog_request_failed = Signal(str, str, str)
     mod_installed = Signal(object)
     manual_file_installed = Signal(str, object, str)
+    manual_files_installed = Signal(str, object)
     modpack_installed = Signal(object)
+    modpack_manual_download_required = Signal(object)
     cache_cleared = Signal(object)
     progress_received = Signal(object)
 
@@ -90,7 +93,7 @@ class CurseForgeController(BaseController):
             blocking=False,
         )
 
-    def install_mod(self, instance_name: str, project_id: int, file_id: int, allowed_release_types: tuple[str, ...]) -> bool:
+    def install_mod(self, instance_name: str, project_id: int, file_id: int, allowed_release_types: tuple[str, ...], allow_unverified: bool = False) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
 
         def task() -> object:
@@ -102,6 +105,7 @@ class CurseForgeController(BaseController):
                 install_dependencies=True,
                 allowed_release_types=allowed_release_types,
                 reporter=reporter,
+                allow_unverified=allow_unverified,
             )
 
         return self._task_runner.run("curseforge.install.mod", task, f"Installing CurseForge mod into '{instance_name}'...")
@@ -118,6 +122,20 @@ class CurseForgeController(BaseController):
             f"Importing manually downloaded CurseForge file '{requirement.file_name}'...",
         )
 
+    def install_manual_files(self, instance_name: str, requirements: tuple[CurseForgeManualDownload, ...] | list[CurseForgeManualDownload], sources: tuple[Path, ...] | list[Path]) -> bool:
+        normalized_sources = [Path(source) for source in sources]
+        if not normalized_sources:
+            return False
+        task_id = "curseforge.install.manual.batch"
+        return self._task_runner.run(
+            task_id,
+            lambda: (
+                instance_name,
+                CurseForgeManualInstaller.install_many(InstanceManager.load(instance_name), requirements, normalized_sources),
+            ),
+            f"Adding {len(normalized_sources)} downloaded mod file(s) to '{instance_name}'...",
+        )
+
     def install_modpack(self, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: tuple[str, ...]) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
         return self._task_runner.run(
@@ -131,6 +149,14 @@ class CurseForgeController(BaseController):
                 reporter=reporter,
             ),
             f"Installing CurseForge modpack '{instance_name}'...",
+        )
+
+    def install_manual_modpack(self, request: CurseForgeModpackManualDownloadRequired, source: Path) -> bool:
+        reporter = ProgressReporter(self.progress_received.emit)
+        return self._task_runner.run(
+            "curseforge.install.modpack.manual",
+            lambda: CurseForgePackInstaller.install_manual_archive(request, Path(source), reporter=reporter),
+            f"Installing downloaded CurseForge modpack '{request.instance_name}'...",
         )
 
     def clear_cache(self, context: str = DIALOG_CONTEXT) -> bool:
@@ -176,6 +202,15 @@ class CurseForgeController(BaseController):
             self.log_created.emit("Installed CurseForge mod and required dependencies")
             self.mod_installed.emit(result)
             return
+        if task_id == "curseforge.install.manual.batch":
+            if isinstance(result, tuple) and len(result) == 2:
+                instance_name, batch_result = result
+                self.manual_files_installed.emit(str(instance_name), batch_result)
+                self.status_changed.emit("Downloaded mod files added")
+                imported_count = len(getattr(batch_result, "imported", ()) or ())
+                extra_count = len(getattr(batch_result, "added_mods", ()) or ())
+                self.log_created.emit(f"Added downloaded mod files: {imported_count} required, {extra_count} additional")
+            return
         if task_id.startswith("curseforge.install.manual."):
             if isinstance(result, tuple) and len(result) == 3:
                 instance_name, requirement, installed_name = result
@@ -183,7 +218,7 @@ class CurseForgeController(BaseController):
                 self.status_changed.emit("CurseForge manual file imported")
                 self.log_created.emit(f"Imported manually downloaded CurseForge file: {installed_name}")
             return
-        if task_id == "curseforge.install.modpack":
+        if task_id in {"curseforge.install.modpack", "curseforge.install.modpack.manual"}:
             self.status_changed.emit("CurseForge modpack installed")
             self.log_created.emit("Created Forge instance from CurseForge modpack")
             self.modpack_installed.emit(result)
@@ -218,11 +253,16 @@ class CurseForgeController(BaseController):
         if task_id.startswith("curseforge.cache.clear.catalog"):
             self.catalog_request_failed.emit("cache", "", str(error) or "Could not clear CurseForge cache.")
             return
+        if task_id == "curseforge.install.modpack" and isinstance(error, CurseForgeModpackManualDownloadRequired):
+            self.status_changed.emit("CurseForge modpack requires a manual download")
+            self.log_created.emit(str(error))
+            self.modpack_manual_download_required.emit(error)
+            return
         if task_id == "curseforge.install.mod":
             title = "Install CurseForge mod"
         elif task_id.startswith("curseforge.install.manual."):
             title = "Import CurseForge file"
-        elif task_id == "curseforge.install.modpack":
+        elif task_id in {"curseforge.install.modpack", "curseforge.install.modpack.manual"}:
             title = "Install CurseForge modpack"
         else:
             title = "CurseForge"
