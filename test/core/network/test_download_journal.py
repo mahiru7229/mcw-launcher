@@ -44,3 +44,16 @@ def test_journal_is_atomic_sanitized_and_recoverable(tmp_path: Path) -> None:
 
     journal.clear_completed()
     assert json.loads(journal_path.read_text(encoding="utf-8"))["entries"] == {}
+
+
+def test_locked_journal_replace_is_best_effort(monkeypatch, tmp_path: Path) -> None:
+    journal_path = tmp_path / "download-journal.json"
+    journal = DownloadJournal(journal_path)
+    request = _request(tmp_path)
+
+    monkeypatch.setattr(journal, "_replace_with_retry", lambda *_args: False)
+
+    journal.start(request, downloaded_bytes=4)
+
+    assert journal_path.exists() is False
+    assert tuple(tmp_path.glob("*.tmp")) == ()

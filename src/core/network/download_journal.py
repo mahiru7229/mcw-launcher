@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from threading import RLock
+from threading import RLock, get_ident
 from urllib.parse import urlsplit
 import json
 import os
+import time
 
 from src.core.fs.paths import Paths
 from src.core.network.download_models import DownloadRequest, DownloadState
@@ -13,6 +14,7 @@ from src.core.network.download_models import DownloadRequest, DownloadState
 
 class DownloadJournal:
     SCHEMA_VERSION = 1
+    REPLACE_RETRY_DELAYS = (0.01, 0.03, 0.08, 0.16)
 
     def __init__(self, path: Path | None = None) -> None:
         self.path = Path(path) if path is not None else Paths.download_journal_path()
@@ -91,15 +93,37 @@ class DownloadJournal:
             }
         return payload
 
-    def _write(self, payload: dict) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_name(f"{self.path.name}.tmp")
-        with temporary.open("w", encoding="utf-8", newline="\n") as file:
-            json.dump(payload, file, ensure_ascii=False, indent=2)
-            file.write("\n")
-            file.flush()
-            os.fsync(file.fileno())
-        temporary.replace(self.path)
+    def _write(self, payload: dict) -> bool:
+        temporary = self.path.with_name(f"{self.path.name}.{os.getpid()}.{get_ident()}.tmp")
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with temporary.open("w", encoding="utf-8", newline="\n") as file:
+                json.dump(payload, file, ensure_ascii=False, indent=2)
+                file.write("\n")
+                file.flush()
+                os.fsync(file.fileno())
+            return self._replace_with_retry(temporary, self.path)
+        except OSError:
+            return False
+        finally:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+    @classmethod
+    def _replace_with_retry(cls, temporary: Path, target: Path) -> bool:
+        for attempt in range(len(cls.REPLACE_RETRY_DELAYS) + 1):
+            try:
+                temporary.replace(target)
+                return True
+            except PermissionError:
+                if attempt >= len(cls.REPLACE_RETRY_DELAYS):
+                    return False
+                time.sleep(cls.REPLACE_RETRY_DELAYS[attempt])
+            except OSError:
+                return False
+        return False
 
     @staticmethod
     def _compact_error(error: str) -> str:
