@@ -20,3 +20,10 @@ def test_redacts_nested_secret_fields() -> None:
     assert result["profile"]["name"] == "Player"
     assert result["access_token"] == "<redacted>"
     assert result["nested"][0]["refresh_token"] == "<redacted>"
+
+
+def test_redacts_standalone_oauth_code_assignment() -> None:
+    result = SensitiveDataRedactor.redact_text("callback failed: code=oauth-secret")
+
+    assert "oauth-secret" not in result
+    assert "code=<redacted>" in result

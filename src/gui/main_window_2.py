@@ -1676,7 +1676,7 @@ class MainWindow(QMainWindow):
         if not selected:
             return
         try:
-            path = DiagnosticsManager.write_report(Path(selected), launcher_version=VERSION_ID, settings=self.gui_settings_controller.raw_settings(), activity_log=self.logs_page.activity_text())
+            path = DiagnosticsManager.write_bundle(Path(selected), launcher_version=VERSION_ID, settings=self.gui_settings_controller.raw_settings(), activity_log=self.logs_page.activity_text())
         except Exception as error:
             self._show_error(tr("diagnostics.export.title"), str(error))
             return

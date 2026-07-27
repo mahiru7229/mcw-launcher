@@ -96,7 +96,7 @@ class Paths:
         from datetime import datetime
 
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        return Paths.logs_root() / f"MCW-Diagnostics-{timestamp}.txt"
+        return Paths.logs_root() / f"MCW-Diagnostics-{timestamp}.zip"
 
     @staticmethod
     def download_journal_path() -> Path:
