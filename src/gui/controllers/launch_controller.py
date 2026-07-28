@@ -9,7 +9,7 @@ from src.core.auth.account_authentication import AccountAuthentication
 from src.core.instance.instance_manager import InstanceManager
 from src.core.language.language_manager import tr
 from src.core.minecraft.minecraft_executor import MinecraftExecutor
-from src.core.network.download_pause import download_pause_controller, is_download_paused
+from src.core.network.download_pause import download_pause_controller, is_download_cancelled, is_download_paused
 from src.gui.controllers.base_controller import BaseController
 from src.gui.presenters.launch_error_presenter import LaunchErrorPresenter
 from src.gui.task_runner import TaskRunner
@@ -22,6 +22,9 @@ class LaunchController(BaseController):
     game_exited = Signal(object)
     pause_requested = Signal()
     launch_paused = Signal()
+    launch_resumed = Signal()
+    cancel_requested = Signal()
+    launch_cancelled = Signal()
 
     TASK_ID = "minecraft.launch"
 
@@ -49,7 +52,10 @@ class LaunchController(BaseController):
 
     def launch(self) -> None:
         if self._task_runner.is_task_active(self.TASK_ID):
-            self.pause()
+            if download_pause_controller.is_paused:
+                self.resume()
+            else:
+                self.pause()
             return
 
         if self._selected_instance is None:
@@ -90,8 +96,23 @@ class LaunchController(BaseController):
         if not download_pause_controller.request_pause():
             return
         self.pause_requested.emit()
-        self.status_changed.emit(tr("launch.pause_requested"))
-        self.log_created.emit(tr("launch.pause_requested"))
+        self.launch_paused.emit()
+        self.status_changed.emit(tr("launch.paused"))
+        self.log_created.emit(tr("launch.paused_log"))
+
+    def resume(self) -> None:
+        if not download_pause_controller.request_resume():
+            return
+        self.launch_resumed.emit()
+        self.status_changed.emit(tr("launch.resumed"))
+        self.log_created.emit(tr("launch.resumed_log"))
+
+    def cancel(self) -> None:
+        if not download_pause_controller.request_cancel():
+            return
+        self.cancel_requested.emit()
+        self.status_changed.emit(tr("launch.cancel_requested"))
+        self.log_created.emit(tr("launch.cancel_requested_log"))
 
     def _on_progress(self, event: ProgressEvent) -> None:
         self.progress_received.emit(event)
@@ -146,6 +167,12 @@ class LaunchController(BaseController):
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if task_id != self.TASK_ID:
+            return
+
+        if is_download_cancelled(error):
+            self.launch_cancelled.emit()
+            self.status_changed.emit(tr("launch.cancelled"))
+            self.log_created.emit(tr("launch.cancelled_log"))
             return
 
         if is_download_paused(error):

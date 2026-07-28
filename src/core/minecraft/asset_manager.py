@@ -9,6 +9,7 @@ from src.core.minecraft.asset_index_manager import (
 from src.core.network.httpx_downloader import HttpDownloader
 from src.core.progress.file_batch_progress import FileBatchProgress
 from src.core.progress.progress_reporter import ProgressReporter
+from src.core.repair.verification_cache import VerificationCache
 from src.models.minecraft.assets import DownloadAsset
 from src.models.minecraft.version import Version
 from src.models.progress.progress_stage import ProgressStage
@@ -24,11 +25,18 @@ class AssetManager:
     def load(
         version: Version,
         reporter: ProgressReporter | None = None,
+        verification_cache: VerificationCache | None = None,
+        fast_verify: bool = False,
     ) -> Path:
-        asset_index_path = AssetIndexManager.load(
-            version=version,
-            reporter=reporter,
-        )
+        if verification_cache is None and not fast_verify:
+            asset_index_path = AssetIndexManager.load(version=version, reporter=reporter)
+        else:
+            asset_index_path = AssetIndexManager.load(
+                version=version,
+                reporter=reporter,
+                verification_cache=verification_cache,
+                fast_verify=fast_verify,
+            )
 
         assets_data = AssetManager._load_asset_index(
             asset_index_path
@@ -46,36 +54,42 @@ class AssetManager:
         if total == 0:
             return Paths.asset_index_dir()
 
-        try:
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=MAX_WORKERS
-            ) as executor:
-                future_to_asset = {}
-                for asset in assets:
-                    token = object()
-                    child_reporter = batch_progress.reporter_for(token)
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=MAX_WORKERS
+        ) as executor:
+            future_to_asset = {}
+            for asset in assets:
+                token = object()
+                child_reporter = batch_progress.reporter_for(token)
+                if verification_cache is None and not fast_verify:
                     future = executor.submit(AssetManager._download_single_asset, asset) if child_reporter is None else executor.submit(AssetManager._download_single_asset, asset, child_reporter)
-                    future_to_asset[future] = (asset, token)
+                else:
+                    future = executor.submit(
+                        AssetManager._download_single_asset,
+                        asset,
+                        child_reporter,
+                        verification_cache,
+                        fast_verify,
+                    )
+                future_to_asset[future] = (asset, token)
 
-                for future in concurrent.futures.as_completed(
-                    future_to_asset
-                ):
-                    asset, token = future_to_asset[future]
+            for future in concurrent.futures.as_completed(
+                future_to_asset
+            ):
+                asset, token = future_to_asset[future]
 
-                    try:
-                        future.result()
+                try:
+                    future.result()
 
-                    except Exception as error:
-                        batch_progress.discard(token)
-                        raise RuntimeError(
-                            "Failed to download asset: "
-                            f"{asset.logical_name}"
-                        ) from error
+                except Exception as error:
+                    batch_progress.discard(token)
+                    raise RuntimeError(
+                        "Failed to download asset: "
+                        f"{asset.logical_name}"
+                    ) from error
 
-                    batch_progress.complete(token)
+                batch_progress.complete(token)
 
-        finally:
-            HttpDownloader.close_client()
 
         return Paths.asset_index_dir()
 
@@ -83,24 +97,42 @@ class AssetManager:
     def _download_single_asset(
         asset: DownloadAsset,
         reporter: ProgressReporter | None = None,
+        verification_cache: VerificationCache | None = None,
+        fast_verify: bool = False,
     ) -> Path:
         asset_path = Paths.asset_object(asset)
 
-        if (
-            asset_path.exists()
-            and HttpDownloader.verify_sha1(
-                asset_path,
-                asset.sha1,
-            )
-        ):
-            return asset_path
+        if asset_path.exists():
+            if verification_cache is not None:
+                verification = verification_cache.verify(
+                    "asset:" + asset.sha1,
+                    asset_path,
+                    asset.size,
+                    asset.sha1,
+                    "sha1",
+                    force_hash=not fast_verify,
+                )
+                if verification.valid:
+                    return asset_path
+            elif HttpDownloader.verify_sha1(asset_path, asset.sha1):
+                return asset_path
 
         HttpDownloader.delete_file(asset_path)
 
         kwargs = {"download_info": asset, "path": asset_path, "max_retry": 5}
         if reporter is not None:
             kwargs.update({"reporter": reporter, "progress_stage": ProgressStage.DOWNLOADING_ASSETS, "progress_message": f"Downloading asset {asset.logical_name}..."})
-        return HttpDownloader.download(**kwargs)
+        downloaded = HttpDownloader.download(**kwargs)
+        if verification_cache is not None:
+            verification_cache.verify(
+                "asset:" + asset.sha1,
+                downloaded,
+                asset.size,
+                asset.sha1,
+                "sha1",
+                force_hash=True,
+            )
+        return downloaded
 
     @staticmethod
     def _load_asset_index(

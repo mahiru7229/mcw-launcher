@@ -9,7 +9,7 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtCore import QObject, Signal
 
-from src.core.network.download_pause import DownloadPausedError, download_pause_controller
+from src.core.network.download_pause import DownloadCancelledError, DownloadPausedError, download_pause_controller
 from src.gui.controllers.launch_controller import LaunchController
 
 
@@ -32,21 +32,47 @@ def reset_pause_controller():
     download_pause_controller.finish()
 
 
-def test_clicking_launch_again_requests_pause() -> None:
+def test_clicking_launch_again_toggles_pause_and_resume() -> None:
+    runner = FakeTaskRunner()
+    controller = LaunchController(runner)
+    runner.active = True
+    paused: list[bool] = []
+    resumed: list[bool] = []
+    controller.launch_paused.connect(lambda: paused.append(True))
+    controller.launch_resumed.connect(lambda: resumed.append(True))
+    download_pause_controller.begin()
+
+    controller.launch()
+    assert paused == [True]
+    assert download_pause_controller.is_paused is True
+
+    controller.launch()
+    assert resumed == [True]
+    assert download_pause_controller.is_paused is False
+
+
+def test_cancel_request_and_cancelled_task_do_not_open_error_dialog() -> None:
     runner = FakeTaskRunner()
     controller = LaunchController(runner)
     runner.active = True
     requested: list[bool] = []
-    controller.pause_requested.connect(lambda: requested.append(True))
+    cancelled: list[bool] = []
+    errors: list[tuple[str, str]] = []
+    controller.cancel_requested.connect(lambda: requested.append(True))
+    controller.launch_cancelled.connect(lambda: cancelled.append(True))
+    controller.error_created.connect(lambda title, message: errors.append((title, message)))
     download_pause_controller.begin()
 
-    controller.launch()
-
+    controller.cancel()
     assert requested == [True]
-    assert download_pause_controller.is_pause_requested is True
+    assert download_pause_controller.is_cancel_requested is True
+
+    controller._on_task_failed(LaunchController.TASK_ID, DownloadCancelledError("cancelled"))
+    assert cancelled == [True]
+    assert errors == []
 
 
-def test_paused_task_emits_paused_signal_without_error_dialog() -> None:
+def test_legacy_paused_task_still_emits_paused_signal_without_error_dialog() -> None:
     runner = FakeTaskRunner()
     controller = LaunchController(runner)
     paused: list[bool] = []

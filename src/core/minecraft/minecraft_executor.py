@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timezone
+import inspect
 
 from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.config.managed_content_policy import ManagedContentPolicy
@@ -24,6 +25,7 @@ from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
 from src.core.network.download_pause import download_pause_controller
 from src.core.progress.progress_reporter import ProgressReporter
+from src.core.repair.verification_cache import VerificationCache
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.models.account.account import Account
 from src.models.auth.authentication import Authentication
@@ -35,10 +37,22 @@ from src.models.runtime.game_exit_result import GameExitResult
 
 class MinecraftExecutor:
     @staticmethod
+    def _load_with_fast_verification(loader: Callable, version: object, reporter: ProgressReporter, verification_cache: VerificationCache):
+        try:
+            parameters = inspect.signature(loader).parameters.values()
+            supports_cache = any(parameter.name == "verification_cache" or parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters)
+        except (TypeError, ValueError):
+            supports_cache = False
+        if supports_cache:
+            return loader(version=version, reporter=reporter, verification_cache=verification_cache, fast_verify=True)
+        return loader(version=version, reporter=reporter)
+
+    @staticmethod
     def run(instance: Instance, authentication: Authentication, account: Account, debug_mode: bool = False, on_progress: ProgressCallback | None = None, on_exit: Callable[[GameExitResult], None] | None = None) -> dict:
         run_lock = InstanceRunLock.acquire(instance)
         process_started = False
         lan_log_path = None
+        verification_cache: VerificationCache | None = None
 
         try:
             reporter = ProgressReporter(on_progress)
@@ -66,6 +80,7 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
             reporter.status(stage=ProgressStage.LOADING_VERSION, message=f"Loading Minecraft {instance.version_id}...")
             version = ModLoaderManager.load(instance, reporter)
+            verification_cache = VerificationCache(Paths.instance_repair_cache(instance))
             download_pause_controller.raise_if_requested()
 
             forge_preflight = ForgePreflightManager.scan(instance, version, verify_files=False)
@@ -75,11 +90,11 @@ class MinecraftExecutor:
                 ForgePreflightManager.raise_for_errors(forge_preflight, False)
 
             reporter.status(stage=ProgressStage.DOWNLOADING_CLIENT, message="Checking Minecraft client...")
-            DownloadClientManager.load(version=version, reporter=reporter)
+            MinecraftExecutor._load_with_fast_verification(DownloadClientManager.load, version, reporter, verification_cache)
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.DOWNLOADING_LIBRARIES, message="Checking Minecraft libraries...")
-            DownloadLibraryManager.load(version=version, reporter=reporter)
+            MinecraftExecutor._load_with_fast_verification(DownloadLibraryManager.load, version, reporter, verification_cache)
             download_pause_controller.raise_if_requested()
 
             forge_runtime_issues = ForgePreflightManager.validate_runtime_files(instance, version)
@@ -88,7 +103,7 @@ class MinecraftExecutor:
                 raise RuntimeError(f"Forge runtime verification failed:\n{details}")
 
             reporter.status(stage=ProgressStage.DOWNLOADING_ASSETS, message="Checking Minecraft assets...")
-            AssetManager.load(version=version, reporter=reporter)
+            MinecraftExecutor._load_with_fast_verification(AssetManager.load, version, reporter, verification_cache)
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.BUILDING_CONTEXT, message="Building launch context...")
@@ -148,3 +163,10 @@ class MinecraftExecutor:
             if not process_started:
                 run_lock.release()
             raise
+        finally:
+            if verification_cache is not None:
+                try:
+                    verification_cache.save()
+                except OSError as error:
+                    if lan_log_path is not None:
+                        LanAgentManager.append_log_path(lan_log_path, f"Verification cache could not be saved: {error}")

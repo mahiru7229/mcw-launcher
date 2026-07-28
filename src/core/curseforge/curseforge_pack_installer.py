@@ -11,6 +11,7 @@ import zipfile
 
 from src.core.curseforge.curseforge_client import CurseForgeClient
 from src.core.curseforge.curseforge_downloader import CurseForgeDownloader, CurseForgeManualDownloadRequired
+from src.core.curseforge.curseforge_errors import CurseForgeModpackManualDownloadRequired
 from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager

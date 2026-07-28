@@ -140,8 +140,8 @@ class InstancesPage(BasePage):
         self.export_forge_diagnostics_button.setToolTip("Export Forge profile, logs, mod metadata, and pre-launch results without accounts, tokens, worlds, or mod JAR contents.")
         self.export_forge_diagnostics_button.clicked.connect(lambda: self.export_forge_diagnostics_requested.emit(self.current_instance_name()))
         self.export_forge_diagnostics_button.setEnabled(False)
-        self.repair_instance_button = set_theme_icon(QPushButton("Repair instance"), "icon.action.repair")
-        self.repair_instance_button.setToolTip("Verify the client, libraries, assets, natives, mod loader, and Java without changing worlds or mods.")
+        self.repair_instance_button = set_theme_icon(QPushButton(tr("repair.center.button")), "icon.action.repair")
+        self.repair_instance_button.setToolTip(tr("repair.center.tooltip"))
         self.repair_instance_button.clicked.connect(self._request_instance_repair)
         self.repair_instance_button.setEnabled(False)
 
@@ -524,9 +524,7 @@ class InstancesPage(BasePage):
         info = self._modpack_update_info
         if not name or info is None or not getattr(info, "available", False):
             return
-        answer = QMessageBox.question(self, tr("Update Modrinth modpack"), tr("Update '{name}' from {current} to {target}? A full safety backup will be created and user-modified files will be preserved.", name=name, current=getattr(info, "current_version_number", "?"), target=getattr(info, "target_version_number", "?")), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if answer == QMessageBox.StandardButton.Yes:
-            self.apply_modpack_update_requested.emit(name)
+        self.apply_modpack_update_requested.emit(name)
 
     def _confirm_modpack_repair(self) -> None:
         name = self.current_instance_name()
@@ -577,10 +575,7 @@ class InstancesPage(BasePage):
 
     def _request_instance_repair(self) -> None:
         name = self.current_instance_name()
-        if not name:
-            return
-        answer = QMessageBox.question(self, tr("Repair instance"), tr("Fully verify and repair '{name}'? Worlds, mods, resource packs, and settings will be kept.", name=name), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if answer == QMessageBox.StandardButton.Yes:
+        if name:
             self.repair_instance_requested.emit(name)
 
     def _confirm_delete(self) -> None:

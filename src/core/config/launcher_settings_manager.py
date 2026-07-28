@@ -14,7 +14,7 @@ from src.core.fs.paths import Paths
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 8
+    SCHEMA_VERSION = 9
     UPDATE_CHANNEL_POLICY_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
@@ -45,6 +45,7 @@ class LauncherSettingsManager:
         },
         "network": {
             "download_limit_mbps": 0.0,
+            "download_concurrency": 0,
         },
         "updates": {
             "auto_check": True,
@@ -187,6 +188,7 @@ class LauncherSettingsManager:
 
         network = normalized.setdefault("network", {})
         network["download_limit_mbps"] = self._as_download_limit(network.get("download_limit_mbps"))
+        network["download_concurrency"] = self._as_download_concurrency(network.get("download_concurrency"))
 
         updates = normalized.setdefault("updates", {})
         updates["auto_check"] = self._as_bool(updates.get("auto_check"), True)
@@ -228,6 +230,17 @@ class LauncherSettingsManager:
         if parsed <= 0 or not math.isfinite(parsed):
             return 0.0
         return min(parsed, 1024.0)
+
+
+    @staticmethod
+    def _as_download_concurrency(value: Any) -> int:
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return 0
+        if parsed <= 0:
+            return 0
+        return min(max(parsed, 1), 16)
 
     @staticmethod
     def _as_bool(value: Any, default: bool) -> bool:

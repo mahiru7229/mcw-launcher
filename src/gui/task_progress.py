@@ -22,6 +22,7 @@ def task_progress_profile(task_id: str) -> TaskProgressProfile | None:
         "mods.update.apply": TaskProgressProfile(ProgressStage.DOWNLOADING_MODS, "mods.update.completed", "mods.update.completed_detail", "mods.update.failed"),
         "modpack.scan": TaskProgressProfile(ProgressStage.CHECKING_MODPACK, "modpack.scan.completed", "modpack.scan.completed_detail", "modpack.scan.failed"),
         "modpack.update.check": TaskProgressProfile(ProgressStage.CHECKING_MODPACK, "modpack.update_check.completed", "modpack.update_check.completed_detail", "modpack.update_check.failed"),
+        "modpack.update.preview": TaskProgressProfile(ProgressStage.CHECKING_MODPACK, "modpack.preview.completed", "modpack.preview.completed_detail", "modpack.preview.failed"),
         "modpack.update.apply": TaskProgressProfile(ProgressStage.DOWNLOADING_MODPACK, "modpack.update.completed", "modpack.update.completed_detail", "modpack.update.failed"),
         "modpack.repair": TaskProgressProfile(ProgressStage.CHECKING_MODPACK, "modpack.repair.completed", "modpack.repair.completed_detail", "modpack.repair.failed"),
         "backup.create": TaskProgressProfile(ProgressStage.EXPORTING_INSTANCE, "backup.create.completed", "backup.create.completed_detail", "backup.create.failed"),
@@ -29,6 +30,8 @@ def task_progress_profile(task_id: str) -> TaskProgressProfile | None:
         "instance.import": TaskProgressProfile(ProgressStage.IMPORTING_INSTANCE, "instance.import.completed", "instance.import.completed_detail", "instance.import.failed"),
         "instance.export": TaskProgressProfile(ProgressStage.EXPORTING_INSTANCE, "instance.export.completed", "instance.export.completed_detail", "instance.export.failed"),
         "instance.repair.full": TaskProgressProfile(ProgressStage.REPAIRING_INSTANCE, "instance.repair.completed", "instance.repair.completed_detail", "instance.repair.failed"),
+        "instance.repair.scan": TaskProgressProfile(ProgressStage.SCANNING_REPAIR, "repair.center.scan_task_completed", "repair.center.scan_task_detail", "repair.center.scan_task_failed"),
+        "instance.repair.execute": TaskProgressProfile(ProgressStage.APPLYING_REPAIR, "repair.center.repair_task_completed", "repair.center.repair_task_detail", "repair.center.repair_task_failed"),
         "lan.hosting.prepare": TaskProgressProfile(ProgressStage.PREPARING, "lan.prepare.completed", "lan.prepare.completed_detail", "lan.prepare.failed"),
         "update.prepare": TaskProgressProfile(ProgressStage.DOWNLOADING_UPDATE, "update.prepare.completed", "update.prepare.completed_detail", "update.prepare.failed"),
     }

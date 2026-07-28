@@ -4,6 +4,10 @@ from enum import Enum
 class ProgressStage(Enum):
     PREPARING = "preparing"
     REPAIRING_INSTANCE = "repairing_instance"
+    SCANNING_REPAIR = "scanning_repair"
+    VERIFYING_REPAIR = "verifying_repair"
+    PLANNING_REPAIR = "planning_repair"
+    APPLYING_REPAIR = "applying_repair"
     IMPORTING_INSTANCE = "importing_instance"
     EXPORTING_INSTANCE = "exporting_instance"
     LOADING_VERSION = "loading_version"

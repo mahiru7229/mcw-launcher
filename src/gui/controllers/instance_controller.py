@@ -15,6 +15,7 @@ from src.core.modloader.forge.forge_change_manager import ForgeChangeManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.progress.progress_reporter import ProgressReporter
 from src.core.runtime.instance_repair_manager import InstanceRepairManager
+from src.core.repair.repair_service import RepairService
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 from src.config import VERSION_ID
@@ -29,11 +30,16 @@ class InstanceController(BaseController):
     loader_progress = Signal(object)
     package_progress = Signal(object)
     repair_finished = Signal(object)
+    repair_scan_finished = Signal(object)
+    repair_execution_finished = Signal(object)
+    repair_center_failed = Signal(object)
     forge_diagnostics_finished = Signal(object)
     instance_created = Signal(object)
 
     CREATE_TASK_ID = "instance.create"
     REPAIR_TASK_ID = "instance.repair.full"
+    REPAIR_SCAN_TASK_ID = "instance.repair.scan"
+    REPAIR_EXECUTE_TASK_ID = "instance.repair.execute"
     LOADER_CHANGE_TASK_ID = "instance.loader"
     LOADER_REPAIR_TASK_ID = "instance.loader.repair"
     FORGE_RESTORE_TASK_ID = "instance.loader.restore"
@@ -187,6 +193,28 @@ class InstanceController(BaseController):
 
         self._task_runner.run(self.REPAIR_TASK_ID, task, f"Repairing '{name}'...")
 
+    def scan_repair_center(self, name: str, mode: str) -> None:
+        name = name.strip()
+        if not name:
+            return
+
+        def task() -> Any:
+            instance = InstanceManager.load(name)
+            return RepairService.scan(instance, mode=mode, on_progress=self._on_repair_progress)
+
+        self._task_runner.run(self.REPAIR_SCAN_TASK_ID, task, f"Checking instance '{name}'...")
+
+    def execute_repair_plan(self, name: str, plan: object) -> None:
+        name = name.strip()
+        if not name:
+            return
+
+        def task() -> Any:
+            instance = InstanceManager.load(name)
+            return RepairService.repair(instance, plan, on_progress=self._on_repair_progress)
+
+        self._task_runner.run(self.REPAIR_EXECUTE_TASK_ID, task, f"Repairing selected components for '{name}'...")
+
     def _on_repair_progress(self, event: object) -> None:
         self.repair_progress.emit(event)
         stage = getattr(getattr(event, "stage", None), "value", "repair")
@@ -288,6 +316,14 @@ class InstanceController(BaseController):
             selected_name = result.instance_name
             self.repair_finished.emit(result)
             self.status_changed.emit(f"Repaired instance '{selected_name}'")
+        elif task_id == self.REPAIR_SCAN_TASK_ID:
+            selected_name = result.instance_name
+            self.repair_scan_finished.emit(result)
+            self.status_changed.emit(f"Checked instance '{selected_name}'")
+        elif task_id == self.REPAIR_EXECUTE_TASK_ID:
+            selected_name = result.instance_name
+            self.repair_execution_finished.emit(result)
+            self.status_changed.emit(f"Repair completed for '{selected_name}'")
         elif task_id == "instance.export":
             self.export_finished.emit(result)
             self.status_changed.emit("Instance export completed")
@@ -301,6 +337,11 @@ class InstanceController(BaseController):
 
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
+        if task_id in {self.REPAIR_SCAN_TASK_ID, self.REPAIR_EXECUTE_TASK_ID}:
+            self.repair_center_failed.emit(error)
+            self.status_changed.emit("Repair Center task failed")
+            self.log_created.emit(f"Repair Center failed: {error}")
+            return
         if task_id.startswith("instance."):
             self._emit_error("Instance task", error)
 

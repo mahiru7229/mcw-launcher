@@ -81,8 +81,14 @@ class LauncherSettingsPage(BasePage):
         self.download_limit_mbps.setValue(10.0)
         self.download_limit_mbps.setEnabled(False)
         self.limit_download_speed.toggled.connect(self.download_limit_mbps.setEnabled)
+        self.download_concurrency = QComboBox()
+        self.download_concurrency.addItem(tr("network.concurrency.auto"), 0)
+        for value in (2, 4, 6, 8, 12, 16):
+            self.download_concurrency.addItem(tr("network.concurrency.value", count=value), value)
         bandwidth_card.layout.addWidget(self.limit_download_speed)
         bandwidth_card.layout.addWidget(self.download_limit_mbps)
+        bandwidth_card.layout.addWidget(QLabel(tr("network.concurrency.label")))
+        bandwidth_card.layout.addWidget(self.download_concurrency)
         downloads_section.add_card(bandwidth_card)
 
         language_card = CardWidget("Language", "Add another language by placing a compatible JSON file in the lang folder.")
@@ -224,6 +230,7 @@ class LauncherSettingsPage(BasePage):
         self.debug_mode.toggled.connect(self._refresh_dirty_state)
         self.limit_download_speed.toggled.connect(self._refresh_dirty_state)
         self.download_limit_mbps.valueChanged.connect(self._refresh_dirty_state)
+        self.download_concurrency.currentIndexChanged.connect(self._refresh_dirty_state)
         self.language_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.modrinth_include_beta.toggled.connect(self._refresh_dirty_state)
         self.modrinth_include_alpha.toggled.connect(self._refresh_dirty_state)
@@ -330,6 +337,7 @@ class LauncherSettingsPage(BasePage):
             "allow_launch_on_forge_preflight_failure": self.allow_forge_preflight_failure.isChecked(),
             "curseforge_gateway_urls": [field.text().strip() for field in self.curseforge_gateway_inputs],
             "download_limit_mbps": self.download_limit_mbps.value() if self.limit_download_speed.isChecked() else 0.0,
+            "download_concurrency": int(self.download_concurrency.currentData() or 0),
         }
 
     def request_save(self) -> None:
@@ -384,6 +392,7 @@ class LauncherSettingsPage(BasePage):
             self.allow_forge_preflight_failure,
             self.limit_download_speed,
             self.download_limit_mbps,
+            self.download_concurrency,
             self.join_tester_program,
             self.language_combo,
             self.theme_combo,
@@ -411,6 +420,9 @@ class LauncherSettingsPage(BasePage):
         self.limit_download_speed.setChecked(download_limit > 0)
         self.download_limit_mbps.setValue(download_limit if download_limit > 0 else 10.0)
         self.download_limit_mbps.setEnabled(download_limit > 0)
+        concurrency = int(settings.get("download_concurrency", 0) or 0)
+        concurrency_index = self.download_concurrency.findData(concurrency)
+        self.download_concurrency.setCurrentIndex(max(0, concurrency_index))
         tester_mode = bool(settings.get("tester_mode", str(settings.get("update_channel", "stable")).strip().lower() == "beta"))
         self.join_tester_program.setChecked(tester_mode)
         self.tester_warning_label.setVisible(tester_mode)

@@ -6,6 +6,7 @@ import re
 
 from src.core.curseforge.curseforge_client import CurseForgeClient
 from src.core.curseforge.curseforge_downloader import CurseForgeDownloader, CurseForgeManualDownloadRequired
+from src.core.curseforge.curseforge_errors import CurseForgeManagedFilesRequired
 from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
 from src.core.curseforge.curseforge_registry import CurseForgeRegistry
 from src.core.fs.paths import Paths

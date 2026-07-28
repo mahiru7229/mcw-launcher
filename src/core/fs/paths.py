@@ -96,7 +96,13 @@ class Paths:
         from datetime import datetime
 
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        return Paths.logs_root() / f"MCW-Diagnostics-{timestamp}.txt"
+        return Paths.logs_root() / f"MCW-Diagnostics-{timestamp}.zip"
+
+    @staticmethod
+    def download_journal_path() -> Path:
+        directory = Paths.CACHE_ROOT / "downloads"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory / "journal.json"
 
     @staticmethod
     def update_root() -> Path:
@@ -339,6 +345,21 @@ class Paths:
     @staticmethod
     def instance_repair_report(instance: Instance) -> Path:
         return Paths.load_instance_dir(instance.name) / ".mcw" / "last-repair.json"
+
+    @staticmethod
+    def instance_repair_cache(instance: Instance) -> Path:
+        instance_dir = Path(getattr(instance, "instance_dir", Paths.load_instance_dir(instance.name)))
+        return instance_dir / ".mcw" / "repair-verification-cache.json"
+
+    @staticmethod
+    def instance_repair_scan_report(instance: Instance) -> Path:
+        instance_dir = Path(getattr(instance, "instance_dir", Paths.load_instance_dir(instance.name)))
+        return instance_dir / ".mcw" / "last-repair-scan.json"
+
+    @staticmethod
+    def instance_repair_execution_report(instance: Instance) -> Path:
+        instance_dir = Path(getattr(instance, "instance_dir", Paths.load_instance_dir(instance.name)))
+        return instance_dir / ".mcw" / "last-repair-execution.json"
 
     @staticmethod
     def instance_mods_dir(instance: Instance) -> Path:

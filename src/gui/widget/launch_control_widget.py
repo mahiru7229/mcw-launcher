@@ -11,8 +11,11 @@ from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap, set_theme_st
 
 class LaunchControlWidget(QFrame):
     launch_clicked = Signal()
+    cancel_clicked = Signal()
 
     LAUNCH_TEXT = "launch.button"
+    PAUSE_TEXT = "launch.pause_button"
+    RESUME_TEXT = "launch.resume_button"
     CANCEL_TEXT = "launch.cancel_button"
 
     def __init__(self, compact: bool = False) -> None:
@@ -34,6 +37,8 @@ class LaunchControlWidget(QFrame):
         self._busy = False
         self._launch_active = False
         self._pause_pending = False
+        self._download_paused = False
+        self._cancel_pending = False
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -80,18 +85,36 @@ class LaunchControlWidget(QFrame):
         progress_layout.addWidget(self.detail_label)
         progress_layout.addWidget(self.progress_bar)
 
-        self.launch_button = set_theme_icon(QPushButton(tr(self.LAUNCH_TEXT)), "icon.action.launch", 32 if self._compact else 40)
+        controls_layout = QVBoxLayout()
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.setSpacing(4)
+
+        self.launch_button = set_theme_icon(QPushButton(tr(self.LAUNCH_TEXT)), "icon.action.launch", 26 if self._compact else 32)
         set_theme_static_text(self.launch_button, "control.launch", tr(self.LAUNCH_TEXT))
         self.launch_button.setObjectName("PrimaryButton")
         self.launch_button.setProperty("themeRole", "launch")
         if self._compact:
-            self.launch_button.setFixedSize(190, 60)
+            self.launch_button.setFixedSize(190, 34)
         else:
-            self.launch_button.setFixedSize(230, 72)
+            self.launch_button.setFixedSize(230, 42)
         self.launch_button.clicked.connect(self.launch_clicked.emit)
 
+        self.cancel_button = set_theme_icon(QPushButton(tr(self.CANCEL_TEXT)), "icon.action.cancel", 18 if self._compact else 20)
+        set_theme_static_text(self.cancel_button, "control.cancel", tr(self.CANCEL_TEXT))
+        self.cancel_button.setObjectName("SecondaryButton")
+        self.cancel_button.setProperty("themeRole", "cancel")
+        if self._compact:
+            self.cancel_button.setFixedSize(190, 22)
+        else:
+            self.cancel_button.setFixedSize(230, 26)
+        self.cancel_button.clicked.connect(self.cancel_clicked.emit)
+        self.cancel_button.setVisible(False)
+
+        controls_layout.addWidget(self.launch_button)
+        controls_layout.addWidget(self.cancel_button)
+
         layout.addLayout(progress_layout, 1)
-        layout.addWidget(self.launch_button)
+        layout.addLayout(controls_layout)
 
     def set_selected_instance(self, _instance: object | None) -> None:
         self._refresh_launch_button()
@@ -164,6 +187,8 @@ class LaunchControlWidget(QFrame):
         self._busy = False
         self._launch_active = False
         self._pause_pending = False
+        self._download_paused = False
+        self._cancel_pending = False
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100)
         self.progress_bar.setFormat("100%")
@@ -233,6 +258,8 @@ class LaunchControlWidget(QFrame):
         self._launch_active = bool(active)
         if not self._launch_active:
             self._pause_pending = False
+            self._download_paused = False
+            self._cancel_pending = False
         self._refresh_launch_button()
 
     def set_pause_pending(self) -> None:
@@ -247,12 +274,39 @@ class LaunchControlWidget(QFrame):
 
     def set_paused(self) -> None:
         self._mode = "paused"
-        self._launch_active = False
+        self._launch_active = True
+        self._download_paused = True
         self._pause_pending = False
+        self._cancel_pending = False
         self.status_label.setText(tr("launch.paused"))
         self.detail_label.setText(tr("launch.paused_detail"))
         self.stage_label.setText(tr("launch.paused_badge"))
         self.progress_bar.setFormat(tr("launch.paused_badge"))
+        self._set_stage_state("warning")
+        self._refresh_launch_button()
+
+    def set_resumed(self) -> None:
+        if not self._launch_active:
+            return
+        self._mode = "progress"
+        self._download_paused = False
+        self._pause_pending = False
+        self._cancel_pending = False
+        self.status_label.setText(tr("launch.resumed"))
+        self.detail_label.setText(tr("launch.resumed_detail"))
+        self.stage_label.setText(tr("launch.running_badge"))
+        self.progress_bar.setFormat("%p%")
+        self._set_stage_state("busy")
+        self._refresh_launch_button()
+
+    def set_cancel_pending(self) -> None:
+        if not self._launch_active:
+            return
+        self._cancel_pending = True
+        self._pause_pending = False
+        self.status_label.setText(tr("launch.cancel_requested"))
+        self.detail_label.setText(tr("launch.cancel_requested_detail"))
+        self.stage_label.setText(tr("launch.cancelling_badge"))
         self._set_stage_state("warning")
         self._refresh_launch_button()
 
@@ -261,6 +315,8 @@ class LaunchControlWidget(QFrame):
         self._busy = False
         self._launch_active = False
         self._pause_pending = False
+        self._download_paused = False
+        self._cancel_pending = False
         self._status_message = "Ready"
         self._detail_message = "Select an account and an instance, then launch."
         self.progress_bar.setRange(0, 100)
@@ -273,24 +329,42 @@ class LaunchControlWidget(QFrame):
         self._refresh_launch_button()
 
     def _refresh_launch_button(self) -> None:
-        is_cancel = self._launch_active
-        text_key = self.CANCEL_TEXT if is_cancel else self.LAUNCH_TEXT
-        static_role = "control.cancel" if is_cancel else "control.launch"
-        theme_role = "cancel" if is_cancel else "launch"
-        button_text = tr(text_key)
+        if self._launch_active and self._download_paused:
+            text_key = self.RESUME_TEXT
+            static_role = "control.launch"
+            theme_role = "launch"
+        elif self._launch_active:
+            text_key = self.PAUSE_TEXT
+            static_role = "control.launch"
+            theme_role = "launch"
+        else:
+            text_key = self.LAUNCH_TEXT
+            static_role = "control.launch"
+            theme_role = "launch"
 
+        button_text = tr(text_key)
         self.launch_button.setProperty("themeRole", theme_role)
         self.launch_button.setProperty("themeStaticTextRole", static_role)
         self.launch_button.setProperty("themeStaticTextFallback", button_text)
-        self.launch_button.setEnabled((is_cancel and not self._pause_pending) or (not is_cancel and not self._busy))
+        self.launch_button.setEnabled((self._launch_active and not self._pause_pending and not self._cancel_pending) or (not self._launch_active and not self._busy))
 
-        if bool(self.launch_button.property("themeStaticTextHidden")):
+        if bool(self.launch_button.property("themeStaticTextHidden")) and not self._launch_active:
             self.launch_button.setText("")
         elif self.launch_button.text() != button_text:
             self.launch_button.setText(button_text)
 
-        self.launch_button.style().unpolish(self.launch_button)
-        self.launch_button.style().polish(self.launch_button)
+        cancel_text = tr(self.CANCEL_TEXT)
+        self.cancel_button.setVisible(self._launch_active)
+        self.cancel_button.setEnabled(self._launch_active and not self._cancel_pending)
+        self.cancel_button.setProperty("themeStaticTextFallback", cancel_text)
+        if bool(self.cancel_button.property("themeStaticTextHidden")):
+            self.cancel_button.setText("")
+        elif self.cancel_button.text() != cancel_text:
+            self.cancel_button.setText(cancel_text)
+
+        for button in (self.launch_button, self.cancel_button):
+            button.style().unpolish(button)
+            button.style().polish(button)
 
     def retranslate_dynamic(self) -> None:
         if self._mode == "progress" and self._last_event is not None:

@@ -9,6 +9,7 @@ from src.core.network.httpx_downloader import (
     CHUNK_SIZE,
     HttpDownloader,
 )
+from src.core.network.download_journal import DownloadJournal
 from src.models.progress.progress_stage import ProgressStage
 
 
@@ -108,7 +109,10 @@ def make_download_info(
 
 
 @pytest.fixture(autouse=True)
-def reset_http_downloader_state():
+def reset_http_downloader_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    journal = DownloadJournal(tmp_path / "download-journal.json")
+    monkeypatch.setattr("src.core.network.httpx_downloader.download_journal", journal)
+    monkeypatch.setattr("src.core.network.download_manager.download_journal", journal)
     HttpDownloader.close_client()
     HttpDownloader._path_locks.clear()
 
@@ -810,7 +814,7 @@ def test_download_and_verify_retries_sha1_mismatch(
     assert sleeps == [1]
 
 
-def test_download_and_verify_cleans_part_file_after_final_failure(
+def test_download_and_verify_preserves_part_file_after_retryable_final_failure(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ):
@@ -850,7 +854,7 @@ def test_download_and_verify_cleans_part_file_after_final_failure(
             timeout=20.0,
         )
 
-    assert not temp_path.exists()
+    assert temp_path.read_bytes() == b"partial"
     assert not path.exists()
 
 

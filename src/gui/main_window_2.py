@@ -9,8 +9,7 @@ from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QMainWindow, QMessageBox
 
 from src.core.config.curseforge_config_manager import CurseForgeConfigManager
 from src.core.curseforge.curseforge_client import CurseForgeClient
-from src.core.curseforge.curseforge_content_manager import CurseForgeManagedFilesRequired
-from src.core.curseforge.curseforge_pack_installer import CurseForgeModpackManualDownloadRequired
+from src.core.curseforge.curseforge_errors import CurseForgeManagedFilesRequired, CurseForgeModpackManualDownloadRequired
 from src.core.diagnostics.diagnostics_manager import DiagnosticsManager
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
@@ -18,7 +17,7 @@ from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.language.language_manager import language_manager, tr
 from src.core.lan.lan_agent_manager import LanAgentManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
-from src.core.network.download_pause import is_download_paused
+from src.core.network.download_pause import is_download_cancelled, is_download_paused
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.core.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
 from src.gui.application import create_application
@@ -45,6 +44,7 @@ from src.gui.dialogs.curseforge_manual_download_dialog import CurseForgeManualDo
 from src.gui.dialogs.lan_agent_log_dialog import LanAgentLogDialog
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
+from src.gui.dialogs.repair_center_dialog import RepairCenterDialog
 from src.gui.dialogs.update_dialog import UpdateDialog
 from src.gui.dialogs.unsaved_changes_dialog import UnsavedChangesDecision, prompt_unsaved_changes
 from src.gui.display_profile import DisplayProfile, select_display_profile
@@ -201,6 +201,7 @@ class MainWindow(QMainWindow):
         self.curseforge_mod_dialog = CurseForgeBrowserDialog("mod", self)
         self.curseforge_modpack_dialog = CurseForgeBrowserDialog("modpack", self)
         self.curseforge_manual_dialog = CurseForgeManualDownloadDialog(self)
+        self.repair_center_dialog = RepairCenterDialog(self)
 
         self.pages = {
             "home": self.home_page,
@@ -253,7 +254,9 @@ class MainWindow(QMainWindow):
         self.instances_page.restore_forge_requested.connect(self.instance_controller.restore_previous_forge)
         self.instances_page.open_forge_logs_requested.connect(self._open_forge_logs)
         self.instances_page.export_forge_diagnostics_requested.connect(self._export_forge_diagnostics)
-        self.instances_page.repair_instance_requested.connect(self.instance_controller.repair_instance)
+        self.instances_page.repair_instance_requested.connect(self._open_repair_center)
+        self.repair_center_dialog.scan_requested.connect(self.instance_controller.scan_repair_center)
+        self.repair_center_dialog.repair_requested.connect(self.instance_controller.execute_repair_plan)
         self.instances_page.manage_mods_requested.connect(self._open_mod_manager)
         self.instances_page.browse_modpacks_requested.connect(self._open_modrinth_modpacks)
         self.instances_page.browse_curseforge_modpacks_requested.connect(self._open_curseforge_modpacks)
@@ -269,7 +272,7 @@ class MainWindow(QMainWindow):
         self.instances_page.scan_modpack_requested.connect(self.modpack_lifecycle_controller.scan)
         self.instances_page.repair_modpack_requested.connect(self.modpack_lifecycle_controller.repair)
         self.instances_page.check_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.check_update(name, self.modrinth_modpack_dialog.allowed_version_types, force_refresh=True))
-        self.instances_page.apply_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.update(name, self.modrinth_modpack_dialog.allowed_version_types))
+        self.instances_page.apply_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.preview_update(name, self.modrinth_modpack_dialog.allowed_version_types))
 
         self.mods_page.search_requested.connect(self.mod_catalog_controller.search)
         self.mods_page.versions_requested.connect(self.mod_catalog_controller.load_versions)
@@ -306,6 +309,7 @@ class MainWindow(QMainWindow):
         self.logs_page.open_latest_crash_report_requested.connect(self._open_latest_crash_report)
 
         self.launch_control.launch_clicked.connect(self._request_launch)
+        self.launch_control.cancel_clicked.connect(self.launch_controller.cancel)
 
         self.version_controller.versions_changed.connect(self.instances_page.set_versions)
         self.version_controller.versions_changed.connect(lambda versions: self.home_page.set_manifest_count(len(versions)))
@@ -321,6 +325,7 @@ class MainWindow(QMainWindow):
         self.backup_controller.restore_finished.connect(self._on_backup_restored)
         self.modpack_lifecycle_controller.state_changed.connect(self.instances_page.set_modpack_state)
         self.modpack_lifecycle_controller.update_checked.connect(self._on_modpack_update_checked)
+        self.modpack_lifecycle_controller.update_previewed.connect(self._on_modpack_update_previewed)
         self.modpack_lifecycle_controller.update_finished.connect(self._on_modpack_updated)
         self.modpack_lifecycle_controller.repair_finished.connect(self._on_modpack_repaired)
 
@@ -407,10 +412,17 @@ class MainWindow(QMainWindow):
         self.launch_controller.game_exited.connect(self._on_game_exited)
         self.launch_controller.pause_requested.connect(self.launch_control.set_pause_pending)
         self.launch_controller.launch_paused.connect(self._on_launch_paused)
+        self.launch_controller.launch_resumed.connect(self._on_launch_resumed)
+        self.launch_controller.cancel_requested.connect(self._on_launch_cancel_requested)
+        self.launch_controller.launch_cancelled.connect(self._on_launch_cancelled)
         self.instance_controller.repair_progress.connect(self._on_progress)
+        self.instance_controller.repair_progress.connect(self.repair_center_dialog.set_progress)
         self.instance_controller.loader_progress.connect(self._on_progress)
         self.instance_controller.package_progress.connect(self._on_progress)
         self.instance_controller.repair_finished.connect(self._on_repair_finished)
+        self.instance_controller.repair_scan_finished.connect(self.repair_center_dialog.set_report)
+        self.instance_controller.repair_execution_finished.connect(self.repair_center_dialog.set_repair_result)
+        self.instance_controller.repair_center_failed.connect(self.repair_center_dialog.set_error)
 
         self.update_controller.update_available.connect(self._on_update_available)
         self.update_controller.no_update_available.connect(self._on_no_update_available)
@@ -547,6 +559,21 @@ class MainWindow(QMainWindow):
     def _request_launch(self) -> None:
         if self._confirm_all_unsaved_settings():
             self.launch_controller.launch()
+
+    def _open_repair_center(self, instance_name: str) -> None:
+        name = str(instance_name or "").strip()
+        if not name:
+            QMessageBox.information(self, tr("repair.center.title"), tr("repair.center.no_instance"))
+            return
+        try:
+            InstanceManager.load(name)
+        except Exception as error:
+            self._show_error(tr("repair.center.title"), str(error))
+            return
+        self.repair_center_dialog.set_instance(name)
+        self.repair_center_dialog.show()
+        self.repair_center_dialog.raise_()
+        self.repair_center_dialog.activateWindow()
 
     def _open_mod_manager(self, instance_name: str) -> None:
         instance_name = instance_name.strip()
@@ -1194,6 +1221,41 @@ class MainWindow(QMainWindow):
         if info is not None and getattr(info, "available", False):
             self.logs_page.append(tr("Modpack update available: {current} → {target}", current=getattr(info, "current_version_number", "?"), target=getattr(info, "target_version_number", "?")))
 
+    def _on_modpack_update_previewed(self, plan: object) -> None:
+        blockers = tuple(getattr(plan, "blockers", ()) or ())
+        if blockers:
+            QMessageBox.warning(
+                self,
+                tr("modpack.preview.title"),
+                tr("modpack.preview.blocked", reasons="\n".join(f"• {reason}" for reason in blockers)),
+            )
+            return
+        download_mib = float(getattr(plan, "estimated_download_bytes", 0) or 0) / (1024 * 1024)
+        message = tr(
+            "modpack.preview.confirm",
+            name=getattr(plan, "instance_name", "?"),
+            current=getattr(plan, "current_version", "?"),
+            target=getattr(plan, "target_version", "?"),
+            added=getattr(plan, "added_files", 0),
+            replaced=getattr(plan, "replaced_files", 0),
+            removed=getattr(plan, "removed_files", 0),
+            preserved=len(tuple(getattr(plan, "preserved_files", ()) or ())),
+            unchanged=getattr(plan, "unchanged_files", 0),
+            download=download_mib,
+        )
+        answer = QMessageBox.question(
+            self,
+            tr("modpack.preview.title"),
+            message,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.modpack_lifecycle_controller.update(
+                str(getattr(plan, "instance_name", "")),
+                self.modrinth_modpack_dialog.allowed_version_types,
+                target_version_id=str(getattr(plan, "target_version_id", "")),
+            )
+
     def _on_modpack_updated(self, result: object) -> None:
         name = str(getattr(result, "instance_name", ""))
         self.instance_controller.refresh(selected_name=name)
@@ -1414,6 +1476,7 @@ class MainWindow(QMainWindow):
             self.curseforge_mod_dialog,
             self.curseforge_modpack_dialog,
             self.curseforge_manual_dialog,
+            self.repair_center_dialog,
         ):
             retranslate_dynamic = getattr(widget, "retranslate_dynamic", None)
             if callable(retranslate_dynamic):
@@ -1506,6 +1569,10 @@ class MainWindow(QMainWindow):
         if task_id == "mods.update.check":
             self.mod_manager_dialog.set_update_error(str(error))
         if task_id == self.launch_controller.TASK_ID:
+            if is_download_cancelled(error):
+                self._on_launch_cancelled()
+                self.instance_controller.refresh_running(force=True)
+                return
             if is_download_paused(error):
                 self._on_launch_paused()
                 self.instance_controller.refresh_running(force=True)
@@ -1556,6 +1623,24 @@ class MainWindow(QMainWindow):
         self.home_page.set_status(message)
         self.right_panel.set_status(message)
 
+    def _on_launch_resumed(self) -> None:
+        self.launch_control.set_resumed()
+        message = tr("launch.resumed")
+        self.home_page.set_status(message)
+        self.right_panel.set_status(message)
+
+    def _on_launch_cancel_requested(self) -> None:
+        self.launch_control.set_cancel_pending()
+        message = tr("launch.cancel_requested")
+        self.home_page.set_status(message)
+        self.right_panel.set_status(message)
+
+    def _on_launch_cancelled(self) -> None:
+        self.launch_control.set_cancelled("launch.cancelled", "launch.cancelled_detail")
+        message = tr("launch.cancelled")
+        self.home_page.set_status(message)
+        self.right_panel.set_status(message)
+
     def _set_launch_active(self, active: bool) -> None:
         self.launch_control.set_launch_active(active)
         self.theme_runtime.reapply_assets(self.launch_control)
@@ -1591,7 +1676,7 @@ class MainWindow(QMainWindow):
         if not selected:
             return
         try:
-            path = DiagnosticsManager.write_report(Path(selected), launcher_version=VERSION_ID, settings=self.gui_settings_controller.raw_settings(), activity_log=self.logs_page.activity_text())
+            path = DiagnosticsManager.write_bundle(Path(selected), launcher_version=VERSION_ID, settings=self.gui_settings_controller.raw_settings(), activity_log=self.logs_page.activity_text())
         except Exception as error:
             self._show_error(tr("diagnostics.export.title"), str(error))
             return

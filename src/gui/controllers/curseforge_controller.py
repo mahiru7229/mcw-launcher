@@ -7,7 +7,8 @@ from PySide6.QtCore import Signal, Slot
 from src.core.curseforge.curseforge_client import CurseForgeClient
 from src.core.curseforge.curseforge_manual_installer import CurseForgeManualInstaller
 from src.core.curseforge.curseforge_mod_installer import CurseForgeModInstaller
-from src.core.curseforge.curseforge_pack_installer import CurseForgeModpackManualDownloadRequired, CurseForgePackInstaller
+from src.core.curseforge.curseforge_errors import CurseForgeModpackManualDownloadRequired
+from src.core.curseforge.curseforge_pack_installer import CurseForgePackInstaller
 from src.core.instance.instance_manager import InstanceManager
 from src.core.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController

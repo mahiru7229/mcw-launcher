@@ -23,7 +23,7 @@ class SensitiveDataRedactor:
 
     _BEARER_PATTERN = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+")
     _ASSIGNMENT_PATTERN = re.compile(
-        r"(?i)(\b(?:access_token|refresh_token|authorization|code_verifier|client_secret|password|xsts_token|xbox_token|token)\b\s*[:=]\s*)([^\s,&;\]\}\"']+|\"[^\"]*\"|'[^']*')"
+        r"(?i)(\b(?:access_token|refresh_token|authorization|code|code_verifier|client_secret|password|xsts_token|xbox_token|token)\b\s*[:=]\s*)([^\s,&;\]\}\"']+|\"[^\"]*\"|'[^']*')"
     )
     _QUERY_PATTERN = re.compile(
         r"(?i)([?&](?:access_token|refresh_token|code|code_verifier|client_secret|token)=)([^&#\s]+)"

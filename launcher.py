@@ -56,6 +56,43 @@ def _write_startup_error(error: BaseException, stage_key: str = "startup.startin
     return None
 
 
+def _validate_startup_dependencies(project_root: Path | None = None) -> None:
+    """Fail early with one actionable error when a source checkout is incomplete.
+
+    PyInstaller validates bundled modules during the build, so this filesystem
+    check is only needed for source-mode patch installs. It prevents a chain of
+    one-module-at-a-time ImportError failures after a partial patch extraction.
+    """
+
+    if getattr(sys, "frozen", False):
+        return
+
+    root = project_root or Path(__file__).resolve().parent
+    required_paths = (
+        Path("src/core/curseforge/curseforge_errors.py"),
+        Path("src/core/lan/lan_agent_manager.py"),
+        Path("src/core/lan/lan_agent_target_resolver.py"),
+        Path("src/core/lan/lan_hosting_manager.py"),
+        Path("src/core/repair/repair_service.py"),
+        Path("src/core/network/download_manager.py"),
+        Path("src/core/network/download_models.py"),
+        Path("src/core/network/download_journal.py"),
+        Path("src/core/network/network_errors.py"),
+        Path("src/core/network/network_session.py"),
+        Path("src/core/network/retry_policy.py"),
+        Path("src/gui/dialogs/repair_center_dialog.py"),
+        Path("runtime/mcw-lan-agent.jar"),
+    )
+    missing = [str(relative_path).replace("\\", "/") for relative_path in required_paths if not (root / relative_path).is_file()]
+    if missing:
+        joined = "\n- ".join(missing)
+        raise RuntimeError(
+            "MCW Launcher installation is incomplete. Reapply the complete "
+            "v0.9.0-beta.2 patch before starting the launcher. Missing files:\n- "
+            f"{joined}"
+        )
+
+
 def main() -> None:
     update_result = _run_update_mode()
     if update_result is not None:
@@ -67,6 +104,8 @@ def main() -> None:
     from src.gui.startup_splash import StartupSplash
 
     app = create_application(sys.argv)
+    from src.core.network.network_session import network_session
+    app.aboutToQuit.connect(network_session.close)
     splash = StartupSplash()
     splash.show()
     splash.update_progress(2, "startup.starting")
@@ -90,6 +129,8 @@ def main() -> None:
         splash.retranslate()
         startup_stage_key = "startup.loading_interface"
         splash.update_progress(93, startup_stage_key)
+
+        _validate_startup_dependencies()
 
         # Import and construct Qt widgets only on the GUI thread. Persistent I/O
         # above is isolated so a locked database cannot freeze the splash forever.
