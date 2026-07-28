@@ -1,6 +1,6 @@
 # CurseForge Gateway integration
 
-MCW Launcher `v0.8.1` provides CurseForge browsing and installation through the public MCW gateway without bundling a CurseForge API key in the source, EXE, or updater package.
+MCW Launcher `v0.10.0-beta.1` provides Fabric and Forge CurseForge browsing and installation through the public MCW gateway without bundling a CurseForge API key in the source, EXE, or updater package.
 
 ## Architecture
 
@@ -115,7 +115,7 @@ The launcher does not construct undocumented CurseForge CDN paths. Every automat
 ## Supported workflow
 
 - Search CurseForge projects through the gateway.
-- Filter by Minecraft version and release channel while ranking loader compatibility.
+- Select Fabric or Forge, then filter by Minecraft version and release channel while ranking loader compatibility.
 - Fetch project/file metadata in batches where possible.
 - Install required CurseForge mod dependencies.
 - Download automatically when `downloadUrl` is available and third-party distribution is permitted.
@@ -124,6 +124,21 @@ The launcher does not construct undocumented CurseForge CDN paths. Every automat
 - Track installed and pending files in the CurseForge registry.
 
 The manual-download flow is implemented for mods. CurseForge modpack handling remains experimental and should be tested on copied instances.
+
+## Transactional standalone-mod installation
+
+`v0.10.0-beta.1` prepares and validates every automatically downloadable standalone mod before changing the target instance.
+
+The selected root file may use an explicit unverified-file approval from the user. That approval is deliberately not inherited by dependencies: every dependency must independently contain metadata compatible with the target Fabric or Forge instance.
+
+During apply, the launcher snapshots only the files that can be replaced:
+
+- the CurseForge registry and its temporary file;
+- destination JARs and disabled variants;
+- installed JARs with the same mod ID;
+- the previously tracked filename for each CurseForge project.
+
+If copying a JAR or saving the registry fails, those affected paths are removed and the snapshot is restored. Download cache files are retained so a later retry does not need to fetch verified data again.
 
 ## Local JSON cache
 

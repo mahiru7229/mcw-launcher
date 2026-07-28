@@ -800,7 +800,7 @@
         "mods.catalog.title.modrinth": "Modrinth mod catalog",
         "mods.catalog.title.curseforge": "CurseForge mod catalog",
         "mods.catalog.subtitle.modrinth": "Search Modrinth, select a version, then choose or create a compatible instance to install it.",
-        "mods.catalog.subtitle.curseforge": "Search through the MCW CurseForge Gateway, select a file, then choose or create a compatible instance to install it.",
+        "mods.catalog.subtitle.curseforge": "Search Fabric or Forge mods through the MCW CurseForge Gateway, then choose or create a compatible instance.",
         "mods.catalog.curseforge.searching": "Searching CurseForge...",
         "mods.catalog.curseforge.contacting": "Contacting the MCW CurseForge Gateway and loading projects...",
         "mods.catalog.curseforge.failed": "CurseForge search failed",

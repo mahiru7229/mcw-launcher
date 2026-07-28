@@ -42,8 +42,8 @@ def _version(version_id: str, loader: str, game_version: str = "1.21.1") -> Modr
 def _curseforge_project() -> CurseForgeProject:
     return CurseForgeProject(
         project_id=42,
-        name="Forge Example",
-        slug="forge-example",
+        name="Fabric Example",
+        slug="fabric-example",
         summary="CurseForge example",
         download_count=456,
         authors=("Tester",),
@@ -51,7 +51,7 @@ def _curseforge_project() -> CurseForgeProject:
         class_id=6,
         date_modified="2026-07-21T00:00:00Z",
         game_versions=("1.20.1",),
-        loaders=("forge",),
+        loaders=("fabric",),
     )
 
 
@@ -59,8 +59,8 @@ def _curseforge_file() -> CurseForgeFile:
     return CurseForgeFile(
         file_id=99,
         project_id=42,
-        display_name="Forge Example 1.0",
-        file_name="forge-example.jar",
+        display_name="Fabric Example 1.0",
+        file_name="fabric-example.jar",
         release_type="release",
         file_date="2026-07-21T00:00:00Z",
         file_length=100,
@@ -68,7 +68,7 @@ def _curseforge_file() -> CurseForgeFile:
         sha1="abc",
         game_versions=("1.20.1",),
         dependencies=(),
-        loaders=("forge",),
+        loaders=("fabric",),
     )
 
 
@@ -153,7 +153,6 @@ def test_curseforge_results_files_and_install_are_rendered_inline(gui_app):
     page.curseforge_files_requested.connect(lambda project_id, loader, channels: files_requested.append((project_id, loader, tuple(channels))))
     page.curseforge_install_requested.connect(lambda file, loader, channels: install_requested.append((file, loader, tuple(channels))))
     page.provider_combo.setCurrentIndex(page.provider_combo.findData("curseforge"))
-    page.loader_combo.setCurrentIndex(page.loader_combo.findData("forge"))
 
     result = CurseForgeSearchResult(
         projects=(_curseforge_project(),),
@@ -162,12 +161,12 @@ def test_curseforge_results_files_and_install_are_rendered_inline(gui_app):
         page_size=25,
         cache_info=CurseForgeCacheInfo(from_cache=True),
     )
-    page.set_curseforge_search_result("forge", result)
+    page.set_curseforge_search_result("fabric", result)
 
     assert page.results_table.rowCount() == 1
-    assert files_requested == [(42, "forge", ("release",))]
+    assert files_requested == [(42, "fabric", ("release",))]
 
-    page.set_curseforge_files(42, "forge", [_curseforge_file()])
+    page.set_curseforge_files(42, "fabric", [_curseforge_file()])
 
     assert page.version_combo.count() == 1
     assert page.version_combo.currentData() == 99
@@ -177,7 +176,7 @@ def test_curseforge_results_files_and_install_are_rendered_inline(gui_app):
 
     assert len(install_requested) == 1
     assert install_requested[0][0].file_id == 99
-    assert install_requested[0][1] == "forge"
+    assert install_requested[0][1] == "fabric"
     assert install_requested[0][2] == ("release",)
 
 

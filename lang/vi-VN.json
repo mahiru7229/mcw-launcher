@@ -800,7 +800,7 @@
         "mods.catalog.title.modrinth": "Danh mục mod Modrinth",
         "mods.catalog.title.curseforge": "Danh mục mod CurseForge",
         "mods.catalog.subtitle.modrinth": "Tìm mod trên Modrinth, chọn phiên bản rồi chọn hoặc tạo instance tương thích để cài.",
-        "mods.catalog.subtitle.curseforge": "Tìm mod qua MCW CurseForge Gateway, chọn file rồi chọn hoặc tạo instance tương thích để cài.",
+        "mods.catalog.subtitle.curseforge": "Tìm mod Fabric hoặc Forge qua MCW CurseForge Gateway, rồi chọn hoặc tạo instance tương thích.",
         "mods.catalog.curseforge.searching": "Đang tìm trên CurseForge...",
         "mods.catalog.curseforge.contacting": "Đang kết nối MCW CurseForge Gateway và tải danh sách dự án...",
         "mods.catalog.curseforge.failed": "Tìm kiếm CurseForge thất bại",

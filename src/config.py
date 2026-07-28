@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-VERSION = "v0.9.0"
-VERSION_ID = "0.9.0"
+VERSION = "v0.10.0 Beta 1"
+VERSION_ID = "0.10.0-beta.1"
 VERSION_TAG = f"v{VERSION_ID}"
-UPDATE_CHANNEL = "stable"
+UPDATE_CHANNEL = "beta"
 GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
 DEVELOPER_NAME = "mahiru7229"
 LAUNCHER_SLUG = "mcw-launcher"
