@@ -101,7 +101,7 @@ class ModrinthModUpdateManager:
             versions = ModrinthClient.list_project_versions(project_id, loader=loader_name, game_version=instance.version_id, version_types=allowed_types, force_refresh=force_refresh)
             latest = versions[0] if versions else None
             if latest is None:
-                raise RuntimeError(f"No allowed {loader_name.title()} version supports Minecraft {instance.version_id}.")
+                raise RuntimeError(f"No allowed {loader_name.title()} version is available.")
             current = ModrinthModUpdateManager._current_version(raw_entry, versions=versions, allowed_types=allowed_types)
             if not ModrinthModUpdateManager._is_newer(latest, current):
                 latest = current or latest

@@ -12,6 +12,7 @@ import httpx
 
 from src.core.fs.paths import Paths
 from src.config import MODRINTH_USER_AGENT
+from src.core.mod.provider_game_version_policy import provider_game_version_rank
 from src.core.network.httpx_downloader import HttpDownloader
 from src.models.modrinth.project import ModrinthProject, ModrinthSearchResult
 from src.models.modrinth.version import ModrinthDependency, ModrinthFile, ModrinthVersion
@@ -79,6 +80,18 @@ class ModrinthClient:
             payload["offset"] = normalized_offset
             payload["limit"] = normalized_limit
 
+        if normalized_game_version:
+            projects = tuple(
+                project
+                for _, project in sorted(
+                    enumerate(projects),
+                    key=lambda pair: (
+                        provider_game_version_rank(normalized_game_version, pair[1].versions),
+                        pair[0],
+                    ),
+                )
+            )
+
         if normalized_type == "modpack" and not normalized_query and not projects:
             raise RuntimeError(
                 "Modrinth returned no modpacks for the default catalog search. "
@@ -97,8 +110,8 @@ class ModrinthClient:
         facets: list[list[str]] = [[f"project_type:{project_type}"]]
         if loader:
             facets.append([f"categories:{loader}"])
-        if game_version:
-            facets.append([f"versions:{game_version}"])
+        # Provider game-version labels are advisory. Omitting the strict facet
+        # keeps nearby patch builds visible; callers rank them locally.
 
         payload = ModrinthClient._get_json(
             "/search",
@@ -146,15 +159,15 @@ class ModrinthClient:
         params: dict[str, str] = {"include_changelog": "false"}
         if loader:
             params["loaders"] = json.dumps([str(loader).strip().lower()], separators=(",", ":"))
-        if game_version:
-            params["game_versions"] = json.dumps([str(game_version).strip()], separators=(",", ":"))
         payload = ModrinthClient._get_json(f"/project/{quote(identifier, safe='')}/version", params=params, ttl=ModrinthClient.VERSIONS_TTL_SECONDS, force_refresh=force_refresh)
         if not isinstance(payload, list):
             raise RuntimeError(f"Modrinth versions for '{identifier}' are unavailable.")
         versions = [ModrinthClient._parse_version(item) for item in payload if isinstance(item, dict)]
         allowed_types = ModrinthClient.normalize_version_types(version_types)
         versions = [version for version in versions if version.version_type in allowed_types]
-        return sorted(versions, key=ModrinthClient._version_sort_key, reverse=True)
+        versions.sort(key=ModrinthClient._version_sort_key, reverse=True)
+        versions.sort(key=lambda version: provider_game_version_rank(game_version, version.game_versions))
+        return versions
 
     @staticmethod
     def get_version(version_id: str, force_refresh: bool = False) -> ModrinthVersion:
@@ -168,7 +181,7 @@ class ModrinthClient:
     def select_version(project_id: str, game_version: str, loader: str = "fabric", version_types: tuple[str, ...] | list[str] | set[str] | None = None) -> ModrinthVersion:
         versions = ModrinthClient.list_project_versions(project_id, loader=loader, game_version=game_version, version_types=version_types)
         if not versions:
-            raise RuntimeError(f"No {loader.title()} version of this project supports Minecraft {game_version}.")
+            raise RuntimeError(f"No allowed {loader.title()} version of this project is available.")
         return versions[0]
 
 

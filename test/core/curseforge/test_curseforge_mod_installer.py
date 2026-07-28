@@ -166,6 +166,34 @@ def test_build_plan_allows_missing_game_version_metadata_for_jar_validation() ->
     assert plan == [root]
 
 
+def test_build_plan_allows_advisory_nearby_patch_metadata_for_jar_validation() -> None:
+    original = make_file(loaders=("fabric",))
+    root = CurseForgeFile(
+        file_id=original.file_id,
+        project_id=original.project_id,
+        display_name=original.display_name,
+        file_name=original.file_name,
+        release_type=original.release_type,
+        file_date=original.file_date,
+        file_length=original.file_length,
+        download_url=original.download_url,
+        sha1=original.sha1,
+        game_versions=("1.20.4",),
+        dependencies=original.dependencies,
+        loaders=original.loaders,
+    )
+
+    plan = CurseForgeModInstaller._build_plan(
+        root,
+        game_version="1.20.1",
+        loader="fabric",
+        install_dependencies=False,
+        allowed_release_types=("release",),
+    )
+
+    assert plan == [root]
+
+
 def test_installs_fabric_mod_and_required_dependency_with_progress(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     dependency = make_file(project_id=11, file_id=21, file_name="fabric-api.jar")
     root = make_file(dependencies=(CurseForgeDependency(project_id=11, relation_type=3),))

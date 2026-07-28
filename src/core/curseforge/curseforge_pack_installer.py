@@ -263,8 +263,9 @@ class CurseForgePackInstaller:
             file = files.get(file_id)
             if file is None or file.project_id != project_id:
                 file = CurseForgeClient.get_file(project_id, file_id)
-            if game_version and file.game_versions and game_version not in file.game_versions:
-                raise RuntimeError(f"CurseForge file '{file.file_name}' does not support Minecraft {game_version}.")
+            # The manifest's exact project/file pair is authoritative. Provider
+            # game-version labels are retained for diagnostics but never block
+            # a managed modpack file that the pack author selected.
             results.append({
                 "projectId": project_id,
                 "fileId": file_id,
@@ -275,6 +276,7 @@ class CurseForgePackInstaller:
                 "size": file.file_length,
                 "downloadUrl": file.download_url,
                 "declaredLoaders": list(file.loaders),
+                "gameVersions": list(file.game_versions),
                 "required": required,
             })
             if reporter is not None:

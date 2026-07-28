@@ -151,7 +151,7 @@ def test_accepts_safe_override_path() -> None:
     assert CurseForgePackInstaller._safe_relative_path("config/example.toml") == PurePosixPath("config/example.toml")
 
 
-def test_resolve_files_keeps_advisory_loader_metadata(monkeypatch) -> None:
+def test_resolve_files_keeps_advisory_loader_and_game_version_metadata(monkeypatch) -> None:
     file = CurseForgeFile(
         file_id=20,
         project_id=10,
@@ -162,7 +162,7 @@ def test_resolve_files_keeps_advisory_loader_metadata(monkeypatch) -> None:
         file_length=100,
         download_url="https://example.invalid/universal.jar",
         sha1="a" * 40,
-        game_versions=(),
+        game_versions=("1.20.4",),
         dependencies=(),
         loaders=("fabric",),
     )
@@ -177,6 +177,7 @@ def test_resolve_files_keeps_advisory_loader_metadata(monkeypatch) -> None:
 
     assert skipped == 0
     assert files[0]["declaredLoaders"] == ["fabric"]
+    assert files[0]["gameVersions"] == ["1.20.4"]
     assert files[0]["fileName"] == "universal.jar"
 
 

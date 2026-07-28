@@ -56,7 +56,7 @@ def test_installs_fabric_modpack_as_new_instance(tmp_path, monkeypatch):
     configure_paths(tmp_path, monkeypatch)
     pack_source = make_pack(tmp_path / "pack.mrpack")
     project = ModrinthProject(project_id="pack-project", slug="pack", title="Test Pack", description="", project_type="modpack")
-    version = ModrinthVersion(version_id="pack-version", project_id="pack-project", name="1.0", version_number="1.0", version_type="release", game_versions=("1.20.1",), loaders=("fabric",), files=(ModrinthFile(url="https://cdn.modrinth.com/pack.mrpack", filename="pack.mrpack", sha1="a", sha512="b", size=1, primary=True),))
+    version = ModrinthVersion(version_id="pack-version", project_id="pack-project", name="1.0", version_number="1.0", version_type="release", game_versions=("1.20.4",), loaders=("fabric",), files=(ModrinthFile(url="https://cdn.modrinth.com/pack.mrpack", filename="pack.mrpack", sha1="a", sha512="b", size=1, primary=True),))
     monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: project)
     monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: version)
     monkeypatch.setattr(ModrinthDownloader, "download_file", lambda file, destination, force=False: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(pack_source.read_bytes()) or destination)

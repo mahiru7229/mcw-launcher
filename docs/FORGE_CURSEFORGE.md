@@ -47,19 +47,19 @@ MCW_CURSEFORGE_CLIENT_TOKEN
 
 The legacy single variable `MCW_CURSEFORGE_GATEWAY_URL` remains readable for compatibility.
 
-## Loader compatibility policy
+## Provider metadata compatibility policy
 
-CurseForge loader labels are treated as **advisory metadata**, not final proof that a JAR is incompatible.
+CurseForge Minecraft-version and loader labels are treated as **advisory metadata**, not final proof that a JAR is incompatible.
 
 For modpacks, the selected browser loader filters discovery, while the downloaded `manifest.json` is authoritative. The launcher accepts a single supported primary `fabric-<version>` or `forge-<version>` entry, rejects unsupported or ambiguous manifests, and creates the instance with that exact loader version.
 
-The launcher now:
+For standalone mods, the launcher now:
 
-1. Requests files by Minecraft version without a strict Fabric/Forge filter.
-2. Ranks files declared for the selected loader first.
+1. Requests files without strict Minecraft-version or Fabric/Forge filters.
+2. Ranks the selected loader first, followed by exact and nearby Minecraft patch labels.
 3. Keeps universal, unknown, and differently labelled files visible.
 4. Downloads the selected JAR.
-5. Inspects the real metadata inside the archive before adding it to the instance.
+5. Inspects the real loader metadata inside the archive before adding it to the instance.
 
 A JAR containing both:
 
@@ -70,7 +70,7 @@ META-INF/mods.toml
 
 is recognized as a Fabric/Forge universal mod. For a Fabric instance the launcher reads `fabric.mod.json`; for a Forge instance it reads `META-INF/mods.toml`.
 
-A differently labelled file is allowed to reach JAR validation. For a standalone mod, MCW Launcher shows a clear warning and requires explicit confirmation before installing it. For a managed modpack, the pack declaration is preserved and the file is installed as **unverified** so the launcher does not silently rewrite the pack or retry the same file forever.
+A differently loader-labelled file is allowed to reach JAR validation. For a standalone mod, MCW Launcher shows a clear loader warning and requires explicit confirmation before installing it. Minecraft-version labels never produce this warning or block installation. For a managed modpack, its exact project/file declaration is authoritative and the provider labels are retained only for diagnostics.
 
 This behavior also applies to managed files inside CurseForge modpacks, fixing packs whose universal dependencies are indexed under only one loader.
 
@@ -117,7 +117,7 @@ The launcher does not construct undocumented CurseForge CDN paths. Every automat
 ## Supported workflow
 
 - Search CurseForge projects through the gateway.
-- Select Fabric or Forge, then filter by Minecraft version and release channel while ranking loader compatibility.
+- Select Fabric or Forge, then filter by release channel while ranking loader and advisory Minecraft-version metadata.
 - Fetch project/file metadata in batches where possible.
 - Install required CurseForge mod dependencies.
 - Download automatically when `downloadUrl` is available and third-party distribution is permitted.

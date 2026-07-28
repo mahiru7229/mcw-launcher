@@ -340,12 +340,10 @@ class CurseForgeModInstaller:
                 raise RuntimeError("The CurseForge dependency graph is too large to install safely.")
             if file.release_type not in allowed_release_types:
                 raise RuntimeError(f"Required CurseForge file '{file.display_name}' uses the disabled {file.release_type} channel.")
-            if game_version and file.game_versions and game_version not in file.game_versions:
-                raise RuntimeError(f"CurseForge file '{file.display_name}' does not support Minecraft {game_version}.")
-            # CurseForge loader metadata is advisory. Some universal JARs are
-            # indexed as only Fabric or only Forge. The file is downloaded and
-            # ModManager validates its real metadata against the instance before
-            # it is added, so a genuinely wrong single-loader JAR is still rejected.
+            # CurseForge game-version and loader labels are advisory. Some JARs
+            # support nearby Minecraft patches or multiple loaders despite
+            # incomplete provider metadata. ModManager validates the downloaded
+            # JAR's real loader metadata before changing the instance.
             if file.project_id in visiting:
                 return
             visiting.add(file.project_id)

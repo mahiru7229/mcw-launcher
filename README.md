@@ -62,9 +62,9 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 
 - Cài mod **Fabric trực tiếp từ CurseForge** trong catalog Mods hiện có; vẫn hỗ trợ Forge bằng cùng một luồng.
 - Cài **modpack Fabric từ CurseForge**: chọn Fabric/Forge trong trình duyệt, đọc loader và phiên bản chính xác từ `manifest.json`, rồi tạo instance tương ứng.
-- Tự chọn file phù hợp với Minecraft version, release channel và loader, sau đó cài dependency bắt buộc.
+- Giữ mọi file trong release channel đã bật, ưu tiên loader cùng nhãn Minecraft chính xác/gần nhất rồi cài dependency bắt buộc; nhãn phiên bản không còn chặn cài đặt.
 - Dùng gateway công khai cho metadata; CurseForge API key vẫn chỉ nằm phía server và file mod được tải trực tiếp bằng Download Engine của launcher.
-- Kiểm tra metadata thật trong JAR trước khi thay đổi instance. Nhãn Fabric/Forge của CurseForge chỉ được dùng để ưu tiên kết quả.
+- Kiểm tra metadata thật trong JAR trước khi thay đổi instance. Nhãn Minecraft và Fabric/Forge của CurseForge chỉ được dùng để ưu tiên kết quả.
 - Chuẩn bị toàn bộ file tự động trước khi cài và rollback mod cùng registry nếu một bước ghi thất bại.
 - Giữ fallback tải thủ công có xác minh size/SHA-1 khi tác giả tắt phân phối bên thứ ba.
 
@@ -72,7 +72,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 
 - Tạo và chạy instance **Vanilla, Fabric hoặc Forge**; cài đặt, thay đổi và repair Fabric Loader/Minecraft Forge.
 - Tài khoản Offline và Microsoft OAuth PKCE, hỗ trợ nhiều tài khoản Microsoft và bảo vệ refresh token bằng Windows DPAPI.
-- Tìm, cài và cập nhật mod từ **Modrinth**; cài, update và repair modpack `.mrpack`.
+- Tìm, cài và cập nhật mod từ **Modrinth**; nhãn Minecraft chỉ để ưu tiên, còn manifest `.mrpack` quyết định phiên bản của modpack.
 - Tìm và cài mod/modpack **CurseForge** qua gateway công khai, có cache, failover và luồng tải thủ công được xác minh khi tác giả hạn chế phân phối.
 - Backup/restore `.mcwbackup`, import/export `.mcwpack`, runtime lock, theo dõi tiến trình Minecraft, game log và crash report.
 - **MCW LAN Agent** cùng LAN hosting profiles cho chế độ Microsoft-only hoặc bạn bè Microsoft + Offline trên các cấu hình được hỗ trợ.
@@ -182,9 +182,9 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 
 - Install **Fabric mods directly from CurseForge** in the existing Mods catalog while retaining the same Forge workflow.
 - Install **Fabric CurseForge modpacks** by selecting Fabric/Forge in the browser, validating the exact loader and version from `manifest.json`, and creating the matching instance.
-- Select files by Minecraft version, enabled release channels, and loader preference, then resolve required dependencies.
+- Keep every file in the enabled release channels, rank selected-loader and exact/nearby Minecraft labels first, then resolve required dependencies; version labels no longer block installation.
 - Fetch metadata through the public gateway, keep the CurseForge API key server-side, and download mod files directly with the launcher's Download Engine.
-- Validate real JAR metadata before changing an instance. CurseForge Fabric/Forge labels are ranking hints rather than the final authority.
+- Validate real JAR metadata before changing an instance. CurseForge Minecraft and Fabric/Forge labels are ranking hints rather than the final authority.
 - Prepare every automatic file before installation and roll back both mods and registry data if an apply step fails.
 - Preserve the size/SHA-1-verified manual fallback when an author disables third-party distribution.
 
@@ -192,7 +192,7 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 
 - Create and launch **Vanilla, Fabric, and Forge** instances; install, change, and repair Fabric Loader/Minecraft Forge.
 - Use Offline or Microsoft OAuth PKCE accounts, including multiple Microsoft accounts and Windows DPAPI protection for refresh tokens.
-- Search, install, and update **Modrinth** mods; install, update, and repair `.mrpack` modpacks.
+- Search, install, and update **Modrinth** mods; Minecraft labels only affect ranking, while each `.mrpack` manifest determines its modpack version.
 - Search and install **CurseForge** mods/modpacks through the public gateway, with caching, failover, and verified manual downloads for restricted files.
 - Backup/restore `.mcwbackup`, import/export `.mcwpack`, enforce runtime locks, and track the Minecraft process, game logs, and crash reports.
 - Use **MCW LAN Agent** and LAN hosting profiles for Microsoft-only or Microsoft + Offline friends on supported configurations.
@@ -306,8 +306,8 @@ See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
 
 - Fabric and Forge mod metadata parsing.
 - Enable/disable, drag-and-drop, dependency analysis, duplicate-ID detection, and loader mismatch checks.
-- Modrinth dependency installation, update checks, update locks, retry/resume, and fallback URLs.
-- CurseForge Gateway search, compatible file selection, dependency installation, automatic/manual distribution handling, local JSON caching, refresh cooldown, and stale fallback.
+- Modrinth dependency installation, advisory Minecraft-version ranking, update checks, update locks, retry/resume, and fallback URLs.
+- CurseForge Gateway search, advisory loader/Minecraft ranking, dependency installation, automatic/manual distribution handling, local JSON caching, refresh cooldown, and stale fallback.
 - Managed modpack registry with update preview, repair, conflict preservation, backup, rollback, and verification cache.
 
 ### Repair, backup, and diagnostics

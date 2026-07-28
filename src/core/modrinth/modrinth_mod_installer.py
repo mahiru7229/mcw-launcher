@@ -167,8 +167,9 @@ class ModrinthModInstaller:
         normalized_loaders = {str(loader).strip().lower() for loader in version.loaders}
         if loader_name not in normalized_loaders:
             raise RuntimeError(f"Modrinth version '{version.version_number}' does not support {loader_name.title()}.")
-        if game_version not in version.game_versions:
-            raise RuntimeError(f"Modrinth version '{version.version_number}' does not support Minecraft {game_version}.")
+        # Modrinth game-version labels are advisory. Nearby patch releases can
+        # share a compatible JAR, so installation is gated by loader and actual
+        # JAR validation rather than this provider-maintained list.
         version.primary_file(".jar")
 
     @staticmethod
