@@ -20,14 +20,6 @@ from src.models.instance.instance import Instance
 from src.models.progress.progress_stage import ProgressStage
 
 
-class CurseForgeManagedFilesRequired(RuntimeError):
-    def __init__(self, instance: Instance, requirements: tuple[CurseForgeManualDownload, ...], message: str) -> None:
-        super().__init__(message)
-        self.instance_name = instance.name
-        self.instance_dir = Path(instance.instance_dir)
-        self.requirements = requirements
-
-
 class CurseForgeContentManager:
     MAX_DOWNLOAD_ROUNDS = 3
     MAX_WORKERS = 8
