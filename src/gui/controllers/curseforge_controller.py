@@ -18,8 +18,8 @@ from src.models.curseforge.manual_download import CurseForgeManualDownload
 
 
 class CurseForgeController(BaseController):
-    search_results_changed = Signal(str, object)
-    files_changed = Signal(str, int, list)
+    search_results_changed = Signal(str, str, object)
+    files_changed = Signal(str, int, str, list)
     cache_info_changed = Signal(str, object)
     catalog_search_results_changed = Signal(str, object)
     catalog_files_changed = Signal(int, str, list)
@@ -136,7 +136,7 @@ class CurseForgeController(BaseController):
             f"Adding {len(normalized_sources)} downloaded mod file(s) to '{instance_name}'...",
         )
 
-    def install_modpack(self, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: tuple[str, ...]) -> bool:
+    def install_modpack(self, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: tuple[str, ...], expected_loader: str = "") -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
         return self._task_runner.run(
             "curseforge.install.modpack",
@@ -147,6 +147,7 @@ class CurseForgeController(BaseController):
                 install_optional_files=install_optional_files,
                 allowed_release_types=allowed_release_types,
                 reporter=reporter,
+                expected_loader=expected_loader,
             ),
             f"Installing CurseForge modpack '{instance_name}'...",
         )
@@ -179,7 +180,7 @@ class CurseForgeController(BaseController):
                 self.catalog_search_results_changed.emit(str(loader), search_result)
                 self.catalog_cache_info_changed.emit(getattr(search_result, "cache_info", CurseForgeClient.cache_status()))
             else:
-                self.search_results_changed.emit(str(project_type), search_result)
+                self.search_results_changed.emit(str(project_type), str(loader), search_result)
                 self.cache_info_changed.emit(str(project_type), getattr(search_result, "cache_info", CurseForgeClient.cache_status()))
             return
         if task_id.startswith("curseforge.files."):
@@ -194,7 +195,7 @@ class CurseForgeController(BaseController):
                 self.catalog_files_changed.emit(int(project_id), str(loader), list(file_result.files))
                 self.catalog_cache_info_changed.emit(file_result.cache_info)
             else:
-                self.files_changed.emit(str(project_type), int(project_id), list(file_result.files))
+                self.files_changed.emit(str(project_type), int(project_id), str(loader), list(file_result.files))
                 self.cache_info_changed.emit(str(project_type), file_result.cache_info)
             return
         if task_id == "curseforge.install.mod":
@@ -220,7 +221,9 @@ class CurseForgeController(BaseController):
             return
         if task_id in {"curseforge.install.modpack", "curseforge.install.modpack.manual"}:
             self.status_changed.emit("CurseForge modpack installed")
-            self.log_created.emit("Created Forge instance from CurseForge modpack")
+            instance = getattr(result, "instance", None)
+            loader, _version = getattr(instance, "mod_loader", ("unknown", ""))
+            self.log_created.emit(f"Created {str(loader).title()} instance from CurseForge modpack")
             self.modpack_installed.emit(result)
             return
         if task_id.startswith("curseforge.cache.clear."):

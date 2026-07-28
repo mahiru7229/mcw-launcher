@@ -31,9 +31,10 @@ class CurseForgePackInstaller:
     MAX_PATH_LENGTH = 240
     MAX_WORKERS = 8
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
+    SUPPORTED_LOADERS = (ModLoaderManager.FABRIC, ModLoaderManager.FORGE)
 
     @staticmethod
-    def install(project_id: int, file_id: int, instance_name: str, install_optional_files: bool = True, allowed_release_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> CurseForgeModpackInstallResult:
+    def install(project_id: int, file_id: int, instance_name: str, install_optional_files: bool = True, allowed_release_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None, expected_loader: str = "") -> CurseForgeModpackInstallResult:
         name, allowed, project, file = CurseForgePackInstaller._prepare_install(project_id, file_id, instance_name, allowed_release_types)
         pack_path = Paths.curseforge_pack_cache(project_id, file_id, file.file_name)
         try:
@@ -45,8 +46,8 @@ class CurseForgePackInstaller:
                 project_url=CurseForgePackInstaller._file_page_url(project.project_url, project_id, file_id),
                 managed_kind="modpack_archive",
             )
-            raise CurseForgeModpackManualDownloadRequired(requirement, project_id, file_id, name, install_optional_files, allowed) from error
-        return CurseForgePackInstaller._install_from_archive(project_id, file_id, name, install_optional_files, project, file, pack_path, reporter)
+            raise CurseForgeModpackManualDownloadRequired(requirement, project_id, file_id, name, install_optional_files, allowed, expected_loader) from error
+        return CurseForgePackInstaller._install_from_archive(project_id, file_id, name, install_optional_files, project, file, pack_path, reporter, expected_loader)
 
     @staticmethod
     def install_manual_archive(request: CurseForgeModpackManualDownloadRequired, source: Path, reporter: ProgressReporter | None = None) -> CurseForgeModpackInstallResult:
@@ -71,6 +72,7 @@ class CurseForgePackInstaller:
             file,
             pack_path,
             reporter,
+            getattr(request, "expected_loader", ""),
         )
 
     @staticmethod
@@ -86,17 +88,18 @@ class CurseForgePackInstaller:
         return name, allowed, project, file
 
     @staticmethod
-    def _install_from_archive(project_id: int, file_id: int, name: str, install_optional_files: bool, project: object, file: object, pack_path: Path, reporter: ProgressReporter | None) -> CurseForgeModpackInstallResult:
+    def _install_from_archive(project_id: int, file_id: int, name: str, install_optional_files: bool, project: object, file: object, pack_path: Path, reporter: ProgressReporter | None, expected_loader: str = "") -> CurseForgeModpackInstallResult:
         try:
             archive = zipfile.ZipFile(pack_path, "r")
         except (OSError, zipfile.BadZipFile) as error:
             raise RuntimeError("The selected CurseForge modpack archive is not a valid ZIP file.") from error
         with archive:
             manifest = CurseForgePackInstaller._read_manifest(archive)
-            minecraft_version, forge_version = CurseForgePackInstaller._parse_loader(manifest)
+            minecraft_version, loader_name, loader_version = CurseForgePackInstaller._parse_loader(manifest)
+            CurseForgePackInstaller._validate_expected_loader(loader_name, expected_loader)
             entries, skipped = CurseForgePackInstaller._resolve_files(manifest, minecraft_version, install_optional_files, reporter)
             version = VersionManager.load(minecraft_version)
-            resolved_loader = ModLoaderManager.resolve(minecraft_version, ModLoaderManager.FORGE, forge_version)
+            resolved_loader = ModLoaderManager.resolve(minecraft_version, loader_name, loader_version)
             ModLoaderManager.prepare(version, *resolved_loader, reporter=reporter)
             instance = InstanceManager.create(name=name, version=version, mod_loader=resolved_loader)
             try:
@@ -107,8 +110,8 @@ class CurseForgePackInstaller:
                     "name": project.name,
                     "versionName": file.display_name,
                     "minecraftVersion": minecraft_version,
-                    "loader": "forge",
-                    "loaderVersion": forge_version,
+                    "loader": loader_name,
+                    "loaderVersion": loader_version,
                     "installOptionalFiles": bool(install_optional_files),
                     "managedFiles": entries,
                     "lastDownloadFailures": [],
@@ -182,22 +185,62 @@ class CurseForgePackInstaller:
         return data
 
     @staticmethod
-    def _parse_loader(manifest: dict) -> tuple[str, str]:
+    def _parse_loader(manifest: dict) -> tuple[str, str, str]:
         minecraft = manifest.get("minecraft", {})
         game_version = str(minecraft.get("version") or "").strip()
         loaders = minecraft.get("modLoaders") if isinstance(minecraft.get("modLoaders"), list) else []
-        selected = next((item for item in loaders if isinstance(item, dict) and str(item.get("id") or "").lower().startswith("forge-") and bool(item.get("primary", False))), None)
-        if selected is None:
-            selected = next((item for item in loaders if isinstance(item, dict) and str(item.get("id") or "").lower().startswith("forge-")), None)
         if not game_version:
             raise RuntimeError("The CurseForge modpack does not declare a Minecraft version.")
+        declared = [
+            (item, CurseForgePackInstaller._parse_loader_id(str(item.get("id") or "")))
+            for item in loaders
+            if isinstance(item, dict)
+        ]
+        primary = [(item, parsed) for item, parsed in declared if bool(item.get("primary", False))]
+        if len(primary) > 1:
+            raise RuntimeError("The CurseForge modpack declares more than one primary mod loader.")
+        if primary:
+            selected = primary[0][1]
+            if selected is None:
+                loader_id = str(primary[0][0].get("id") or "unknown")
+                raise RuntimeError(f"The CurseForge modpack uses an unsupported loader: {loader_id}.")
+        else:
+            supported = [parsed for _item, parsed in declared if parsed is not None]
+            families = {loader_name for loader_name, _loader_version in supported}
+            if len(families) > 1:
+                raise RuntimeError("The CurseForge modpack declares both Fabric and Forge and cannot be installed safely.")
+            selected = supported[0] if supported else None
         if selected is None:
-            raise RuntimeError("Only Forge CurseForge modpacks are supported in v0.7.0.")
-        loader_id = str(selected.get("id") or "")
-        forge_version = loader_id.split("-", 1)[1].strip() if "-" in loader_id else ""
-        if not forge_version:
-            raise RuntimeError("The CurseForge modpack declares an invalid Forge version.")
-        return game_version, forge_version
+            raise RuntimeError("The CurseForge modpack does not declare a supported Fabric or Forge loader.")
+        loader_name, loader_version = selected
+        return game_version, loader_name, loader_version
+
+    @staticmethod
+    def _parse_loader_id(value: str) -> tuple[str, str] | None:
+        loader_id = str(value).strip()
+        normalized = loader_id.casefold()
+        for loader_name in CurseForgePackInstaller.SUPPORTED_LOADERS:
+            prefix = loader_name + "-"
+            if not normalized.startswith(prefix):
+                continue
+            loader_version = loader_id[len(prefix):].strip()
+            if not loader_version:
+                raise RuntimeError(f"The CurseForge modpack declares an invalid {loader_name.title()} Loader version.")
+            return loader_name, loader_version
+        return None
+
+    @staticmethod
+    def _validate_expected_loader(actual_loader: str, expected_loader: str) -> None:
+        expected = str(expected_loader).strip().casefold()
+        if not expected:
+            return
+        if expected not in CurseForgePackInstaller.SUPPORTED_LOADERS:
+            raise RuntimeError(f"Unsupported CurseForge modpack loader filter: {expected_loader}.")
+        if actual_loader != expected:
+            raise RuntimeError(
+                f"This CurseForge modpack uses {actual_loader.title()}, "
+                f"but the browser filter is set to {expected.title()}."
+            )
 
     @staticmethod
     def _resolve_files(manifest: dict, game_version: str, install_optional_files: bool, reporter: ProgressReporter | None) -> tuple[list[dict], int]:

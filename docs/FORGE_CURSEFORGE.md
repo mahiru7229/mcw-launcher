@@ -51,6 +51,8 @@ The legacy single variable `MCW_CURSEFORGE_GATEWAY_URL` remains readable for com
 
 CurseForge loader labels are treated as **advisory metadata**, not final proof that a JAR is incompatible.
 
+For modpacks, the selected browser loader filters discovery, while the downloaded `manifest.json` is authoritative. The launcher accepts a single supported primary `fabric-<version>` or `forge-<version>` entry, rejects unsupported or ambiguous manifests, and creates the instance with that exact loader version.
+
 The launcher now:
 
 1. Requests files by Minecraft version without a strict Fabric/Forge filter.
@@ -122,8 +124,9 @@ The launcher does not construct undocumented CurseForge CDN paths. Every automat
 - If automatic distribution is unavailable, open the official project page and allow the user to select the downloaded `.jar`.
 - Validate manually selected files by expected byte size and SHA-1 before adding them to the instance.
 - Track installed and pending files in the CurseForge registry.
+- Install Fabric and Forge modpacks by validating `manifest.json`, preparing the declared loader, extracting overrides safely, and recording managed files for launch-time verification.
 
-The manual-download flow is implemented for mods. CurseForge modpack handling remains experimental and should be tested on copied instances.
+The verified manual-download flow supports both restricted mod JARs and restricted modpack ZIP archives. CurseForge modpack handling remains experimental and should be tested with non-critical worlds.
 
 ## Transactional standalone-mod installation
 

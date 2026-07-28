@@ -1,6 +1,6 @@
 # MCW Launcher v0.10.0 Beta 1
 
-> Opt-in test build for installing Fabric mods from CurseForge. `v0.9.0` remains the default Stable release.
+> Opt-in test build for installing Fabric mods and Fabric modpacks from CurseForge. `v0.9.0` remains the default Stable release.
 
 ---
 
@@ -10,6 +10,7 @@
 
 - Catalog Mods hỗ trợ chọn **CurseForge + Fabric**, tìm project, chọn file và cài vào instance Fabric tương thích.
 - Có thể chọn instance sẵn có hoặc tạo instance Fabric mới trước khi cài.
+- Trình duyệt modpack CurseForge hỗ trợ chọn **Fabric hoặc Forge**; launcher kiểm tra loader/version trong `manifest.json` trước khi tạo instance.
 - Dependency bắt buộc được giải quyết theo Minecraft version, loader ưu tiên và các kênh Release/Beta/Alpha đã bật.
 - Metadata CurseForge đi qua public gateway; API key không được nhúng trong launcher.
 - File JAR tải trực tiếp qua Download Engine, có progress, retry, resume, giới hạn mạng và xác minh SHA-1/size.
@@ -38,7 +39,8 @@ UPDATE_CHANNEL = beta
 3. Thử một mod Fabric cần Fabric API hoặc dependency bắt buộc khác.
 4. Thử đổi Release/Beta/Alpha và chọn Minecraft version khác.
 5. Thử file bị hạn chế phân phối và kiểm tra luồng nhập thủ công.
-6. Backup instance/world quan trọng trước khi thử Beta.
+6. Thử cài một modpack CurseForge Fabric và xác nhận instance mới dùng đúng Fabric Loader trong manifest.
+7. Backup instance/world quan trọng trước khi thử Beta.
 
 Chạy regression:
 
@@ -47,7 +49,7 @@ python -m pytest test -q
 python -m tools.release_preflight
 ```
 
-Kết quả source Beta 1: `1026 passed`, `0 failed`, `0 errors`.
+Kết quả source Beta 1: `1031 passed`, `0 failed`, `0 errors`.
 
 ---
 
@@ -57,6 +59,7 @@ Kết quả source Beta 1: `1026 passed`, `0 failed`, `0 errors`.
 
 - The Mods catalog supports **CurseForge + Fabric** project search, exact file selection, and installation into a compatible Fabric instance.
 - Users may select an existing instance or create a new Fabric instance before installation.
+- The CurseForge modpack browser supports **Fabric or Forge** and validates the loader/version in `manifest.json` before creating an instance.
 - Required dependencies are resolved using the Minecraft version, preferred loader, and enabled Release/Beta/Alpha channels.
 - CurseForge metadata uses the public gateway; no API key is bundled in the launcher.
 - JAR files download directly through the Download Engine with progress, retry, resume, shared network limits, and SHA-1/size verification.
@@ -85,7 +88,8 @@ UPDATE_CHANNEL = beta
 3. Test a Fabric mod requiring Fabric API or another required dependency.
 4. Test Release/Beta/Alpha choices and a different Minecraft version.
 5. Test a restricted-distribution file and the verified manual import flow.
-6. Back up important instances and worlds before testing the Beta.
+6. Install a Fabric CurseForge modpack and confirm the new instance uses the Fabric Loader version declared by its manifest.
+7. Back up important instances and worlds before testing the Beta.
 
 Regression commands:
 
@@ -94,4 +98,4 @@ python -m pytest test -q
 python -m tools.release_preflight
 ```
 
-Beta 1 source result: `1026 passed`, `0 failed`, `0 errors`.
+Beta 1 source result: `1031 passed`, `0 failed`, `0 errors`.

@@ -61,6 +61,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 ### Thử nghiệm trong `v0.10.0-beta.1`
 
 - Cài mod **Fabric trực tiếp từ CurseForge** trong catalog Mods hiện có; vẫn hỗ trợ Forge bằng cùng một luồng.
+- Cài **modpack Fabric từ CurseForge**: chọn Fabric/Forge trong trình duyệt, đọc loader và phiên bản chính xác từ `manifest.json`, rồi tạo instance tương ứng.
 - Tự chọn file phù hợp với Minecraft version, release channel và loader, sau đó cài dependency bắt buộc.
 - Dùng gateway công khai cho metadata; CurseForge API key vẫn chỉ nằm phía server và file mod được tải trực tiếp bằng Download Engine của launcher.
 - Kiểm tra metadata thật trong JAR trước khi thay đổi instance. Nhãn Fabric/Forge của CurseForge chỉ được dùng để ưu tiên kết quả.
@@ -180,6 +181,7 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 ### Experimental in `v0.10.0-beta.1`
 
 - Install **Fabric mods directly from CurseForge** in the existing Mods catalog while retaining the same Forge workflow.
+- Install **Fabric CurseForge modpacks** by selecting Fabric/Forge in the browser, validating the exact loader and version from `manifest.json`, and creating the matching instance.
 - Select files by Minecraft version, enabled release channels, and loader preference, then resolve required dependencies.
 - Fetch metadata through the public gateway, keep the CurseForge API key server-side, and download mod files directly with the launcher's Download Engine.
 - Validate real JAR metadata before changing an instance. CurseForge Fabric/Forge labels are ranking hints rather than the final authority.
@@ -411,7 +413,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 | PNG themes | Available |
 | NeoForge / Quilt | Not supported |
 | CurseForge Gateway mods | Beta — Fabric/Forge install, required dependencies, transactional apply, public gateway, cache and manual fallback |
-| CurseForge modpacks | Experimental — Forge flow with universal dependency support |
+| CurseForge modpacks | Experimental — Fabric/Forge manifest-driven install with universal dependency support |
 
 ## Contributing and bug reports
 

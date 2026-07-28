@@ -868,13 +868,13 @@ class MainWindow(QMainWindow):
         self.curseforge_controller.search(project_type, query, sort, index, game_version=self.curseforge_mod_dialog.game_version, loader=self.curseforge_mod_dialog.loader)
 
     def _search_curseforge_modpacks(self, project_type: str, query: str, sort: str, index: int) -> None:
-        self.curseforge_controller.search(project_type, query, sort, index, loader=ModLoaderManager.FORGE)
+        self.curseforge_controller.search(project_type, query, sort, index, loader=self.curseforge_modpack_dialog.loader)
 
     def _refresh_curseforge_mods(self, project_type: str, query: str, sort: str, index: int) -> None:
         self.curseforge_controller.search(project_type, query, sort, index, game_version=self.curseforge_mod_dialog.game_version, loader=self.curseforge_mod_dialog.loader, force_refresh=True, manual_refresh=True)
 
     def _refresh_curseforge_modpacks(self, project_type: str, query: str, sort: str, index: int) -> None:
-        self.curseforge_controller.search(project_type, query, sort, index, loader=ModLoaderManager.FORGE, force_refresh=True, manual_refresh=True)
+        self.curseforge_controller.search(project_type, query, sort, index, loader=self.curseforge_modpack_dialog.loader, force_refresh=True, manual_refresh=True)
 
     def _install_curseforge_mod(self, project_id: int, file_id: int, allowed_release_types: object) -> None:
         if self.curseforge_mod_dialog.catalog_mode:
@@ -962,7 +962,7 @@ class MainWindow(QMainWindow):
         )
         return True if answer == QMessageBox.StandardButton.Yes else None
 
-    def _install_curseforge_modpack(self, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: object) -> None:
+    def _install_curseforge_modpack(self, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: object, expected_loader: str) -> None:
         self._curseforge_pending_modpack_install = None
         self.curseforge_controller.install_modpack(
             int(project_id),
@@ -970,15 +970,16 @@ class MainWindow(QMainWindow):
             str(instance_name),
             bool(install_optional_files),
             tuple(allowed_release_types) if isinstance(allowed_release_types, (list, tuple, set)) else ("release",),
+            str(expected_loader),
         )
 
-    def _set_curseforge_results(self, project_type: str, result: object) -> None:
+    def _set_curseforge_results(self, project_type: str, loader: str, result: object) -> None:
         dialog = self.curseforge_mod_dialog if project_type == "mod" else self.curseforge_modpack_dialog
-        dialog.set_search_result(result)
+        dialog.set_search_result(result, loader)
 
-    def _set_curseforge_files(self, project_type: str, project_id: int, files: list) -> None:
+    def _set_curseforge_files(self, project_type: str, project_id: int, loader: str, files: list) -> None:
         dialog = self.curseforge_mod_dialog if project_type == "mod" else self.curseforge_modpack_dialog
-        dialog.set_files(project_id, files)
+        dialog.set_files(project_id, files, loader)
 
     def _set_curseforge_cache_info(self, project_type: str, info: object) -> None:
         dialog = self.curseforge_mod_dialog if project_type == "mod" else self.curseforge_modpack_dialog

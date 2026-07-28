@@ -62,6 +62,7 @@ def test_modpack_manual_download_exception_has_stable_module_and_legacy_reexport
     assert error.instance_name == "Pack Instance"
     assert error.install_optional_files is True
     assert error.allowed_release_types == ("release",)
+    assert error.expected_loader == ""
 
 def test_gui_imports_curseforge_recovery_errors_from_stable_module() -> None:
     main_window = Path("src/gui/main_window_2.py").read_text(encoding="utf-8")
@@ -70,4 +71,3 @@ def test_gui_imports_curseforge_recovery_errors_from_stable_module() -> None:
     assert "from src.core.curseforge.curseforge_errors import" in main_window
     assert "from src.core.curseforge.curseforge_pack_installer import CurseForgeModpackManualDownloadRequired" not in main_window
     assert "from src.core.curseforge.curseforge_errors import CurseForgeModpackManualDownloadRequired" in controller
-

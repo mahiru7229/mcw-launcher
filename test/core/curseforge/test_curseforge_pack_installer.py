@@ -1,10 +1,17 @@
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
+from types import SimpleNamespace
+import json
+import zipfile
 
 import pytest
 
 from src.core.curseforge.curseforge_client import CurseForgeClient
 from src.core.curseforge.curseforge_pack_installer import CurseForgePackInstaller
+from src.core.instance.instance_manager import InstanceManager
+from src.core.minecraft.version_manager import VersionManager
+from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.models.curseforge.file import CurseForgeFile
+from src.models.instance.instance import Instance
 
 
 def test_parses_primary_forge_loader() -> None:
@@ -18,14 +25,120 @@ def test_parses_primary_forge_loader() -> None:
         }
     }
 
-    assert CurseForgePackInstaller._parse_loader(manifest) == ("1.20.1", "47.3.0")
+    assert CurseForgePackInstaller._parse_loader(manifest) == ("1.20.1", "forge", "47.3.0")
 
 
-def test_rejects_non_forge_pack() -> None:
+def test_parses_primary_fabric_loader() -> None:
     manifest = {"minecraft": {"version": "1.20.1", "modLoaders": [{"id": "fabric-0.16.0", "primary": True}]}}
 
-    with pytest.raises(RuntimeError, match="Only Forge CurseForge modpacks"):
-        CurseForgePackInstaller._parse_loader(manifest)
+    assert CurseForgePackInstaller._parse_loader(manifest) == ("1.20.1", "fabric", "0.16.0")
+
+
+def test_rejects_ambiguous_or_unsupported_modpack_loaders() -> None:
+    mixed = {
+        "minecraft": {
+            "version": "1.20.1",
+            "modLoaders": [
+                {"id": "fabric-0.16.0"},
+                {"id": "forge-47.3.0"},
+            ],
+        }
+    }
+    unsupported = {
+        "minecraft": {
+            "version": "1.20.1",
+            "modLoaders": [
+                {"id": "quilt-0.27.1", "primary": True},
+                {"id": "fabric-0.16.0"},
+            ],
+        }
+    }
+
+    with pytest.raises(RuntimeError, match="both Fabric and Forge"):
+        CurseForgePackInstaller._parse_loader(mixed)
+    with pytest.raises(RuntimeError, match="unsupported loader"):
+        CurseForgePackInstaller._parse_loader(unsupported)
+
+
+def test_rejects_modpack_when_browser_loader_filter_does_not_match_manifest() -> None:
+    with pytest.raises(RuntimeError, match="browser filter is set to Forge"):
+        CurseForgePackInstaller._validate_expected_loader("fabric", "forge")
+
+
+def test_installs_fabric_modpack_as_fabric_instance(tmp_path: Path, monkeypatch) -> None:
+    pack_path = tmp_path / "fabric-pack.zip"
+    manifest = {
+        "minecraft": {
+            "version": "1.20.1",
+            "modLoaders": [{"id": "fabric-0.16.0", "primary": True}],
+        },
+        "files": [],
+        "overrides": "overrides",
+    }
+    with zipfile.ZipFile(pack_path, "w") as archive:
+        archive.writestr("manifest.json", json.dumps(manifest))
+        archive.writestr("overrides/config/example.json", "{}")
+
+    calls: list[tuple[str, ...]] = []
+    base_version = SimpleNamespace(id="1.20.1")
+    project = SimpleNamespace(name="Fabric Pack")
+    file = SimpleNamespace(display_name="Fabric Pack 1.0")
+
+    def create_instance(name: str, version: object, mod_loader: tuple[str, str]) -> Instance:
+        instance_dir = tmp_path / "instances" / name
+        instance_dir.mkdir(parents=True)
+        return Instance(
+            instance_id="fabric-pack",
+            name=name,
+            version_id=version.id,
+            instance_dir=instance_dir,
+            mod_loader=mod_loader,
+        )
+
+    monkeypatch.setattr(CurseForgePackInstaller, "_resolve_files", staticmethod(lambda *_args, **_kwargs: ([], 0)))
+    monkeypatch.setattr(VersionManager, "load", staticmethod(lambda version_id: base_version))
+    monkeypatch.setattr(
+        ModLoaderManager,
+        "resolve",
+        staticmethod(
+            lambda game_version, loader_name, loader_version="auto": (
+                calls.append(("resolve", game_version, loader_name, loader_version))
+                or (loader_name, loader_version)
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        ModLoaderManager,
+        "prepare",
+        staticmethod(
+            lambda version, loader_name, loader_version, reporter=None: (
+                calls.append(("prepare", loader_name, loader_version)) or version
+            )
+        ),
+    )
+    monkeypatch.setattr(InstanceManager, "create", staticmethod(create_instance))
+
+    result = CurseForgePackInstaller._install_from_archive(
+        11,
+        22,
+        "Fabric Instance",
+        True,
+        project,
+        file,
+        pack_path,
+        None,
+        expected_loader="fabric",
+    )
+
+    assert result.instance.mod_loader == ("fabric", "0.16.0")
+    assert ("resolve", "1.20.1", "fabric", "0.16.0") in calls
+    assert ("prepare", "fabric", "0.16.0") in calls
+    assert (result.instance.instance_dir / "config" / "example.json").is_file()
+    registry = json.loads(
+        (result.instance.instance_dir / ".mcw" / "curseforge-pack.json").read_text(encoding="utf-8")
+    )
+    assert registry["loader"] == "fabric"
+    assert registry["loaderVersion"] == "0.16.0"
 
 
 @pytest.mark.parametrize("value", ["../outside", "/absolute", "C:/windows", "folder/../../escape", ""])
@@ -68,12 +181,9 @@ def test_resolve_files_keeps_advisory_loader_metadata(monkeypatch) -> None:
 
 
 def test_manual_modpack_download_becomes_resumable_request(monkeypatch, tmp_path) -> None:
-    from types import SimpleNamespace
-
     from src.core.curseforge.curseforge_downloader import CurseForgeDownloader, CurseForgeManualDownloadRequired
     from src.core.curseforge.curseforge_pack_installer import CurseForgeModpackManualDownloadRequired
     from src.core.fs.paths import Paths
-    from src.core.instance.instance_manager import InstanceManager
     from src.models.curseforge.manual_download import CurseForgeManualDownload
 
     project = SimpleNamespace(name="Restricted Pack", project_url="https://www.curseforge.com/minecraft/modpacks/restricted-pack")
@@ -110,13 +220,20 @@ def test_manual_modpack_download_becomes_resumable_request(monkeypatch, tmp_path
     monkeypatch.setattr(CurseForgeDownloader, "download_file", staticmethod(lambda *_args, **_kwargs: (_ for _ in ()).throw(CurseForgeManualDownloadRequired(requirement))))
 
     with pytest.raises(CurseForgeModpackManualDownloadRequired) as raised:
-        CurseForgePackInstaller.install(11, 22, "Restricted Pack", allowed_release_types=("release",))
+        CurseForgePackInstaller.install(
+            11,
+            22,
+            "Restricted Pack",
+            allowed_release_types=("release",),
+            expected_loader="fabric",
+        )
 
     request = raised.value
     assert request.instance_name == "Restricted Pack"
     assert request.requirement.managed_kind == "modpack_archive"
     assert request.requirement.project_url.endswith("/files/22")
     assert request.allowed_release_types == ("release",)
+    assert request.expected_loader == "fabric"
 
 
 def test_manual_modpack_archive_is_verified_cached_and_resumed(monkeypatch, tmp_path) -> None:
