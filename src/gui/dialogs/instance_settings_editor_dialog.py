@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -49,7 +47,7 @@ class InstanceSettingsEditorDialog(QDialog):
     def settings_data(self) -> dict:
         return SettingsManager.to_dict(
             InstanceSettings(
-                java_path=Path(self.java_path_input.text().strip()) if self.java_path_input.text().strip() else "",
+                java_path=self.java_path_input.text().strip(),
                 min_memory=self.min_memory.value(),
                 max_memory=self.max_memory.value(),
                 jvm_arguments=self._lines(self.jvm_arguments.toPlainText()),

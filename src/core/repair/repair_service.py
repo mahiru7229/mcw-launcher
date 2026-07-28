@@ -21,7 +21,6 @@ from src.core.minecraft.asset_manager import AssetManager
 from src.core.minecraft.download_manager import DownloadClientManager
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.minecraft.version_manager import VersionManager
-from src.core.minecraft.version_manifest_manager import VersionManifestManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.core.modrinth.modrinth_pack_repair_manager import ModrinthPackRepairManager
@@ -470,10 +469,13 @@ class RepairService:
             cached_version = VersionManager._parse_version(cached_data, cached_path)
         except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError):
             cached_version = None
-        if cached_version is not None:
-            return cached_version
-        VersionManifestManager.get()
-        return VersionManager.load(instance.version_id)
+
+        try:
+            return VersionManager.load(instance.version_id)
+        except RuntimeError:
+            if cached_version is not None:
+                return cached_version
+            raise
 
     @classmethod
     def _version_for_scan(cls, instance: Instance, base_version: Version) -> tuple[Version, RepairIssue | None]:
