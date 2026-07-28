@@ -22,6 +22,7 @@ class PackageManager:
     PACKAGE_TYPE_INSTANCE = "instance"
     MAX_ARCHIVE_FILES = 500_000
     MAX_EXTRACTED_BYTES = 128 * 1024 * 1024 * 1024
+    MAX_METADATA_BYTES = 1024 * 1024
     COPY_CHUNK_SIZE = 1024 * 1024
     WINDOWS_RESERVED_NAMES = {"con", "prn", "aux", "nul", *(f"com{index}" for index in range(1, 10)), *(f"lpt{index}" for index in range(1, 10))}
     WINDOWS_INVALID_CHARACTERS = set('<>:"|?*')
@@ -128,6 +129,59 @@ class PackageManager:
                 return metadata
         except BadZipFile as error:
             raise RuntimeError("Invalid package: the archive is corrupted.") from error
+
+    @staticmethod
+    def inspect_instance(package_path: Path) -> tuple[PackageMetadata, dict, dict | None]:
+        if not package_path.exists():
+            raise RuntimeError(f"Package '{package_path}' does not exist.")
+        if package_path.suffix.lower() != ".mcwpack":
+            raise RuntimeError("Invalid package extension.")
+
+        inspection_root = package_path.parent / ".mcwpack-inspection"
+        try:
+            with ZipFile(package_path, "r") as archive:
+                metadata = PackageManager.load_package_metadata(archive)
+                PackageManager.validate_package(metadata)
+                members, _total_bytes = PackageManager._validated_members(archive, inspection_root)
+                instance_members = [
+                    (member, relative)
+                    for member, relative, _target in members
+                    if not member.is_dir() and relative.name.casefold() == "instance.json"
+                ]
+                if len(instance_members) != 1:
+                    raise RuntimeError("Invalid package: missing or duplicated instance.json.")
+
+                instance_member, instance_relative = instance_members[0]
+                instance_data = PackageManager._read_json_member(archive, instance_member, "instance.json")
+                settings_relative = instance_relative.parent / "settings.json"
+                settings_members = [
+                    member
+                    for member, relative, _target in members
+                    if not member.is_dir() and relative.as_posix().casefold() == settings_relative.as_posix().casefold()
+                ]
+                if len(settings_members) > 1:
+                    raise RuntimeError("Invalid package: duplicated settings.json.")
+                settings_data = (
+                    PackageManager._read_json_member(archive, settings_members[0], "settings.json")
+                    if settings_members
+                    else None
+                )
+                return metadata, instance_data, settings_data
+        except BadZipFile as error:
+            raise RuntimeError("Invalid package: the archive is corrupted.") from error
+
+    @staticmethod
+    def _read_json_member(archive: ZipFile, member: ZipInfo, label: str) -> dict:
+        if int(member.file_size or 0) > PackageManager.MAX_METADATA_BYTES:
+            raise RuntimeError(f"Invalid package: {label} is too large.")
+        try:
+            raw = archive.read(member)
+            data = json.loads(raw.decode("utf-8-sig"))
+        except (UnicodeError, json.JSONDecodeError) as error:
+            raise RuntimeError(f"Invalid package: {label} is malformed.") from error
+        if not isinstance(data, dict):
+            raise RuntimeError(f"Invalid package: {label} must contain an object.")
+        return data
 
     @staticmethod
     def _collect_export_files(instance_dir: Path, include_saves: bool, excluded_paths: set[Path]) -> list[tuple[Path, PurePosixPath, int]]:

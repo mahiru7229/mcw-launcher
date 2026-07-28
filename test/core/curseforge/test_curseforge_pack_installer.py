@@ -151,6 +151,12 @@ def test_accepts_safe_override_path() -> None:
     assert CurseForgePackInstaller._safe_relative_path("config/example.toml") == PurePosixPath("config/example.toml")
 
 
+@pytest.mark.parametrize("value", ["settings.json", "instance.json", ".mcw/registry.json"])
+def test_rejects_launcher_owned_override_paths(value: str) -> None:
+    with pytest.raises(RuntimeError, match="Reserved"):
+        CurseForgePackInstaller._safe_relative_path(value)
+
+
 def test_resolve_files_keeps_advisory_loader_and_game_version_metadata(monkeypatch) -> None:
     file = CurseForgeFile(
         file_id=20,

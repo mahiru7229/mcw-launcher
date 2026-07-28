@@ -42,6 +42,7 @@ from src.gui.dialogs.compatible_instance_dialog import CompatibleInstanceDialog
 from src.gui.dialogs.curseforge_browser_dialog import CurseForgeBrowserDialog
 from src.gui.dialogs.curseforge_manual_download_dialog import CurseForgeManualDownloadDialog
 from src.gui.dialogs.lan_agent_log_dialog import LanAgentLogDialog
+from src.gui.dialogs.instance_import_settings_dialog import InstanceImportSettingsDialog
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
 from src.gui.dialogs.repair_center_dialog import RepairCenterDialog
@@ -263,7 +264,7 @@ class MainWindow(QMainWindow):
         self.instances_page.rename_requested.connect(self.instance_controller.rename)
         self.instances_page.clone_requested.connect(self.instance_controller.clone)
         self.instances_page.delete_requested.connect(self.instance_controller.delete)
-        self.instances_page.import_requested.connect(self.instance_controller.import_package)
+        self.instances_page.import_requested.connect(self.instance_controller.inspect_package)
         self.instances_page.export_requested.connect(self.instance_controller.export_package)
         self.instances_page.backup_requested.connect(self.backup_controller.create)
         self.instances_page.restore_backup_requested.connect(self.backup_controller.restore)
@@ -335,6 +336,7 @@ class MainWindow(QMainWindow):
         self.instance_controller.selected_instance_changed.connect(self._instance_selected)
         self.instance_controller.forge_diagnostics_finished.connect(self._forge_diagnostics_finished)
         self.instance_controller.export_finished.connect(self._show_export_finished)
+        self.instance_controller.import_preview_ready.connect(self._show_instance_import_settings)
 
         self.instance_settings_controller.settings_loaded.connect(self.instance_settings_page.set_settings)
         self.gui_settings_controller.settings_changed.connect(self._apply_gui_settings)
@@ -1751,6 +1753,17 @@ class MainWindow(QMainWindow):
 
     def _show_export_finished(self, path: Path) -> None:
         QMessageBox.information(self, tr("Export complete"), tr("Saved to:\n{path}", path=path))
+
+    def _show_instance_import_settings(self, preview: object) -> None:
+        launcher_defaults = self.gui_settings_controller.current.get("instance_defaults", {})
+        dialog = InstanceImportSettingsDialog(preview, launcher_defaults, self)
+        if not dialog.exec():
+            self._set_status(tr("instance_import.settings.cancelled"))
+            return
+        self.instance_controller.import_package(
+            preview.package_path,
+            dialog.selected_settings_override,
+        )
 
     def closeEvent(self, event: QCloseEvent) -> None:
         if self.task_runner.has_active_tasks:

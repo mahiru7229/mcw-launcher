@@ -30,6 +30,7 @@ class CurseForgePackInstaller:
     MAX_OVERRIDE_BYTES = 2 * 1024 * 1024 * 1024
     MAX_PATH_LENGTH = 240
     MAX_WORKERS = 8
+    RESERVED_ROOT_NAMES = {"instance.json", "settings.json", ".mcw"}
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
     SUPPORTED_LOADERS = (ModLoaderManager.FABRIC, ModLoaderManager.FORGE)
 
@@ -313,8 +314,11 @@ class CurseForgePackInstaller:
         path = PurePosixPath(normalized)
         if len(normalized) > CurseForgePackInstaller.MAX_PATH_LENGTH or not normalized or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
             raise RuntimeError(f"Unsafe path in CurseForge modpack: {value!r}")
-        if ":" in path.parts[0]:
+        first = path.parts[0].casefold()
+        if ":" in first:
             raise RuntimeError(f"Unsafe Windows path in CurseForge modpack: {value!r}")
+        if first in CurseForgePackInstaller.RESERVED_ROOT_NAMES:
+            raise RuntimeError(f"Reserved path in CurseForge modpack: {value!r}")
         return path
 
     @staticmethod
