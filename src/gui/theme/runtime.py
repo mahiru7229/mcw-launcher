@@ -7,6 +7,7 @@ from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
 
 from src.core.theme.theme_manager import ThemeManager, theme_manager
+from src.gui.theme.font_runtime import ThemeFontRuntime, theme_font_runtime
 from src.gui.widget.themed_animated_label import ThemedAnimatedLabel
 from src.gui.widget.themed_progress_bar import ThemedProgressBar
 
@@ -129,8 +130,14 @@ class ThemeRuntime:
         "combo.arrow": "QComboBox::down-arrow",
     }
 
-    def __init__(self, manager: ThemeManager | None = None) -> None:
+    def __init__(self, manager: ThemeManager | None = None, font_runtime: ThemeFontRuntime | None = None) -> None:
         self.manager = manager or theme_manager
+        if font_runtime is not None:
+            self.font_runtime = font_runtime
+        elif self.manager is theme_manager:
+            self.font_runtime = theme_font_runtime
+        else:
+            self.font_runtime = ThemeFontRuntime(self.manager)
         self._base_stylesheet = ""
         self._show_static_text = False
 
@@ -138,9 +145,11 @@ class ThemeRuntime:
         self._base_stylesheet = str(base_stylesheet)
         self._show_static_text = bool(show_static_text)
         self.manager.reload()
-        self.manager.select(theme_id)
-        stylesheet = self.build_stylesheet(self._base_stylesheet)
+        selected_theme = self.manager.select(theme_id)
         application = QApplication.instance()
+        if application is not None:
+            self.font_runtime.apply(application, selected_theme)
+        stylesheet = self.build_stylesheet(self._base_stylesheet)
         if application is not None:
             application.setStyleSheet(stylesheet)
         else:
@@ -153,6 +162,9 @@ class ThemeRuntime:
 
     def build_stylesheet(self, base_stylesheet: str = "") -> str:
         rules: list[str] = [str(base_stylesheet).rstrip()]
+        font_rule = self.font_runtime.stylesheet_rule()
+        if font_rule:
+            rules.append(font_rule)
         for key, (selector, slice_size) in self.STYLE_ASSETS.items():
             path = self.manager.resolve_asset(key, fallback_to_default=key.startswith("button.cancel"))
             if path is None:

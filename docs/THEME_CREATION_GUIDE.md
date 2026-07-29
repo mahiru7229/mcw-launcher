@@ -1,6 +1,6 @@
 # Hướng dẫn tạo theme cho MCW Launcher
 
-Tài liệu này hướng dẫn tạo theme PNG ngoài EXE cho MCW Launcher. Từ v0.11.0-alpha.1, theme có thể kèm PNG spritesheet animation.
+Tài liệu này hướng dẫn tạo theme ngoài EXE cho MCW Launcher. Từ v0.11.0-alpha.1, theme có thể kèm PNG spritesheet animation; từ v0.11.0-alpha.2, theme có thể đóng gói font TTF/OTF cho toàn bộ chữ.
 
 ## 1. Tạo thư mục theme
 
@@ -16,7 +16,7 @@ themes/
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "id": "my-theme",
   "name": "My Theme",
   "author": "Artist name",
@@ -158,7 +158,38 @@ Theme có thể vẽ progress, trạng thái busy và các animated asset tươn
 
 Theme schema 1 cũ vẫn hoạt động. Xem [`THEME_ANIMATION_GUIDE.md`](THEME_ANIMATION_GUIDE.md) để biết cách xếp frame, animation key, fallback và giới hạn an toàn.
 
-## 8. Trạng thái button
+## 8. Custom font trong v0.11.0-alpha.2
+
+Đặt font vào thư mục theme và khai báo manifest schema 3:
+
+```text
+themes/my-theme/
+├── theme.json
+└── fonts/
+    ├── ui-regular.ttf
+    └── ui-bold.otf
+```
+
+```json
+{
+  "schema_version": 3,
+  "font": {
+    "files": [
+      "fonts/ui-regular.ttf",
+      "fonts/ui-bold.otf"
+    ],
+    "family": "My Pixel Font",
+    "point_size": 10.5,
+    "weight": 400,
+    "letter_spacing": 0,
+    "fallback_families": ["Segoe UI", "Arial"]
+  }
+}
+```
+
+Font được áp dụng cho toàn bộ chữ và đổi ngay khi preview theme. Font nên chứa glyph tiếng Việt; nếu thiếu, hãy khai báo `fallback_families`. Xem [`THEME_FONT_GUIDE.md`](THEME_FONT_GUIDE.md) để biết đầy đủ field và giới hạn an toàn.
+
+## 9. Trạng thái button
 
 Một nút nên có đủ state khi có thể:
 
@@ -176,7 +207,7 @@ controls/buttons/launch/
 
 Các state Launch thiếu sẽ fallback về CSS. Riêng state Cancel có bộ PNG fallback đi kèm launcher, nên nút vẫn hiện rõ khi theme cũ chưa khai báo asset mới.
 
-## 9. Background và vùng an toàn
+## 10. Background và vùng an toàn
 
 - `background.window`: 1600 × 900.
 - Sidebar: 220 × 900.
@@ -185,7 +216,7 @@ Các state Launch thiếu sẽ fallback về CSS. Riêng state Cancel có bộ P
 - Không đặt chữ quan trọng sát mép vì cửa sổ có thể scale hoặc resize.
 - Kiểm tra theme trên 1366 × 768 và 1600 × 900.
 
-## 10. Kiểm tra theme
+## 11. Kiểm tra theme
 
 1. Đặt folder cạnh source hoặc cạnh EXE:
 
@@ -208,7 +239,7 @@ Nếu theme không xuất hiện:
 - kiểm tra file thật sự là PNG;
 - không dùng `..`, drive letter hoặc path tuyệt đối.
 
-## 11. Fallback và theme chưa hoàn chỉnh
+## 12. Fallback và theme chưa hoàn chỉnh
 
 Theme có thể được phát hành khi mới có vài PNG. Launcher không crash vì:
 
@@ -220,7 +251,7 @@ Theme có thể được phát hành khi mới có vài PNG. Launcher không cra
 
 Asset lỗi bị bỏ qua riêng lẻ. Tuy vậy, nên test console/log để phát hiện typo trong manifest.
 
-## 12. Đóng gói cùng release
+## 13. Đóng gói cùng release
 
 Công cụ release tự copy toàn bộ `themes/`:
 
@@ -241,6 +272,8 @@ Người dùng cũng có thể thêm theme mới vào folder `themes/` mà khôn
 [ ] Button có hover/pressed khi cần
 [ ] PNG có chữ được khai báo trong text_assets
 [ ] Nội dung động không bị vẽ cứng vào PNG
-[ ] Thiếu asset vẫn fallback dễ đọc
+[ ] Font TTF/OTF nằm trong theme và có glyph tiếng Việt
+[ ] Font thiếu glyph có fallback_families phù hợp
+[ ] Thiếu asset/font vẫn fallback dễ đọc
 [ ] Theme xuất hiện sau Reload and preview theme
 ```

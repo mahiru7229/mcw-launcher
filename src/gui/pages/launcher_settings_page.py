@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import copy
+
 from PySide6.QtCore import QSignalBlocker, QTimer, Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QLabel, QLineEdit, QPushButton
 
+from src.core.instance.settings_manager import SettingsManager
 from src.core.language.language_manager import language_manager, tr
 from src.core.theme.theme_manager import theme_manager
 from src.gui.config import NAVIGATION_ITEMS, VERSION
+from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
 from src.gui.dialogs.protected_value_reveal_dialog import confirm_reveal_protected_values
 from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
@@ -26,6 +30,7 @@ class LauncherSettingsPage(BasePage):
     def __init__(self) -> None:
         super().__init__("Launcher Settings", "Preferences here belong to the GUI, not to an individual Minecraft instance.", "launcher_settings")
         self._java_installations: list[object] = []
+        self._instance_defaults = SettingsManager.default_dict()
         self._tracking_suspended = True
         self._dirty = False
         self._saved_data: dict = {}
@@ -164,6 +169,23 @@ class LauncherSettingsPage(BasePage):
         java_card.layout.addWidget(self.open_java_button)
         runtime_section.add_card(java_card)
 
+        self.instance_defaults_card = CardWidget(
+            tr("instance_defaults.launcher.title"),
+            tr("instance_defaults.launcher.description"),
+        )
+        self.instance_defaults_summary = QLabel()
+        self.instance_defaults_summary.setObjectName("MutedLabel")
+        self.instance_defaults_summary.setWordWrap(True)
+        self.edit_instance_defaults_button = set_theme_icon(
+            QPushButton(tr("instance_defaults.launcher.edit")),
+            "icon.action.settings",
+        )
+        self.edit_instance_defaults_button.clicked.connect(self._edit_instance_defaults)
+        self.instance_defaults_card.layout.addWidget(self.instance_defaults_summary)
+        self.instance_defaults_card.layout.addWidget(self.edit_instance_defaults_button)
+        runtime_section.add_card(self.instance_defaults_card)
+        self._update_instance_defaults_summary()
+
         forge_preflight_card = CardWidget(
             tr("forge_preflight.launcher.title"),
             tr("forge_preflight.launcher.detail"),
@@ -290,7 +312,7 @@ class LauncherSettingsPage(BasePage):
         for theme in themes:
             label = f"{theme.name} — {theme.author}"
             if theme.issues:
-                label += f" ({len(theme.issues)} fallback asset(s))"
+                label += f" ({len(theme.issues)} issue(s), fallback active)"
             self.theme_combo.addItem(label, theme.theme_id)
         selected = str(current_theme or theme_manager.current.theme_id or "mcw-default")
         index = self.theme_combo.findData(selected)
@@ -338,6 +360,7 @@ class LauncherSettingsPage(BasePage):
             "curseforge_gateway_urls": [field.text().strip() for field in self.curseforge_gateway_inputs],
             "download_limit_mbps": self.download_limit_mbps.value() if self.limit_download_speed.isChecked() else 0.0,
             "download_concurrency": int(self.download_concurrency.currentData() or 0),
+            "instance_defaults": copy.deepcopy(self._instance_defaults),
         }
 
     def request_save(self) -> None:
@@ -376,6 +399,12 @@ class LauncherSettingsPage(BasePage):
         self.block_curseforge_failure.setText(tr("managed_content.curseforge.block"))
         self.allow_forge_preflight_failure.setText(tr("forge_preflight.launcher.allow"))
         self.forge_preflight_warning_label.setText(tr("forge_preflight.warning"))
+        if self.instance_defaults_card.title_label is not None:
+            self.instance_defaults_card.title_label.setText(tr("instance_defaults.launcher.title"))
+        if self.instance_defaults_card.subtitle_label is not None:
+            self.instance_defaults_card.subtitle_label.setText(tr("instance_defaults.launcher.description"))
+        self.edit_instance_defaults_button.setText(tr("instance_defaults.launcher.edit"))
+        self._update_instance_defaults_summary()
         self._update_save_button_text()
 
     def _apply_form_data(self, settings: dict) -> None:
@@ -437,7 +466,24 @@ class LauncherSettingsPage(BasePage):
         self.theme_combo.setCurrentIndex(max(0, theme_index))
         self.theme_combo.blockSignals(False)
         self.show_static_text.setChecked(bool(settings.get("show_static_text", False)))
+        self._instance_defaults = SettingsManager.normalize_dict(settings.get("instance_defaults"))
+        self._update_instance_defaults_summary()
         del blockers
+
+    def _edit_instance_defaults(self) -> None:
+        dialog = InstanceSettingsEditorDialog(
+            self._instance_defaults,
+            self,
+            title=tr("instance_defaults.editor.title"),
+        )
+        if not dialog.exec():
+            return
+        self._instance_defaults = dialog.settings_data
+        self._update_instance_defaults_summary()
+        self._refresh_dirty_state()
+
+    def _update_instance_defaults_summary(self) -> None:
+        self.instance_defaults_summary.setText(InstanceSettingsEditorDialog.summary(self._instance_defaults))
 
 
     def _set_gateway_links_revealed(self, revealed: bool) -> None:

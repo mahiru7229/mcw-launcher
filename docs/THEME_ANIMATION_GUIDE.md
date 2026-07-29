@@ -51,7 +51,7 @@ Mỗi spritesheet là một PNG gồm nhiều frame có cùng kích thước, x�
 }
 ```
 
-Theme schema 1 cũ vẫn được hỗ trợ. Chỉ cần chuyển sang schema 2 khi theme muốn khai báo `animations`.
+Theme schema 1 cũ vẫn được hỗ trợ. Dùng schema 2 khi theme chỉ cần `animations`; schema 3 của Alpha 2 giữ nguyên toàn bộ animation field và bổ sung custom font.
 
 ## 3. Các field animation
 

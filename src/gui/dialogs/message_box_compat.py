@@ -32,7 +32,6 @@ QMessageBox {{
 QMessageBox QLabel {{
     background: transparent;
     color: {DIALOG_TEXT};
-    font-family: "Segoe UI";
     font-size: 10.5pt;
 }}
 
@@ -41,7 +40,6 @@ QMessageBox QPlainTextEdit {{
     background: {DARK_INPUT};
     color: {DIALOG_TEXT};
     border: 2px solid {DIALOG_BORDER};
-    font-family: "Segoe UI";
     font-size: 10.5pt;
 }}
 

@@ -2,7 +2,7 @@
 
 Mỗi theme nằm trong `themes/<theme-id>/` và có một `theme.json`.
 
-- Mọi PNG đều tùy chọn.
+- Mọi PNG và font theme đều tùy chọn.
 - Thiếu hoặc hỏng một file chỉ làm đúng thành phần đó fallback về CSS mặc định.
 - Launcher không dừng khởi động vì theme chưa hoàn chỉnh.
 - Có thể reload/preview trong **Launcher Settings → Appearance**.
@@ -12,6 +12,8 @@ Tài liệu:
 
 - [`docs/THEME_CREATION_GUIDE.md`](../docs/THEME_CREATION_GUIDE.md) — hướng dẫn tạo theme từng bước.
 - [`docs/THEME_ASSET_GUIDE.md`](../docs/THEME_ASSET_GUIDE.md) — toàn bộ key, đường dẫn và canvas PNG.
+- [`docs/THEME_ANIMATION_GUIDE.md`](../docs/THEME_ANIMATION_GUIDE.md) — PNG spritesheet và animation metadata.
+- [`docs/THEME_FONT_GUIDE.md`](../docs/THEME_FONT_GUIDE.md) — đóng gói TTF/OTF và áp dụng font toàn launcher.
 
 ## Asset mới của Beta 9
 
@@ -98,3 +100,23 @@ Ví dụ tối thiểu:
 ```
 
 Xem [`docs/THEME_ANIMATION_GUIDE.md`](../docs/THEME_ANIMATION_GUIDE.md) để biết đầy đủ schema, fallback, giới hạn an toàn và cách bố trí frame.
+
+
+## Custom font của v0.11.0-alpha.2
+
+Theme schema 3 có thể đóng gói font mà không yêu cầu người dùng cài font vào Windows:
+
+```json
+{
+  "schema_version": 3,
+  "font": {
+    "path": "fonts/ui.ttf",
+    "family": "My Pixel Font",
+    "point_size": 10.5,
+    "weight": 400,
+    "fallback_families": ["Segoe UI", "Arial"]
+  }
+}
+```
+
+Font được áp dụng lên toàn bộ widget, dialog, splash, tooltip và log. Khi file thiếu, hỏng hoặc Qt không đọc được, launcher tự quay về font hệ thống. Xem [`docs/THEME_FONT_GUIDE.md`](../docs/THEME_FONT_GUIDE.md) để biết cách dùng nhiều weight, glyph tiếng Việt và giới hạn file.

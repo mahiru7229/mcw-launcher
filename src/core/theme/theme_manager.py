@@ -11,6 +11,7 @@ from typing import Any
 from src.core.fs.paths import Paths
 from src.core.theme.theme_animation import ResolvedThemeAnimation, ThemeAnimationDefinition
 from src.core.theme.theme_catalog import THEME_ASSET_BY_KEY
+from src.core.theme.theme_font import ResolvedThemeFont, ThemeFontDefinition
 
 
 class ThemeError(RuntimeError):
@@ -34,6 +35,7 @@ class ThemeDefinition:
     assets: dict[str, str] = field(default_factory=dict)
     text_assets: dict[str, str] = field(default_factory=dict)
     animations: dict[str, ThemeAnimationDefinition] = field(default_factory=dict)
+    font: ThemeFontDefinition | None = None
     capabilities: frozenset[str] = frozenset()
     issues: tuple[str, ...] = ()
     builtin_fallback: bool = False
@@ -44,13 +46,18 @@ class ThemeManager:
     FALLBACK_THEME_ID = "builtin-css"
     MANIFEST_NAME = "theme.json"
     MAX_MANIFEST_BYTES = 512 * 1024
-    SUPPORTED_SCHEMA_VERSIONS = frozenset({1, 2})
+    SUPPORTED_SCHEMA_VERSIONS = frozenset({1, 2, 3})
     MAX_ANIMATION_FRAMES = 256
     MIN_FRAME_DURATION_MS = 16
     MAX_FRAME_DURATION_MS = 10_000
     ANIMATION_KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
     ANIMATION_RENDER_MODES = frozenset({"tile_x", "stretch", "contain"})
     ANIMATION_FILTERING_MODES = frozenset({"nearest", "smooth"})
+    FONT_EXTENSIONS = frozenset({".ttf", ".otf"})
+    FONT_WEIGHTS = frozenset({100, 200, 300, 400, 500, 600, 700, 800, 900})
+    MAX_FONT_FILES = 8
+    MAX_FONT_FILE_BYTES = 16 * 1024 * 1024
+    MAX_FONT_TOTAL_BYTES = 32 * 1024 * 1024
 
     def __init__(self, root: Path | None = None) -> None:
         self.root = Path(root) if root is not None else Paths.THEME_ROOT
@@ -143,6 +150,14 @@ class ThemeManager:
             return None
         return self.resolve_asset(fallback_definition.fallback_asset, fallback)
 
+    def resolve_font(self, theme: ThemeDefinition | None = None, fallback_to_default: bool = True) -> ResolvedThemeFont | None:
+        selected = theme or self.current
+        resolved = self._resolve_font_for_theme(selected)
+        if resolved is not None or not fallback_to_default or selected.theme_id == self.DEFAULT_THEME_ID:
+            return resolved
+        fallback = self._default_theme()
+        return self._resolve_font_for_theme(fallback) if fallback is not None else None
+
     def _default_theme(self) -> ThemeDefinition | None:
         with self._lock:
             return self._themes.get(self.DEFAULT_THEME_ID)
@@ -173,6 +188,22 @@ class ThemeManager:
             return None
         return ResolvedThemeAnimation(definition=definition, path=candidate, theme_id=selected.theme_id)
 
+    def _resolve_font_for_theme(self, selected: ThemeDefinition) -> ResolvedThemeFont | None:
+        if selected.root is None or selected.font is None:
+            return None
+        paths: list[Path] = []
+        total_bytes = 0
+        try:
+            for relative in selected.font.paths:
+                candidate = self._safe_font_path(selected.root, relative)
+                total_bytes += self._validate_font(candidate)
+                paths.append(candidate)
+            if total_bytes > self.MAX_FONT_TOTAL_BYTES:
+                raise ThemeAssetError("Theme font files exceed the total size limit.")
+        except ThemeAssetError:
+            return None
+        return ResolvedThemeFont(definition=selected.font, paths=tuple(paths), theme_id=selected.theme_id)
+
     def asset_status(self, theme: ThemeDefinition | None = None) -> dict[str, bool]:
         selected = theme or self.current
         return {key: self.resolve_asset(key, selected) is not None for key in THEME_ASSET_BY_KEY}
@@ -180,6 +211,10 @@ class ThemeManager:
     def animation_status(self, theme: ThemeDefinition | None = None) -> dict[str, bool]:
         selected = theme or self.current
         return {key: self.resolve_animation(key, selected, fallback_to_default=False) is not None for key in selected.animations}
+
+    def font_status(self, theme: ThemeDefinition | None = None) -> bool:
+        selected = theme or self.current
+        return self.resolve_font(selected, fallback_to_default=False) is not None
 
     def _load_theme(self, directory: Path) -> ThemeDefinition:
         manifest_path = directory / self.MANIFEST_NAME
@@ -215,10 +250,14 @@ class ThemeManager:
         raw_animations = payload.get("animations", {})
         if not isinstance(raw_animations, dict):
             raise ThemeManifestError("Theme animations must be an object.")
+        raw_font = payload.get("font")
+        if raw_font is not None and not isinstance(raw_font, dict):
+            raise ThemeManifestError("Theme font must be an object.")
 
         assets: dict[str, str] = {}
         text_assets: dict[str, str] = {}
         animations: dict[str, ThemeAnimationDefinition] = {}
+        font: ThemeFontDefinition | None = None
         issues: list[str] = []
         for key, value in raw_assets.items():
             normalized_key = str(key).strip()
@@ -263,9 +302,32 @@ class ThemeManager:
                 except ThemeAssetError as error:
                     issues.append(str(error))
 
+        if raw_font is not None:
+            try:
+                font = self._parse_font(directory, raw_font)
+            except ThemeAssetError as error:
+                issues.append(str(error))
+            else:
+                total_bytes = 0
+                for relative in font.paths:
+                    candidate = directory.resolve() / relative
+                    if not candidate.is_file():
+                        issues.append(f"Theme font file is missing: {candidate}")
+                        continue
+                    try:
+                        total_bytes += self._validate_font(candidate)
+                    except ThemeAssetError as error:
+                        issues.append(str(error))
+                if total_bytes > self.MAX_FONT_TOTAL_BYTES:
+                    issues.append(
+                        f"Theme font files exceed the {self.MAX_FONT_TOTAL_BYTES // (1024 * 1024)} MiB total limit."
+                    )
+
         capabilities = self._parse_capabilities(payload.get("capabilities", {}), issues)
         if animations:
             capabilities = frozenset({*capabilities, "animated_assets", "sprite_sheets"})
+        if font is not None:
+            capabilities = frozenset({*capabilities, "custom_font"})
 
         return ThemeDefinition(
             theme_id=theme_id,
@@ -275,6 +337,7 @@ class ThemeManager:
             assets=assets,
             text_assets=text_assets,
             animations=animations,
+            font=font,
             capabilities=capabilities,
             issues=tuple(issues),
         )
@@ -347,6 +410,75 @@ class ThemeManager:
             fallback_asset=fallback_asset,
         )
 
+    def _parse_font(self, directory: Path, value: object) -> ThemeFontDefinition:
+        if not isinstance(value, dict):
+            raise ThemeAssetError("Theme font must be an object.")
+
+        raw_files = value.get("files")
+        if raw_files is None:
+            single_path = value.get("path")
+            raw_files = [single_path] if single_path is not None else []
+        if not isinstance(raw_files, (list, tuple)):
+            raise ThemeAssetError("Theme font files must be a list.")
+        if not 1 <= len(raw_files) <= self.MAX_FONT_FILES:
+            raise ThemeAssetError(f"Theme font must declare between 1 and {self.MAX_FONT_FILES} files.")
+
+        paths: list[str] = []
+        for raw_path in raw_files:
+            candidate = self._safe_font_path(directory, str(raw_path or ""))
+            normalized = candidate.relative_to(directory.resolve()).as_posix()
+            if normalized not in paths:
+                paths.append(normalized)
+        if not paths:
+            raise ThemeAssetError("Theme font does not contain a usable font file.")
+
+        raw_family = value.get("family")
+        family = str(raw_family).strip() if raw_family is not None else None
+        if family == "":
+            family = None
+        if family is not None and (len(family) > 128 or any(ord(character) < 32 for character in family)):
+            raise ThemeAssetError("Theme font family is invalid.")
+
+        try:
+            point_size = float(value.get("point_size", 10.5))
+            weight = int(value.get("weight", 400))
+            letter_spacing = float(value.get("letter_spacing", 0.0))
+        except (TypeError, ValueError) as error:
+            raise ThemeAssetError("Theme font has invalid numeric metadata.") from error
+        if not 6.0 <= point_size <= 72.0:
+            raise ThemeAssetError("Theme font point_size must be between 6 and 72.")
+        if weight not in self.FONT_WEIGHTS:
+            raise ThemeAssetError("Theme font weight must be one of 100, 200, 300, 400, 500, 600, 700, 800, or 900.")
+        if not -5.0 <= letter_spacing <= 20.0:
+            raise ThemeAssetError("Theme font letter_spacing must be between -5 and 20 pixels.")
+
+        italic = value.get("italic", False)
+        if not isinstance(italic, bool):
+            raise ThemeAssetError("Theme font italic must be a boolean.")
+
+        raw_fallbacks = value.get("fallback_families", [])
+        if not isinstance(raw_fallbacks, (list, tuple)):
+            raise ThemeAssetError("Theme font fallback_families must be a list.")
+        if len(raw_fallbacks) > 8:
+            raise ThemeAssetError("Theme font supports at most 8 fallback families.")
+        fallback_families: list[str] = []
+        for raw_fallback in raw_fallbacks:
+            fallback = str(raw_fallback).strip()
+            if not fallback or len(fallback) > 128 or any(ord(character) < 32 for character in fallback):
+                raise ThemeAssetError("Theme font contains an invalid fallback family.")
+            if fallback not in fallback_families:
+                fallback_families.append(fallback)
+
+        return ThemeFontDefinition(
+            paths=tuple(paths),
+            family=family,
+            point_size=point_size,
+            weight=weight,
+            italic=italic,
+            letter_spacing=letter_spacing,
+            fallback_families=tuple(fallback_families),
+        )
+
     @staticmethod
     def _parse_capabilities(raw: object, issues: list[str]) -> frozenset[str]:
         if raw is None:
@@ -357,6 +489,37 @@ class ThemeManager:
             return frozenset(str(value).strip() for value in raw if str(value).strip())
         issues.append("Theme capabilities must be an object or list.")
         return frozenset()
+
+    @classmethod
+    def _safe_font_path(cls, root: Path, relative: str) -> Path:
+        value = str(relative).replace("\\", "/").strip()
+        if not value or value.startswith("/") or ":" in value.split("/", 1)[0]:
+            raise ThemeAssetError(f"Unsafe theme font path: {relative!r}")
+        root_resolved = root.resolve()
+        candidate = (root_resolved / value).resolve()
+        try:
+            candidate.relative_to(root_resolved)
+        except ValueError as error:
+            raise ThemeAssetError(f"Theme font escapes its theme directory: {relative!r}") from error
+        if candidate.suffix.lower() not in cls.FONT_EXTENSIONS:
+            raise ThemeAssetError(f"Theme font must be a TTF or OTF file: {relative!r}")
+        return candidate
+
+    @classmethod
+    def _validate_font(cls, path: Path) -> int:
+        try:
+            size = path.stat().st_size
+            with path.open("rb") as file:
+                signature = file.read(4)
+        except OSError as error:
+            raise ThemeAssetError(f"Unable to read theme font: {path}") from error
+        if size <= 0 or size > cls.MAX_FONT_FILE_BYTES:
+            raise ThemeAssetError(
+                f"Theme font size must be between 1 byte and {cls.MAX_FONT_FILE_BYTES // (1024 * 1024)} MiB: {path}"
+            )
+        if signature not in {b"\x00\x01\x00\x00", b"OTTO", b"true", b"typ1"}:
+            raise ThemeAssetError(f"Invalid TTF/OTF theme font: {path}")
+        return size
 
     @staticmethod
     def _safe_png_path(root: Path, relative: str) -> Path:

@@ -285,3 +285,111 @@ def test_unsupported_animation_type_is_ignored(tmp_path: Path) -> None:
 
     assert selected.animations == {}
     assert any("unsupported type" in issue for issue in selected.issues)
+
+
+def write_font(path: Path, signature: bytes = b"\x00\x01\x00\x00", payload_size: int = 64) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(signature + (b"\x00" * max(0, payload_size - len(signature))))
+
+
+def test_valid_custom_font_is_resolved(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "font-theme"
+    theme_root.mkdir(parents=True)
+    payload = {
+        "schema_version": 3,
+        "id": "font-theme",
+        "name": "Font Theme",
+        "assets": {},
+        "font": {
+            "files": ["fonts/ui-regular.ttf", "fonts/ui-bold.otf"],
+            "family": "MCW Pixel",
+            "point_size": 11,
+            "weight": 500,
+            "italic": False,
+            "letter_spacing": 1.0,
+            "fallback_families": ["Segoe UI", "Arial"],
+        },
+    }
+    (theme_root / "theme.json").write_text(json.dumps(payload), encoding="utf-8")
+    write_font(theme_root / "fonts/ui-regular.ttf")
+    write_font(theme_root / "fonts/ui-bold.otf", signature=b"OTTO")
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("font-theme")
+    resolved = manager.resolve_font()
+
+    assert resolved is not None
+    assert resolved.theme_id == "font-theme"
+    assert resolved.paths == (
+        (theme_root / "fonts/ui-regular.ttf").resolve(),
+        (theme_root / "fonts/ui-bold.otf").resolve(),
+    )
+    assert resolved.definition.family == "MCW Pixel"
+    assert resolved.definition.point_size == 11
+    assert resolved.definition.weight == 500
+    assert resolved.definition.letter_spacing == 1.0
+    assert resolved.definition.fallback_families == ("Segoe UI", "Arial")
+    assert "custom_font" in selected.capabilities
+    assert manager.font_status()
+
+
+def test_theme_font_rejects_path_traversal_without_breaking_theme(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "font-theme"
+    theme_root.mkdir(parents=True)
+    (theme_root / "theme.json").write_text(json.dumps({
+        "schema_version": 3,
+        "id": "font-theme",
+        "assets": {},
+        "font": {"path": "../outside.ttf"},
+    }), encoding="utf-8")
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("font-theme")
+
+    assert selected.theme_id == "font-theme"
+    assert selected.font is None
+    assert any("escapes its theme directory" in issue for issue in selected.issues)
+    assert manager.resolve_font(fallback_to_default=False) is None
+
+
+def test_invalid_font_file_falls_back_safely(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "font-theme"
+    theme_root.mkdir(parents=True)
+    (theme_root / "theme.json").write_text(json.dumps({
+        "schema_version": 3,
+        "id": "font-theme",
+        "assets": {},
+        "font": {"path": "fonts/ui.ttf"},
+    }), encoding="utf-8")
+    write_font(theme_root / "fonts/ui.ttf", signature=b"NOPE")
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("font-theme")
+
+    assert selected.font is not None
+    assert any("Invalid TTF/OTF theme font" in issue for issue in selected.issues)
+    assert manager.resolve_font(fallback_to_default=False) is None
+    assert not manager.font_status()
+
+
+def test_missing_custom_font_falls_back_to_default_theme(tmp_path: Path) -> None:
+    default_root = tmp_path / "themes" / ThemeManager.DEFAULT_THEME_ID
+    default_root.mkdir(parents=True)
+    (default_root / "theme.json").write_text(json.dumps({
+        "schema_version": 3,
+        "id": ThemeManager.DEFAULT_THEME_ID,
+        "assets": {},
+        "font": {"path": "fonts/default.ttf", "family": "Default Pixel"},
+    }), encoding="utf-8")
+    write_font(default_root / "fonts/default.ttf")
+
+    custom_root = tmp_path / "themes" / "custom"
+    write_manifest(custom_root, {})
+
+    manager = ThemeManager(tmp_path / "themes")
+    manager.select("custom")
+    resolved = manager.resolve_font()
+
+    assert resolved is not None
+    assert resolved.theme_id == ThemeManager.DEFAULT_THEME_ID
+    assert resolved.paths == ((default_root / "fonts/default.ttf").resolve(),)

@@ -88,31 +88,26 @@ class StartupSplash(QWidget):
             }
             QLabel#StartupEyebrow {
                 color: #ffffff;
-                font-family: "Segoe UI";
                 font-size: 11px;
                 font-weight: 700;
                 letter-spacing: 2px;
             }
             QLabel#StartupTitle {
                 color: #ffffff;
-                font-family: "Segoe UI";
                 font-size: 30px;
                 font-weight: 800;
             }
             QLabel#StartupVersion {
                 color: #ffffff;
-                font-family: "Segoe UI";
                 font-size: 12px;
             }
             QLabel#StartupStatus {
                 color: #ffffff;
-                font-family: "Segoe UI";
                 font-size: 15px;
                 font-weight: 700;
             }
             QLabel#StartupDetail {
                 color: #ffffff;
-                font-family: "Segoe UI";
                 font-size: 12px;
             }
             QProgressBar#StartupProgress {

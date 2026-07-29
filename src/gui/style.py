@@ -4,7 +4,6 @@ from src.gui.dark_theme_constants import FORCED_DARK_APPLICATION_STYLE
 APP_STYLE = """
 QWidget {
     color: #ffffff;
-    font-family: "Segoe UI";
     font-size: 10.5pt;
 }
 
@@ -25,7 +24,6 @@ QMessageBox {
 QMessageBox QLabel, QMessageBox QTextEdit {
     background: transparent;
     color: #ffffff;
-    font-family: "Segoe UI";
 }
 
 QMessageBox QPushButton {
@@ -349,7 +347,6 @@ QProgressBar::chunk {
 QTextEdit#LogOutput {
     background: #141613;
     color: #ffffff;
-    font-family: Consolas;
     font-size: 10pt;
 }
 
