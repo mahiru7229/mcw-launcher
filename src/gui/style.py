@@ -386,6 +386,33 @@ QTableWidget::item {
     padding: 5px;
 }
 
+QFrame#ToastNotification {
+    background: #252823;
+    border: 2px solid #11130f;
+    border-radius: 6px;
+}
+
+QFrame#ToastNotification[toastLevel="success"] {
+    border-color: #77a957;
+}
+
+QFrame#ToastNotification[toastLevel="warning"] {
+    border-color: #d8a84f;
+}
+
+QFrame#ToastNotification[toastLevel="error"] {
+    border-color: #c45c5c;
+}
+
+QLabel#ToastTitle {
+    color: #ffffff;
+    font-weight: 800;
+}
+
+QLabel#ToastMessage {
+    color: #d8dbd3;
+}
+
 QToolTip {
     background: #252823;
     color: #ffffff;

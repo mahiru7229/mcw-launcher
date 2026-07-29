@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 
 from PySide6.QtCore import QSignalBlocker, QTimer, Signal
-from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QLabel, QLineEdit, QPushButton
+from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QHBoxLayout, QLabel, QLineEdit, QPushButton
 
 from src.core.instance.settings_manager import SettingsManager, default_instance_settings
 from src.core.language.language_manager import language_manager, tr
@@ -15,6 +15,8 @@ from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
 from src.gui.widget.settings_section import SettingsSection
+from src.gui.widget.themed_animated_label import ThemedAnimatedLabel
+from src.gui.widget.themed_progress_bar import ThemedProgressBar
 
 
 class LauncherSettingsPage(BasePage):
@@ -24,6 +26,7 @@ class LauncherSettingsPage(BasePage):
     check_updates_requested = Signal()
     reload_theme_requested = Signal(str)
     motion_mode_changed = Signal(str)
+    preview_toast_requested = Signal()
     scan_java_requested = Signal()
     open_java_requested = Signal(object)
     dirty_changed = Signal(bool)
@@ -247,6 +250,44 @@ class LauncherSettingsPage(BasePage):
         appearance_card.layout.addWidget(reload_theme_button)
         appearance_section.add_card(appearance_card, span=2)
 
+        self.motion_preview_card = CardWidget(
+            tr("motion.preview.title"),
+            tr("motion.preview.description"),
+        )
+        state_row = QHBoxLayout()
+        state_row.setContentsMargins(0, 0, 0, 0)
+        state_row.setSpacing(12)
+        self.preview_success_icon = ThemedAnimatedLabel("state.success", "icon.state.success", 28, 28)
+        self.preview_warning_icon = ThemedAnimatedLabel("state.warning", "icon.state.warning", 28, 28)
+        self.preview_error_icon = ThemedAnimatedLabel("state.error", "icon.state.error", 28, 28)
+        self.preview_success_label = QLabel(tr("motion.preview.success"))
+        self.preview_warning_label = QLabel(tr("motion.preview.warning"))
+        self.preview_error_label = QLabel(tr("motion.preview.error"))
+        state_row.addWidget(self.preview_success_icon)
+        state_row.addWidget(self.preview_success_label)
+        state_row.addWidget(self.preview_warning_icon)
+        state_row.addWidget(self.preview_warning_label)
+        state_row.addWidget(self.preview_error_icon)
+        state_row.addWidget(self.preview_error_label)
+        state_row.addStretch()
+        self.preview_determinate = ThemedProgressBar()
+        self.preview_determinate.setRange(0, 100)
+        self.preview_determinate.setValue(64)
+        self.preview_determinate.setFormat(tr("motion.preview.progress", value=64))
+        self.preview_indeterminate = ThemedProgressBar()
+        self.preview_indeterminate.setRange(0, 0)
+        self.preview_indeterminate.setFormat(tr("motion.preview.indeterminate"))
+        self.preview_toast_button = set_theme_icon(
+            QPushButton(tr("motion.preview.toast_button")),
+            "icon.state.success",
+        )
+        self.preview_toast_button.clicked.connect(self.preview_toast_requested.emit)
+        self.motion_preview_card.layout.addLayout(state_row)
+        self.motion_preview_card.layout.addWidget(self.preview_determinate)
+        self.motion_preview_card.layout.addWidget(self.preview_indeterminate)
+        self.motion_preview_card.layout.addWidget(self.preview_toast_button)
+        appearance_section.add_card(self.motion_preview_card, span=2)
+
         self.save_button = set_theme_icon(QPushButton("Save launcher settings"), "icon.action.save")
         self.save_button.setObjectName("PrimaryButton")
         self.save_button.clicked.connect(self.request_save)
@@ -439,6 +480,16 @@ class LauncherSettingsPage(BasePage):
         self.edit_instance_defaults_button.setText(tr("instance_defaults.launcher.edit"))
         self.motion_mode_label.setText(tr("motion.mode.label"))
         self.motion_mode_detail.setText(tr("motion.mode.detail"))
+        if self.motion_preview_card.title_label is not None:
+            self.motion_preview_card.title_label.setText(tr("motion.preview.title"))
+        if self.motion_preview_card.subtitle_label is not None:
+            self.motion_preview_card.subtitle_label.setText(tr("motion.preview.description"))
+        self.preview_success_label.setText(tr("motion.preview.success"))
+        self.preview_warning_label.setText(tr("motion.preview.warning"))
+        self.preview_error_label.setText(tr("motion.preview.error"))
+        self.preview_determinate.setFormat(tr("motion.preview.progress", value=64))
+        self.preview_indeterminate.setFormat(tr("motion.preview.indeterminate"))
+        self.preview_toast_button.setText(tr("motion.preview.toast_button"))
         self._reload_motion_modes()
         self._update_instance_defaults_summary()
         self._update_save_button_text()

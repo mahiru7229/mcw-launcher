@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "id": "mcw-default",
   "name": "MCW Default PNG",
   "author": "mahiru7229",
@@ -138,7 +138,9 @@
     "animated_assets": true,
     "sprite_sheets": true,
     "animated_progress": true,
-    "motion_configuration": true
+    "motion_configuration": true,
+    "toast_notifications": true,
+    "motion_performance": true
   },
   "animations": {
     "progress.chunk": {
@@ -185,6 +187,51 @@
       "loop": true,
       "render_mode": "contain",
       "filtering": "nearest"
+    },
+    "state.success": {
+      "type": "spritesheet",
+      "path": "animations/states/success_spritesheet.png",
+      "fallback_asset": "icon.state.success",
+      "frame_size": [
+        24,
+        24
+      ],
+      "frame_count": 8,
+      "columns": 8,
+      "frame_duration_ms": 90,
+      "loop": true,
+      "render_mode": "contain",
+      "filtering": "nearest"
+    },
+    "state.warning": {
+      "type": "spritesheet",
+      "path": "animations/states/warning_spritesheet.png",
+      "fallback_asset": "icon.state.warning",
+      "frame_size": [
+        24,
+        24
+      ],
+      "frame_count": 8,
+      "columns": 8,
+      "frame_duration_ms": 90,
+      "loop": true,
+      "render_mode": "contain",
+      "filtering": "nearest"
+    },
+    "state.error": {
+      "type": "spritesheet",
+      "path": "animations/states/error_spritesheet.png",
+      "fallback_asset": "icon.state.error",
+      "frame_size": [
+        24,
+        24
+      ],
+      "frame_count": 8,
+      "columns": 8,
+      "frame_duration_ms": 90,
+      "loop": true,
+      "render_mode": "contain",
+      "filtering": "nearest"
     }
   },
   "motion": {
@@ -215,6 +262,19 @@
       "type": "fade",
       "duration_ms": 140,
       "easing": "out_cubic"
+    },
+    "toast": {
+      "type": "slide_fade",
+      "duration_ms": 180,
+      "visible_duration_ms": 3000,
+      "easing": "out_cubic",
+      "distance_px": 24,
+      "max_visible": 3
+    },
+    "performance": {
+      "full_fps": 60,
+      "reduced_fps": 30,
+      "pause_when_hidden": true
     }
   }
 }

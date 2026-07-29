@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QApplication, QDialog, QGraphicsColorizeEffect, QG
 
 from src.core.theme.theme_manager import ThemeManager, theme_manager
 from src.core.theme.theme_motion import MotionTransitionDefinition, ThemeMotionDefinition
+from src.gui.animation.animation_clock import AnimationClock
 
 
 class MotionMode:
@@ -65,6 +66,13 @@ class MotionRuntime(QObject):
     def apply(self, mode: object = MotionMode.FULL) -> None:
         self.mode = MotionMode.normalize(mode)
         self.definition = self.manager.current.motion
+        performance = self.definition.performance
+        AnimationClock.instance().configure(
+            self.mode,
+            full_fps=performance.full_fps,
+            reduced_fps=performance.reduced_fps,
+            pause_when_hidden=performance.pause_when_hidden,
+        )
         self._install_event_filter()
         if self.mode == MotionMode.OFF:
             self._stop_page_animation()

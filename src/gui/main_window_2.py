@@ -67,6 +67,7 @@ from src.gui.widget.launch_control_style import LAUNCH_CONTROL_STYLE
 from src.gui.widget.launch_control_widget import LaunchControlWidget
 from src.gui.widget.right_panel_widget import RightPanelWidget
 from src.gui.widget.sidebar_widget import SidebarWidget
+from src.gui.widget.toast_notification import ToastManager
 from src.models.progress.progress_event import ProgressEvent
 from src.models.progress.progress_state import ProgressState
 from src.models.update.update_info import PreparedUpdate, UpdateInfo
@@ -118,6 +119,7 @@ class MainWindow(QMainWindow):
         self.running_instances_timer.setInterval(1000)
 
         self._build_ui()
+        self.toast_manager = ToastManager(self.centralWidget(), self.motion_runtime, self)
         retranslate_widget_tree(self)
         self._connect_signals()
         self.launch_control.set_motion_runtime(self.motion_runtime)
@@ -307,6 +309,13 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.check_updates_requested.connect(lambda: self.update_controller.check(manual=True))
         self.launcher_settings_page.reload_theme_requested.connect(self._preview_theme)
         self.launcher_settings_page.motion_mode_changed.connect(self._preview_motion)
+        self.launcher_settings_page.preview_toast_requested.connect(
+            lambda: self.toast_manager.show(
+                tr("motion.preview.toast.message"),
+                "success",
+                tr("motion.preview.toast.title"),
+            )
+        )
         self.launcher_settings_page.scan_java_requested.connect(self.java_controller.scan)
         self.launcher_settings_page.open_java_requested.connect(self._open_java_folder)
         self.logs_page.export_diagnostics_requested.connect(self._export_diagnostics)
@@ -1211,7 +1220,11 @@ class MainWindow(QMainWindow):
         backup = getattr(result, "backup", None)
         path = getattr(backup, "path", "")
         self.instance_controller.refresh(selected_name=str(getattr(self._selected_instance, "name", "")))
-        QMessageBox.information(self, tr("Instance backup"), tr("Backup created successfully:\n{path}", path=path))
+        self.toast_manager.show(
+            tr("Backup created successfully:\n{path}", path=path),
+            "success",
+            tr("Instance backup"),
+        )
 
     def _on_backup_restored(self, result: object) -> None:
         name = str(getattr(result, "instance_name", ""))
@@ -1220,7 +1233,7 @@ class MainWindow(QMainWindow):
         message = tr("Backup restored successfully for '{name}'.", name=name)
         if safety:
             message += tr("\nSafety backup: {path}", path=safety)
-        QMessageBox.information(self, tr("Restore backup"), message)
+        self.toast_manager.show(message, "success", tr("Restore backup"))
 
     def _on_modpack_update_checked(self, info: object) -> None:
         self.instances_page.set_modpack_update_info(info)
@@ -1270,7 +1283,7 @@ class MainWindow(QMainWindow):
         if preserved:
             message += tr("\n{count} user-modified file(s) were preserved.", count=len(preserved))
         message += tr("\nSafety backup: {path}", path=getattr(result, "backup_path", ""))
-        QMessageBox.information(self, tr("Update Modrinth modpack"), message)
+        self.toast_manager.show(message, "success", tr("Update Modrinth modpack"))
 
     def _on_modpack_repaired(self, result: object) -> None:
         name = str(getattr(result, "instance_name", ""))
@@ -1282,7 +1295,7 @@ class MainWindow(QMainWindow):
             message += tr("\nSafety backup: {path}", path=backup_path)
         else:
             message += tr("\nNo damaged managed files were found, so no backup was needed.")
-        QMessageBox.information(self, tr("Repair Modrinth modpack"), message)
+        self.toast_manager.show(message, "success", tr("Repair Modrinth modpack"))
 
     def _on_game_exited(self, result: object) -> None:
         selected_name = str(getattr(self._selected_instance, "name", ""))
@@ -1313,7 +1326,11 @@ class MainWindow(QMainWindow):
         libraries = int(getattr(result, "libraries_checked", 0))
         self.launch_control.reset_progress()
         self.logs_page.append(tr("Repair completed for '{name}'. Libraries checked: {count}.", name=instance_name, count=libraries))
-        QMessageBox.information(self, tr("Repair instance"), tr("Repair completed for '{name}'. Client, libraries, assets, natives, mod loader, and Java were verified.", name=instance_name))
+        self.toast_manager.show(
+            tr("Repair completed for '{name}'. Client, libraries, assets, natives, mod loader, and Java were verified.", name=instance_name),
+            "success",
+            tr("Repair instance"),
+        )
 
     def _on_update_available(self, info: UpdateInfo, manual: bool) -> None:
         if not manual and info.version in self._prompted_update_versions:
@@ -1451,6 +1468,11 @@ class MainWindow(QMainWindow):
         selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked())
         self.motion_runtime.apply(self.launcher_settings_page.current_motion_mode())
         self.logs_page.append(f"Theme preview: {selected}")
+        self.toast_manager.show(
+            tr("motion.preview.theme_reloaded", theme=selected),
+            "success",
+            tr("motion.preview.toast.title"),
+        )
 
     def _preview_motion(self, mode: str) -> None:
         self.motion_runtime.apply(mode)
@@ -1760,7 +1782,7 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, title, message)
 
     def _show_export_finished(self, path: Path) -> None:
-        QMessageBox.information(self, tr("Export complete"), tr("Saved to:\n{path}", path=path))
+        self.toast_manager.show(tr("Saved to:\n{path}", path=path), "success", tr("Export complete"))
 
     def closeEvent(self, event: QCloseEvent) -> None:
         if self.task_runner.has_active_tasks:

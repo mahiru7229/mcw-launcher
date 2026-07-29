@@ -16,7 +16,7 @@ themes/
 
 ```json
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "id": "my-theme",
   "name": "My Theme",
   "author": "Artist name",
@@ -189,19 +189,21 @@ themes/my-theme/
 
 Font được áp dụng cho toàn bộ chữ và đổi ngay khi preview theme. Font nên chứa glyph tiếng Việt; nếu thiếu, hãy khai báo `fallback_families`. Xem [`THEME_FONT_GUIDE.md`](THEME_FONT_GUIDE.md) để biết đầy đủ field và giới hạn an toàn.
 
-## 9. Motion trong v0.11.0-alpha.4
+## 9. Motion trong v0.11.0-alpha.5
 
-Theme schema 4 có thể cấu hình chuyển trang, button, dialog, sidebar và Launch Control:
+Theme schema 5 có thể cấu hình chuyển trang, button, dialog, sidebar, Launch Control, toast và giới hạn FPS:
 
 ```json
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "motion": {
     "page": {"type": "fade_slide", "duration_ms": 170, "easing": "out_cubic", "distance_px": 18},
     "button": {"hover_duration_ms": 100, "press_duration_ms": 70, "easing": "out_quad"},
     "dialog": {"type": "fade", "duration_ms": 160, "easing": "out_cubic"},
     "sidebar": {"duration_ms": 220, "easing": "out_cubic", "collapsed_width": 72},
-    "launch_control": {"type": "fade", "duration_ms": 140, "easing": "out_cubic"}
+    "launch_control": {"type": "fade", "duration_ms": 140, "easing": "out_cubic"},
+    "toast": {"type": "slide_fade", "duration_ms": 180, "visible_duration_ms": 3000, "easing": "out_cubic", "distance_px": 24, "max_visible": 3},
+    "performance": {"full_fps": 60, "reduced_fps": 30, "pause_when_hidden": true}
   }
 }
 ```
@@ -248,7 +250,8 @@ themes/
 2. Mở **Launcher Settings → Appearance**.
 3. Chọn theme.
 4. Nhấn **Reload and preview theme**.
-5. Kiểm tra Accounts, Instances, Launcher Settings, Mod Manager, Modrinth Browser và các dialog.
+5. Dùng card **Theme motion preview** để kiểm tra progress, state và toast.
+6. Kiểm tra Accounts, Instances, Launcher Settings, Mod Manager, Modrinth Browser và các dialog.
 
 Nếu theme không xuất hiện:
 

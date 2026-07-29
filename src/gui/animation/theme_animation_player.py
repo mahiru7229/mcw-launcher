@@ -15,6 +15,7 @@ class ThemeAnimationPlayer(QObject):
         super().__init__(parent)
         self._clock = AnimationClock.instance()
         self._clock.tick.connect(self._on_tick)
+        self._clock.mode_changed.connect(self._on_mode_changed)
         self._animation: ResolvedThemeAnimation | None = None
         self._frames: tuple[QPixmap, ...] = ()
         self._frame_index = 0
@@ -84,6 +85,11 @@ class ThemeAnimationPlayer(QObject):
         if next_index != self._frame_index:
             self._frame_index = int(next_index)
             self.frame_changed.emit(self._frame_index)
+
+
+    def _on_mode_changed(self, mode: str) -> None:
+        if str(mode) == "off" and self._frames:
+            self.reset()
 
     @staticmethod
     def _load_frames(animation: ResolvedThemeAnimation | None) -> tuple[QPixmap, ...]:

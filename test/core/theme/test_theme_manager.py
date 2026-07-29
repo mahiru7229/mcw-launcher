@@ -442,3 +442,63 @@ def test_invalid_theme_motion_falls_back_without_breaking_theme(tmp_path: Path) 
     assert selected.motion.page.transition_type == "fade_slide"
     assert selected.issues
     assert any("motion page.type" in issue for issue in selected.issues)
+
+
+def test_schema_five_loads_toast_and_performance_motion(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "motion-five"
+    theme_root.mkdir(parents=True)
+    (theme_root / "theme.json").write_text(json.dumps({
+        "schema_version": 5,
+        "id": "motion-five",
+        "assets": {},
+        "motion": {
+            "toast": {
+                "type": "slide_fade",
+                "duration_ms": 190,
+                "visible_duration_ms": 4200,
+                "easing": "out_cubic",
+                "distance_px": 28,
+                "max_visible": 4,
+            },
+            "performance": {
+                "full_fps": 75,
+                "reduced_fps": 25,
+                "pause_when_hidden": True,
+            },
+        },
+    }), encoding="utf-8")
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("motion-five")
+
+    assert selected.motion.toast.transition_type == "slide_fade"
+    assert selected.motion.toast.visible_duration_ms == 4200
+    assert selected.motion.toast.max_visible == 4
+    assert selected.motion.performance.full_fps == 75
+    assert selected.motion.performance.reduced_fps == 25
+    assert selected.motion.performance.pause_when_hidden
+
+
+def test_schema_five_rejects_invalid_performance_without_breaking_theme(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "motion-five"
+    theme_root.mkdir(parents=True)
+    (theme_root / "theme.json").write_text(json.dumps({
+        "schema_version": 5,
+        "id": "motion-five",
+        "assets": {},
+        "motion": {
+            "performance": {
+                "full_fps": 30,
+                "reduced_fps": 60,
+                "pause_when_hidden": True,
+            },
+        },
+    }), encoding="utf-8")
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("motion-five")
+
+    assert selected.theme_id == "motion-five"
+    assert selected.motion.performance.full_fps == 60
+    assert selected.motion.performance.reduced_fps == 30
+    assert any("reduced_fps must not exceed full_fps" in issue for issue in selected.issues)

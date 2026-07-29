@@ -12,7 +12,7 @@ from src.core.fs.paths import Paths
 from src.core.theme.theme_animation import ResolvedThemeAnimation, ThemeAnimationDefinition
 from src.core.theme.theme_catalog import THEME_ASSET_BY_KEY
 from src.core.theme.theme_font import ResolvedThemeFont, ThemeFontDefinition
-from src.core.theme.theme_motion import ButtonMotionDefinition, MotionTransitionDefinition, SidebarMotionDefinition, ThemeMotionDefinition
+from src.core.theme.theme_motion import ButtonMotionDefinition, MotionPerformanceDefinition, MotionTransitionDefinition, SidebarMotionDefinition, ThemeMotionDefinition, ToastMotionDefinition
 
 
 class ThemeError(RuntimeError):
@@ -48,7 +48,7 @@ class ThemeManager:
     FALLBACK_THEME_ID = "builtin-css"
     MANIFEST_NAME = "theme.json"
     MAX_MANIFEST_BYTES = 512 * 1024
-    SUPPORTED_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4})
+    SUPPORTED_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4, 5})
     MAX_ANIMATION_FRAMES = 256
     MIN_FRAME_DURATION_MS = 16
     MAX_FRAME_DURATION_MS = 10_000
@@ -64,6 +64,7 @@ class ThemeManager:
     PAGE_TRANSITIONS = frozenset({"none", "fade", "slide_left", "slide_right", "fade_slide"})
     DIALOG_TRANSITIONS = frozenset({"none", "fade"})
     LAUNCH_TRANSITIONS = frozenset({"none", "fade"})
+    TOAST_TRANSITIONS = frozenset({"none", "fade", "slide", "slide_fade"})
 
     def __init__(self, root: Path | None = None) -> None:
         self.root = Path(root) if root is not None else Paths.THEME_ROOT
@@ -395,7 +396,51 @@ class ThemeManager:
             easing=self._motion_easing(raw_sidebar.get("easing", sidebar_defaults.easing), "sidebar.easing"),
             collapsed_width=self._motion_int(raw_sidebar.get("collapsed_width", sidebar_defaults.collapsed_width), 56, 160, "sidebar.collapsed_width"),
         )
-        return ThemeMotionDefinition(page=page, dialog=dialog, launch_control=launch_control, button=button, sidebar=sidebar)
+
+        raw_toast = value.get("toast", {})
+        if raw_toast is None:
+            raw_toast = {}
+        if not isinstance(raw_toast, dict):
+            raise ThemeAssetError("Theme motion toast must be an object.")
+        toast_defaults = ThemeMotionDefinition().toast
+        toast_type = str(raw_toast.get("type", toast_defaults.transition_type)).strip().lower()
+        if toast_type not in self.TOAST_TRANSITIONS:
+            raise ThemeAssetError(f"Theme motion toast.type is invalid: {toast_type!r}")
+        toast = ToastMotionDefinition(
+            transition_type=toast_type,
+            duration_ms=self._motion_int(raw_toast.get("duration_ms", toast_defaults.duration_ms), 0, 3000, "toast.duration_ms"),
+            visible_duration_ms=self._motion_int(raw_toast.get("visible_duration_ms", toast_defaults.visible_duration_ms), 500, 30_000, "toast.visible_duration_ms"),
+            easing=self._motion_easing(raw_toast.get("easing", toast_defaults.easing), "toast.easing"),
+            distance_px=self._motion_int(raw_toast.get("distance_px", toast_defaults.distance_px), 0, 256, "toast.distance_px"),
+            max_visible=self._motion_int(raw_toast.get("max_visible", toast_defaults.max_visible), 1, 8, "toast.max_visible"),
+        )
+
+        raw_performance = value.get("performance", {})
+        if raw_performance is None:
+            raw_performance = {}
+        if not isinstance(raw_performance, dict):
+            raise ThemeAssetError("Theme motion performance must be an object.")
+        performance_defaults = ThemeMotionDefinition().performance
+        pause_when_hidden = raw_performance.get("pause_when_hidden", performance_defaults.pause_when_hidden)
+        if not isinstance(pause_when_hidden, bool):
+            raise ThemeAssetError("Theme motion performance.pause_when_hidden must be a boolean.")
+        performance = MotionPerformanceDefinition(
+            full_fps=self._motion_int(raw_performance.get("full_fps", performance_defaults.full_fps), 15, 120, "performance.full_fps"),
+            reduced_fps=self._motion_int(raw_performance.get("reduced_fps", performance_defaults.reduced_fps), 10, 60, "performance.reduced_fps"),
+            pause_when_hidden=pause_when_hidden,
+        )
+        if performance.reduced_fps > performance.full_fps:
+            raise ThemeAssetError("Theme motion performance.reduced_fps must not exceed full_fps.")
+
+        return ThemeMotionDefinition(
+            page=page,
+            dialog=dialog,
+            launch_control=launch_control,
+            button=button,
+            sidebar=sidebar,
+            toast=toast,
+            performance=performance,
+        )
 
     def _parse_transition(self, value: object, default: MotionTransitionDefinition, allowed_types: frozenset[str], label: str) -> MotionTransitionDefinition:
         if value is None:
