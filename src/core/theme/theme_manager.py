@@ -12,6 +12,7 @@ from src.core.fs.paths import Paths
 from src.core.theme.theme_animation import ResolvedThemeAnimation, ThemeAnimationDefinition
 from src.core.theme.theme_catalog import THEME_ASSET_BY_KEY
 from src.core.theme.theme_font import ResolvedThemeFont, ThemeFontDefinition
+from src.core.theme.theme_motion import ButtonMotionDefinition, MotionTransitionDefinition, SidebarMotionDefinition, ThemeMotionDefinition
 
 
 class ThemeError(RuntimeError):
@@ -36,6 +37,7 @@ class ThemeDefinition:
     text_assets: dict[str, str] = field(default_factory=dict)
     animations: dict[str, ThemeAnimationDefinition] = field(default_factory=dict)
     font: ThemeFontDefinition | None = None
+    motion: ThemeMotionDefinition = field(default_factory=ThemeMotionDefinition)
     capabilities: frozenset[str] = frozenset()
     issues: tuple[str, ...] = ()
     builtin_fallback: bool = False
@@ -46,7 +48,7 @@ class ThemeManager:
     FALLBACK_THEME_ID = "builtin-css"
     MANIFEST_NAME = "theme.json"
     MAX_MANIFEST_BYTES = 512 * 1024
-    SUPPORTED_SCHEMA_VERSIONS = frozenset({1, 2, 3})
+    SUPPORTED_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4})
     MAX_ANIMATION_FRAMES = 256
     MIN_FRAME_DURATION_MS = 16
     MAX_FRAME_DURATION_MS = 10_000
@@ -58,6 +60,10 @@ class ThemeManager:
     MAX_FONT_FILES = 8
     MAX_FONT_FILE_BYTES = 16 * 1024 * 1024
     MAX_FONT_TOTAL_BYTES = 32 * 1024 * 1024
+    MOTION_EASINGS = frozenset({"linear", "in_quad", "out_quad", "in_out_quad", "in_cubic", "out_cubic", "in_out_cubic", "out_back"})
+    PAGE_TRANSITIONS = frozenset({"none", "fade", "slide_left", "slide_right", "fade_slide"})
+    DIALOG_TRANSITIONS = frozenset({"none", "fade"})
+    LAUNCH_TRANSITIONS = frozenset({"none", "fade"})
 
     def __init__(self, root: Path | None = None) -> None:
         self.root = Path(root) if root is not None else Paths.THEME_ROOT
@@ -251,13 +257,17 @@ class ThemeManager:
         if not isinstance(raw_animations, dict):
             raise ThemeManifestError("Theme animations must be an object.")
         raw_font = payload.get("font")
+        raw_motion = payload.get("motion")
         if raw_font is not None and not isinstance(raw_font, dict):
             raise ThemeManifestError("Theme font must be an object.")
+        if raw_motion is not None and not isinstance(raw_motion, dict):
+            raise ThemeManifestError("Theme motion must be an object.")
 
         assets: dict[str, str] = {}
         text_assets: dict[str, str] = {}
         animations: dict[str, ThemeAnimationDefinition] = {}
         font: ThemeFontDefinition | None = None
+        motion = ThemeMotionDefinition()
         issues: list[str] = []
         for key, value in raw_assets.items():
             normalized_key = str(key).strip()
@@ -323,11 +333,19 @@ class ThemeManager:
                         f"Theme font files exceed the {self.MAX_FONT_TOTAL_BYTES // (1024 * 1024)} MiB total limit."
                     )
 
+        if raw_motion is not None:
+            try:
+                motion = self._parse_motion(raw_motion)
+            except ThemeAssetError as error:
+                issues.append(str(error))
+
         capabilities = self._parse_capabilities(payload.get("capabilities", {}), issues)
         if animations:
             capabilities = frozenset({*capabilities, "animated_assets", "sprite_sheets"})
         if font is not None:
             capabilities = frozenset({*capabilities, "custom_font"})
+        if raw_motion is not None:
+            capabilities = frozenset({*capabilities, "motion_configuration"})
 
         return ThemeDefinition(
             theme_id=theme_id,
@@ -338,9 +356,87 @@ class ThemeManager:
             text_assets=text_assets,
             animations=animations,
             font=font,
+            motion=motion,
             capabilities=capabilities,
             issues=tuple(issues),
         )
+
+    def _parse_motion(self, value: object) -> ThemeMotionDefinition:
+        if not isinstance(value, dict):
+            raise ThemeAssetError("Theme motion must be an object.")
+
+        page = self._parse_transition(value.get("page"), ThemeMotionDefinition().page, self.PAGE_TRANSITIONS, "page")
+        dialog = self._parse_transition(value.get("dialog"), ThemeMotionDefinition().dialog, self.DIALOG_TRANSITIONS, "dialog")
+        launch_control = self._parse_transition(value.get("launch_control"), ThemeMotionDefinition().launch_control, self.LAUNCH_TRANSITIONS, "launch_control")
+
+        raw_button = value.get("button", {})
+        if raw_button is None:
+            raw_button = {}
+        if not isinstance(raw_button, dict):
+            raise ThemeAssetError("Theme motion button must be an object.")
+        defaults = ThemeMotionDefinition().button
+        hover_duration_ms = self._motion_int(raw_button.get("hover_duration_ms", defaults.hover_duration_ms), 0, 2000, "button.hover_duration_ms")
+        press_duration_ms = self._motion_int(raw_button.get("press_duration_ms", defaults.press_duration_ms), 0, 2000, "button.press_duration_ms")
+        easing = self._motion_easing(raw_button.get("easing", defaults.easing), "button.easing")
+        hover_strength = self._motion_float(raw_button.get("hover_strength", defaults.hover_strength), 0.0, 1.0, "button.hover_strength")
+        press_strength = self._motion_float(raw_button.get("press_strength", defaults.press_strength), 0.0, 1.0, "button.press_strength")
+        if press_strength < hover_strength:
+            raise ThemeAssetError("Theme motion button.press_strength must be greater than or equal to hover_strength.")
+        button = ButtonMotionDefinition(hover_duration_ms, press_duration_ms, easing, hover_strength, press_strength)
+
+        raw_sidebar = value.get("sidebar", {})
+        if raw_sidebar is None:
+            raw_sidebar = {}
+        if not isinstance(raw_sidebar, dict):
+            raise ThemeAssetError("Theme motion sidebar must be an object.")
+        sidebar_defaults = ThemeMotionDefinition().sidebar
+        sidebar = SidebarMotionDefinition(
+            duration_ms=self._motion_int(raw_sidebar.get("duration_ms", sidebar_defaults.duration_ms), 0, 3000, "sidebar.duration_ms"),
+            easing=self._motion_easing(raw_sidebar.get("easing", sidebar_defaults.easing), "sidebar.easing"),
+            collapsed_width=self._motion_int(raw_sidebar.get("collapsed_width", sidebar_defaults.collapsed_width), 56, 160, "sidebar.collapsed_width"),
+        )
+        return ThemeMotionDefinition(page=page, dialog=dialog, launch_control=launch_control, button=button, sidebar=sidebar)
+
+    def _parse_transition(self, value: object, default: MotionTransitionDefinition, allowed_types: frozenset[str], label: str) -> MotionTransitionDefinition:
+        if value is None:
+            return default
+        if not isinstance(value, dict):
+            raise ThemeAssetError(f"Theme motion {label} must be an object.")
+        transition_type = str(value.get("type", default.transition_type)).strip().lower()
+        if transition_type not in allowed_types:
+            raise ThemeAssetError(f"Theme motion {label}.type is invalid: {transition_type!r}")
+        return MotionTransitionDefinition(
+            transition_type=transition_type,
+            duration_ms=self._motion_int(value.get("duration_ms", default.duration_ms), 0, 3000, f"{label}.duration_ms"),
+            easing=self._motion_easing(value.get("easing", default.easing), f"{label}.easing"),
+            distance_px=self._motion_int(value.get("distance_px", default.distance_px), 0, 256, f"{label}.distance_px"),
+        )
+
+    def _motion_easing(self, value: object, label: str) -> str:
+        easing = str(value).strip().lower()
+        if easing not in self.MOTION_EASINGS:
+            raise ThemeAssetError(f"Theme motion {label} is invalid: {easing!r}")
+        return easing
+
+    @staticmethod
+    def _motion_int(value: object, minimum: int, maximum: int, label: str) -> int:
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError) as error:
+            raise ThemeAssetError(f"Theme motion {label} must be an integer.") from error
+        if not minimum <= parsed <= maximum:
+            raise ThemeAssetError(f"Theme motion {label} must be between {minimum} and {maximum}.")
+        return parsed
+
+    @staticmethod
+    def _motion_float(value: object, minimum: float, maximum: float, label: str) -> float:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError) as error:
+            raise ThemeAssetError(f"Theme motion {label} must be numeric.") from error
+        if not minimum <= parsed <= maximum:
+            raise ThemeAssetError(f"Theme motion {label} must be between {minimum} and {maximum}.")
+        return parsed
 
     def _parse_animation(self, directory: Path, key: object, value: object) -> ThemeAnimationDefinition:
         normalized_key = str(key).strip().lower()

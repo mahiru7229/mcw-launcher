@@ -21,3 +21,18 @@ def test_sidebar_marks_settings_page_with_unsaved_indicator(gui_app):
 
     assert button.property("unsavedChanges") is False
     assert not button.text().startswith("● ")
+
+
+def test_sidebar_collapses_to_icon_only_and_restores_dirty_label(gui_app):
+    sidebar = SidebarWidget()
+    sidebar.set_page_dirty("instance_settings", True)
+
+    sidebar.set_collapsed_visual(True)
+
+    assert sidebar._buttons["instance_settings"].text() == ""
+    assert sidebar._buttons["instance_settings"].toolTip()
+
+    sidebar.set_collapsed_visual(False)
+
+    assert sidebar._buttons["instance_settings"].text().startswith("● ")
+    assert sidebar._buttons["instance_settings"].toolTip() == ""

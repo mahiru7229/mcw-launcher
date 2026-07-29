@@ -1,6 +1,6 @@
 # Hướng dẫn tạo theme cho MCW Launcher
 
-Tài liệu này hướng dẫn tạo theme ngoài EXE cho MCW Launcher. Từ v0.11.0-alpha.1, theme có thể kèm PNG spritesheet animation; từ v0.11.0-alpha.2, theme có thể đóng gói font TTF/OTF cho toàn bộ chữ.
+Tài liệu này hướng dẫn tạo theme ngoài EXE cho MCW Launcher. Từ v0.11.0-alpha.1, theme có thể kèm PNG spritesheet animation; từ v0.11.0-alpha.2, theme có thể đóng gói font TTF/OTF cho toàn bộ chữ; từ v0.11.0-alpha.4, theme có thể điều khiển chuyển động giao diện.
 
 ## 1. Tạo thư mục theme
 
@@ -16,7 +16,7 @@ themes/
 
 ```json
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "id": "my-theme",
   "name": "My Theme",
   "author": "Artist name",
@@ -189,7 +189,26 @@ themes/my-theme/
 
 Font được áp dụng cho toàn bộ chữ và đổi ngay khi preview theme. Font nên chứa glyph tiếng Việt; nếu thiếu, hãy khai báo `fallback_families`. Xem [`THEME_FONT_GUIDE.md`](THEME_FONT_GUIDE.md) để biết đầy đủ field và giới hạn an toàn.
 
-## 9. Trạng thái button
+## 9. Motion trong v0.11.0-alpha.4
+
+Theme schema 4 có thể cấu hình chuyển trang, button, dialog, sidebar và Launch Control:
+
+```json
+{
+  "schema_version": 4,
+  "motion": {
+    "page": {"type": "fade_slide", "duration_ms": 170, "easing": "out_cubic", "distance_px": 18},
+    "button": {"hover_duration_ms": 100, "press_duration_ms": 70, "easing": "out_quad"},
+    "dialog": {"type": "fade", "duration_ms": 160, "easing": "out_cubic"},
+    "sidebar": {"duration_ms": 220, "easing": "out_cubic", "collapsed_width": 72},
+    "launch_control": {"type": "fade", "duration_ms": 140, "easing": "out_cubic"}
+  }
+}
+```
+
+Người dùng vẫn có thể chọn Full, Reduced hoặc Off. Xem [`THEME_MOTION_GUIDE.md`](THEME_MOTION_GUIDE.md) để biết loại transition và giới hạn hợp lệ.
+
+## 10. Trạng thái button
 
 Một nút nên có đủ state khi có thể:
 
@@ -207,7 +226,7 @@ controls/buttons/launch/
 
 Các state Launch thiếu sẽ fallback về CSS. Riêng state Cancel có bộ PNG fallback đi kèm launcher, nên nút vẫn hiện rõ khi theme cũ chưa khai báo asset mới.
 
-## 10. Background và vùng an toàn
+## 11. Background và vùng an toàn
 
 - `background.window`: 1600 × 900.
 - Sidebar: 220 × 900.
@@ -216,7 +235,7 @@ Các state Launch thiếu sẽ fallback về CSS. Riêng state Cancel có bộ P
 - Không đặt chữ quan trọng sát mép vì cửa sổ có thể scale hoặc resize.
 - Kiểm tra theme trên 1366 × 768 và 1600 × 900.
 
-## 11. Kiểm tra theme
+## 12. Kiểm tra theme
 
 1. Đặt folder cạnh source hoặc cạnh EXE:
 
@@ -239,7 +258,7 @@ Nếu theme không xuất hiện:
 - kiểm tra file thật sự là PNG;
 - không dùng `..`, drive letter hoặc path tuyệt đối.
 
-## 12. Fallback và theme chưa hoàn chỉnh
+## 13. Fallback và theme chưa hoàn chỉnh
 
 Theme có thể được phát hành khi mới có vài PNG. Launcher không crash vì:
 
@@ -251,7 +270,7 @@ Theme có thể được phát hành khi mới có vài PNG. Launcher không cra
 
 Asset lỗi bị bỏ qua riêng lẻ. Tuy vậy, nên test console/log để phát hiện typo trong manifest.
 
-## 13. Đóng gói cùng release
+## 14. Đóng gói cùng release
 
 Công cụ release tự copy toàn bộ `themes/`:
 

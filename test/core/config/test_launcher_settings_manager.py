@@ -134,15 +134,25 @@ def test_theme_and_modrinth_channels_are_created_and_persisted(tmp_path: Path) -
     manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
 
     data = manager.load()
-    assert data["appearance"] == {"theme": "mcw-default", "show_static_text": False}
+    assert data["appearance"] == {"theme": "mcw-default", "show_static_text": False, "motion_mode": "full"}
     assert data["modrinth"] == {"include_beta": False, "include_alpha": False}
 
-    manager.save({"appearance": {"theme": "pixel-night", "show_static_text": "off"}, "modrinth": {"include_beta": True, "include_alpha": "yes"}})
+    manager.save({"appearance": {"theme": "pixel-night", "show_static_text": "off", "motion_mode": "reduced"}, "modrinth": {"include_beta": True, "include_alpha": "yes"}})
     updated = manager.load()
 
-    assert updated["appearance"] == {"theme": "pixel-night", "show_static_text": False}
+    assert updated["appearance"] == {"theme": "pixel-night", "show_static_text": False, "motion_mode": "reduced"}
     assert updated["modrinth"] == {"include_beta": True, "include_alpha": True}
 
+
+
+def test_motion_mode_is_normalized_to_supported_values(tmp_path: Path) -> None:
+    manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
+
+    manager.update_section("appearance", {"motion_mode": "off"})
+    assert manager.load()["appearance"]["motion_mode"] == "off"
+
+    manager.update_section("appearance", {"motion_mode": "unknown"})
+    assert manager.load()["appearance"]["motion_mode"] == "full"
 
 def test_download_limit_is_unlimited_by_default_and_normalized(tmp_path: Path) -> None:
     manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")

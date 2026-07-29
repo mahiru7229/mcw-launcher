@@ -393,3 +393,52 @@ def test_missing_custom_font_falls_back_to_default_theme(tmp_path: Path) -> None
     assert resolved is not None
     assert resolved.theme_id == ThemeManager.DEFAULT_THEME_ID
     assert resolved.paths == ((default_root / "fonts/default.ttf").resolve(),)
+
+
+def test_valid_theme_motion_configuration_is_loaded(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "motion-theme"
+    theme_root.mkdir(parents=True)
+    (theme_root / "theme.json").write_text(json.dumps({
+        "schema_version": 4,
+        "id": "motion-theme",
+        "assets": {},
+        "motion": {
+            "page": {"type": "fade_slide", "duration_ms": 210, "easing": "out_cubic", "distance_px": 24},
+            "button": {"hover_duration_ms": 90, "press_duration_ms": 60, "easing": "out_quad", "hover_strength": 0.1, "press_strength": 0.2},
+            "dialog": {"type": "fade", "duration_ms": 150, "easing": "out_cubic"},
+            "sidebar": {"duration_ms": 240, "easing": "in_out_cubic", "collapsed_width": 76},
+            "launch_control": {"type": "fade", "duration_ms": 130, "easing": "out_quad"},
+        },
+    }), encoding="utf-8")
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("motion-theme")
+
+    assert selected.motion.page.transition_type == "fade_slide"
+    assert selected.motion.page.duration_ms == 210
+    assert selected.motion.page.distance_px == 24
+    assert selected.motion.button.hover_strength == 0.1
+    assert selected.motion.sidebar.collapsed_width == 76
+    assert selected.motion.launch_control.duration_ms == 130
+    assert "motion_configuration" in selected.capabilities
+
+
+def test_invalid_theme_motion_falls_back_without_breaking_theme(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "motion-theme"
+    theme_root.mkdir(parents=True)
+    (theme_root / "theme.json").write_text(json.dumps({
+        "schema_version": 4,
+        "id": "motion-theme",
+        "assets": {},
+        "motion": {
+            "page": {"type": "teleport", "duration_ms": 99999},
+        },
+    }), encoding="utf-8")
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("motion-theme")
+
+    assert selected.theme_id == "motion-theme"
+    assert selected.motion.page.transition_type == "fade_slide"
+    assert selected.issues
+    assert any("motion page.type" in issue for issue in selected.issues)

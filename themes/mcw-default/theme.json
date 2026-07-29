@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "id": "mcw-default",
   "name": "MCW Default PNG",
   "author": "mahiru7229",
@@ -137,7 +137,8 @@
   "capabilities": {
     "animated_assets": true,
     "sprite_sheets": true,
-    "animated_progress": true
+    "animated_progress": true,
+    "motion_configuration": true
   },
   "animations": {
     "progress.chunk": {
@@ -184,6 +185,36 @@
       "loop": true,
       "render_mode": "contain",
       "filtering": "nearest"
+    }
+  },
+  "motion": {
+    "page": {
+      "type": "fade_slide",
+      "duration_ms": 170,
+      "easing": "out_cubic",
+      "distance_px": 18
+    },
+    "button": {
+      "hover_duration_ms": 100,
+      "press_duration_ms": 70,
+      "easing": "out_quad",
+      "hover_strength": 0.08,
+      "press_strength": 0.18
+    },
+    "dialog": {
+      "type": "fade",
+      "duration_ms": 160,
+      "easing": "out_cubic"
+    },
+    "sidebar": {
+      "duration_ms": 220,
+      "easing": "out_cubic",
+      "collapsed_width": 72
+    },
+    "launch_control": {
+      "type": "fade",
+      "duration_ms": 140,
+      "easing": "out_cubic"
     }
   }
 }

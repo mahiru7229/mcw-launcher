@@ -1090,7 +1090,14 @@
         "instance_defaults.summary": "Memory {minimum}–{maximum} · Java: {java} · {width}×{height}{fullscreen}",
         "instance_defaults.launcher.title": "Default instance settings",
         "instance_defaults.launcher.description": "Choose the Java, memory, window, LAN, policy, and argument defaults used for new instances.",
-        "instance_defaults.launcher.edit": "Edit defaults"
+        "instance_defaults.launcher.edit": "Edit defaults",
+        "motion.mode.label": "Interface animation",
+        "motion.mode.detail": "Full uses all theme motion. Reduced shortens transitions and softens button effects. Off keeps the interface immediate and static.",
+        "motion.mode.full": "Full motion",
+        "motion.mode.reduced": "Reduced motion",
+        "motion.mode.off": "Animations off",
+        "motion.sidebar.collapse": "Collapse sidebar",
+        "motion.sidebar.expand": "Expand sidebar"
     },
     "aliases": {
         "MCW Launcher": "app.name",

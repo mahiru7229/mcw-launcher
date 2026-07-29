@@ -14,6 +14,7 @@ Tài liệu:
 - [`docs/THEME_ASSET_GUIDE.md`](../docs/THEME_ASSET_GUIDE.md) — toàn bộ key, đường dẫn và canvas PNG.
 - [`docs/THEME_ANIMATION_GUIDE.md`](../docs/THEME_ANIMATION_GUIDE.md) — PNG spritesheet và animation metadata.
 - [`docs/THEME_FONT_GUIDE.md`](../docs/THEME_FONT_GUIDE.md) — đóng gói TTF/OTF và áp dụng font toàn launcher.
+- [`docs/THEME_MOTION_GUIDE.md`](../docs/THEME_MOTION_GUIDE.md) — page, button, dialog, sidebar và Launch Control motion.
 
 ## Asset mới của Beta 9
 
@@ -120,3 +121,21 @@ Theme schema 3 có thể đóng gói font mà không yêu cầu người dùng c
 ```
 
 Font được áp dụng lên toàn bộ widget, dialog, splash, tooltip và log. Khi file thiếu, hỏng hoặc Qt không đọc được, launcher tự quay về font hệ thống. Xem [`docs/THEME_FONT_GUIDE.md`](../docs/THEME_FONT_GUIDE.md) để biết cách dùng nhiều weight, glyph tiếng Việt và giới hạn file.
+
+
+## Interactive Motion của v0.11.0-alpha.4
+
+Theme schema 4 có thể khai báo field `motion` để điều khiển transition, duration, easing và độ mạnh interaction. Người dùng vẫn có quyền chọn Full, Reduced hoặc Off trong Launcher Settings. Theme schema cũ tự dùng motion mặc định an toàn.
+
+```json
+{
+  "schema_version": 4,
+  "motion": {
+    "page": {"type": "fade_slide", "duration_ms": 170, "easing": "out_cubic", "distance_px": 18},
+    "button": {"hover_duration_ms": 100, "press_duration_ms": 70, "easing": "out_quad"},
+    "dialog": {"type": "fade", "duration_ms": 160, "easing": "out_cubic"},
+    "sidebar": {"duration_ms": 220, "easing": "out_cubic", "collapsed_width": 72},
+    "launch_control": {"type": "fade", "duration_ms": 140, "easing": "out_cubic"}
+  }
+}
+```

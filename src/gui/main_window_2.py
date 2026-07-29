@@ -21,6 +21,7 @@ from src.core.network.download_pause import is_download_cancelled, is_download_p
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.core.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
 from src.gui.application import create_application
+from src.gui.animation.motion_runtime import MotionRuntime
 from src.gui.config import LAUNCHER_NAME, VERSION_ID
 from src.gui.controllers.account_controller import AccountController
 from src.gui.controllers.curseforge_controller import CurseForgeController
@@ -96,6 +97,7 @@ class MainWindow(QMainWindow):
         self.gui_settings_controller = GuiSettingsController()
         self._startup_settings = self.gui_settings_controller.load()
         self.theme_runtime = ThemeRuntime()
+        self.motion_runtime = MotionRuntime(parent=self)
         language_manager.reload()
         language_manager.set_language(self._startup_settings.get("language", "en-US"), notify=False)
         self.launch_controller = LaunchController(self.task_runner)
@@ -118,8 +120,10 @@ class MainWindow(QMainWindow):
         self._build_ui()
         retranslate_widget_tree(self)
         self._connect_signals()
+        self.launch_control.set_motion_runtime(self.motion_runtime)
 
         self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(self._startup_settings.get("theme", "mcw-default")))
+        self.motion_runtime.apply(self._startup_settings.get("motion_mode", "full"))
         self._initialize_data()
 
     @staticmethod
@@ -224,6 +228,7 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self) -> None:
         self.sidebar.page_requested.connect(self.show_page)
+        self.sidebar.collapse_requested.connect(lambda collapsed: self.motion_runtime.set_sidebar_collapsed(self.sidebar, collapsed, self._display_profile.sidebar_width))
 
         self.home_page.manage_accounts_requested.connect(lambda: self.show_page("accounts"))
         self.home_page.manage_instances_requested.connect(lambda: self.show_page("instances"))
@@ -301,6 +306,7 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.language_changed.connect(self._preview_language)
         self.launcher_settings_page.check_updates_requested.connect(lambda: self.update_controller.check(manual=True))
         self.launcher_settings_page.reload_theme_requested.connect(self._preview_theme)
+        self.launcher_settings_page.motion_mode_changed.connect(self._preview_motion)
         self.launcher_settings_page.scan_java_requested.connect(self.java_controller.scan)
         self.launcher_settings_page.open_java_requested.connect(self._open_java_folder)
         self.logs_page.export_diagnostics_requested.connect(self._export_diagnostics)
@@ -503,7 +509,7 @@ class MainWindow(QMainWindow):
             return
 
         page = self.pages.get(requested_page, self.home_page)
-        self.content_stack.setCurrentWidget(page)
+        self.motion_runtime.switch_page(self.content_stack, page)
         self.sidebar.set_current_page(requested_page)
         if requested_page == "mods" and self.mods_page.selected_provider == "modrinth" and not self.mods_page.has_loaded_search and not self.task_runner.is_task_active(f"{self.mod_catalog_controller.SEARCH_PREFIX}{self.mods_page.selected_loader}"):
             QTimer.singleShot(0, self.mods_page.start_search)
@@ -1439,10 +1445,15 @@ class MainWindow(QMainWindow):
         self.instances_page.browse_curseforge_modpacks_button.setVisible(curseforge_available)
         self.mod_manager_dialog.curseforge_button.setVisible(curseforge_available)
         self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")), bool(settings.get("show_static_text", False)))
+        self.motion_runtime.apply(settings.get("motion_mode", "full"))
 
     def _preview_theme(self, theme_id: str) -> None:
         selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked())
+        self.motion_runtime.apply(self.launcher_settings_page.current_motion_mode())
         self.logs_page.append(f"Theme preview: {selected}")
+
+    def _preview_motion(self, mode: str) -> None:
+        self.motion_runtime.apply(mode)
 
     def _set_modrinth_channel_preferences(self, include_beta: bool, include_alpha: bool) -> None:
         self.mods_page.set_channel_preferences(include_beta, include_alpha)

@@ -91,3 +91,14 @@ def test_launcher_settings_has_five_masked_gateway_slots(gui_app):
     assert all(field.echoMode() == QLineEdit.EchoMode.Password for field in page.curseforge_gateway_inputs)
     assert page.curseforge_gateway_inputs[0].text() == "https://one.example/api/curseforge"
     assert page.form_data()["curseforge_gateway_urls"][1:] == ["", "", "", ""]
+
+
+def test_launcher_settings_round_trips_motion_mode(gui_app):
+    page = LauncherSettingsPage()
+    settings = _launcher_settings()
+    settings["motion_mode"] = "reduced"
+
+    page.set_settings(settings)
+
+    assert page.current_motion_mode() == "reduced"
+    assert page.form_data()["motion_mode"] == "reduced"

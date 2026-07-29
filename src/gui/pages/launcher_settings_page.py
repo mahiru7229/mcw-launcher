@@ -23,6 +23,7 @@ class LauncherSettingsPage(BasePage):
     language_changed = Signal(str)
     check_updates_requested = Signal()
     reload_theme_requested = Signal(str)
+    motion_mode_changed = Signal(str)
     scan_java_requested = Signal()
     open_java_requested = Signal(object)
     dirty_changed = Signal(bool)
@@ -225,6 +226,9 @@ class LauncherSettingsPage(BasePage):
         appearance_card = CardWidget("Appearance", "PNG theme files are optional. Missing or invalid files automatically fall back to the built-in CSS interface.")
         self.theme_combo = QComboBox()
         self.reload_themes()
+        self.motion_mode_combo = QComboBox()
+        self._reload_motion_modes()
+        self.motion_mode_combo.currentIndexChanged.connect(self._emit_motion_mode_changed)
         self.show_static_text = QCheckBox("Show static text over themed controls")
         self.show_static_text.setToolTip("Disabled by default. Enable this only when you want launcher text drawn over themed PNG controls.")
         reload_theme_button = set_theme_icon(QPushButton("Reload and preview theme"), "icon.action.theme")
@@ -232,6 +236,13 @@ class LauncherSettingsPage(BasePage):
         self.show_static_text.toggled.connect(self._queue_theme_preview)
         appearance_card.layout.addWidget(QLabel("Launcher theme"))
         appearance_card.layout.addWidget(self.theme_combo)
+        self.motion_mode_label = QLabel(tr("motion.mode.label"))
+        self.motion_mode_detail = QLabel(tr("motion.mode.detail"))
+        self.motion_mode_detail.setObjectName("MutedLabel")
+        self.motion_mode_detail.setWordWrap(True)
+        appearance_card.layout.addWidget(self.motion_mode_label)
+        appearance_card.layout.addWidget(self.motion_mode_combo)
+        appearance_card.layout.addWidget(self.motion_mode_detail)
         appearance_card.layout.addWidget(self.show_static_text)
         appearance_card.layout.addWidget(reload_theme_button)
         appearance_section.add_card(appearance_card, span=2)
@@ -264,6 +275,7 @@ class LauncherSettingsPage(BasePage):
         self.auto_check_updates.toggled.connect(self._refresh_dirty_state)
         self.join_tester_program.toggled.connect(self._refresh_dirty_state)
         self.theme_combo.currentIndexChanged.connect(self._refresh_dirty_state)
+        self.motion_mode_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.show_static_text.toggled.connect(self._refresh_dirty_state)
 
     def set_java_installations(self, installations: list) -> None:
@@ -319,6 +331,24 @@ class LauncherSettingsPage(BasePage):
         self.theme_combo.setCurrentIndex(max(0, index))
         self.theme_combo.blockSignals(False)
 
+    def _reload_motion_modes(self) -> None:
+        current = self.motion_mode_combo.currentData() if hasattr(self, "motion_mode_combo") else "full"
+        self.motion_mode_combo.blockSignals(True)
+        self.motion_mode_combo.clear()
+        self.motion_mode_combo.addItem(tr("motion.mode.full"), "full")
+        self.motion_mode_combo.addItem(tr("motion.mode.reduced"), "reduced")
+        self.motion_mode_combo.addItem(tr("motion.mode.off"), "off")
+        index = self.motion_mode_combo.findData(current or "full")
+        self.motion_mode_combo.setCurrentIndex(max(0, index))
+        self.motion_mode_combo.blockSignals(False)
+
+    def current_motion_mode(self) -> str:
+        value = str(self.motion_mode_combo.currentData() or "full").strip().lower()
+        return value if value in {"full", "reduced", "off"} else "full"
+
+    def _emit_motion_mode_changed(self, _index: int) -> None:
+        self.motion_mode_changed.emit(self.current_motion_mode())
+
     def _emit_language_changed(self, _index: int) -> None:
         locale = self.language_combo.currentData()
         if locale:
@@ -340,6 +370,7 @@ class LauncherSettingsPage(BasePage):
         if pending_data is not None:
             self.language_changed.emit(str(pending_data.get("language", "en-US")))
             self.reload_theme_requested.emit(str(pending_data.get("theme", "mcw-default")))
+            self.motion_mode_changed.emit(str(pending_data.get("motion_mode", "full")))
 
     def form_data(self) -> dict:
         return {
@@ -352,6 +383,7 @@ class LauncherSettingsPage(BasePage):
             "tester_mode": self.join_tester_program.isChecked(),
             "theme": self.theme_combo.currentData() or "mcw-default",
             "show_static_text": self.show_static_text.isChecked(),
+            "motion_mode": self.current_motion_mode(),
             "modrinth_include_beta": self.modrinth_include_beta.isChecked(),
             "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
             "block_launch_on_modrinth_failure": self.block_modrinth_failure.isChecked(),
@@ -382,6 +414,7 @@ class LauncherSettingsPage(BasePage):
         self._set_dirty(False)
         self.language_changed.emit(str(self._saved_data.get("language", "en-US")))
         self.reload_theme_requested.emit(str(self._saved_data.get("theme", "mcw-default")))
+        self.motion_mode_changed.emit(str(self._saved_data.get("motion_mode", "full")))
 
     def set_update_status(self, message: str) -> None:
         self.update_status_label.setText(message)
@@ -404,6 +437,9 @@ class LauncherSettingsPage(BasePage):
         if self.instance_defaults_card.subtitle_label is not None:
             self.instance_defaults_card.subtitle_label.setText(tr("instance_defaults.launcher.description"))
         self.edit_instance_defaults_button.setText(tr("instance_defaults.launcher.edit"))
+        self.motion_mode_label.setText(tr("motion.mode.label"))
+        self.motion_mode_detail.setText(tr("motion.mode.detail"))
+        self._reload_motion_modes()
         self._update_instance_defaults_summary()
         self._update_save_button_text()
 
@@ -425,6 +461,7 @@ class LauncherSettingsPage(BasePage):
             self.join_tester_program,
             self.language_combo,
             self.theme_combo,
+            self.motion_mode_combo,
             self.show_static_text,
             *self.curseforge_gateway_inputs,
         )
@@ -465,6 +502,8 @@ class LauncherSettingsPage(BasePage):
         self.theme_combo.blockSignals(True)
         self.theme_combo.setCurrentIndex(max(0, theme_index))
         self.theme_combo.blockSignals(False)
+        motion_index = self.motion_mode_combo.findData(str(settings.get("motion_mode", "full")))
+        self.motion_mode_combo.setCurrentIndex(max(0, motion_index))
         self.show_static_text.setChecked(bool(settings.get("show_static_text", False)))
         self._instance_defaults = SettingsManager.normalize_dict(settings.get("instance_defaults"))
         self._update_instance_defaults_summary()

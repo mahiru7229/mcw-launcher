@@ -15,7 +15,7 @@ from src.core.instance.settings_manager import SettingsManager, default_instance
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 10
+    SCHEMA_VERSION = 11
     UPDATE_CHANNEL_POLICY_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
@@ -34,6 +34,7 @@ class LauncherSettingsManager:
         "appearance": {
             "theme": "mcw-default",
             "show_static_text": False,
+            "motion_mode": "full",
         },
         "modrinth": {
             "include_beta": False,
@@ -178,6 +179,8 @@ class LauncherSettingsManager:
         appearance = normalized.setdefault("appearance", {})
         appearance["theme"] = str(appearance.get("theme") or "mcw-default").strip() or "mcw-default"
         appearance["show_static_text"] = self._as_bool(appearance.get("show_static_text"), False)
+        motion_mode = str(appearance.get("motion_mode") or "full").strip().lower()
+        appearance["motion_mode"] = motion_mode if motion_mode in {"full", "reduced", "off"} else "full"
 
         modrinth = normalized.setdefault("modrinth", {})
         modrinth["include_beta"] = self._as_bool(modrinth.get("include_beta"), False)

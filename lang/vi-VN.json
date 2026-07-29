@@ -1090,7 +1090,14 @@
         "instance_defaults.summary": "Bộ nhớ {minimum}–{maximum} · Java: {java} · {width}×{height}{fullscreen}",
         "instance_defaults.launcher.title": "Cài đặt mặc định của instance",
         "instance_defaults.launcher.description": "Chọn Java, bộ nhớ, cửa sổ, LAN, chính sách và tham số mặc định dùng cho instance mới.",
-        "instance_defaults.launcher.edit": "Chỉnh sửa mặc định"
+        "instance_defaults.launcher.edit": "Chỉnh sửa mặc định",
+        "motion.mode.label": "Animation giao diện",
+        "motion.mode.detail": "Đầy đủ sử dụng toàn bộ chuyển động của theme. Giảm chuyển động rút ngắn transition và làm nhẹ hiệu ứng nút. Tắt sẽ giữ giao diện phản hồi ngay và đứng yên.",
+        "motion.mode.full": "Chuyển động đầy đủ",
+        "motion.mode.reduced": "Giảm chuyển động",
+        "motion.mode.off": "Tắt animation",
+        "motion.sidebar.collapse": "Thu gọn thanh bên",
+        "motion.sidebar.expand": "Mở rộng thanh bên"
     },
     "aliases": {
         "Show static text over themed controls": "launcher_settings.theme.show_static_text",
