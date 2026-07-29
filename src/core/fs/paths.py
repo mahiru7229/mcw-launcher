@@ -322,6 +322,12 @@ class Paths:
         return Path(instance.instance_dir) / ".mcw" / "curseforge.json"
 
     @staticmethod
+    def curseforge_instance_transaction_root(instance: Instance) -> Path:
+        directory = Path(instance.instance_dir) / ".mcw" / "transactions" / "curseforge"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
     def curseforge_pack_registry(instance: Instance) -> Path:
         return Path(instance.instance_dir) / ".mcw" / "curseforge-pack.json"
 

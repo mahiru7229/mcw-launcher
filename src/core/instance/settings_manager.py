@@ -43,16 +43,45 @@ class SettingsManager:
         if not data:
             SettingsManager.save_default(instance)
             data = copy.deepcopy(SettingsManager.DEFAULT_SETTINGS)
-        return SettingsManager._parse_instance_settings(data)
+        return SettingsManager.from_dict(data)
 
     @staticmethod
     def save(instance: Instance, settings: InstanceSettings) -> None:
-        settings.min_memory, settings.max_memory = MemoryAllocationPolicy.normalize(settings.min_memory, settings.max_memory)
-        SettingsManager._write(Paths.instance_settings_path(instance), SettingsManager._settings_to_dict(settings))
+        SettingsManager._write(Paths.instance_settings_path(instance), SettingsManager.to_dict(settings))
 
     @staticmethod
     def save_default(instance: Instance) -> None:
-        SettingsManager._write(Paths.instance_settings_path(instance), copy.deepcopy(SettingsManager.DEFAULT_SETTINGS))
+        SettingsManager.save_dict(instance, SettingsManager.default_dict())
+
+    @staticmethod
+    def default_dict() -> dict[str, Any]:
+        return copy.deepcopy(SettingsManager.DEFAULT_SETTINGS)
+
+    @staticmethod
+    def from_dict(data: dict[str, Any] | InstanceSettings | None) -> InstanceSettings:
+        if isinstance(data, InstanceSettings):
+            data = SettingsManager._settings_to_dict(data)
+        if not isinstance(data, dict):
+            data = {}
+        return SettingsManager._parse_instance_settings(data)
+
+    @staticmethod
+    def to_dict(settings: InstanceSettings) -> dict[str, Any]:
+        if not isinstance(settings, InstanceSettings):
+            raise TypeError("Instance settings must use InstanceSettings.")
+        minimum, maximum = MemoryAllocationPolicy.normalize(settings.min_memory, settings.max_memory)
+        normalized = copy.copy(settings)
+        normalized.min_memory = minimum
+        normalized.max_memory = maximum
+        return SettingsManager._settings_to_dict(normalized)
+
+    @staticmethod
+    def normalize_dict(data: dict[str, Any] | InstanceSettings | None) -> dict[str, Any]:
+        return SettingsManager.to_dict(SettingsManager.from_dict(data))
+
+    @staticmethod
+    def save_dict(instance: Instance, data: dict[str, Any] | InstanceSettings | None) -> None:
+        SettingsManager._write(Paths.instance_settings_path(instance), SettingsManager.normalize_dict(data))
 
     @staticmethod
     def update_memory(instance: Instance, min_memory: int, max_memory: int) -> InstanceSettings:

@@ -3,7 +3,7 @@ import json
 from src.core.modrinth.modrinth_client import ModrinthClient
 
 
-def test_search_builds_fabric_facets_and_parses_projects(monkeypatch):
+def test_search_builds_loader_facets_but_keeps_game_version_advisory(monkeypatch):
     captured = {}
 
     def fake_get_json(path, params=None, ttl=0, force_refresh=False, **_kwargs):
@@ -32,7 +32,7 @@ def test_search_builds_fabric_facets_and_parses_projects(monkeypatch):
     facets = json.loads(captured["params"]["facets"])
     assert ["project_type:mod"] in facets
     assert ["categories:fabric"] in facets
-    assert ["versions:1.20.1"] in facets
+    assert ["versions:1.20.1"] not in facets
     assert result.projects[0].title == "Example Mod"
     assert result.projects[0].client_side == "required"
 
@@ -69,6 +69,74 @@ def test_versions_are_sorted_by_publish_date_across_channels(monkeypatch):
 
     assert [version.version_id for version in versions] == ["beta", "release"]
     assert versions[0].primary_file(".jar").filename == "beta.jar"
+
+
+def test_versions_keep_nearby_patch_metadata_and_rank_likely_matches(monkeypatch):
+    captured = {}
+
+    def version(version_id: str, game_versions: list[str], published: str):
+        return {
+            "id": version_id,
+            "project_id": "project",
+            "name": version_id,
+            "version_number": version_id,
+            "version_type": "release",
+            "game_versions": game_versions,
+            "loaders": ["fabric"],
+            "date_published": published,
+            "files": [{
+                "url": f"https://cdn.modrinth.com/{version_id}.jar",
+                "filename": f"{version_id}.jar",
+                "hashes": {"sha1": "a", "sha512": "b"},
+                "size": 1,
+                "primary": True,
+            }],
+        }
+
+    def fake_get_json(path, params=None, **_kwargs):
+        captured["params"] = params
+        return [
+            version("other", ["1.21.1"], "2026-07-28T00:00:00Z"),
+            version("nearby", ["1.20.4"], "2026-07-27T00:00:00Z"),
+            version("unknown", [], "2026-07-26T00:00:00Z"),
+            version("exact", ["1.20.1"], "2026-07-25T00:00:00Z"),
+        ]
+
+    monkeypatch.setattr(ModrinthClient, "_get_json", fake_get_json)
+
+    versions = ModrinthClient.list_project_versions(
+        "project",
+        loader="fabric",
+        game_version="1.20.1",
+    )
+
+    assert "game_versions" not in captured["params"]
+    assert [version.version_id for version in versions] == ["exact", "nearby", "unknown", "other"]
+
+
+def test_search_ranks_exact_and_nearby_patch_projects_without_hiding_others(monkeypatch):
+    def fake_get_json(*_args, **_kwargs):
+        return {
+            "hits": [
+                {"project_id": "other", "title": "Other", "project_type": "mod", "versions": ["1.21.1"]},
+                {"project_id": "nearby", "title": "Nearby", "project_type": "mod", "versions": ["1.20.4"]},
+                {"project_id": "exact", "title": "Exact", "project_type": "mod", "versions": ["1.20.1"]},
+            ],
+            "total_hits": 3,
+            "offset": 0,
+            "limit": 25,
+        }
+
+    monkeypatch.setattr(ModrinthClient, "_get_json", fake_get_json)
+
+    result = ModrinthClient.search_projects(
+        "mod",
+        "example",
+        game_version="1.20.1",
+        loader="fabric",
+    )
+
+    assert [project.project_id for project in result.projects] == ["exact", "nearby", "other"]
 
 
 def test_user_agent_identifies_launcher():

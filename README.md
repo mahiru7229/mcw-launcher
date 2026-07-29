@@ -7,10 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Stable-v0.9.0-brightgreen" alt="Current stable version">
-  </a>
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Tester-opt--in-orange" alt="Experimental builds require tester opt-in">
+    <img src="https://img.shields.io/badge/Stable-v0.10.0-brightgreen" alt="Current stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -25,12 +22,13 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v0.9.0.md">v0.9.0 release notes</a> ·
+  <a href="docs/RELEASE-v0.10.0.md">v0.10.0 release notes</a> ·
+  <a href="docs/RELEASE-v0.10.0-beta.2.md">Beta 2 history</a> ·
   <a href="docs/UPDATE_PACKAGES.md">Updater packages</a>
 </p>
 
 > [!NOTE]
-> `v0.9.0` là bản Stable hiện tại. Stable là kênh mặc định; bản thử nghiệm chỉ được nhận khi người dùng chủ động tham gia tester program.
+> `v0.10.0` là bản Stable hiện tại và kênh Stable vẫn là mặc định. Tester program tiếp tục là tùy chọn chủ động cho các bản thử nghiệm trong tương lai.
 
 ---
 
@@ -42,7 +40,7 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
-### Điểm nổi bật của `v0.9.0`
+### Nền tảng ổn định từ `v0.9.0`
 
 - Thêm **Repair Center** cho từng instance với **Quick Check** và **Full Verification**.
 - Kiểm tra Minecraft client, libraries, natives, assets, Java, mod loader, file modpack được quản lý, LAN Agent và metadata của instance.
@@ -57,11 +55,24 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 - Xuất diagnostics ZIP có giới hạn dung lượng, lọc token/thông tin nhạy cảm và không chứa account database, world hoặc nội dung mod JAR.
 - Sửa chuỗi tác vụ preview → update bị báo nhầm đang có tác vụ khác, đồng thời thêm fallback an toàn khi Windows chặn đổi tên thư mục staging như `.fabric` lúc restore backup.
 
+### Tính năng mới trong `v0.10.0`
+
+- Thêm **cài đặt mặc định cho instance** trong Launcher Settings: Java, RAM, kích thước cửa sổ/toàn màn hình, LAN, chính sách file được quản lý, Forge preflight, JVM arguments và game arguments.
+- Mọi instance Vanilla/Fabric/Forge mới và mọi modpack Modrinth/CurseForge mới đều sao chép bộ mặc định này; instance hiện có vẫn giữ `settings.json` riêng.
+- Khi import `.mcwpack`, hiển thị thông tin gói và cho chọn ghi đè bằng setting tổng, giữ setting trong gói hoặc mở toàn bộ setting của gói để chỉnh trước khi nhập.
+- Cài mod **Fabric trực tiếp từ CurseForge** trong catalog Mods hiện có; vẫn hỗ trợ Forge bằng cùng một luồng.
+- Cài **modpack Fabric từ CurseForge**: chọn Fabric/Forge trong trình duyệt, đọc loader và phiên bản chính xác từ `manifest.json`, rồi tạo instance tương ứng.
+- Giữ mọi file trong release channel đã bật, ưu tiên loader cùng nhãn Minecraft chính xác/gần nhất rồi cài dependency bắt buộc; nhãn phiên bản không còn chặn cài đặt.
+- Dùng gateway công khai cho metadata; CurseForge API key vẫn chỉ nằm phía server và file mod được tải trực tiếp bằng Download Engine của launcher.
+- Kiểm tra metadata thật trong JAR trước khi thay đổi instance. Nhãn Minecraft và Fabric/Forge của CurseForge chỉ được dùng để ưu tiên kết quả.
+- Chuẩn bị toàn bộ file tự động trước khi cài và rollback mod cùng registry nếu một bước ghi thất bại.
+- Giữ fallback tải thủ công có xác minh size/SHA-1 khi tác giả tắt phân phối bên thứ ba.
+
 ### Nền tảng hiện có
 
 - Tạo và chạy instance **Vanilla, Fabric hoặc Forge**; cài đặt, thay đổi và repair Fabric Loader/Minecraft Forge.
 - Tài khoản Offline và Microsoft OAuth PKCE, hỗ trợ nhiều tài khoản Microsoft và bảo vệ refresh token bằng Windows DPAPI.
-- Tìm, cài và cập nhật mod từ **Modrinth**; cài, update và repair modpack `.mrpack`.
+- Tìm, cài và cập nhật mod từ **Modrinth**; nhãn Minecraft chỉ để ưu tiên, còn manifest `.mrpack` quyết định phiên bản của modpack.
 - Tìm và cài mod/modpack **CurseForge** qua gateway công khai, có cache, failover và luồng tải thủ công được xác minh khi tác giả hạn chế phân phối.
 - Backup/restore `.mcwbackup`, import/export `.mcwpack`, runtime lock, theo dõi tiến trình Minecraft, game log và crash report.
 - **MCW LAN Agent** cùng LAN hosting profiles cho chế độ Microsoft-only hoặc bạn bè Microsoft + Offline trên các cấu hình được hỗ trợ.
@@ -72,7 +83,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.9.0` là bản Stable hiện tại dành cho người dùng thông thường.
+- `v0.10.0` là bản Stable hiện tại dành cho người dùng thông thường.
 - Stable là kênh mặc định. Để nhận bản thử nghiệm, người dùng phải chủ động bật:
 
 ```text
@@ -129,14 +140,14 @@ Hoặc chạy thủ công:
 python -m tools.release_preflight
 python -m pytest test -q
 python -m PyInstaller --clean --noconfirm mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.9.0"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.10.0"
 ```
 
 Kết quả updater package:
 
 ```text
-MCW-Launcher-v0.9.0-windows-x64.zip
-MCW-Launcher-v0.9.0-windows-x64.zip.sha256
+MCW-Launcher-v0.10.0-windows-x64.zip
+MCW-Launcher-v0.10.0-windows-x64.zip.sha256
 ```
 
 Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -151,7 +162,7 @@ MCW Launcher is an open-source Minecraft launcher centered around **isolated ins
 
 Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
 
-### `v0.9.0` highlights
+### Stable foundation from `v0.9.0`
 
 - Add a per-instance **Repair Center** with **Quick Check** and **Full Verification**.
 - Check the Minecraft client, libraries, natives, assets, Java, mod loader, managed modpack files, LAN Agent, and instance metadata.
@@ -166,11 +177,24 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 - Export bounded, privacy-filtered diagnostic ZIP bundles without account databases, worlds, or mod JAR contents.
 - Fix preview → update task chains being rejected as already busy, and add a safe fallback when Windows blocks renaming staged folders such as `.fabric` during backup restore.
 
+### New in `v0.10.0`
+
+- Add **default instance settings** under Launcher Settings for Java, memory, window/fullscreen, LAN, managed-file policies, Forge preflight, JVM arguments, and game arguments.
+- Every new Vanilla/Fabric/Forge instance and every new Modrinth/CurseForge modpack copies these defaults, while existing instances retain their own `settings.json`.
+- Before importing a `.mcwpack`, show its package details and let the user overwrite settings with launcher defaults, keep package settings, or review and edit the complete package settings first.
+- Install **Fabric mods directly from CurseForge** in the existing Mods catalog while retaining the same Forge workflow.
+- Install **Fabric CurseForge modpacks** by selecting Fabric/Forge in the browser, validating the exact loader and version from `manifest.json`, and creating the matching instance.
+- Keep every file in the enabled release channels, rank selected-loader and exact/nearby Minecraft labels first, then resolve required dependencies; version labels no longer block installation.
+- Fetch metadata through the public gateway, keep the CurseForge API key server-side, and download mod files directly with the launcher's Download Engine.
+- Validate real JAR metadata before changing an instance. CurseForge Minecraft and Fabric/Forge labels are ranking hints rather than the final authority.
+- Prepare every automatic file before installation and roll back both mods and registry data if an apply step fails.
+- Preserve the size/SHA-1-verified manual fallback when an author disables third-party distribution.
+
 ### Existing foundation
 
 - Create and launch **Vanilla, Fabric, and Forge** instances; install, change, and repair Fabric Loader/Minecraft Forge.
 - Use Offline or Microsoft OAuth PKCE accounts, including multiple Microsoft accounts and Windows DPAPI protection for refresh tokens.
-- Search, install, and update **Modrinth** mods; install, update, and repair `.mrpack` modpacks.
+- Search, install, and update **Modrinth** mods; Minecraft labels only affect ranking, while each `.mrpack` manifest determines its modpack version.
 - Search and install **CurseForge** mods/modpacks through the public gateway, with caching, failover, and verified manual downloads for restricted files.
 - Backup/restore `.mcwbackup`, import/export `.mcwpack`, enforce runtime locks, and track the Minecraft process, game logs, and crash reports.
 - Use **MCW LAN Agent** and LAN hosting profiles for Microsoft-only or Microsoft + Offline friends on supported configurations.
@@ -181,7 +205,7 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 Packaged Windows builds are published on the **Releases** page:
 
 - [Open releases](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.9.0` is the current Stable release for regular users.
+- `v0.10.0` is the current Stable release for regular users.
 - Stable is the default channel. Experimental builds require explicitly enabling:
 
 ```text
@@ -238,14 +262,14 @@ Or run each step manually:
 python -m tools.release_preflight
 python -m pytest test -q
 python -m PyInstaller --clean --noconfirm mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.9.0"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.10.0"
 ```
 
 Expected updater assets:
 
 ```text
-MCW-Launcher-v0.9.0-windows-x64.zip
-MCW-Launcher-v0.9.0-windows-x64.zip.sha256
+MCW-Launcher-v0.10.0-windows-x64.zip
+MCW-Launcher-v0.10.0-windows-x64.zip.sha256
 ```
 
 See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -283,8 +307,8 @@ See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
 
 - Fabric and Forge mod metadata parsing.
 - Enable/disable, drag-and-drop, dependency analysis, duplicate-ID detection, and loader mismatch checks.
-- Modrinth dependency installation, update checks, update locks, retry/resume, and fallback URLs.
-- CurseForge Gateway search, compatible file selection, dependency installation, automatic/manual distribution handling, local JSON caching, refresh cooldown, and stale fallback.
+- Modrinth dependency installation, advisory Minecraft-version ranking, update checks, update locks, retry/resume, and fallback URLs.
+- CurseForge Gateway search, advisory loader/Minecraft ranking, dependency installation, automatic/manual distribution handling, local JSON caching, refresh cooldown, and stale fallback.
 - Managed modpack registry with update preview, repair, conflict preservation, backup, rollback, and verification cache.
 
 ### Repair, backup, and diagnostics
@@ -357,6 +381,8 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
+| [`docs/RELEASE-v0.10.0.md`](docs/RELEASE-v0.10.0.md) | Complete v0.10.0 Stable release notes |
+| [`docs/RELEASE-v0.10.0-beta.2.md`](docs/RELEASE-v0.10.0-beta.2.md) | v0.10.0 Beta 2 global instance settings and import review notes |
 | [`docs/RELEASE-v0.9.0.md`](docs/RELEASE-v0.9.0.md) | Complete v0.9.0 Stable release notes |
 | [`docs/RELEASE-v0.8.1.md`](docs/RELEASE-v0.8.1.md) | v0.8.1 CurseForge and managed-modpack hotfix notes |
 | [`docs/RELEASE-v0.8.0.md`](docs/RELEASE-v0.8.0.md) | Complete v0.8.0 Stable release notes |
@@ -374,7 +400,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v0.9.0 |
+| Component | Status in v0.10.0 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |
@@ -388,8 +414,8 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 | English / Vietnamese | Available |
 | PNG themes | Available |
 | NeoForge / Quilt | Not supported |
-| CurseForge Gateway mods | Available — public default gateway, universal Fabric/Forge JAR validation, cache and manual fallback |
-| CurseForge modpacks | Experimental — Forge flow with universal dependency support |
+| CurseForge Gateway mods | Available — Fabric/Forge install, required dependencies, transactional apply, public gateway, cache and manual fallback |
+| CurseForge modpacks | Available — Fabric/Forge manifest-driven install with universal dependency support |
 
 ## Contributing and bug reports
 

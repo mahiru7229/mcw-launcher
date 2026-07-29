@@ -26,7 +26,7 @@ class CurseForgeBrowserDialog(QDialog):
     files_refresh_requested = Signal(str, int, str, str, object)
     clear_cache_requested = Signal()
     install_mod_requested = Signal(int, int, object)
-    install_modpack_requested = Signal(int, int, str, bool, object)
+    install_modpack_requested = Signal(int, int, str, bool, object, str)
     channel_preferences_changed = Signal(bool, bool)
 
     PAGE_SIZE = 25
@@ -77,6 +77,12 @@ class CurseForgeBrowserDialog(QDialog):
         search_row = QHBoxLayout()
         self.search_input = QLineEdit()
         self.search_input.returnPressed.connect(self._request_search)
+        self.loader_label = QLabel()
+        self.loader_label.setObjectName("MutedLabel")
+        self.loader_combo = QComboBox()
+        self.loader_combo.addItem("Fabric", ModLoaderManager.FABRIC)
+        self.loader_combo.addItem("Forge", ModLoaderManager.FORGE)
+        self.loader_combo.currentIndexChanged.connect(self._loader_changed)
         self.sort_combo = QComboBox()
         self.sort_combo.addItem("Popularity", "popularity")
         self.sort_combo.addItem("Downloads", "downloads")
@@ -86,6 +92,9 @@ class CurseForgeBrowserDialog(QDialog):
         self.search_button.setObjectName("PrimaryButton")
         self.search_button.clicked.connect(self._request_search)
         search_row.addWidget(self.search_input, 1)
+        if self.project_type == "modpack":
+            search_row.addWidget(self.loader_label)
+            search_row.addWidget(self.loader_combo)
         search_row.addWidget(self.sort_combo)
         search_row.addWidget(self.search_button)
         root.addLayout(search_row)
@@ -175,7 +184,8 @@ class CurseForgeBrowserDialog(QDialog):
     @property
     def loader(self) -> str:
         if self.project_type == "modpack":
-            return ModLoaderManager.FORGE
+            loader = str(self.loader_combo.currentData() or ModLoaderManager.FABRIC).strip().casefold()
+            return loader if loader in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE} else ModLoaderManager.FABRIC
         if self._instance is not None:
             return ModLoaderManager.normalize(self._instance.mod_loader)[0]
         return self._catalog_loader
@@ -217,6 +227,9 @@ class CurseForgeBrowserDialog(QDialog):
         self.install_button.setEnabled(False)
         if self.project_type == "modpack":
             self.instance_name_input.clear()
+            self.loader_combo.blockSignals(True)
+            self.loader_combo.setCurrentIndex(max(0, self.loader_combo.findData(ModLoaderManager.FABRIC)))
+            self.loader_combo.blockSignals(False)
         self.retranslate_dynamic()
 
 
@@ -228,7 +241,9 @@ class CurseForgeBrowserDialog(QDialog):
         self._catalog_loader = normalized
         self.retranslate_dynamic()
 
-    def set_search_result(self, result: CurseForgeSearchResult) -> None:
+    def set_search_result(self, result: CurseForgeSearchResult, loader: str = "") -> None:
+        if loader and str(loader).strip().casefold() != self.loader:
+            return
         self._result = result
         self._projects = list(result.projects)
         self._index = result.index
@@ -258,7 +273,9 @@ class CurseForgeBrowserDialog(QDialog):
         else:
             self._clear_selection(tr("curseforge.results.empty"))
 
-    def set_files(self, project_id: int, files: list[CurseForgeFile]) -> None:
+    def set_files(self, project_id: int, files: list[CurseForgeFile], loader: str = "") -> None:
+        if loader and str(loader).strip().casefold() != self.loader:
+            return
         if self._selected_project is None or self._selected_project.project_id != int(project_id):
             return
         self._files = list(files)
@@ -292,6 +309,7 @@ class CurseForgeBrowserDialog(QDialog):
         self.search_button.setEnabled(not self._busy)
         self.results_table.setEnabled(not self._busy)
         self.file_combo.setEnabled(not self._busy)
+        self.loader_combo.setEnabled(not self._busy)
         self.include_beta_checkbox.setEnabled(not self._busy)
         self.include_alpha_checkbox.setEnabled(not self._busy)
         self.clear_cache_button.setEnabled(not self._busy)
@@ -313,6 +331,22 @@ class CurseForgeBrowserDialog(QDialog):
         self.channel_preferences_changed.emit(include_beta, include_alpha)
         if self._selected_project is not None:
             self.files_requested.emit(self.project_type, self._selected_project.project_id, self.game_version, self.loader, self.allowed_release_types)
+
+    def _loader_changed(self, _index: int) -> None:
+        if self.project_type != "modpack":
+            return
+        self._index = 0
+        self._result = None
+        self._projects = []
+        self.results_table.clearSelection()
+        self.results_table.clearContents()
+        self.results_table.setRowCount(0)
+        self.previous_button.setEnabled(False)
+        self.next_button.setEnabled(False)
+        self._clear_selection(tr("curseforge.results.ready"))
+        self.retranslate_dynamic()
+        if self.isVisible() and self.search_input.text().strip():
+            self._request_search()
 
     def _request_search(self) -> None:
         if self.project_type == "mod" and self._instance is None and not self._catalog_loader:
@@ -407,7 +441,14 @@ class CurseForgeBrowserDialog(QDialog):
         if self.project_type == "mod":
             self.install_mod_requested.emit(project.project_id, file.file_id, self.allowed_release_types)
             return
-        self.install_modpack_requested.emit(project.project_id, file.file_id, self.instance_name_input.text().strip(), self.optional_checkbox.isChecked(), self.allowed_release_types)
+        self.install_modpack_requested.emit(
+            project.project_id,
+            file.file_id,
+            self.instance_name_input.text().strip(),
+            self.optional_checkbox.isChecked(),
+            self.allowed_release_types,
+            self.loader,
+        )
 
     def selected_file(self) -> CurseForgeFile | None:
         file_id = int(self.file_combo.currentData() or 0)
@@ -474,13 +515,20 @@ class CurseForgeBrowserDialog(QDialog):
         self.title_label.setText(title)
         if is_mod:
             if self._instance is not None:
-                self.context_label.setText(tr("curseforge.mod.context", instance=self._instance.name, minecraft=self._instance.version_id))
+                self.context_label.setText(
+                    tr(
+                        "curseforge.mod.context",
+                        instance=self._instance.name,
+                        minecraft=self._instance.version_id,
+                        loader=self.loader.title(),
+                    )
+                )
             elif self._catalog_loader:
                 self.context_label.setText(tr("curseforge.mod.catalog_context", loader=self._catalog_loader.title()))
             else:
                 self.context_label.setText(tr("curseforge.mod.context.none"))
         else:
-            self.context_label.setText(tr("curseforge.modpack.context"))
+            self.context_label.setText(tr("curseforge.modpack.context", loader=self.loader.title()))
         self.release_channel_label.setText(tr("curseforge.channel.release_always"))
         self.include_beta_checkbox.setText(tr("curseforge.channel.beta"))
         self.include_alpha_checkbox.setText(tr("curseforge.channel.alpha"))
@@ -493,6 +541,10 @@ class CurseForgeBrowserDialog(QDialog):
         self.install_button.setText(tr("curseforge.mod.install" if is_mod else "curseforge.modpack.install"))
         self.instance_name_input.setPlaceholderText(tr("curseforge.modpack.instance_name"))
         self.optional_checkbox.setText(tr("curseforge.modpack.optional_files"))
+        self.loader_label.setText(tr("curseforge.loader.label"))
+        self.loader_combo.setItemText(0, tr("curseforge.loader.fabric"))
+        self.loader_combo.setItemText(1, tr("curseforge.loader.forge"))
+        self.loader_combo.setToolTip(tr("curseforge.loader.help"))
         self.sort_combo.setItemText(0, tr("curseforge.sort.popularity"))
         self.sort_combo.setItemText(1, tr("curseforge.sort.downloads"))
         self.sort_combo.setItemText(2, tr("curseforge.sort.updated"))

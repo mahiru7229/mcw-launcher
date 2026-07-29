@@ -59,7 +59,7 @@ def test_search_projects_uses_gateway_filters_and_safe_headers(monkeypatch, tmp_
     assert request.url.params["query"] == "example"
     assert request.url.params["classId"] == "6"
     assert "loader" not in request.url.params
-    assert request.url.params["gameVersion"] == "1.20.1"
+    assert "gameVersion" not in request.url.params
     assert result.projects[0].project_id == 101
     assert result.projects[0].authors == ("Mahiru",)
     assert result.projects[0].project_url.endswith("/example")
@@ -207,7 +207,7 @@ def test_curseforge_file_works_with_shared_instance_compatibility_flow() -> None
 
     assert file.version_number == "Example Forge Build"
     assert file.game_versions == ("1.20.1",)
-    assert [instance.name for instance in result] == ["Match"]
+    assert [instance.name for instance in result] == ["Match", "Wrong game"]
 
 
 def test_catalog_search_filters_projects_by_latest_file_loader(monkeypatch, tmp_path: Path) -> None:
@@ -250,13 +250,16 @@ def test_catalog_search_filters_projects_by_latest_file_loader(monkeypatch, tmp_
     client.close()
 
 
-def test_catalog_file_list_does_not_strictly_filter_loader_metadata(monkeypatch, tmp_path: Path) -> None:
+def test_catalog_file_list_ranks_advisory_loader_and_game_version_metadata(monkeypatch, tmp_path: Path) -> None:
     captured = {}
     payload = {
         "data": [
             {"id": 1, "modId": 1515343, "displayName": "Fabric-labelled", "fileName": "universal.jar", "releaseType": 1, "fileDate": "2026-07-22T00:00:00Z", "gameVersions": ["1.20.1", "Fabric"]},
             {"id": 2, "modId": 1515343, "displayName": "Forge", "fileName": "forge.jar", "releaseType": 1, "fileDate": "2026-07-20T00:00:00Z", "gameVersions": ["1.20.1", "Forge"]},
             {"id": 3, "modId": 1515343, "displayName": "Universal", "fileName": "both.jar", "releaseType": 1, "fileDate": "2026-07-21T00:00:00Z", "gameVersions": ["1.20.1", "Fabric", "Forge"]},
+            {"id": 4, "modId": 1515343, "displayName": "Nearby patch", "fileName": "nearby.jar", "releaseType": 1, "fileDate": "2026-07-24T00:00:00Z", "gameVersions": ["1.20.4", "Forge"]},
+            {"id": 5, "modId": 1515343, "displayName": "Other release", "fileName": "other.jar", "releaseType": 1, "fileDate": "2026-07-26T00:00:00Z", "gameVersions": ["1.21.1", "Forge"]},
+            {"id": 6, "modId": 1515343, "displayName": "Unknown game version", "fileName": "unknown.jar", "releaseType": 1, "fileDate": "2026-07-25T00:00:00Z", "gameVersions": ["Forge"]},
         ]
     }
 
@@ -269,10 +272,54 @@ def test_catalog_file_list_does_not_strictly_filter_loader_metadata(monkeypatch,
 
     result = CurseForgeClient.list_files_result(1515343, game_version="1.20.1", loader="forge", force_refresh=True)
 
-    assert [file.file_id for file in result.files] == [2, 3, 1]
+    assert [file.file_id for file in result.files] == [2, 4, 6, 5, 3, 1]
     assert "loader" not in captured["request"].url.params
-    assert captured["request"].url.params["gameVersion"] == "1.20.1"
+    assert "gameVersion" not in captured["request"].url.params
     assert CurseForgeClient.loader_compatibility(result.files[-1], "forge") == "unverified"
+    client.close()
+
+
+def test_catalog_search_keeps_and_ranks_nearby_patch_projects(monkeypatch, tmp_path: Path) -> None:
+    payload = {
+        "data": [
+            {
+                "id": 1,
+                "name": "Other release",
+                "slug": "other",
+                "latestFilesIndexes": [{"gameVersion": "1.21.1", "fileId": 1, "modLoader": 4}],
+            },
+            {
+                "id": 2,
+                "name": "Nearby patch",
+                "slug": "nearby",
+                "latestFilesIndexes": [{"gameVersion": "1.20.4", "fileId": 2, "modLoader": 4}],
+            },
+            {
+                "id": 3,
+                "name": "Exact",
+                "slug": "exact",
+                "latestFilesIndexes": [{"gameVersion": "1.20.1", "fileId": 3, "modLoader": 4}],
+            },
+        ],
+        "pagination": {"index": 0, "pageSize": 25, "totalCount": 3},
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "gameVersion" not in request.url.params
+        return httpx.Response(200, request=request, json=payload)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    configure_gateway(monkeypatch, tmp_path, client)
+
+    result = CurseForgeClient.search_projects(
+        "mod",
+        query="example",
+        game_version="1.20.1",
+        loader="fabric",
+        force_refresh=True,
+    )
+
+    assert [project.project_id for project in result.projects] == [3, 2, 1]
     client.close()
 
 

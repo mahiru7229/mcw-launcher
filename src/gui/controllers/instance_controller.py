@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import re
 from pathlib import Path
 from typing import Any
@@ -35,8 +36,11 @@ class InstanceController(BaseController):
     repair_center_failed = Signal(object)
     forge_diagnostics_finished = Signal(object)
     instance_created = Signal(object)
+    import_preview_ready = Signal(object)
 
     CREATE_TASK_ID = "instance.create"
+    IMPORT_INSPECT_TASK_ID = "instance.import.inspect"
+    IMPORT_TASK_ID = "instance.import"
     REPAIR_TASK_ID = "instance.repair.full"
     REPAIR_SCAN_TASK_ID = "instance.repair.scan"
     REPAIR_EXECUTE_TASK_ID = "instance.repair.execute"
@@ -256,8 +260,26 @@ class InstanceController(BaseController):
             return
         self._task_runner.run("instance.delete", lambda: {"name": name, "deleted": InstanceManager.delete_instance(name)}, f"Deleting '{name}'...")
 
-    def import_package(self, package_path: Path) -> None:
-        self._task_runner.run("instance.import", lambda: InstanceManager.import_instance(package_path, self._on_package_progress), f"Importing '{package_path.name}'...")
+    def inspect_package(self, package_path: Path) -> None:
+        package_path = Path(package_path)
+        self._task_runner.run(
+            self.IMPORT_INSPECT_TASK_ID,
+            lambda: InstanceManager.inspect_import(package_path),
+            f"Reading '{package_path.name}'...",
+        )
+
+    def import_package(self, package_path: Path, settings_override: dict | None = None) -> None:
+        package_path = Path(package_path)
+        normalized_override = copy.deepcopy(settings_override)
+        self._task_runner.run(
+            self.IMPORT_TASK_ID,
+            lambda: InstanceManager.import_instance(
+                package_path,
+                self._on_package_progress,
+                settings_override=normalized_override,
+            ),
+            f"Importing '{package_path.name}'...",
+        )
 
     def export_package(self, name: str, output_path: Path, include_saves: bool) -> None:
         name = name.strip()
@@ -273,6 +295,12 @@ class InstanceController(BaseController):
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
+        if task_id == self.IMPORT_INSPECT_TASK_ID:
+            self.import_preview_ready.emit(result)
+            self.status_changed.emit(f"Ready to import '{result.name}'")
+            self.log_created.emit(f"Instance package inspected: {result.package_path}")
+            return
+
         selected_name = self._selected_name
         if task_id == self.CREATE_TASK_ID:
             selected_name = result.name
@@ -290,7 +318,7 @@ class InstanceController(BaseController):
                 return
             selected_name = ""
             self.status_changed.emit(f"Deleted '{result['name']}'")
-        elif task_id == "instance.import":
+        elif task_id == self.IMPORT_TASK_ID:
             selected_name = result.name
             self.status_changed.emit(f"Imported '{selected_name}'")
         elif task_id == self.LOADER_CHANGE_TASK_ID:

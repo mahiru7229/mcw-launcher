@@ -1,6 +1,6 @@
 # CurseForge Gateway integration
 
-MCW Launcher `v0.8.1` provides CurseForge browsing and installation through the public MCW gateway without bundling a CurseForge API key in the source, EXE, or updater package.
+MCW Launcher `v0.10.0-beta.1` provides Fabric and Forge CurseForge browsing and installation through the public MCW gateway without bundling a CurseForge API key in the source, EXE, or updater package.
 
 ## Architecture
 
@@ -47,17 +47,19 @@ MCW_CURSEFORGE_CLIENT_TOKEN
 
 The legacy single variable `MCW_CURSEFORGE_GATEWAY_URL` remains readable for compatibility.
 
-## Loader compatibility policy
+## Provider metadata compatibility policy
 
-CurseForge loader labels are treated as **advisory metadata**, not final proof that a JAR is incompatible.
+CurseForge Minecraft-version and loader labels are treated as **advisory metadata**, not final proof that a JAR is incompatible.
 
-The launcher now:
+For modpacks, the selected browser loader filters discovery, while the downloaded `manifest.json` is authoritative. The launcher accepts a single supported primary `fabric-<version>` or `forge-<version>` entry, rejects unsupported or ambiguous manifests, and creates the instance with that exact loader version.
 
-1. Requests files by Minecraft version without a strict Fabric/Forge filter.
-2. Ranks files declared for the selected loader first.
+For standalone mods, the launcher now:
+
+1. Requests files without strict Minecraft-version or Fabric/Forge filters.
+2. Ranks the selected loader first, followed by exact and nearby Minecraft patch labels.
 3. Keeps universal, unknown, and differently labelled files visible.
 4. Downloads the selected JAR.
-5. Inspects the real metadata inside the archive before adding it to the instance.
+5. Inspects the real loader metadata inside the archive before adding it to the instance.
 
 A JAR containing both:
 
@@ -68,7 +70,7 @@ META-INF/mods.toml
 
 is recognized as a Fabric/Forge universal mod. For a Fabric instance the launcher reads `fabric.mod.json`; for a Forge instance it reads `META-INF/mods.toml`.
 
-A differently labelled file is allowed to reach JAR validation. For a standalone mod, MCW Launcher shows a clear warning and requires explicit confirmation before installing it. For a managed modpack, the pack declaration is preserved and the file is installed as **unverified** so the launcher does not silently rewrite the pack or retry the same file forever.
+A differently loader-labelled file is allowed to reach JAR validation. For a standalone mod, MCW Launcher shows a clear loader warning and requires explicit confirmation before installing it. Minecraft-version labels never produce this warning or block installation. For a managed modpack, its exact project/file declaration is authoritative and the provider labels are retained only for diagnostics.
 
 This behavior also applies to managed files inside CurseForge modpacks, fixing packs whose universal dependencies are indexed under only one loader.
 
@@ -115,15 +117,31 @@ The launcher does not construct undocumented CurseForge CDN paths. Every automat
 ## Supported workflow
 
 - Search CurseForge projects through the gateway.
-- Filter by Minecraft version and release channel while ranking loader compatibility.
+- Select Fabric or Forge, then filter by release channel while ranking loader and advisory Minecraft-version metadata.
 - Fetch project/file metadata in batches where possible.
 - Install required CurseForge mod dependencies.
 - Download automatically when `downloadUrl` is available and third-party distribution is permitted.
 - If automatic distribution is unavailable, open the official project page and allow the user to select the downloaded `.jar`.
 - Validate manually selected files by expected byte size and SHA-1 before adding them to the instance.
 - Track installed and pending files in the CurseForge registry.
+- Install Fabric and Forge modpacks by validating `manifest.json`, preparing the declared loader, extracting overrides safely, and recording managed files for launch-time verification.
 
-The manual-download flow is implemented for mods. CurseForge modpack handling remains experimental and should be tested on copied instances.
+The verified manual-download flow supports both restricted mod JARs and restricted modpack ZIP archives. CurseForge modpack handling remains experimental and should be tested with non-critical worlds.
+
+## Transactional standalone-mod installation
+
+`v0.10.0-beta.1` prepares and validates every automatically downloadable standalone mod before changing the target instance.
+
+The selected root file may use an explicit unverified-file approval from the user. That approval is deliberately not inherited by dependencies: every dependency must independently contain metadata compatible with the target Fabric or Forge instance.
+
+During apply, the launcher snapshots only the files that can be replaced:
+
+- the CurseForge registry and its temporary file;
+- destination JARs and disabled variants;
+- installed JARs with the same mod ID;
+- the previously tracked filename for each CurseForge project.
+
+If copying a JAR or saving the registry fails, those affected paths are removed and the snapshot is restored. Download cache files are retained so a later retry does not need to fetch verified data again.
 
 ## Local JSON cache
 

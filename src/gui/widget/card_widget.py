@@ -11,17 +11,19 @@ class CardWidget(QFrame):
         self.layout.setContentsMargins(18, 16, 18, 16)
         self.layout.setSpacing(10)
         self._compact = False
+        self.title_label: QLabel | None = None
+        self.subtitle_label: QLabel | None = None
 
         if title:
-            title_label = QLabel(title)
-            title_label.setObjectName("CardTitle")
-            self.layout.addWidget(title_label)
+            self.title_label = QLabel(title)
+            self.title_label.setObjectName("CardTitle")
+            self.layout.addWidget(self.title_label)
 
         if subtitle:
-            subtitle_label = QLabel(subtitle)
-            subtitle_label.setObjectName("CardSubtitle")
-            subtitle_label.setWordWrap(True)
-            self.layout.addWidget(subtitle_label)
+            self.subtitle_label = QLabel(subtitle)
+            self.subtitle_label.setObjectName("CardSubtitle")
+            self.subtitle_label.setWordWrap(True)
+            self.layout.addWidget(self.subtitle_label)
 
     def set_compact_mode(self, compact: bool) -> None:
         self._compact = bool(compact)
@@ -32,4 +34,3 @@ class CardWidget(QFrame):
         else:
             self.layout.setContentsMargins(18, 16, 18, 16)
             self.layout.setSpacing(10)
-

@@ -1,7 +1,11 @@
 from src.models.minecraft.version import Version
 from src.models.instance.instance import Instance
 from src.models.progress.progress_callback import ProgressCallback
+from src.models.instance.settings import InstanceSettings
+from src.models.package.instance_package_preview import InstancePackagePreview
+from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.fs.paths import Paths
+from src.core.instance.settings_manager import SettingsManager
 from src.core.package.package_manager import PackageManager
 from src.config import VERSION_TAG
 
@@ -68,6 +72,13 @@ class InstanceManager:
     def _load_instance_metadata(path: Path) -> Instance:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+            raise RuntimeError(f"Invalid instance metadata: {path}") from error
+        return InstanceManager._parse_instance_metadata(data, path.parent, path)
+
+    @staticmethod
+    def _parse_instance_metadata(data: object, instance_dir: Path, source: object = "instance.json") -> Instance:
+        try:
             if not isinstance(data, dict):
                 raise ValueError("instance.json must contain an object.")
             instance_id = str(data["id"]).strip()
@@ -77,10 +88,9 @@ class InstanceManager:
             if not instance_id or not name or not version_id or not isinstance(raw_loader, (list, tuple)) or len(raw_loader) != 2:
                 raise ValueError("instance.json is missing required fields.")
             mod_loader = (str(raw_loader[0]).strip().lower() or "vanilla", str(raw_loader[1]).strip() or "-1")
-        except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
-            raise RuntimeError(f"Invalid instance metadata: {path}") from error
-
-        return Instance(instance_id=instance_id, name=name, version_id=version_id, mod_loader=mod_loader, instance_dir=path.parent)
+        except (KeyError, TypeError, ValueError) as error:
+            raise RuntimeError(f"Invalid instance metadata: {source}") from error
+        return Instance(instance_id=instance_id, name=name, version_id=version_id, mod_loader=mod_loader, instance_dir=instance_dir)
 
     @staticmethod
     def list_instances() -> list[Instance]:
@@ -191,7 +201,28 @@ class InstanceManager:
         return PackageManager.export_instance(instance, output_path, include_saves, on_progress)
 
     @staticmethod
-    def import_instance(package_path: Path, on_progress: ProgressCallback | None = None) -> Instance:
+    def inspect_import(package_path: Path) -> InstancePackagePreview:
+        metadata, instance_data, settings_data = PackageManager.inspect_instance(Path(package_path))
+        instance = InstanceManager._parse_instance_metadata(instance_data, Path(), package_path)
+        instance.name = InstanceManager.validate_name(instance.name)
+        if InstanceManager.is_instance_exist(instance.name):
+            raise RuntimeError(f"Instance '{instance.name}' already exists.")
+        return InstancePackagePreview(
+            package_path=Path(package_path),
+            name=instance.name,
+            version_id=instance.version_id,
+            mod_loader=instance.mod_loader,
+            settings=SettingsManager.normalize_dict(settings_data),
+            has_package_settings=settings_data is not None,
+            package_metadata=metadata,
+        )
+
+    @staticmethod
+    def import_instance(
+        package_path: Path,
+        on_progress: ProgressCallback | None = None,
+        settings_override: dict | InstanceSettings | None = None,
+    ) -> Instance:
         temp_dir = Paths.instances_root() / "_import_temp"
 
         if temp_dir.exists():
@@ -228,6 +259,13 @@ class InstanceManager:
                 )
 
             target_dir = Paths.load_instance_dir(instance.name)
+
+            if settings_override is not None:
+                SettingsManager.save_dict(instance, settings_override)
+            elif (imported_dir / "settings.json").is_file():
+                SettingsManager.save(instance, SettingsManager.load(instance))
+            else:
+                SettingsManager.save_dict(instance, InstanceManager.default_instance_settings())
 
             shutil.move(
                 str(imported_dir),
@@ -333,7 +371,8 @@ class InstanceManager:
     def create(
         name: str,
         version: Version,
-        mod_loader=("vanilla", "-1")
+        mod_loader=("vanilla", "-1"),
+        settings: dict | InstanceSettings | None = None,
     ) -> Instance:
         name = InstanceManager.validate_name(name)
         if InstanceManager.is_instance_exist(name):
@@ -358,8 +397,17 @@ class InstanceManager:
         InstanceManager._save_instances(instances_data)
 
         InstanceManager._save_instance_metadata(instance)
+        SettingsManager.save_dict(instance, settings if settings is not None else InstanceManager.default_instance_settings())
 
         return instance
+
+    @staticmethod
+    def default_instance_settings() -> dict:
+        try:
+            settings = LauncherSettingsManager().load().get("instance_defaults")
+        except (OSError, RuntimeError, TypeError, ValueError):
+            settings = None
+        return SettingsManager.normalize_dict(settings)
 
     @staticmethod
     def set_runtime_profile(name: str, version: Version, mod_loader: tuple[str, str]) -> Instance:

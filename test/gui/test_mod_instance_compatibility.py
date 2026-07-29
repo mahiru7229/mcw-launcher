@@ -22,7 +22,7 @@ def _version() -> ModrinthVersion:
     )
 
 
-def test_compatible_instances_require_matching_game_version_and_loader():
+def test_compatible_instances_require_loader_but_treat_game_version_as_advisory():
     instances = [
         _instance("Correct", "1.21.1", "fabric"),
         _instance("Wrong loader", "1.21.1", "forge"),
@@ -32,7 +32,7 @@ def test_compatible_instances_require_matching_game_version_and_loader():
 
     compatible = compatible_instances(instances, _version(), "fabric")
 
-    assert [item.name for item in compatible] == ["Also correct", "Correct"]
+    assert [item.name for item in compatible] == ["Also correct", "Correct", "Wrong game"]
 
 
 def test_curseforge_file_can_use_the_same_compatible_instance_flow():

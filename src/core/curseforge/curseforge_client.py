@@ -12,6 +12,7 @@ import httpx
 from src.config import CURSEFORGE_USER_AGENT, VERSION_ID
 from src.core.config.curseforge_config_manager import CurseForgeConfigManager
 from src.core.curseforge.curseforge_cache import CacheLookup, CurseForgeCache
+from src.core.mod.provider_game_version_policy import provider_game_version_rank
 from src.core.network.httpx_downloader import HttpDownloader
 from src.models.curseforge.cache import CurseForgeCacheInfo, CurseForgeFileListResult
 from src.models.curseforge.file import CurseForgeDependency, CurseForgeFile
@@ -107,8 +108,9 @@ class CurseForgeClient:
             "index": max(0, int(index)),
             "pageSize": min(max(1, int(page_size)), 50),
         }
-        if game_version:
-            params["gameVersion"] = str(game_version).strip()
+        normalized_game_version = str(game_version).strip()
+        # CurseForge's gameVersion field is advisory. Projects that declare a
+        # nearby patch version can still work, so do not let the API hide them.
         lookup = CurseForgeClient._request_json(
             "GET",
             "/search",
@@ -123,14 +125,16 @@ class CurseForgeClient:
         data = payload.get("data", []) if isinstance(payload, dict) else []
         pagination = payload.get("pagination", {}) if isinstance(payload, dict) and isinstance(payload.get("pagination"), dict) else {}
         projects = tuple(CurseForgeClient._parse_project(item) for item in data if isinstance(item, dict))
-        # Loader metadata is advisory. Universal JARs are sometimes indexed
-        # under only one loader, so filtering projects here can hide a valid
-        # Fabric/Forge build before the launcher has inspected the JAR. Keep
-        # every search result and rank likely matches first instead.
-        if normalized_loader:
+        # Loader and game-version metadata are advisory. Keep every result and
+        # rank likely matches first; the selected JAR is validated later.
+        if normalized_loader or normalized_game_version:
             projects = tuple(sorted(
                 enumerate(projects),
-                key=lambda pair: (CurseForgeClient._loader_rank(pair[1].loaders, normalized_loader), pair[0]),
+                key=lambda pair: (
+                    CurseForgeClient._loader_rank(pair[1].loaders, normalized_loader),
+                    provider_game_version_rank(normalized_game_version, pair[1].game_versions),
+                    pair[0],
+                ),
             ))
             projects = tuple(project for _, project in projects)
         return CurseForgeSearchResult(
@@ -190,12 +194,12 @@ class CurseForgeClient:
             "pageSize": min(max(1, int(page_size)), 50),
             "index": 0,
         }
-        if game_version:
-            params["gameVersion"] = str(game_version).strip()
         # Do not send a strict loader filter. CurseForge metadata can label a
         # dual-loader JAR as only Fabric or only Forge. The selected loader is
         # therefore used for ranking and UI warnings; the downloaded JAR is the
         # final authority and is validated by ModManager before installation.
+        # The same applies to gameVersion: nearby patch labels are useful for
+        # ranking but must not remove files from the catalog.
         lookup = CurseForgeClient._request_json(
             "GET",
             "/files",
@@ -213,11 +217,12 @@ class CurseForgeClient:
         files = [
             item for item in files
             if item.release_type in allowed
-            and (not normalized_game_version or not item.game_versions or normalized_game_version in item.game_versions)
         ]
         files.sort(key=lambda item: item.file_date, reverse=True)
-        if normalized_loader:
-            files.sort(key=lambda item: CurseForgeClient._loader_rank(item.loaders, normalized_loader))
+        files.sort(key=lambda item: (
+            CurseForgeClient._loader_rank(item.loaders, normalized_loader),
+            provider_game_version_rank(normalized_game_version, item.game_versions),
+        ))
         return CurseForgeFileListResult(files=tuple(files), cache_info=lookup.cache_info)
 
     @staticmethod
@@ -294,7 +299,7 @@ class CurseForgeClient:
     def latest_compatible_file(project_id: int | str, game_version: str, loader: str = "forge", release_types: tuple[str, ...] | list[str] | set[str] | None = None) -> CurseForgeFile:
         files = CurseForgeClient.list_files(project_id, game_version=game_version, loader=loader, release_types=release_types)
         if not files:
-            raise RuntimeError(f"No {loader.title()} file for CurseForge project {project_id} supports Minecraft {game_version}.")
+            raise RuntimeError(f"No allowed {loader.title()} file is available for CurseForge project {project_id}.")
         return files[0]
 
     @staticmethod
@@ -342,6 +347,8 @@ class CurseForgeClient:
 
     @staticmethod
     def _loader_rank(loaders: tuple[str, ...] | list[str] | set[str], loader: str) -> int:
+        if not CurseForgeClient.normalize_loader(loader):
+            return 0
         status = CurseForgeClient._loader_compatibility(loaders, loader)
         return {"compatible": 0, "universal": 1, "unknown": 2, "unverified": 3}.get(status, 4)
 

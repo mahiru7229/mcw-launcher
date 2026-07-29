@@ -207,3 +207,42 @@ def test_managed_content_failure_defaults_are_source_specific_and_persisted(tmp_
         "curseforge_failure_policy": "block",
         "forge_preflight_failure_policy": "allow",
     }
+
+
+def test_instance_defaults_are_created_normalized_and_persisted(tmp_path: Path, monkeypatch) -> None:
+    from src.core.system.memory import SystemMemory
+
+    monkeypatch.setattr(SystemMemory, "total_physical_memory_mb", classmethod(lambda cls: 8192))
+    manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
+
+    defaults = manager.load()["instance_defaults"]
+    assert defaults["java"]["max_memory"] == 2048
+    assert defaults["launch"]["lan_auth_mode"] == "microsoft_only"
+
+    manager.save({
+        "instance_defaults": {
+            "java": {
+                "path": "C:/Java/bin/javaw.exe",
+                "min_memory": 8192,
+                "max_memory": 16384,
+                "arguments": ["-XX:+UseG1GC"],
+            },
+            "window": {"width": 1920, "height": 1080, "fullscreen": True},
+            "launch": {
+                "game_arguments": ["--demo"],
+                "lan_auth_mode": "friends",
+                "lan_connection_provider": "e4mc",
+                "modrinth_failure_policy": "allow",
+            },
+        }
+    })
+
+    saved = manager.load()["instance_defaults"]
+    assert saved["java"]["path"] == "C:/Java/bin/javaw.exe"
+    assert saved["java"]["min_memory"] == 8192
+    assert saved["java"]["max_memory"] == 8192
+    assert saved["window"] == {"width": 1920, "height": 1080, "fullscreen": True}
+    assert saved["launch"]["lan_auth_mode"] == "private_offline"
+    assert saved["launch"]["lan_connection_provider"] == "e4mc"
+    assert saved["launch"]["modrinth_failure_policy"] == "allow"
+    assert saved["launch"]["curseforge_failure_policy"] == "inherit"

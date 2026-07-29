@@ -14,8 +14,6 @@ class CreateCompatibleInstanceDialog(QDialog):
         self._version = version
         self._loader = normalize_supported_loader(loader)
         self._game_versions = tuple(dict.fromkeys(str(item).strip() for item in version.game_versions if str(item).strip()))
-        if not self._game_versions:
-            raise ValueError(tr("mods.instance_create.no_game_versions"))
         self._suggested_name = ""
         self._name_customized = False
         self._build_ui()
@@ -28,7 +26,7 @@ class CreateCompatibleInstanceDialog(QDialog):
 
     @property
     def game_version(self) -> str:
-        return str(self.game_version_combo.currentData() or self.game_version_combo.currentText()).strip()
+        return self.game_version_combo.currentText().strip()
 
     @property
     def loader(self) -> str:
@@ -57,9 +55,10 @@ class CreateCompatibleInstanceDialog(QDialog):
 
         self.game_version_label = QLabel()
         self.game_version_combo = QComboBox()
+        self.game_version_combo.setEditable(True)
         for game_version in self._game_versions:
             self.game_version_combo.addItem(game_version, game_version)
-        self.game_version_combo.currentIndexChanged.connect(lambda _index: self._update_suggested_name(force=False))
+        self.game_version_combo.currentTextChanged.connect(lambda _text: self._update_suggested_name(force=False))
         root.addWidget(self.game_version_label)
         root.addWidget(self.game_version_combo)
 
@@ -85,7 +84,7 @@ class CreateCompatibleInstanceDialog(QDialog):
         preferred = tr(
             "mods.instance_create.default_name",
             loader=self._loader.title(),
-            version=self.game_version,
+            version=self.game_version or tr("common.unknown"),
         )
         self._suggested_name = InstanceManager.next_available_name(preferred)
         self.name_input.setText(self._suggested_name)

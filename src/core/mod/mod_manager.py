@@ -46,7 +46,7 @@ class ModManager:
 
             loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
             metadata = ModManager.read_mod(source, preferred_loader=loader_name)
-            ModManager._validate_mod_for_instance(instance, metadata, allow_unverified=allow_unverified)
+            ModManager.validate_mod_for_instance(instance, metadata, allow_unverified=allow_unverified)
 
             destination = destination_dir / source.name
             disabled_destination = destination.with_name(destination.name + ModManager.DISABLED_SUFFIX)
@@ -74,7 +74,7 @@ class ModManager:
             try:
                 shutil.copy2(source, temporary_path)
                 copied = ModManager.read_mod(temporary_path, preferred_loader=loader_name)
-                ModManager._validate_mod_for_instance(instance, copied, allow_unverified=allow_unverified)
+                ModManager.validate_mod_for_instance(instance, copied, allow_unverified=allow_unverified)
 
                 for conflict in same_id:
                     conflict.path.unlink(missing_ok=True)
@@ -384,7 +384,7 @@ class ModManager:
         return required, optional
 
     @staticmethod
-    def _validate_mod_for_instance(instance: Instance, mod: ModInfo, allow_unverified: bool = False) -> None:
+    def validate_mod_for_instance(instance: Instance, mod: ModInfo, allow_unverified: bool = False) -> None:
         if mod.status in ModManager._INVALID_STATUSES and not allow_unverified:
             raise RuntimeError(mod.error or f"'{mod.file_name}' is not a supported Minecraft mod.")
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)

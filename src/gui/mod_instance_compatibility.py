@@ -13,14 +13,12 @@ class CompatibleModVersion(Protocol):
 
 
 def compatible_instances(instances: Iterable[Instance], version: CompatibleModVersion, loader: str) -> list[Instance]:
+    """Return loader-compatible instances; provider game versions are advisory."""
     normalized_loader = normalize_supported_loader(loader)
-    supported_versions = {str(item).strip() for item in version.game_versions if str(item).strip()}
     compatible: list[Instance] = []
     for instance in instances:
         instance_loader, _ = ModLoaderManager.normalize(instance.mod_loader)
         if instance_loader != normalized_loader:
-            continue
-        if instance.version_id not in supported_versions:
             continue
         compatible.append(instance)
     return sorted(compatible, key=lambda item: item.name.casefold())

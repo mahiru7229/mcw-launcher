@@ -1,4 +1,5 @@
 from pathlib import Path
+from dataclasses import replace
 import json
 import zipfile
 
@@ -138,3 +139,12 @@ def test_rejects_modrinth_version_for_wrong_instance_loader(tmp_path, monkeypatc
     import pytest
     with pytest.raises(RuntimeError, match="does not support Forge"):
         ModrinthModInstaller.install(instance, "root-version")
+
+
+def test_accepts_advisory_nearby_patch_metadata_for_jar_validation():
+    version = replace(
+        make_version("root-version", "root-project", "root.jar"),
+        game_versions=("1.20.4",),
+    )
+
+    ModrinthModInstaller._validate_version(version, "1.20.1", "fabric")

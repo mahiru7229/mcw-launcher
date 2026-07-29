@@ -34,10 +34,14 @@ def test_dialog_only_renders_compatible_instances(gui_app, monkeypatch):
     dialog = CompatibleInstanceDialog(
         _version(),
         "fabric",
-        [_instance("Correct", "1.21.1", "fabric"), _instance("Wrong", "1.21.1", "forge")],
+        [
+            _instance("Correct", "1.21.1", "fabric"),
+            _instance("Nearby patch", "1.20.4", "fabric"),
+            _instance("Wrong", "1.21.1", "forge"),
+        ],
     )
 
-    assert dialog.table.rowCount() == 1
+    assert dialog.table.rowCount() == 2
     assert dialog.table.item(0, 0).text() == "Correct"
     assert dialog.install_button.isEnabled()
 
