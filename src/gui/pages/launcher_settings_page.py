@@ -5,7 +5,7 @@ import copy
 from PySide6.QtCore import QSignalBlocker, QTimer, Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QLabel, QLineEdit, QPushButton
 
-from src.core.instance.settings_manager import SettingsManager
+from src.core.instance.settings_manager import SettingsManager, default_instance_settings
 from src.core.language.language_manager import language_manager, tr
 from src.core.theme.theme_manager import theme_manager
 from src.gui.config import NAVIGATION_ITEMS, VERSION
@@ -30,7 +30,7 @@ class LauncherSettingsPage(BasePage):
     def __init__(self) -> None:
         super().__init__("Launcher Settings", "Preferences here belong to the GUI, not to an individual Minecraft instance.", "launcher_settings")
         self._java_installations: list[object] = []
-        self._instance_defaults = SettingsManager.default_dict()
+        self._instance_defaults = default_instance_settings()
         self._tracking_suspended = True
         self._dirty = False
         self._saved_data: dict = {}

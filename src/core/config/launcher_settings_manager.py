@@ -11,10 +11,11 @@ from typing import Any
 
 from src.core.config.managed_content_policy import ManagedContentPolicy
 from src.core.fs.paths import Paths
+from src.core.instance.settings_manager import SettingsManager, default_instance_settings
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 9
+    SCHEMA_VERSION = 10
     UPDATE_CHANNEL_POLICY_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
@@ -47,6 +48,7 @@ class LauncherSettingsManager:
             "download_limit_mbps": 0.0,
             "download_concurrency": 0,
         },
+        "instance_defaults": default_instance_settings(),
         "updates": {
             "auto_check": True,
             "channel": "stable",
@@ -189,6 +191,8 @@ class LauncherSettingsManager:
         network = normalized.setdefault("network", {})
         network["download_limit_mbps"] = self._as_download_limit(network.get("download_limit_mbps"))
         network["download_concurrency"] = self._as_download_concurrency(network.get("download_concurrency"))
+
+        normalized["instance_defaults"] = SettingsManager.normalize_dict(normalized.get("instance_defaults"))
 
         updates = normalized.setdefault("updates", {})
         updates["auto_check"] = self._as_bool(updates.get("auto_check"), True)

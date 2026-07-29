@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from src.core.instance.settings_manager import SettingsManager
+from src.core.instance.settings_manager import SettingsManager, default_instance_settings
 from src.models.instance.instance import Instance
 
 
@@ -183,3 +183,35 @@ def test_legacy_modrinth_boolean_does_not_change_forge_preflight_policy(tmp_path
     settings = SettingsManager.load(instance)
 
     assert settings.forge_preflight_failure_policy == "inherit"
+
+
+def test_public_dict_codec_returns_canonical_independent_data(monkeypatch) -> None:
+    from src.core.system.memory import SystemMemory
+
+    monkeypatch.setattr(SystemMemory, "total_physical_memory_mb", classmethod(lambda cls: 4096))
+    source = {
+        "java": {"path": None, "min_memory": 8192, "max_memory": 16384, "arguments": ["-Xmx4G"]},
+        "window": {"width": "1920", "height": 0, "fullscreen": "yes"},
+        "launch": {"game_arguments": ["--demo"], "lan_auth_mode": "friends"},
+    }
+
+    normalized = SettingsManager.normalize_dict(source)
+    source["java"]["arguments"].append("-Dchanged=true")
+
+    assert normalized["java"]["min_memory"] == 4096
+    assert normalized["java"]["max_memory"] == 4096
+    assert normalized["java"]["arguments"] == ["-Xmx4G"]
+    assert normalized["window"]["width"] == 1920
+    assert normalized["window"]["height"] == 720
+    assert normalized["window"]["fullscreen"] is True
+    assert normalized["launch"]["lan_auth_mode"] == "private_offline"
+
+
+def test_default_instance_settings_is_available_without_class_factory() -> None:
+    first = default_instance_settings()
+    second = default_instance_settings()
+
+    first["java"]["path"] = "C:/changed/javaw.exe"
+
+    assert second["java"]["path"] == ""
+    assert SettingsManager.default_dict() == second

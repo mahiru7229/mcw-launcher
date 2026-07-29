@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import copy
+
 from PySide6.QtCore import QByteArray, Signal
 
 from src.core.config.curseforge_config_manager import CurseForgeConfigManager
 from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.config.managed_content_policy import ManagedContentPolicy
+from src.core.instance.settings_manager import SettingsManager, default_instance_settings
 from src.core.language.language_manager import tr
 from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
 from src.core.network.download_manager import download_manager
@@ -34,16 +37,17 @@ class GuiSettingsController(BaseController):
         "curseforge_gateway_urls": (),
         "download_limit_mbps": 0.0,
         "download_concurrency": 0,
+        "instance_defaults": default_instance_settings(),
     }
 
     def __init__(self) -> None:
         super().__init__()
         self._settings = LauncherSettingsManager()
-        self._current = dict(self.DEFAULTS)
+        self._current = copy.deepcopy(self.DEFAULTS)
 
     @property
     def current(self) -> dict:
-        return dict(self._current)
+        return copy.deepcopy(self._current)
 
     def raw_settings(self) -> dict:
         return self._settings.load()
@@ -80,11 +84,12 @@ class GuiSettingsController(BaseController):
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": float(network.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]) or 0.0),
             "download_concurrency": int(network.get("download_concurrency", self.DEFAULTS["download_concurrency"]) or 0),
+            "instance_defaults": SettingsManager.normalize_dict(data.get("instance_defaults")),
         }
         download_bandwidth_limiter.configure_mbps(self._current["download_limit_mbps"])
         download_manager.configure(self._current["download_concurrency"] or DEFAULT_MAX_CONCURRENT_DOWNLOADS)
-        self.settings_changed.emit(dict(self._current))
-        return dict(self._current)
+        self.settings_changed.emit(copy.deepcopy(self._current))
+        return copy.deepcopy(self._current)
 
     def save(self, data: dict) -> None:
         try:
@@ -121,6 +126,7 @@ class GuiSettingsController(BaseController):
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": download_limit_mbps,
             "download_concurrency": download_concurrency,
+            "instance_defaults": SettingsManager.normalize_dict(data.get("instance_defaults")),
         }
         self._settings.save({
             "gui": {
@@ -148,21 +154,22 @@ class GuiSettingsController(BaseController):
                 "download_limit_mbps": self._current["download_limit_mbps"],
                 "download_concurrency": self._current["download_concurrency"],
             },
+            "instance_defaults": self._current["instance_defaults"],
         })
-        self.settings_changed.emit(dict(self._current))
+        self.settings_changed.emit(copy.deepcopy(self._current))
         self.status_changed.emit(tr("Launcher settings saved"))
         self.log_created.emit(tr("GUI preferences saved"))
 
     def set_auto_check_updates(self, enabled: bool) -> None:
         self._current["auto_check_updates"] = bool(enabled)
         self._settings.update_section("updates", {"auto_check": bool(enabled)})
-        self.settings_changed.emit(dict(self._current))
+        self.settings_changed.emit(copy.deepcopy(self._current))
 
     def set_modrinth_channels(self, include_beta: bool, include_alpha: bool) -> None:
         self._current["modrinth_include_beta"] = bool(include_beta)
         self._current["modrinth_include_alpha"] = bool(include_alpha)
         self._settings.update_section("modrinth", {"include_beta": bool(include_beta), "include_alpha": bool(include_alpha)})
-        self.settings_changed.emit(dict(self._current))
+        self.settings_changed.emit(copy.deepcopy(self._current))
 
     def reset(self) -> None:
         self._settings.reset()
