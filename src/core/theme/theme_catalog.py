@@ -94,6 +94,7 @@ THEME_ASSET_SPECS: tuple[ThemeAssetSpec, ...] = (
     ThemeAssetSpec("icon.nav.home", "icons/navigation/home.png", 32, 32, "Navigation icon", "Home navigation icon."),
     ThemeAssetSpec("icon.nav.accounts", "icons/navigation/accounts.png", 32, 32, "Navigation icon", "Accounts navigation icon."),
     ThemeAssetSpec("icon.nav.instances", "icons/navigation/instances.png", 32, 32, "Navigation icon", "Instances navigation icon."),
+    ThemeAssetSpec("icon.nav.mods", "icons/actions/mods.png", 32, 32, "Navigation icon", "Mods navigation icon."),
     ThemeAssetSpec("icon.nav.instance_settings", "icons/navigation/instance_settings.png", 32, 32, "Navigation icon", "Instance Settings navigation icon."),
     ThemeAssetSpec("icon.nav.launcher_settings", "icons/navigation/launcher_settings.png", 32, 32, "Navigation icon", "Launcher Settings navigation icon."),
     ThemeAssetSpec("icon.nav.logs", "icons/navigation/logs.png", 32, 32, "Navigation icon", "Logs navigation icon."),

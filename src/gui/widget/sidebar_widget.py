@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Property, Signal
-from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
+from PySide6.QtCore import Property, QSize, Signal
+from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QStyle, QVBoxLayout
 
 from src.core.language.language_manager import tr
 from src.gui.config import DEVELOPER_NAME, LAUNCHER_NAME, NAVIGATION_ITEMS
 from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap
 from src.gui.widget.separator import Separator
-
-
-_COLLAPSE_GLYPH = "‹"
-_EXPAND_GLYPH = "›"
 
 
 class SidebarWidget(QFrame):
@@ -38,9 +34,10 @@ class SidebarWidget(QFrame):
             layout.setContentsMargins(14, 14, 14, 18)
             layout.setSpacing(8)
 
-        self._toggle_button = QPushButton(_COLLAPSE_GLYPH)
+        self._toggle_button = QPushButton()
         self._toggle_button.setObjectName("SidebarToggleButton")
-        self._toggle_button.setFixedHeight(28)
+        self._toggle_button.setFixedHeight(36)
+        self._toggle_button.setIconSize(QSize(22, 22))
         self._toggle_button.setVisible(not self._compact)
         self._toggle_button.clicked.connect(lambda: self.collapse_requested.emit(not self._collapsed))
         layout.addWidget(self._toggle_button)
@@ -123,7 +120,9 @@ class SidebarWidget(QFrame):
         for page_id, button in self._buttons.items():
             button.setText(self._button_text(page_id))
             button.setToolTip(self._button_labels.get(page_id, "") if self._collapsed else "")
-        self._toggle_button.setText(_EXPAND_GLYPH if self._collapsed else _COLLAPSE_GLYPH)
+        arrow = QStyle.StandardPixmap.SP_ArrowRight if self._collapsed else QStyle.StandardPixmap.SP_ArrowLeft
+        self._toggle_button.setText("")
+        self._toggle_button.setIcon(self.style().standardIcon(arrow))
         self._toggle_button.setToolTip(tr("motion.sidebar.expand" if self._collapsed else "motion.sidebar.collapse"))
         self._toggle_button.setAccessibleName(self._toggle_button.toolTip())
 

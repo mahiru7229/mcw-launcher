@@ -502,3 +502,12 @@ def test_schema_five_rejects_invalid_performance_without_breaking_theme(tmp_path
     assert selected.motion.performance.full_fps == 60
     assert selected.motion.performance.reduced_fps == 30
     assert any("reduced_fps must not exceed full_fps" in issue for issue in selected.issues)
+
+
+def test_bundled_default_theme_has_no_manifest_issues() -> None:
+    theme_root = Path(__file__).resolve().parents[3] / "themes"
+    manager = ThemeManager(theme_root)
+    selected = manager.select(ThemeManager.DEFAULT_THEME_ID)
+
+    assert selected.theme_id == ThemeManager.DEFAULT_THEME_ID
+    assert selected.issues == ()

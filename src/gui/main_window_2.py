@@ -1700,6 +1700,7 @@ class MainWindow(QMainWindow):
         self.instances_page.set_busy(busy)
         self.mods_page.set_busy(bool(busy) or bool(self._mod_catalog_tasks) or bool(self._curseforge_catalog_tasks))
         self.instance_settings_page.set_busy(busy)
+        self.launcher_settings_page.set_busy(busy)
         self.launch_control.set_busy(busy)
         self.right_panel.set_busy(busy)
 

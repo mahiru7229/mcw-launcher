@@ -460,6 +460,9 @@ class LauncherSettingsPage(BasePage):
     def set_update_status(self, message: str) -> None:
         self.update_status_label.setText(message)
 
+    def set_busy(self, busy: bool) -> None:
+        self.set_interaction_locked(busy)
+
     def set_update_busy(self, busy: bool) -> None:
         self.check_updates_button.setEnabled(not busy)
 
