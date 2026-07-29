@@ -1,6 +1,6 @@
 # Hướng dẫn tạo theme cho MCW Launcher
 
-Tài liệu này hướng dẫn tạo một theme PNG ngoài EXE cho MCW Launcher Beta 10.
+Tài liệu này hướng dẫn tạo theme PNG ngoài EXE cho MCW Launcher. Từ v0.11.0-alpha.1, theme có thể kèm PNG spritesheet animation.
 
 ## 1. Tạo thư mục theme
 
@@ -16,7 +16,7 @@ themes/
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "my-theme",
   "name": "My Theme",
   "author": "Artist name",
@@ -131,7 +131,34 @@ Chỉ dùng cho chữ cố định. Ví dụ nút Launch đã vẽ chữ `LAUNCH
 
 Không vẽ sẵn nội dung thay đổi theo thời gian như username, tên instance, version, trạng thái tải hoặc error message.
 
-## 7. Trạng thái button
+
+## 7. Animation spritesheet trong v0.11.0-alpha.1
+
+Theme có thể vẽ progress, trạng thái busy và các animated asset tương lai bằng PNG spritesheet:
+
+```json
+{
+  "schema_version": 2,
+  "animations": {
+    "progress.chunk": {
+      "type": "spritesheet",
+      "path": "animations/progress/chunk.png",
+      "fallback_asset": "progress.chunk",
+      "frame_size": [16, 16],
+      "frame_count": 8,
+      "columns": 8,
+      "frame_duration_ms": 80,
+      "loop": true,
+      "render_mode": "tile_x",
+      "filtering": "nearest"
+    }
+  }
+}
+```
+
+Theme schema 1 cũ vẫn hoạt động. Xem [`THEME_ANIMATION_GUIDE.md`](THEME_ANIMATION_GUIDE.md) để biết cách xếp frame, animation key, fallback và giới hạn an toàn.
+
+## 8. Trạng thái button
 
 Một nút nên có đủ state khi có thể:
 
@@ -149,7 +176,7 @@ controls/buttons/launch/
 
 Các state Launch thiếu sẽ fallback về CSS. Riêng state Cancel có bộ PNG fallback đi kèm launcher, nên nút vẫn hiện rõ khi theme cũ chưa khai báo asset mới.
 
-## 8. Background và vùng an toàn
+## 9. Background và vùng an toàn
 
 - `background.window`: 1600 × 900.
 - Sidebar: 220 × 900.
@@ -158,7 +185,7 @@ Các state Launch thiếu sẽ fallback về CSS. Riêng state Cancel có bộ P
 - Không đặt chữ quan trọng sát mép vì cửa sổ có thể scale hoặc resize.
 - Kiểm tra theme trên 1366 × 768 và 1600 × 900.
 
-## 9. Kiểm tra theme
+## 10. Kiểm tra theme
 
 1. Đặt folder cạnh source hoặc cạnh EXE:
 
@@ -181,7 +208,7 @@ Nếu theme không xuất hiện:
 - kiểm tra file thật sự là PNG;
 - không dùng `..`, drive letter hoặc path tuyệt đối.
 
-## 10. Fallback và theme chưa hoàn chỉnh
+## 11. Fallback và theme chưa hoàn chỉnh
 
 Theme có thể được phát hành khi mới có vài PNG. Launcher không crash vì:
 
@@ -193,7 +220,7 @@ Theme có thể được phát hành khi mới có vài PNG. Launcher không cra
 
 Asset lỗi bị bỏ qua riêng lẻ. Tuy vậy, nên test console/log để phát hiện typo trong manifest.
 
-## 11. Đóng gói cùng release
+## 12. Đóng gói cùng release
 
 Công cụ release tự copy toàn bộ `themes/`:
 

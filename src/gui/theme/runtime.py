@@ -7,6 +7,8 @@ from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
 
 from src.core.theme.theme_manager import ThemeManager, theme_manager
+from src.gui.widget.themed_animated_label import ThemedAnimatedLabel
+from src.gui.widget.themed_progress_bar import ThemedProgressBar
 
 
 def set_theme_icon(button: QPushButton, key: str, size: int = 24) -> QPushButton:
@@ -169,7 +171,11 @@ class ThemeRuntime:
     def apply_assets(self, root: QWidget) -> None:
         widgets = [root, *root.findChildren(QWidget)]
         for widget in widgets:
-            if isinstance(widget, QPushButton):
+            if isinstance(widget, ThemedProgressBar):
+                widget.apply_theme()
+            if isinstance(widget, ThemedAnimatedLabel):
+                widget.apply_theme()
+            elif isinstance(widget, QPushButton):
                 self._apply_button_icon(widget)
                 self._apply_static_text(widget)
             elif isinstance(widget, QLabel):

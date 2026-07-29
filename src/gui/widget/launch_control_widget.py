@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 from src.core.language.language_manager import tr
 from src.gui.presenters.progress_presenter import ProgressPresenter
 from src.models.progress.progress_state import ProgressState
-from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap, set_theme_static_text
+from src.gui.theme.runtime import set_theme_icon, set_theme_static_text
+from src.gui.widget.themed_animated_label import ThemedAnimatedLabel
+from src.gui.widget.themed_progress_bar import ThemedProgressBar
 
 
 class LaunchControlWidget(QFrame):
@@ -59,7 +61,7 @@ class LaunchControlWidget(QFrame):
         status_row.setSpacing(10)
 
         stage_icon_size = 26 if self._compact else 32
-        self.stage_icon = set_theme_pixmap(QLabel(), "icon.state.ready", stage_icon_size, stage_icon_size)
+        self.stage_icon = ThemedAnimatedLabel("state.ready", "icon.state.ready", stage_icon_size, stage_icon_size)
 
         self.status_label = QLabel("Ready")
         self.status_label.setObjectName("ValueLabel")
@@ -76,7 +78,7 @@ class LaunchControlWidget(QFrame):
         self.detail_label.setObjectName("TinyLabel")
         self.detail_label.setWordWrap(True)
 
-        self.progress_bar = QProgressBar()
+        self.progress_bar = ThemedProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat("%p%")
@@ -401,7 +403,7 @@ class LaunchControlWidget(QFrame):
         if self._stage_state == state_key:
             return
         self._stage_state = state_key
-        set_theme_pixmap(self.stage_icon, f"icon.state.{icon_state}", 32, 32)
+        self.stage_icon.set_theme_state(f"state.{icon_state}", f"icon.state.{icon_state}")
         self.stage_label.setProperty("state", state)
         self.stage_label.style().unpolish(self.stage_label)
         self.stage_label.style().polish(self.stage_label)

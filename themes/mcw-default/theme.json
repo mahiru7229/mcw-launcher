@@ -1,9 +1,9 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "mcw-default",
   "name": "MCW Default PNG",
   "author": "mahiru7229",
-  "description": "Optional PNG overrides for the built-in MCW CSS theme. Missing files fall back safely.",
+  "description": "Default MCW theme with safe PNG fallbacks and theme-driven sprite animations.",
   "assets": {
     "background.window": "backgrounds/window.png",
     "background.center": "backgrounds/center.png",
@@ -133,5 +133,57 @@
   "text_assets": {
     "control.launch": "button.launch",
     "control.cancel": "button.cancel"
+  },
+  "capabilities": {
+    "animated_assets": true,
+    "sprite_sheets": true,
+    "animated_progress": true
+  },
+  "animations": {
+    "progress.chunk": {
+      "type": "spritesheet",
+      "path": "animations/progress/chunk_spritesheet.png",
+      "fallback_asset": "progress.chunk",
+      "frame_size": [
+        16,
+        16
+      ],
+      "frame_count": 8,
+      "columns": 8,
+      "frame_duration_ms": 80,
+      "loop": true,
+      "render_mode": "tile_x",
+      "filtering": "nearest"
+    },
+    "progress.indeterminate": {
+      "type": "spritesheet",
+      "path": "animations/progress/indeterminate_spritesheet.png",
+      "fallback_asset": "progress.chunk",
+      "frame_size": [
+        64,
+        16
+      ],
+      "frame_count": 12,
+      "columns": 12,
+      "frame_duration_ms": 70,
+      "loop": true,
+      "render_mode": "stretch",
+      "filtering": "nearest"
+    },
+    "state.busy": {
+      "type": "spritesheet",
+      "path": "animations/states/busy_spritesheet.png",
+      "fallback_asset": "icon.state.busy",
+      "frame_size": [
+        24,
+        24
+      ],
+      "frame_count": 8,
+      "columns": 8,
+      "frame_duration_ms": 90,
+      "loop": true,
+      "render_mode": "contain",
+      "filtering": "nearest"
+    }
   }
 }

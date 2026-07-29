@@ -66,3 +66,35 @@ controls/buttons/launch/cancel_disabled.png
 ```
 
 Các key tương ứng là `button.cancel`, `button.cancel_hover`, `button.cancel_pressed`, `button.cancel_disabled`. Có thể khai báo `control.cancel` trong `text_assets` nếu PNG đã chứa chữ. Theme cũ không có các file này sẽ tự dùng PNG Cancel mặc định của launcher.
+
+## Animation của v0.11.0-alpha.1
+
+Theme schema 2 có thể khai báo PNG spritesheet trong field `animations`. Alpha 1 hỗ trợ trực tiếp:
+
+```text
+progress.chunk
+progress.indeterminate
+state.busy
+```
+
+Ví dụ tối thiểu:
+
+```json
+{
+  "schema_version": 2,
+  "animations": {
+    "progress.chunk": {
+      "type": "spritesheet",
+      "path": "animations/progress.png",
+      "frame_size": [16, 16],
+      "frame_count": 8,
+      "columns": 8,
+      "frame_duration_ms": 80,
+      "render_mode": "tile_x",
+      "filtering": "nearest"
+    }
+  }
+}
+```
+
+Xem [`docs/THEME_ANIMATION_GUIDE.md`](../docs/THEME_ANIMATION_GUIDE.md) để biết đầy đủ schema, fallback, giới hạn an toàn và cách bố trí frame.

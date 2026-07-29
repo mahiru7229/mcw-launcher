@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from PySide6.QtCore import QElapsedTimer, Qt, QTimer
 from PySide6.QtGui import QColor, QGuiApplication, QPalette
-from PySide6.QtWidgets import QFrame, QLabel, QProgressBar, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
 from src.core.language.language_manager import tr
 from src.gui.config import VERSION_ID
+from src.gui.widget.themed_progress_bar import ThemedProgressBar
 
 
 class StartupSplash(QWidget):
@@ -59,7 +60,7 @@ class StartupSplash(QWidget):
         self.detail_label.setObjectName("StartupDetail")
         self.detail_label.setWordWrap(True)
 
-        self.progress_bar = QProgressBar()
+        self.progress_bar = ThemedProgressBar()
         self.progress_bar.setObjectName("StartupProgress")
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)

@@ -127,3 +127,161 @@ def test_cancel_artwork_falls_back_to_default_theme(tmp_path: Path) -> None:
     assert manager.resolve_asset("button.cancel") is None
     assert manager.resolve_asset("button.cancel", fallback_to_default=True) == (default_root / "controls" / "cancel.png").resolve()
     assert manager.resolve_text_asset("control.cancel", fallback_to_default=True) == (default_root / "controls" / "cancel.png").resolve()
+
+
+def test_valid_spritesheet_animation_is_resolved(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "test-theme"
+    theme_root.mkdir(parents=True)
+    payload = {
+        "schema_version": 2,
+        "id": "test-theme",
+        "name": "Animated Theme",
+        "author": "Test",
+        "assets": {"progress.chunk": "controls/progress/chunk.png"},
+        "animations": {
+            "progress.chunk": {
+                "type": "spritesheet",
+                "path": "animations/progress.png",
+                "fallback_asset": "progress.chunk",
+                "frame_size": [8, 8],
+                "frame_count": 4,
+                "columns": 4,
+                "frame_duration_ms": 80,
+                "loop": True,
+                "render_mode": "tile_x",
+                "filtering": "nearest",
+            }
+        },
+    }
+    (theme_root / "theme.json").write_text(json.dumps(payload), encoding="utf-8")
+    write_png(theme_root / "controls/progress/chunk.png", 8, 8)
+    write_png(theme_root / "animations/progress.png", 32, 8)
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("test-theme")
+    animation = manager.resolve_animation("progress.chunk")
+
+    assert animation is not None
+    assert animation.path == (theme_root / "animations/progress.png").resolve()
+    assert animation.definition.frame_count == 4
+    assert animation.definition.frame_width == 8
+    assert animation.definition.render_mode == "tile_x"
+    assert manager.resolve_animation_fallback("progress.chunk") == (theme_root / "controls/progress/chunk.png").resolve()
+    assert {"animated_assets", "sprite_sheets"}.issubset(selected.capabilities)
+
+
+def test_animation_rejects_unsafe_path_without_breaking_theme(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "test-theme"
+    theme_root.mkdir(parents=True)
+    payload = {
+        "schema_version": 2,
+        "id": "test-theme",
+        "assets": {},
+        "animations": {
+            "progress.chunk": {
+                "type": "spritesheet",
+                "path": "../outside.png",
+                "frame_size": [8, 8],
+                "frame_count": 2,
+                "columns": 2,
+                "frame_duration_ms": 80,
+            }
+        },
+    }
+    (theme_root / "theme.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("test-theme")
+
+    assert selected.theme_id == "test-theme"
+    assert selected.animations == {}
+    assert any("escapes its theme directory" in issue for issue in selected.issues)
+    assert manager.resolve_animation("progress.chunk", fallback_to_default=False) is None
+
+
+def test_animation_rejects_sprite_sheet_that_is_too_small(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "test-theme"
+    theme_root.mkdir(parents=True)
+    payload = {
+        "schema_version": 2,
+        "id": "test-theme",
+        "assets": {},
+        "animations": {
+            "progress.chunk": {
+                "type": "spritesheet",
+                "path": "animations/progress.png",
+                "frame_size": [8, 8],
+                "frame_count": 4,
+                "columns": 4,
+                "frame_duration_ms": 80,
+            }
+        },
+    }
+    (theme_root / "theme.json").write_text(json.dumps(payload), encoding="utf-8")
+    write_png(theme_root / "animations/progress.png", 16, 8)
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("test-theme")
+
+    assert any("sprite sheet is too small" in issue for issue in selected.issues)
+    assert manager.resolve_animation("progress.chunk", fallback_to_default=False) is None
+
+
+def test_missing_custom_animation_falls_back_to_default_theme(tmp_path: Path) -> None:
+    default_root = tmp_path / "themes" / ThemeManager.DEFAULT_THEME_ID
+    default_root.mkdir(parents=True)
+    default_payload = {
+        "schema_version": 2,
+        "id": ThemeManager.DEFAULT_THEME_ID,
+        "assets": {},
+        "animations": {
+            "progress.chunk": {
+                "type": "spritesheet",
+                "path": "animations/progress.png",
+                "frame_size": [8, 8],
+                "frame_count": 2,
+                "columns": 2,
+                "frame_duration_ms": 80,
+            }
+        },
+    }
+    (default_root / "theme.json").write_text(json.dumps(default_payload), encoding="utf-8")
+    write_png(default_root / "animations/progress.png", 16, 8)
+
+    custom_root = tmp_path / "themes" / "custom"
+    write_manifest(custom_root, {})
+
+    manager = ThemeManager(tmp_path / "themes")
+    manager.select("custom")
+    animation = manager.resolve_animation("progress.chunk")
+
+    assert animation is not None
+    assert animation.theme_id == ThemeManager.DEFAULT_THEME_ID
+    assert animation.path == (default_root / "animations/progress.png").resolve()
+
+
+def test_unsupported_animation_type_is_ignored(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "test-theme"
+    theme_root.mkdir(parents=True)
+    payload = {
+        "schema_version": 2,
+        "id": "test-theme",
+        "assets": {},
+        "animations": {
+            "progress.chunk": {
+                "type": "python",
+                "path": "animation.py",
+                "frame_size": [8, 8],
+                "frame_count": 2,
+                "columns": 2,
+                "frame_duration_ms": 80,
+            }
+        },
+    }
+    (theme_root / "theme.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("test-theme")
+
+    assert selected.animations == {}
+    assert any("unsupported type" in issue for issue in selected.issues)
