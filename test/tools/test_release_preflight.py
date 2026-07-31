@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from src.config import VERSION_TAG
-from tools.release_preflight import audit_language_packs, audit_private_gateway_bundling, find_merge_markers
+from tools.release_preflight import audit_language_packs, audit_private_gateway_bundling, audit_theme_contract, find_merge_markers
 
 
 def write_pack(path: Path, locale: str, translations: dict[str, str]) -> None:
@@ -91,3 +91,8 @@ def test_private_gateway_audit_accepts_public_default(tmp_path: Path) -> None:
     (tmp_path / ".gitignore").write_text("config/private/\n", encoding="utf-8")
 
     assert audit_private_gateway_bundling(tmp_path) == []
+
+
+def test_current_theme_contract_audit_passes() -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    assert audit_theme_contract(project_root) == []

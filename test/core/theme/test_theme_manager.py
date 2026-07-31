@@ -539,3 +539,32 @@ def test_custom_stylesheet_rejects_external_urls(tmp_path: Path) -> None:
     assert selected.stylesheet is None
     assert any("url()" in issue for issue in selected.issues)
     assert manager.resolve_stylesheet() == ""
+
+
+def test_schema_6_rejects_unknown_top_level_fields(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "strict-theme"
+    theme_root.mkdir(parents=True)
+    (theme_root / "theme.json").write_text(json.dumps({
+        "schema_version": 6,
+        "id": "strict-theme",
+        "assets": {},
+        "unknown_runtime_field": True,
+    }), encoding="utf-8")
+
+    manager = ThemeManager(tmp_path / "themes")
+
+    assert manager.select("strict-theme").theme_id == ThemeManager.FALLBACK_THEME_ID
+
+
+def test_schema_6_requires_normalized_theme_id_but_legacy_schema_remains_compatible(tmp_path: Path) -> None:
+    strict_root = tmp_path / "themes" / "strict"
+    strict_root.mkdir(parents=True)
+    (strict_root / "theme.json").write_text(json.dumps({"schema_version": 6, "id": "Not Normalized", "assets": {}}), encoding="utf-8")
+    legacy_root = tmp_path / "themes" / "legacy"
+    legacy_root.mkdir(parents=True)
+    (legacy_root / "theme.json").write_text(json.dumps({"schema_version": 1, "id": "Legacy Theme", "assets": {}}), encoding="utf-8")
+
+    manager = ThemeManager(tmp_path / "themes")
+
+    assert manager.select("Not Normalized").theme_id == ThemeManager.FALLBACK_THEME_ID
+    assert manager.select("Legacy Theme").theme_id == "Legacy Theme"

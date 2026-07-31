@@ -3,13 +3,35 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
-import re
 import struct
 from threading import RLock
 from typing import Any
 
 from src.core.fs.paths import Paths
 from src.core.theme.theme_animation import ResolvedThemeAnimation, ThemeAnimationDefinition
+from src.core.theme.theme_contract import (
+    ANIMATION_FILTERING_MODES,
+    ANIMATION_KEY_PATTERN,
+    ANIMATION_RENDER_MODES,
+    DIALOG_TRANSITIONS,
+    FONT_EXTENSIONS,
+    FONT_WEIGHTS,
+    LAUNCH_TRANSITIONS,
+    MAX_ANIMATION_FRAMES,
+    MAX_FONT_FILES,
+    MAX_FONT_FILE_BYTES,
+    MAX_FONT_TOTAL_BYTES,
+    MAX_FRAME_DURATION_MS,
+    MAX_MANIFEST_BYTES,
+    MAX_STYLESHEET_BYTES,
+    MIN_FRAME_DURATION_MS,
+    MOTION_EASINGS,
+    PAGE_TRANSITIONS,
+    SUPPORTED_THEME_SCHEMA_VERSIONS,
+    THEME_ID_PATTERN,
+    THEME_SCHEMA_VERSION,
+    TOAST_TRANSITIONS,
+)
 from src.core.theme.theme_catalog import THEME_ASSET_BY_KEY
 from src.core.theme.theme_font import ResolvedThemeFont, ThemeFontDefinition
 from src.core.theme.theme_motion import ButtonMotionDefinition, MotionPerformanceDefinition, MotionTransitionDefinition, SidebarMotionDefinition, ThemeMotionDefinition, ToastMotionDefinition
@@ -33,6 +55,7 @@ class ThemeDefinition:
     name: str
     author: str
     root: Path | None
+    schema_version: int = 1
     assets: dict[str, str] = field(default_factory=dict)
     text_assets: dict[str, str] = field(default_factory=dict)
     animations: dict[str, ThemeAnimationDefinition] = field(default_factory=dict)
@@ -48,25 +71,41 @@ class ThemeManager:
     DEFAULT_THEME_ID = "mcw-default"
     FALLBACK_THEME_ID = "builtin-css"
     MANIFEST_NAME = "theme.json"
-    MAX_MANIFEST_BYTES = 512 * 1024
-    MAX_STYLESHEET_BYTES = 512 * 1024
-    SUPPORTED_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4, 5, 6})
-    MAX_ANIMATION_FRAMES = 256
-    MIN_FRAME_DURATION_MS = 16
-    MAX_FRAME_DURATION_MS = 10_000
-    ANIMATION_KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
-    ANIMATION_RENDER_MODES = frozenset({"tile_x", "stretch", "contain"})
-    ANIMATION_FILTERING_MODES = frozenset({"nearest", "smooth"})
-    FONT_EXTENSIONS = frozenset({".ttf", ".otf"})
-    FONT_WEIGHTS = frozenset({100, 200, 300, 400, 500, 600, 700, 800, 900})
-    MAX_FONT_FILES = 8
-    MAX_FONT_FILE_BYTES = 16 * 1024 * 1024
-    MAX_FONT_TOTAL_BYTES = 32 * 1024 * 1024
-    MOTION_EASINGS = frozenset({"linear", "in_quad", "out_quad", "in_out_quad", "in_cubic", "out_cubic", "in_out_cubic", "out_back"})
-    PAGE_TRANSITIONS = frozenset({"none", "fade", "slide_left", "slide_right", "fade_slide"})
-    DIALOG_TRANSITIONS = frozenset({"none", "fade"})
-    LAUNCH_TRANSITIONS = frozenset({"none", "fade"})
-    TOAST_TRANSITIONS = frozenset({"none", "fade", "slide", "slide_fade"})
+    LATEST_SCHEMA_VERSION = THEME_SCHEMA_VERSION
+    MAX_MANIFEST_BYTES = MAX_MANIFEST_BYTES
+    MAX_STYLESHEET_BYTES = MAX_STYLESHEET_BYTES
+    SUPPORTED_SCHEMA_VERSIONS = SUPPORTED_THEME_SCHEMA_VERSIONS
+    MAX_ANIMATION_FRAMES = MAX_ANIMATION_FRAMES
+    MIN_FRAME_DURATION_MS = MIN_FRAME_DURATION_MS
+    MAX_FRAME_DURATION_MS = MAX_FRAME_DURATION_MS
+    ANIMATION_KEY_PATTERN = ANIMATION_KEY_PATTERN
+    ANIMATION_RENDER_MODES = ANIMATION_RENDER_MODES
+    ANIMATION_FILTERING_MODES = ANIMATION_FILTERING_MODES
+    FONT_EXTENSIONS = FONT_EXTENSIONS
+    FONT_WEIGHTS = FONT_WEIGHTS
+    MAX_FONT_FILES = MAX_FONT_FILES
+    MAX_FONT_FILE_BYTES = MAX_FONT_FILE_BYTES
+    MAX_FONT_TOTAL_BYTES = MAX_FONT_TOTAL_BYTES
+    MOTION_EASINGS = MOTION_EASINGS
+    PAGE_TRANSITIONS = PAGE_TRANSITIONS
+    DIALOG_TRANSITIONS = DIALOG_TRANSITIONS
+    LAUNCH_TRANSITIONS = LAUNCH_TRANSITIONS
+    TOAST_TRANSITIONS = TOAST_TRANSITIONS
+    SCHEMA_V6_FIELDS = frozenset({
+        "$schema",
+        "schema_version",
+        "id",
+        "name",
+        "author",
+        "description",
+        "assets",
+        "text_assets",
+        "animations",
+        "font",
+        "motion",
+        "stylesheet",
+        "capabilities",
+    })
 
     def __init__(self, root: Path | None = None) -> None:
         self.root = Path(root) if root is not None else Paths.THEME_ROOT
@@ -254,10 +293,14 @@ class ThemeManager:
             raise ThemeManifestError("Theme schema_version must be an integer.") from error
         if schema_version not in self.SUPPORTED_SCHEMA_VERSIONS:
             raise ThemeManifestError(f"Unsupported theme schema version: {schema_version}")
+        if schema_version == self.LATEST_SCHEMA_VERSION:
+            self._validate_schema_v6_manifest(payload)
 
         theme_id = str(payload.get("id") or directory.name).strip()
         if not theme_id or theme_id in {".", ".."} or any(character in theme_id for character in "/\\:"):
             raise ThemeManifestError("Theme ID is invalid.")
+        if schema_version == self.LATEST_SCHEMA_VERSION and not THEME_ID_PATTERN.fullmatch(theme_id):
+            raise ThemeManifestError("Theme ID is invalid for schema 6.")
         name = str(payload.get("name") or theme_id).strip()
         author = str(payload.get("author") or "Unknown").strip()
         raw_assets = payload.get("assets", {})
@@ -379,6 +422,7 @@ class ThemeManager:
             name=name,
             author=author,
             root=directory.resolve(),
+            schema_version=schema_version,
             assets=assets,
             text_assets=text_assets,
             animations=animations,
@@ -388,6 +432,46 @@ class ThemeManager:
             capabilities=capabilities,
             issues=tuple(issues),
         )
+
+
+    @classmethod
+    def _validate_schema_v6_manifest(cls, payload: dict[str, object]) -> None:
+        unknown = sorted(str(key) for key in payload if str(key) not in cls.SCHEMA_V6_FIELDS)
+        if unknown:
+            raise ThemeManifestError(f"Theme schema 6 contains unknown top-level field: {unknown[0]}")
+        if "id" not in payload:
+            raise ThemeManifestError("Theme schema 6 requires id.")
+        for field_name in ("id", "name", "author", "description", "$schema"):
+            value = payload.get(field_name)
+            if value is not None and not isinstance(value, str):
+                raise ThemeManifestError(f"Theme schema 6 field {field_name} must be a string.")
+        for field_name, maximum in (("name", 128), ("author", 128), ("description", 2048), ("$schema", 512)):
+            value = payload.get(field_name)
+            if isinstance(value, str) and len(value) > maximum:
+                raise ThemeManifestError(f"Theme schema 6 field {field_name} exceeds {maximum} characters.")
+        for field_name in ("name", "author"):
+            value = payload.get(field_name)
+            if isinstance(value, str) and not value.strip():
+                raise ThemeManifestError(f"Theme schema 6 field {field_name} must not be empty.")
+        for object_name in ("assets", "text_assets", "animations", "font", "motion"):
+            value = payload.get(object_name)
+            if value is not None and not isinstance(value, dict):
+                raise ThemeManifestError(f"Theme {object_name} must be an object.")
+        stylesheet = payload.get("stylesheet")
+        if stylesheet is not None and not isinstance(stylesheet, str):
+            raise ThemeManifestError("Theme stylesheet must be a string path.")
+        capabilities = payload.get("capabilities")
+        if capabilities is not None and not isinstance(capabilities, (dict, list, tuple)):
+            raise ThemeManifestError("Theme capabilities must be an object or list.")
+        assets = payload.get("assets")
+        if isinstance(assets, dict) and any(not isinstance(key, str) or not isinstance(value, str) for key, value in assets.items()):
+            raise ThemeManifestError("Theme schema 6 assets must map string keys to string paths.")
+        text_assets = payload.get("text_assets")
+        if isinstance(text_assets, dict) and any(not isinstance(key, str) or not isinstance(value, str) for key, value in text_assets.items()):
+            raise ThemeManifestError("Theme schema 6 text_assets must map string roles to string asset keys.")
+        animations = payload.get("animations")
+        if isinstance(animations, dict) and any(not isinstance(key, str) or not isinstance(value, dict) for key, value in animations.items()):
+            raise ThemeManifestError("Theme schema 6 animations must map string keys to objects.")
 
     def _parse_motion(self, value: object) -> ThemeMotionDefinition:
         if not isinstance(value, dict):
@@ -761,7 +845,7 @@ class ThemeManager:
 
     @classmethod
     def _fallback_theme(cls) -> ThemeDefinition:
-        return ThemeDefinition(theme_id=cls.FALLBACK_THEME_ID, name="Built-in CSS fallback", author="MCW Launcher", root=None, builtin_fallback=True)
+        return ThemeDefinition(theme_id=cls.FALLBACK_THEME_ID, name="Built-in CSS fallback", author="MCW Launcher", root=None, schema_version=THEME_SCHEMA_VERSION, builtin_fallback=True)
 
 
 theme_manager = ThemeManager()

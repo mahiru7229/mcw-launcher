@@ -147,3 +147,13 @@ Theme schema 5 có thể khai báo field `motion` để điều khiển transiti
 Appearance hiện có validation details, live reload, duplicate, import và export ZIP. Schema 6 hỗ trợ custom stylesheet qua field `stylesheet`, với giới hạn 512 KiB và chặn `@import`/`url()`.
 
 Xem [`docs/THEME_AUTHORING_TOOLKIT.md`](../docs/THEME_AUTHORING_TOOLKIT.md) và template trong [`docs/theme-template`](../docs/theme-template).
+
+## Runtime Contract của v0.11.0-rc.1
+
+Schema 6 đã được đóng băng để MCW Theme Studio và các công cụ ngoài launcher có thể dùng chung một hợp đồng ổn định. Không hard-code asset key từ source; hãy đọc các tệp máy có thể đọc trong [`docs/schema`](../docs/schema):
+
+- `theme.schema.v6.json`
+- `theme-assets.v1.json`
+- `theme-runtime-contract.v1.json`
+
+Package export từ RC 1 dùng ZIP deterministic và `theme-checksums.json` format 1. Xem [`docs/THEME_RUNTIME_CONTRACT.md`](../docs/THEME_RUNTIME_CONTRACT.md).

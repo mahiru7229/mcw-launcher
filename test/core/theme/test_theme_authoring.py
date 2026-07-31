@@ -93,3 +93,102 @@ def test_export_refuses_invalid_theme(tmp_path: Path) -> None:
 
     with pytest.raises(ThemeAuthoringError, match="validation errors"):
         service.export("broken", tmp_path / "broken.zip")
+
+
+def test_export_is_deterministic_and_uses_contract_checksum_format(tmp_path: Path) -> None:
+    themes = tmp_path / "themes"
+    write_theme(themes / "portable", "portable", "Portable Theme")
+    service = ThemeAuthoringService(ThemeManager(themes))
+
+    first = service.export("portable", tmp_path / "first.zip")
+    second = service.export("portable", tmp_path / "second.zip")
+
+    assert first.read_bytes() == second.read_bytes()
+    with zipfile.ZipFile(first) as archive:
+        payload = json.loads(archive.read("portable/theme-checksums.json"))
+        assert payload["package_format_version"] == 1
+        assert payload["algorithm"] == "sha256"
+        assert "theme-checksums.json" not in payload["files"]
+        assert archive.namelist()[-1] == "portable/theme-checksums.json"
+        assert archive.namelist()[:-1] == sorted(archive.namelist()[:-1])
+
+
+def test_import_rejects_checksum_mismatch(tmp_path: Path) -> None:
+    archive = tmp_path / "tampered.zip"
+    manifest = json.dumps({"schema_version": 6, "id": "tampered", "assets": {}}).encode()
+    checksums = {
+        "package_format_version": 1,
+        "theme_id": "tampered",
+        "algorithm": "sha256",
+        "files": {"theme.json": "0" * 64},
+    }
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("tampered/theme.json", manifest)
+        output.writestr("tampered/theme-checksums.json", json.dumps(checksums))
+
+    service = ThemeAuthoringService(ThemeManager(tmp_path / "themes"))
+    with pytest.raises(ThemeAuthoringError) as captured:
+        service.import_archive(archive)
+
+    assert captured.value.code == "THEME_PACKAGE_CHECKSUM_MISMATCH"
+
+
+def test_import_accepts_beta2_checksum_map_for_compatibility(tmp_path: Path) -> None:
+    import hashlib
+
+    archive = tmp_path / "legacy-checksum.zip"
+    manifest = json.dumps({"schema_version": 6, "id": "legacy-checksum", "assets": {}}).encode()
+    checksums = {"theme_id": "legacy-checksum", "sha256": {"theme.json": hashlib.sha256(manifest).hexdigest()}}
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("legacy-checksum/theme.json", manifest)
+        output.writestr("legacy-checksum/theme-checksums.json", json.dumps(checksums))
+
+    service = ThemeAuthoringService(ThemeManager(tmp_path / "themes"))
+    imported = service.import_archive(archive)
+
+    assert imported.theme_id == "legacy-checksum"
+
+
+def test_import_rejects_files_not_covered_by_checksum_manifest(tmp_path: Path) -> None:
+    import hashlib
+
+    archive = tmp_path / "extra-file.zip"
+    manifest = json.dumps({"schema_version": 6, "id": "extra-file", "assets": {}}).encode()
+    checksums = {
+        "package_format_version": 1,
+        "theme_id": "extra-file",
+        "algorithm": "sha256",
+        "files": {"theme.json": hashlib.sha256(manifest).hexdigest()},
+    }
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("extra-file/theme.json", manifest)
+        output.writestr("extra-file/untracked.txt", "tampered")
+        output.writestr("extra-file/theme-checksums.json", json.dumps(checksums))
+
+    service = ThemeAuthoringService(ThemeManager(tmp_path / "themes"))
+    with pytest.raises(ThemeAuthoringError) as captured:
+        service.import_archive(archive)
+
+    assert captured.value.code == "THEME_PACKAGE_CHECKSUM_EXTRA_FILE"
+
+
+def test_import_rejects_checksum_theme_id_mismatch(tmp_path: Path) -> None:
+    import hashlib
+
+    archive = tmp_path / "wrong-id.zip"
+    manifest = json.dumps({"schema_version": 6, "id": "manifest-id", "assets": {}}).encode()
+    checksums = {
+        "package_format_version": 1,
+        "theme_id": "different-id",
+        "algorithm": "sha256",
+        "files": {"theme.json": hashlib.sha256(manifest).hexdigest()},
+    }
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("manifest-id/theme.json", manifest)
+        output.writestr("manifest-id/theme-checksums.json", json.dumps(checksums))
+
+    service = ThemeAuthoringService(ThemeManager(tmp_path / "themes"))
+    with pytest.raises(ThemeAuthoringError) as captured:
+        service.import_archive(archive)
+
+    assert captured.value.code == "THEME_PACKAGE_ID_MISMATCH"

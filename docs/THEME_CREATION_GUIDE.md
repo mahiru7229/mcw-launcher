@@ -312,3 +312,9 @@ Trong **Launcher Settings → Appearance**, theme có thể được validate, m
 ```
 
 QSS không được dùng `@import` hoặc `url()`; asset hình ảnh tiếp tục đi qua catalog và manifest để launcher kiểm tra path, định dạng và fallback. Xem [`THEME_AUTHORING_TOOLKIT.md`](THEME_AUTHORING_TOOLKIT.md) và [`theme-template`](theme-template).
+
+## 15. Runtime Contract và MCW Theme Studio
+
+Từ `v0.11.0-rc.1`, schema 6, asset catalog 1, validation report 1 và package ZIP 1 được đóng băng. Theme editor không nên sao chép danh sách key hoặc giới hạn từ GUI; hãy đọc [`schema/theme.schema.v6.json`](schema/theme.schema.v6.json), [`schema/theme-assets.v1.json`](schema/theme-assets.v1.json) và [`THEME_RUNTIME_CONTRACT.md`](THEME_RUNTIME_CONTRACT.md).
+
+Schema 6 yêu cầu ID dạng chữ thường như `my-pixel-theme`. Field cấp cao không thuộc contract sẽ bị từ chối. Schema 1–5 vẫn được launcher đọc để giữ tương thích với theme cũ.

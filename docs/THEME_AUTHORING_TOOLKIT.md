@@ -112,3 +112,11 @@ Schema 6 adds an optional local QSS file:
 The stylesheet is limited to 512 KiB, must remain inside the theme directory, and may not contain `@import`, `url()`, or NUL. Images and fonts continue to use the validated manifest fields.
 
 A minimal template is available in [`docs/theme-template`](theme-template).
+
+---
+
+## RC 1 contract freeze
+
+MCW Launcher `v0.11.0-rc.1` đóng băng schema 6 và package format 1 để chuẩn bị cho MCW Theme Studio. Công cụ bên ngoài nên đọc [`THEME_RUNTIME_CONTRACT.md`](THEME_RUNTIME_CONTRACT.md) và các tệp trong [`docs/schema`](schema) thay vì hard-code asset key hoặc giới hạn runtime.
+
+MCW Launcher `v0.11.0-rc.1` freezes schema 6 and package format 1 for MCW Theme Studio. External tools should consume [`THEME_RUNTIME_CONTRACT.md`](THEME_RUNTIME_CONTRACT.md) and the machine-readable files under [`docs/schema`](schema) instead of hard-coding runtime limits or asset keys.

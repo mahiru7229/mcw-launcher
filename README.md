@@ -370,6 +370,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 | [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md) | Updater-compatible release ZIPs |
 | [`docs/LANGUAGE_PACKS.md`](docs/LANGUAGE_PACKS.md) | Language pack format |
 | [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) | PNG theme assets and sizes |
+| [`docs/THEME_RUNTIME_CONTRACT.md`](docs/THEME_RUNTIME_CONTRACT.md) | Frozen schema 6, asset catalog, validation API and package contract |
 | [`docs/gui-api.en.md`](docs/gui-api.en.md) / [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API |
 
 ## Support status
