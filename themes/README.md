@@ -141,3 +141,9 @@ Theme schema 5 có thể khai báo field `motion` để điều khiển transiti
   }
 }
 ```
+
+## Theme Authoring Toolkit của v0.11.0-beta.2
+
+Appearance hiện có validation details, live reload, duplicate, import và export ZIP. Schema 6 hỗ trợ custom stylesheet qua field `stylesheet`, với giới hạn 512 KiB và chặn `@import`/`url()`.
+
+Xem [`docs/THEME_AUTHORING_TOOLKIT.md`](../docs/THEME_AUTHORING_TOOLKIT.md) và template trong [`docs/theme-template`](../docs/theme-template).

@@ -38,6 +38,7 @@ class ThemeDefinition:
     animations: dict[str, ThemeAnimationDefinition] = field(default_factory=dict)
     font: ThemeFontDefinition | None = None
     motion: ThemeMotionDefinition = field(default_factory=ThemeMotionDefinition)
+    stylesheet: str | None = None
     capabilities: frozenset[str] = frozenset()
     issues: tuple[str, ...] = ()
     builtin_fallback: bool = False
@@ -48,7 +49,8 @@ class ThemeManager:
     FALLBACK_THEME_ID = "builtin-css"
     MANIFEST_NAME = "theme.json"
     MAX_MANIFEST_BYTES = 512 * 1024
-    SUPPORTED_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4, 5})
+    MAX_STYLESHEET_BYTES = 512 * 1024
+    SUPPORTED_SCHEMA_VERSIONS = frozenset({1, 2, 3, 4, 5, 6})
     MAX_ANIMATION_FRAMES = 256
     MIN_FRAME_DURATION_MS = 16
     MAX_FRAME_DURATION_MS = 10_000
@@ -165,6 +167,16 @@ class ThemeManager:
         fallback = self._default_theme()
         return self._resolve_font_for_theme(fallback) if fallback is not None else None
 
+    def resolve_stylesheet(self, theme: ThemeDefinition | None = None) -> str:
+        selected = theme or self.current
+        if selected.root is None or not selected.stylesheet:
+            return ""
+        try:
+            path = self._safe_stylesheet_path(selected.root, selected.stylesheet)
+            return self._read_stylesheet(path)
+        except ThemeAssetError:
+            return ""
+
     def _default_theme(self) -> ThemeDefinition | None:
         with self._lock:
             return self._themes.get(self.DEFAULT_THEME_ID)
@@ -259,16 +271,20 @@ class ThemeManager:
             raise ThemeManifestError("Theme animations must be an object.")
         raw_font = payload.get("font")
         raw_motion = payload.get("motion")
+        raw_stylesheet = payload.get("stylesheet")
         if raw_font is not None and not isinstance(raw_font, dict):
             raise ThemeManifestError("Theme font must be an object.")
         if raw_motion is not None and not isinstance(raw_motion, dict):
             raise ThemeManifestError("Theme motion must be an object.")
+        if raw_stylesheet is not None and not isinstance(raw_stylesheet, str):
+            raise ThemeManifestError("Theme stylesheet must be a string path.")
 
         assets: dict[str, str] = {}
         text_assets: dict[str, str] = {}
         animations: dict[str, ThemeAnimationDefinition] = {}
         font: ThemeFontDefinition | None = None
         motion = ThemeMotionDefinition()
+        stylesheet: str | None = None
         issues: list[str] = []
         for key, value in raw_assets.items():
             normalized_key = str(key).strip()
@@ -340,6 +356,14 @@ class ThemeManager:
             except ThemeAssetError as error:
                 issues.append(str(error))
 
+        if raw_stylesheet is not None:
+            try:
+                stylesheet_path = self._safe_stylesheet_path(directory, raw_stylesheet)
+                self._read_stylesheet(stylesheet_path)
+                stylesheet = stylesheet_path.relative_to(directory.resolve()).as_posix()
+            except ThemeAssetError as error:
+                issues.append(str(error))
+
         capabilities = self._parse_capabilities(payload.get("capabilities", {}), issues)
         if animations:
             capabilities = frozenset({*capabilities, "animated_assets", "sprite_sheets"})
@@ -347,6 +371,8 @@ class ThemeManager:
             capabilities = frozenset({*capabilities, "custom_font"})
         if raw_motion is not None:
             capabilities = frozenset({*capabilities, "motion_configuration"})
+        if stylesheet is not None:
+            capabilities = frozenset({*capabilities, "custom_stylesheet"})
 
         return ThemeDefinition(
             theme_id=theme_id,
@@ -358,6 +384,7 @@ class ThemeManager:
             animations=animations,
             font=font,
             motion=motion,
+            stylesheet=stylesheet,
             capabilities=capabilities,
             issues=tuple(issues),
         )
@@ -630,6 +657,35 @@ class ThemeManager:
             return frozenset(str(value).strip() for value in raw if str(value).strip())
         issues.append("Theme capabilities must be an object or list.")
         return frozenset()
+
+    @classmethod
+    def _safe_stylesheet_path(cls, root: Path, relative: str) -> Path:
+        value = str(relative).replace("\\", "/").strip()
+        if not value or value.startswith("/") or ":" in value.split("/", 1)[0]:
+            raise ThemeAssetError(f"Unsafe theme stylesheet path: {relative!r}")
+        root_resolved = root.resolve()
+        candidate = (root_resolved / value).resolve()
+        try:
+            candidate.relative_to(root_resolved)
+        except ValueError as error:
+            raise ThemeAssetError(f"Theme stylesheet escapes its theme directory: {relative!r}") from error
+        if candidate.suffix.lower() != ".qss":
+            raise ThemeAssetError(f"Theme stylesheet must be a QSS file: {relative!r}")
+        return candidate
+
+    @classmethod
+    def _read_stylesheet(cls, path: Path) -> str:
+        try:
+            size = path.stat().st_size
+            text = path.read_text(encoding="utf-8-sig")
+        except (OSError, UnicodeError) as error:
+            raise ThemeAssetError(f"Unable to read theme stylesheet: {path}") from error
+        if size > cls.MAX_STYLESHEET_BYTES:
+            raise ThemeAssetError(f"Theme stylesheet exceeds the {cls.MAX_STYLESHEET_BYTES // 1024} KiB limit: {path}")
+        lowered = text.casefold()
+        if "\x00" in text or "@import" in lowered or "url(" in lowered:
+            raise ThemeAssetError("Theme stylesheet may not contain NUL, @import, or url() directives.")
+        return text.strip()
 
     @classmethod
     def _safe_font_path(cls, root: Path, relative: str) -> Path:

@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import copy
+from pathlib import Path
 
-from PySide6.QtCore import QSignalBlocker, QTimer, Signal
-from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QHBoxLayout, QLabel, QLineEdit, QPushButton
+from PySide6.QtCore import QSignalBlocker, QTimer, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton
 
 from src.core.instance.settings_manager import SettingsManager, default_instance_settings
 from src.core.language.language_manager import language_manager, tr
+from src.core.theme.theme_authoring import ThemeAuthoringError, ThemeAuthoringService
 from src.core.theme.theme_manager import theme_manager
 from src.gui.config import NAVIGATION_ITEMS, VERSION
 from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
 from src.gui.dialogs.protected_value_reveal_dialog import confirm_reveal_protected_values
+from src.gui.dialogs.theme_issues_dialog import ThemeIssuesDialog
 from src.gui.pages.base_page import BasePage
+from src.gui.theme.live_reload import ThemeLiveReload
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
 from src.gui.widget.settings_section import SettingsSection
@@ -25,6 +30,7 @@ class LauncherSettingsPage(BasePage):
     language_changed = Signal(str)
     check_updates_requested = Signal()
     reload_theme_requested = Signal(str)
+    live_theme_reload_requested = Signal(str)
     motion_mode_changed = Signal(str)
     preview_toast_requested = Signal()
     scan_java_requested = Signal()
@@ -34,6 +40,9 @@ class LauncherSettingsPage(BasePage):
     def __init__(self) -> None:
         super().__init__("Launcher Settings", "Preferences here belong to the GUI, not to an individual Minecraft instance.", "launcher_settings")
         self._java_installations: list[object] = []
+        self._theme_authoring = ThemeAuthoringService(theme_manager)
+        self._theme_live_reload = ThemeLiveReload(self)
+        self._theme_live_reload.reload_requested.connect(self._handle_live_theme_reload)
         self._instance_defaults = default_instance_settings()
         self._tracking_suspended = True
         self._dirty = False
@@ -234,11 +243,40 @@ class LauncherSettingsPage(BasePage):
         self.motion_mode_combo.currentIndexChanged.connect(self._emit_motion_mode_changed)
         self.show_static_text = QCheckBox("Show static text over themed controls")
         self.show_static_text.setToolTip("Disabled by default. Enable this only when you want launcher text drawn over themed PNG controls.")
-        reload_theme_button = set_theme_icon(QPushButton("Reload and preview theme"), "icon.action.theme")
-        reload_theme_button.clicked.connect(self._emit_theme_preview)
+        self.reload_theme_button = set_theme_icon(QPushButton(tr("theme.authoring.reload")), "icon.action.theme")
+        self.reload_theme_button.clicked.connect(self._emit_theme_preview)
         self.show_static_text.toggled.connect(self._queue_theme_preview)
+        self.live_theme_reload = QCheckBox(tr("theme.authoring.live_reload"))
+        self.live_theme_reload.setToolTip(tr("theme.authoring.live_reload.detail"))
+        self.live_theme_reload.toggled.connect(self._set_live_theme_reload)
+        self.theme_status_label = QLabel()
+        self.theme_status_label.setObjectName("MutedLabel")
+        self.theme_status_label.setWordWrap(True)
+        self.theme_details_button = set_theme_icon(QPushButton(tr("theme.authoring.details")), "icon.action.settings")
+        self.theme_open_button = set_theme_icon(QPushButton(tr("theme.authoring.open_folder")), "icon.action.folder")
+        self.theme_duplicate_button = set_theme_icon(QPushButton(tr("theme.authoring.duplicate")), "icon.action.clone")
+        self.theme_import_button = set_theme_icon(QPushButton(tr("theme.authoring.import")), "icon.action.import")
+        self.theme_export_button = set_theme_icon(QPushButton(tr("theme.authoring.export")), "icon.action.export")
+        self.theme_details_button.clicked.connect(self._show_theme_details)
+        self.theme_open_button.clicked.connect(self._open_theme_folder)
+        self.theme_duplicate_button.clicked.connect(self._duplicate_theme)
+        self.theme_import_button.clicked.connect(self._import_theme)
+        self.theme_export_button.clicked.connect(self._export_theme)
+        authoring_row = QHBoxLayout()
+        authoring_row.setContentsMargins(0, 0, 0, 0)
+        authoring_row.addWidget(self.theme_details_button)
+        authoring_row.addWidget(self.theme_open_button)
+        authoring_row.addWidget(self.theme_duplicate_button)
+        package_row = QHBoxLayout()
+        package_row.setContentsMargins(0, 0, 0, 0)
+        package_row.addWidget(self.theme_import_button)
+        package_row.addWidget(self.theme_export_button)
+        package_row.addStretch()
         appearance_card.layout.addWidget(QLabel("Launcher theme"))
         appearance_card.layout.addWidget(self.theme_combo)
+        appearance_card.layout.addWidget(self.theme_status_label)
+        appearance_card.layout.addLayout(authoring_row)
+        appearance_card.layout.addLayout(package_row)
         self.motion_mode_label = QLabel(tr("motion.mode.label"))
         self.motion_mode_detail = QLabel(tr("motion.mode.detail"))
         self.motion_mode_detail.setObjectName("MutedLabel")
@@ -247,7 +285,8 @@ class LauncherSettingsPage(BasePage):
         appearance_card.layout.addWidget(self.motion_mode_combo)
         appearance_card.layout.addWidget(self.motion_mode_detail)
         appearance_card.layout.addWidget(self.show_static_text)
-        appearance_card.layout.addWidget(reload_theme_button)
+        appearance_card.layout.addWidget(self.live_theme_reload)
+        appearance_card.layout.addWidget(self.reload_theme_button)
         appearance_section.add_card(appearance_card, span=2)
 
         self.motion_preview_card = CardWidget(
@@ -277,11 +316,31 @@ class LauncherSettingsPage(BasePage):
         self.preview_indeterminate = ThemedProgressBar()
         self.preview_indeterminate.setRange(0, 0)
         self.preview_indeterminate.setFormat(tr("motion.preview.indeterminate"))
+        self.preview_font_label = QLabel(tr("theme.authoring.preview.font_sample"))
+        self.preview_font_label.setObjectName("ValueLabel")
+        self.preview_font_label.setWordWrap(True)
+        preview_button_row = QHBoxLayout()
+        preview_button_row.setContentsMargins(0, 0, 0, 0)
+        self.preview_default_button = QPushButton(tr("theme.authoring.preview.default_button"))
+        self.preview_primary_button = QPushButton(tr("theme.authoring.preview.primary_button"))
+        self.preview_primary_button.setObjectName("PrimaryButton")
+        self.preview_disabled_button = QPushButton(tr("theme.authoring.preview.disabled_button"))
+        self.preview_disabled_button.setEnabled(False)
+        self.preview_dialog_button = QPushButton(tr("theme.authoring.preview.dialog_button"))
+        self.preview_dialog_button.clicked.connect(self._show_preview_dialog)
+        preview_button_row.addWidget(self.preview_default_button)
+        preview_button_row.addWidget(self.preview_primary_button)
+        preview_button_row.addWidget(self.preview_disabled_button)
+        preview_button_row.addWidget(self.preview_dialog_button)
         self.preview_toast_button = set_theme_icon(
             QPushButton(tr("motion.preview.toast_button")),
             "icon.state.success",
         )
         self.preview_toast_button.clicked.connect(self.preview_toast_requested.emit)
+        self.preview_default_button.clicked.connect(self.preview_toast_requested.emit)
+        self.preview_primary_button.clicked.connect(self.preview_toast_requested.emit)
+        self.motion_preview_card.layout.addWidget(self.preview_font_label)
+        self.motion_preview_card.layout.addLayout(preview_button_row)
         self.motion_preview_card.layout.addLayout(state_row)
         self.motion_preview_card.layout.addWidget(self.preview_determinate)
         self.motion_preview_card.layout.addWidget(self.preview_indeterminate)
@@ -315,9 +374,11 @@ class LauncherSettingsPage(BasePage):
             field.textChanged.connect(self._refresh_dirty_state)
         self.auto_check_updates.toggled.connect(self._refresh_dirty_state)
         self.join_tester_program.toggled.connect(self._refresh_dirty_state)
+        self.theme_combo.currentIndexChanged.connect(self._on_theme_selection_changed)
         self.theme_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.motion_mode_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.show_static_text.toggled.connect(self._refresh_dirty_state)
+        self.live_theme_reload.toggled.connect(self._refresh_dirty_state)
 
     def set_java_installations(self, installations: list) -> None:
         self._java_installations = list(installations)
@@ -365,12 +426,15 @@ class LauncherSettingsPage(BasePage):
         for theme in themes:
             label = f"{theme.name} — {theme.author}"
             if theme.issues:
-                label += f" ({len(theme.issues)} issue(s), fallback active)"
+                label += " " + tr("theme.authoring.combo.issues", count=len(theme.issues))
             self.theme_combo.addItem(label, theme.theme_id)
         selected = str(current_theme or theme_manager.current.theme_id or "mcw-default")
         index = self.theme_combo.findData(selected)
         self.theme_combo.setCurrentIndex(max(0, index))
         self.theme_combo.blockSignals(False)
+        self._update_theme_authoring_state()
+        if hasattr(self, "_theme_live_reload"):
+            self._watch_selected_theme()
 
     def _reload_motion_modes(self) -> None:
         current = self.motion_mode_combo.currentData() if hasattr(self, "motion_mode_combo") else "full"
@@ -425,6 +489,7 @@ class LauncherSettingsPage(BasePage):
             "theme": self.theme_combo.currentData() or "mcw-default",
             "show_static_text": self.show_static_text.isChecked(),
             "motion_mode": self.current_motion_mode(),
+            "live_theme_reload": self.live_theme_reload.isChecked(),
             "modrinth_include_beta": self.modrinth_include_beta.isChecked(),
             "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
             "block_launch_on_modrinth_failure": self.block_modrinth_failure.isChecked(),
@@ -483,6 +548,15 @@ class LauncherSettingsPage(BasePage):
         self.edit_instance_defaults_button.setText(tr("instance_defaults.launcher.edit"))
         self.motion_mode_label.setText(tr("motion.mode.label"))
         self.motion_mode_detail.setText(tr("motion.mode.detail"))
+        self.reload_theme_button.setText(tr("theme.authoring.reload"))
+        self.live_theme_reload.setText(tr("theme.authoring.live_reload"))
+        self.live_theme_reload.setToolTip(tr("theme.authoring.live_reload.detail"))
+        self.theme_details_button.setText(tr("theme.authoring.details"))
+        self.theme_open_button.setText(tr("theme.authoring.open_folder"))
+        self.theme_duplicate_button.setText(tr("theme.authoring.duplicate"))
+        self.theme_import_button.setText(tr("theme.authoring.import"))
+        self.theme_export_button.setText(tr("theme.authoring.export"))
+        self._update_theme_authoring_state()
         if self.motion_preview_card.title_label is not None:
             self.motion_preview_card.title_label.setText(tr("motion.preview.title"))
         if self.motion_preview_card.subtitle_label is not None:
@@ -493,6 +567,11 @@ class LauncherSettingsPage(BasePage):
         self.preview_determinate.setFormat(tr("motion.preview.progress", value=64))
         self.preview_indeterminate.setFormat(tr("motion.preview.indeterminate"))
         self.preview_toast_button.setText(tr("motion.preview.toast_button"))
+        self.preview_font_label.setText(tr("theme.authoring.preview.font_sample"))
+        self.preview_default_button.setText(tr("theme.authoring.preview.default_button"))
+        self.preview_primary_button.setText(tr("theme.authoring.preview.primary_button"))
+        self.preview_disabled_button.setText(tr("theme.authoring.preview.disabled_button"))
+        self.preview_dialog_button.setText(tr("theme.authoring.preview.dialog_button"))
         self._reload_motion_modes()
         self._update_instance_defaults_summary()
         self._update_save_button_text()
@@ -517,6 +596,7 @@ class LauncherSettingsPage(BasePage):
             self.theme_combo,
             self.motion_mode_combo,
             self.show_static_text,
+            self.live_theme_reload,
             *self.curseforge_gateway_inputs,
         )
         blockers = [QSignalBlocker(control) for control in persisted_controls]
@@ -559,6 +639,8 @@ class LauncherSettingsPage(BasePage):
         motion_index = self.motion_mode_combo.findData(str(settings.get("motion_mode", "full")))
         self.motion_mode_combo.setCurrentIndex(max(0, motion_index))
         self.show_static_text.setChecked(bool(settings.get("show_static_text", False)))
+        self.live_theme_reload.setChecked(bool(settings.get("live_theme_reload", False)))
+        self._set_live_theme_reload(self.live_theme_reload.isChecked())
         self._instance_defaults = SettingsManager.normalize_dict(settings.get("instance_defaults"))
         self._update_instance_defaults_summary()
         del blockers
@@ -602,6 +684,118 @@ class LauncherSettingsPage(BasePage):
         with QSignalBlocker(self.reveal_curseforge_gateways):
             self.reveal_curseforge_gateways.setChecked(False)
 
+
+
+
+    def _show_preview_dialog(self) -> None:
+        QMessageBox.information(self, tr("theme.authoring.preview.dialog.title"), tr("theme.authoring.preview.dialog.message"))
+
+    def _selected_theme(self):
+        theme_id = str(self.theme_combo.currentData() or "mcw-default")
+        return next((theme for theme in theme_manager.available_themes() if theme.theme_id == theme_id), None)
+
+    def _on_theme_selection_changed(self, _index: int) -> None:
+        self._update_theme_authoring_state()
+        self._watch_selected_theme()
+
+    def _update_theme_authoring_state(self) -> None:
+        if not hasattr(self, "theme_status_label"):
+            return
+        theme = self._selected_theme()
+        editable = theme is not None and theme.root is not None
+        self.theme_open_button.setEnabled(editable)
+        self.theme_duplicate_button.setEnabled(editable)
+        self.theme_export_button.setEnabled(editable)
+        self.theme_details_button.setEnabled(theme is not None)
+        if theme is None:
+            self.theme_status_label.setText(tr("theme.authoring.status.missing"))
+        elif theme.issues:
+            self.theme_status_label.setText(tr("theme.authoring.status.issues", count=len(theme.issues)))
+        else:
+            self.theme_status_label.setText(tr("theme.authoring.status.clean"))
+
+    def _show_theme_details(self) -> None:
+        theme_id = str(self.theme_combo.currentData() or "mcw-default")
+        ThemeIssuesDialog(self._theme_authoring.validate(theme_id), self).exec()
+
+    def _open_theme_folder(self) -> None:
+        theme = self._selected_theme()
+        if theme is None or theme.root is None:
+            QMessageBox.information(self, tr("theme.authoring.title"), tr("theme.authoring.no_folder"))
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(theme.root)))
+
+    def _duplicate_theme(self) -> None:
+        theme = self._selected_theme()
+        if theme is None or theme.root is None:
+            return
+        default_id = f"{theme.theme_id}-copy"
+        new_id, accepted = QInputDialog.getText(self, tr("theme.authoring.duplicate.title"), tr("theme.authoring.duplicate.id"), QLineEdit.EchoMode.Normal, default_id)
+        if not accepted or not new_id.strip():
+            return
+        new_name, accepted = QInputDialog.getText(self, tr("theme.authoring.duplicate.title"), tr("theme.authoring.duplicate.name"), QLineEdit.EchoMode.Normal, f"{theme.name} Copy")
+        if not accepted:
+            return
+        try:
+            created = self._theme_authoring.duplicate(theme.theme_id, new_id, new_name)
+        except ThemeAuthoringError as error:
+            QMessageBox.warning(self, tr("theme.authoring.title"), str(error))
+            return
+        self.reload_themes()
+        index = self.theme_combo.findData(created.theme_id)
+        self.theme_combo.setCurrentIndex(max(0, index))
+        self._emit_theme_preview()
+
+    def _import_theme(self) -> None:
+        filename, _filter = QFileDialog.getOpenFileName(self, tr("theme.authoring.import.title"), str(theme_manager.root), tr("theme.authoring.zip_filter"))
+        if not filename:
+            return
+        try:
+            imported = self._theme_authoring.import_archive(Path(filename))
+        except ThemeAuthoringError as error:
+            QMessageBox.warning(self, tr("theme.authoring.title"), str(error))
+            return
+        self.reload_themes()
+        index = self.theme_combo.findData(imported.theme_id)
+        self.theme_combo.setCurrentIndex(max(0, index))
+        self._emit_theme_preview()
+        QMessageBox.information(self, tr("theme.authoring.title"), tr("theme.authoring.import.success", theme=imported.name))
+
+    def _export_theme(self) -> None:
+        theme = self._selected_theme()
+        if theme is None or theme.root is None:
+            return
+        filename, _filter = QFileDialog.getSaveFileName(self, tr("theme.authoring.export.title"), str(theme_manager.root / f"{theme.theme_id}.zip"), tr("theme.authoring.zip_filter"))
+        if not filename:
+            return
+        try:
+            output = self._theme_authoring.export(theme.theme_id, Path(filename))
+        except ThemeAuthoringError as error:
+            QMessageBox.warning(self, tr("theme.authoring.title"), str(error))
+            return
+        QMessageBox.information(self, tr("theme.authoring.title"), tr("theme.authoring.export.success", path=str(output)))
+
+    def _set_live_theme_reload(self, enabled: bool) -> None:
+        self._theme_live_reload.set_enabled(enabled)
+        self._watch_selected_theme()
+
+    def _watch_selected_theme(self) -> None:
+        theme = self._selected_theme()
+        self._theme_live_reload.watch(theme.theme_id if theme is not None else "", theme.root if theme is not None else None)
+
+    def _handle_live_theme_reload(self, theme_id: str) -> None:
+        current = str(self.theme_combo.currentData() or "")
+        if theme_id != current:
+            return
+        report = self._theme_authoring.validate(theme_id)
+        if not report.is_valid:
+            self.theme_status_label.setText(tr("theme.authoring.live_reload.invalid", count=report.error_count))
+            return
+        self.reload_themes()
+        index = self.theme_combo.findData(theme_id)
+        self.theme_combo.setCurrentIndex(max(0, index))
+        self.live_theme_reload_requested.emit(theme_id)
+
     def hideEvent(self, event) -> None:
         self._mask_gateway_links()
         super().hideEvent(event)
@@ -632,4 +826,13 @@ class LauncherSettingsPage(BasePage):
         self._theme_preview_timer.start()
 
     def _emit_theme_preview(self) -> None:
-        self.reload_theme_requested.emit(str(self.theme_combo.currentData() or "mcw-default"))
+        theme_id = str(self.theme_combo.currentData() or "mcw-default")
+        report = self._theme_authoring.validate(theme_id)
+        if not report.is_valid:
+            self.theme_status_label.setText(tr("theme.authoring.live_reload.invalid", count=report.error_count))
+            ThemeIssuesDialog(report, self).exec()
+            return
+        self.reload_themes()
+        index = self.theme_combo.findData(theme_id)
+        self.theme_combo.setCurrentIndex(max(0, index))
+        self.reload_theme_requested.emit(theme_id)

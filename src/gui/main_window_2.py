@@ -308,6 +308,7 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.language_changed.connect(self._preview_language)
         self.launcher_settings_page.check_updates_requested.connect(lambda: self.update_controller.check(manual=True))
         self.launcher_settings_page.reload_theme_requested.connect(self._preview_theme)
+        self.launcher_settings_page.live_theme_reload_requested.connect(self._reload_theme_silently)
         self.launcher_settings_page.motion_mode_changed.connect(self._preview_motion)
         self.launcher_settings_page.preview_toast_requested.connect(
             lambda: self.toast_manager.show(
@@ -1473,6 +1474,11 @@ class MainWindow(QMainWindow):
             "success",
             tr("motion.preview.toast.title"),
         )
+
+    def _reload_theme_silently(self, theme_id: str) -> None:
+        selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked())
+        self.motion_runtime.apply(self.launcher_settings_page.current_motion_mode())
+        self.logs_page.append(f"Theme live reload: {selected}")
 
     def _preview_motion(self, mode: str) -> None:
         self.motion_runtime.apply(mode)

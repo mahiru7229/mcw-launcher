@@ -162,6 +162,9 @@ class ThemeRuntime:
 
     def build_stylesheet(self, base_stylesheet: str = "") -> str:
         rules: list[str] = [str(base_stylesheet).rstrip()]
+        custom_stylesheet = self.manager.resolve_stylesheet()
+        if custom_stylesheet:
+            rules.append(custom_stylesheet)
         font_rule = self.font_runtime.stylesheet_rule()
         if font_rule:
             rules.append(font_rule)

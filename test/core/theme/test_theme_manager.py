@@ -511,3 +511,31 @@ def test_bundled_default_theme_has_no_manifest_issues() -> None:
 
     assert selected.theme_id == ThemeManager.DEFAULT_THEME_ID
     assert selected.issues == ()
+
+
+def test_custom_stylesheet_is_loaded_for_schema_six(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "styled"
+    theme_root.mkdir(parents=True)
+    (theme_root / "styles.qss").write_text("QPushButton { padding: 8px; }", encoding="utf-8")
+    (theme_root / "theme.json").write_text(json.dumps({"schema_version": 6, "id": "styled", "stylesheet": "styles.qss", "assets": {}}), encoding="utf-8")
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("styled")
+
+    assert selected.stylesheet == "styles.qss"
+    assert manager.resolve_stylesheet() == "QPushButton { padding: 8px; }"
+    assert "custom_stylesheet" in selected.capabilities
+
+
+def test_custom_stylesheet_rejects_external_urls(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "styled"
+    theme_root.mkdir(parents=True)
+    (theme_root / "styles.qss").write_text('QWidget { image: url("https://example.invalid/a.png"); }', encoding="utf-8")
+    (theme_root / "theme.json").write_text(json.dumps({"schema_version": 6, "id": "styled", "stylesheet": "styles.qss", "assets": {}}), encoding="utf-8")
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("styled")
+
+    assert selected.stylesheet is None
+    assert any("url()" in issue for issue in selected.issues)
+    assert manager.resolve_stylesheet() == ""

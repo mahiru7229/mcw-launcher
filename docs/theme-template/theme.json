@@ -1,0 +1,22 @@
+{
+  "schema_version": 6,
+  "id": "my-theme",
+  "name": "My Theme",
+  "author": "Theme author",
+  "stylesheet": "styles.qss",
+  "assets": {},
+  "animations": {},
+  "motion": {
+    "page": {
+      "type": "fade_slide",
+      "duration_ms": 170,
+      "easing": "out_cubic",
+      "distance_px": 18
+    },
+    "performance": {
+      "full_fps": 60,
+      "reduced_fps": 30,
+      "pause_when_hidden": true
+    }
+  }
+}

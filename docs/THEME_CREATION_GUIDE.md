@@ -299,3 +299,16 @@ Người dùng cũng có thể thêm theme mới vào folder `themes/` mà khôn
 [ ] Thiếu asset/font vẫn fallback dễ đọc
 [ ] Theme xuất hiện sau Reload and preview theme
 ```
+
+## 13. Theme Authoring Toolkit trong v0.11.0-beta.2
+
+Trong **Launcher Settings → Appearance**, theme có thể được validate, mở thư mục, nhân bản, import/export ZIP và live reload. Theme schema 6 còn hỗ trợ custom QSS cục bộ:
+
+```json
+{
+  "schema_version": 6,
+  "stylesheet": "styles.qss"
+}
+```
+
+QSS không được dùng `@import` hoặc `url()`; asset hình ảnh tiếp tục đi qua catalog và manifest để launcher kiểm tra path, định dạng và fallback. Xem [`THEME_AUTHORING_TOOLKIT.md`](THEME_AUTHORING_TOOLKIT.md) và [`theme-template`](theme-template).
