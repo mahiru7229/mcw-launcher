@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 from src.core.language.language_manager import tr
 from src.gui.presenters.progress_presenter import ProgressPresenter
 from src.models.progress.progress_state import ProgressState
-from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap, set_theme_static_text
+from src.gui.theme.runtime import set_theme_icon, set_theme_static_text
+from src.gui.widget.themed_animated_label import ThemedAnimatedLabel
+from src.gui.widget.themed_progress_bar import ThemedProgressBar
+
+if TYPE_CHECKING:
+    from src.gui.animation.motion_runtime import MotionRuntime
 
 
 class LaunchControlWidget(QFrame):
@@ -34,6 +41,7 @@ class LaunchControlWidget(QFrame):
         self._status_message = "Ready"
         self._detail_message = "Select an account and an instance, then launch."
         self._stage_state: str | None = None
+        self._motion_runtime: MotionRuntime | None = None
         self._busy = False
         self._launch_active = False
         self._pause_pending = False
@@ -59,7 +67,7 @@ class LaunchControlWidget(QFrame):
         status_row.setSpacing(10)
 
         stage_icon_size = 26 if self._compact else 32
-        self.stage_icon = set_theme_pixmap(QLabel(), "icon.state.ready", stage_icon_size, stage_icon_size)
+        self.stage_icon = ThemedAnimatedLabel("state.ready", "icon.state.ready", stage_icon_size, stage_icon_size)
 
         self.status_label = QLabel("Ready")
         self.status_label.setObjectName("ValueLabel")
@@ -76,7 +84,7 @@ class LaunchControlWidget(QFrame):
         self.detail_label.setObjectName("TinyLabel")
         self.detail_label.setWordWrap(True)
 
-        self.progress_bar = QProgressBar()
+        self.progress_bar = ThemedProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat("%p%")
@@ -103,6 +111,8 @@ class LaunchControlWidget(QFrame):
         set_theme_static_text(self.cancel_button, "control.cancel", tr(self.CANCEL_TEXT))
         self.cancel_button.setObjectName("SecondaryButton")
         self.cancel_button.setProperty("themeRole", "cancel")
+        self.cancel_button.setProperty("motionVisibilityOnly", True)
+        self.cancel_button.setProperty("motionVisibleTarget", False)
         if self._compact:
             self.cancel_button.setFixedSize(190, 22)
         else:
@@ -115,6 +125,11 @@ class LaunchControlWidget(QFrame):
 
         layout.addLayout(progress_layout, 1)
         layout.addLayout(controls_layout)
+
+    def set_motion_runtime(self, runtime: "MotionRuntime | None") -> None:
+        self._motion_runtime = runtime
+        if runtime is not None:
+            runtime.animate_visibility(self.cancel_button, self._launch_active)
 
     def set_selected_instance(self, _instance: object | None) -> None:
         self._refresh_launch_button()
@@ -354,7 +369,10 @@ class LaunchControlWidget(QFrame):
             self.launch_button.setText(button_text)
 
         cancel_text = tr(self.CANCEL_TEXT)
-        self.cancel_button.setVisible(self._launch_active)
+        if self._motion_runtime is not None:
+            self._motion_runtime.animate_visibility(self.cancel_button, self._launch_active)
+        else:
+            self.cancel_button.setVisible(self._launch_active)
         self.cancel_button.setEnabled(self._launch_active and not self._cancel_pending)
         self.cancel_button.setProperty("themeStaticTextFallback", cancel_text)
         if bool(self.cancel_button.property("themeStaticTextHidden")):
@@ -401,7 +419,9 @@ class LaunchControlWidget(QFrame):
         if self._stage_state == state_key:
             return
         self._stage_state = state_key
-        set_theme_pixmap(self.stage_icon, f"icon.state.{icon_state}", 32, 32)
+        self.stage_icon.set_theme_state(f"state.{icon_state}", f"icon.state.{icon_state}")
         self.stage_label.setProperty("state", state)
         self.stage_label.style().unpolish(self.stage_label)
         self.stage_label.style().polish(self.stage_label)
+        if self._motion_runtime is not None:
+            self._motion_runtime.pulse(self.stage_label)

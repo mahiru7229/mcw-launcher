@@ -134,15 +134,25 @@ def test_theme_and_modrinth_channels_are_created_and_persisted(tmp_path: Path) -
     manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
 
     data = manager.load()
-    assert data["appearance"] == {"theme": "mcw-default", "show_static_text": False}
+    assert data["appearance"] == {"theme": "mcw-default", "show_static_text": False, "motion_mode": "full", "live_theme_reload": False, "accent_mode": "theme", "accent_color": "#8ed35b"}
     assert data["modrinth"] == {"include_beta": False, "include_alpha": False}
 
-    manager.save({"appearance": {"theme": "pixel-night", "show_static_text": "off"}, "modrinth": {"include_beta": True, "include_alpha": "yes"}})
+    manager.save({"appearance": {"theme": "pixel-night", "show_static_text": "off", "motion_mode": "reduced", "live_theme_reload": "yes", "accent_mode": "custom", "accent_color": "#B26CFF"}, "modrinth": {"include_beta": True, "include_alpha": "yes"}})
     updated = manager.load()
 
-    assert updated["appearance"] == {"theme": "pixel-night", "show_static_text": False}
+    assert updated["appearance"] == {"theme": "pixel-night", "show_static_text": False, "motion_mode": "reduced", "live_theme_reload": True, "accent_mode": "custom", "accent_color": "#b26cff"}
     assert updated["modrinth"] == {"include_beta": True, "include_alpha": True}
 
+
+
+def test_motion_mode_is_normalized_to_supported_values(tmp_path: Path) -> None:
+    manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
+
+    manager.update_section("appearance", {"motion_mode": "off"})
+    assert manager.load()["appearance"]["motion_mode"] == "off"
+
+    manager.update_section("appearance", {"motion_mode": "unknown"})
+    assert manager.load()["appearance"]["motion_mode"] == "full"
 
 def test_download_limit_is_unlimited_by_default_and_normalized(tmp_path: Path) -> None:
     manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
@@ -209,40 +219,15 @@ def test_managed_content_failure_defaults_are_source_specific_and_persisted(tmp_
     }
 
 
-def test_instance_defaults_are_created_normalized_and_persisted(tmp_path: Path, monkeypatch) -> None:
-    from src.core.system.memory import SystemMemory
-
-    monkeypatch.setattr(SystemMemory, "total_physical_memory_mb", classmethod(lambda cls: 8192))
+def test_accent_settings_are_normalized_and_migrated(tmp_path: Path) -> None:
     manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
 
-    defaults = manager.load()["instance_defaults"]
-    assert defaults["java"]["max_memory"] == 2048
-    assert defaults["launch"]["lan_auth_mode"] == "microsoft_only"
+    manager.update_section("appearance", {"accent_mode": "CUSTOM", "accent_color": "#12ABef"})
+    appearance = manager.load()["appearance"]
+    assert appearance["accent_mode"] == "custom"
+    assert appearance["accent_color"] == "#12abef"
 
-    manager.save({
-        "instance_defaults": {
-            "java": {
-                "path": "C:/Java/bin/javaw.exe",
-                "min_memory": 8192,
-                "max_memory": 16384,
-                "arguments": ["-XX:+UseG1GC"],
-            },
-            "window": {"width": 1920, "height": 1080, "fullscreen": True},
-            "launch": {
-                "game_arguments": ["--demo"],
-                "lan_auth_mode": "friends",
-                "lan_connection_provider": "e4mc",
-                "modrinth_failure_policy": "allow",
-            },
-        }
-    })
-
-    saved = manager.load()["instance_defaults"]
-    assert saved["java"]["path"] == "C:/Java/bin/javaw.exe"
-    assert saved["java"]["min_memory"] == 8192
-    assert saved["java"]["max_memory"] == 8192
-    assert saved["window"] == {"width": 1920, "height": 1080, "fullscreen": True}
-    assert saved["launch"]["lan_auth_mode"] == "private_offline"
-    assert saved["launch"]["lan_connection_provider"] == "e4mc"
-    assert saved["launch"]["modrinth_failure_policy"] == "allow"
-    assert saved["launch"]["curseforge_failure_policy"] == "inherit"
+    manager.update_section("appearance", {"accent_mode": "unknown", "accent_color": "blue"})
+    appearance = manager.load()["appearance"]
+    assert appearance["accent_mode"] == "theme"
+    assert appearance["accent_color"] == "#8ed35b"

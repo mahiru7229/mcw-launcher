@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QMessageBox,
-    QProgressBar,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -20,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from src.core.language.language_manager import tr
 from src.core.repair.repair_service import RepairService
+from src.gui.widget.themed_progress_bar import ThemedProgressBar
 from src.gui.window_sizing import resize_dialog_to_screen
 from src.models.repair.repair_models import RepairComponent, RepairMode, RepairPlan, RepairReport, RepairStatus
 
@@ -66,7 +66,7 @@ class RepairCenterDialog(QDialog):
         self.progress_label = QLabel()
         self.progress_label.setObjectName("MutedLabel")
         self.progress_label.setWordWrap(True)
-        self.progress_bar = QProgressBar()
+        self.progress_bar = ThemedProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         root.addWidget(self.progress_label)

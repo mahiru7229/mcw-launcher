@@ -7,6 +7,10 @@ from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
 
 from src.core.theme.theme_manager import ThemeManager, theme_manager
+from src.gui.theme.accent_runtime import ThemeAccentRuntime, theme_accent_runtime
+from src.gui.theme.font_runtime import ThemeFontRuntime, theme_font_runtime
+from src.gui.widget.themed_animated_label import ThemedAnimatedLabel
+from src.gui.widget.themed_progress_bar import ThemedProgressBar
 
 
 def set_theme_icon(button: QPushButton, key: str, size: int = 24) -> QPushButton:
@@ -14,6 +18,7 @@ def set_theme_icon(button: QPushButton, key: str, size: int = 24) -> QPushButton
     button.setProperty("themeIconSize", int(size))
     path = theme_manager.resolve_asset(str(key))
     if path is not None:
+        path = theme_accent_runtime.tinted_path(path, key)
         button.setIcon(QIcon(str(path)))
         button.setIconSize(QSize(int(size), int(size)))
     return button
@@ -27,6 +32,7 @@ def set_theme_pixmap(label: QLabel, key: str, width: int, height: int, fallback_
     label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     path = theme_manager.resolve_asset(str(key))
     if path is not None:
+        path = theme_accent_runtime.tinted_path(path, key)
         pixmap = QPixmap(str(path))
         if not pixmap.isNull():
             label.setPixmap(pixmap.scaled(int(width), int(height), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
@@ -127,18 +133,38 @@ class ThemeRuntime:
         "combo.arrow": "QComboBox::down-arrow",
     }
 
-    def __init__(self, manager: ThemeManager | None = None) -> None:
+    def __init__(self, manager: ThemeManager | None = None, font_runtime: ThemeFontRuntime | None = None, accent_runtime: ThemeAccentRuntime | None = None) -> None:
         self.manager = manager or theme_manager
+        if font_runtime is not None:
+            self.font_runtime = font_runtime
+        elif self.manager is theme_manager:
+            self.font_runtime = theme_font_runtime
+        else:
+            self.font_runtime = ThemeFontRuntime(self.manager)
+        if accent_runtime is not None:
+            self.accent_runtime = accent_runtime
+        elif self.manager is theme_manager:
+            self.accent_runtime = theme_accent_runtime
+        else:
+            self.accent_runtime = ThemeAccentRuntime(self.manager)
         self._base_stylesheet = ""
         self._show_static_text = False
+        self._accent_mode = "theme"
+        self._accent_color = "#8ed35b"
 
-    def apply(self, root: QWidget, base_stylesheet: str, theme_id: str, show_static_text: bool = False) -> str:
+    def apply(self, root: QWidget, base_stylesheet: str, theme_id: str, show_static_text: bool = False, accent_mode: str = "theme", accent_color: str = "#8ed35b") -> str:
         self._base_stylesheet = str(base_stylesheet)
         self._show_static_text = bool(show_static_text)
         self.manager.reload()
-        self.manager.select(theme_id)
-        stylesheet = self.build_stylesheet(self._base_stylesheet)
+        selected_theme = self.manager.select(theme_id)
+        self._accent_mode = str(accent_mode or "theme")
+        self._accent_color = str(accent_color or "#8ed35b")
+        self.accent_runtime.configure(selected_theme, self._accent_mode, self._accent_color)
         application = QApplication.instance()
+        if application is not None:
+            self.font_runtime.apply(application, selected_theme)
+            self.accent_runtime.apply_application_palette(application)
+        stylesheet = self.build_stylesheet(self._base_stylesheet)
         if application is not None:
             application.setStyleSheet(stylesheet)
         else:
@@ -151,10 +177,17 @@ class ThemeRuntime:
 
     def build_stylesheet(self, base_stylesheet: str = "") -> str:
         rules: list[str] = [str(base_stylesheet).rstrip()]
+        custom_stylesheet = self.manager.resolve_stylesheet()
+        if custom_stylesheet:
+            rules.append(custom_stylesheet)
+        font_rule = self.font_runtime.stylesheet_rule()
+        if font_rule:
+            rules.append(font_rule)
         for key, (selector, slice_size) in self.STYLE_ASSETS.items():
             path = self.manager.resolve_asset(key, fallback_to_default=key.startswith("button.cancel"))
             if path is None:
                 continue
+            path = self.accent_runtime.tinted_path(path, key)
             url = self._qss_url(path)
             if slice_size:
                 rules.append(f'{selector} {{ border-image: url("{url}") {slice_size} {slice_size} {slice_size} {slice_size} stretch stretch; background: transparent; }}')
@@ -163,13 +196,21 @@ class ThemeRuntime:
         for key, selector in self.IMAGE_ASSETS.items():
             path = self.manager.resolve_asset(key)
             if path is not None:
+                path = self.accent_runtime.tinted_path(path, key)
                 rules.append(f'{selector} {{ image: url("{self._qss_url(path)}"); }}')
+        accent_rule = self.accent_runtime.stylesheet_rule()
+        if accent_rule:
+            rules.append(accent_rule)
         return "\n\n".join(rule for rule in rules if rule)
 
     def apply_assets(self, root: QWidget) -> None:
         widgets = [root, *root.findChildren(QWidget)]
         for widget in widgets:
-            if isinstance(widget, QPushButton):
+            if isinstance(widget, ThemedProgressBar):
+                widget.apply_theme()
+            if isinstance(widget, ThemedAnimatedLabel):
+                widget.apply_theme()
+            elif isinstance(widget, QPushButton):
                 self._apply_button_icon(widget)
                 self._apply_static_text(widget)
             elif isinstance(widget, QLabel):
@@ -189,6 +230,7 @@ class ThemeRuntime:
             button.setIcon(QIcon())
             return
         size = max(1, int(button.property("themeIconSize") or 24))
+        path = self.accent_runtime.tinted_path(path, key)
         button.setIcon(QIcon(str(path)))
         button.setIconSize(QSize(size, size))
 
@@ -211,6 +253,7 @@ class ThemeRuntime:
             label.setPixmap(QPixmap())
             label.setText(fallback_text)
             return
+        path = self.accent_runtime.tinted_path(path, key)
         pixmap = QPixmap(str(path))
         if pixmap.isNull():
             label.setPixmap(QPixmap())

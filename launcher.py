@@ -122,6 +122,16 @@ def main() -> None:
 
         settings = run_startup_task(initialize_application, update_startup_progress, app.processEvents)
 
+        from src.core.theme.theme_manager import theme_manager
+        from src.gui.theme.font_runtime import theme_font_runtime
+
+        appearance_settings = settings.get("appearance", {}) if isinstance(settings, dict) else {}
+        theme_manager.reload()
+        selected_theme = theme_manager.select(str(appearance_settings.get("theme", "mcw-default")))
+        theme_font_runtime.apply(app, selected_theme)
+        splash.update()
+        app.processEvents()
+
         from src.core.language.language_manager import language_manager, tr
 
         language_manager.reload()

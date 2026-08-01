@@ -122,7 +122,7 @@ class AccountPage(BasePage):
         return str(self.account_combo.currentData() or "")
 
     def set_busy(self, busy: bool) -> None:
-        self.setEnabled(not busy)
+        self.set_interaction_locked(busy)
 
     def set_microsoft_auth_state(self, active: bool, message: str = "") -> None:
         self._microsoft_auth_active = bool(active)

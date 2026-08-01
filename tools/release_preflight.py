@@ -15,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.config import CURSEFORGE_DEFAULT_GATEWAY_URL, UPDATE_CHANNEL, VERSION, VERSION_ID, VERSION_TAG
 from src.core.lan.lan_agent_manager import LanAgentManager
+from src.core.theme.theme_contract import ASSET_CATALOG_FILENAME, CONTRACT_FILENAME, SCHEMA_FILENAME, THEME_SCHEMA_VERSION, build_theme_asset_catalog_v1, build_theme_runtime_contract_v1, build_theme_schema_v6
 
 TEXT_SUFFIXES = {".json", ".md", ".ps1", ".py", ".txt", ".yml", ".yaml"}
 IGNORED_DIRECTORIES = {".git", ".pytest_cache", ".venv", "__pycache__", "build", "cache", "dist", "release"}
@@ -154,6 +155,64 @@ def audit_private_gateway_bundling(project_root: Path) -> list[str]:
 
 
 
+
+def audit_theme_contract(project_root: Path) -> list[str]:
+    errors: list[str] = []
+    schema_root = project_root / "docs" / "schema"
+    expected_documents = {
+        SCHEMA_FILENAME: build_theme_schema_v6(),
+        ASSET_CATALOG_FILENAME: build_theme_asset_catalog_v1(),
+        CONTRACT_FILENAME: build_theme_runtime_contract_v1(),
+    }
+    for filename, expected in expected_documents.items():
+        path = schema_root / filename
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            errors.append(f"Theme contract document error for {filename}: {error}")
+            continue
+        if payload != expected:
+            errors.append(f"Theme contract document is out of date: docs/schema/{filename}")
+
+    contract_path = schema_root / CONTRACT_FILENAME
+    try:
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        contract = None
+    if isinstance(contract, dict):
+        hashes = contract.get("sha256")
+        if not isinstance(hashes, dict):
+            errors.append("Theme runtime contract is missing document hashes")
+        else:
+            for filename, expected_hash in hashes.items():
+                path = schema_root / str(filename)
+                if not path.is_file():
+                    errors.append(f"Theme contract hash target is missing: docs/schema/{filename}")
+                    continue
+                actual_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+                if actual_hash != str(expected_hash):
+                    errors.append(f"Theme contract SHA-256 mismatch: docs/schema/{filename}")
+
+    default_manifest = project_root / "themes" / "mcw-default" / "theme.json"
+    try:
+        default_theme = json.loads(default_manifest.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        errors.append(f"Default theme manifest error: {error}")
+    else:
+        if not isinstance(default_theme, dict) or default_theme.get("schema_version") != THEME_SCHEMA_VERSION:
+            errors.append(f"Default theme must target frozen schema {THEME_SCHEMA_VERSION}")
+
+    core_root = project_root / "src" / "core" / "theme"
+    for path in sorted(core_root.glob("*.py")):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as error:
+            errors.append(f"Unable to inspect theme core module {path.name}: {error}")
+            continue
+        if "PySide6" in text or "src.gui" in text:
+            errors.append(f"Theme core module depends on GUI code: src/core/theme/{path.name}")
+    return errors
+
 def audit_lan_agent(project_root: Path) -> list[str]:
     errors: list[str] = []
     agent_path = project_root / "runtime" / LanAgentManager.AGENT_FILENAME
@@ -211,6 +270,7 @@ def run_preflight(project_root: Path = PROJECT_ROOT) -> list[str]:
     errors: list[str] = []
     errors.extend(audit_version_metadata(project_root))
     errors.extend(audit_private_gateway_bundling(project_root))
+    errors.extend(audit_theme_contract(project_root))
     errors.extend(audit_lan_agent(project_root))
     errors.extend(find_merge_markers(project_root))
     errors.extend(audit_language_packs(project_root))

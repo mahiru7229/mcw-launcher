@@ -4,7 +4,6 @@ from src.gui.dark_theme_constants import FORCED_DARK_APPLICATION_STYLE
 APP_STYLE = """
 QWidget {
     color: #ffffff;
-    font-family: "Segoe UI";
     font-size: 10.5pt;
 }
 
@@ -25,7 +24,6 @@ QMessageBox {
 QMessageBox QLabel, QMessageBox QTextEdit {
     background: transparent;
     color: #ffffff;
-    font-family: "Segoe UI";
 }
 
 QMessageBox QPushButton {
@@ -349,7 +347,6 @@ QProgressBar::chunk {
 QTextEdit#LogOutput {
     background: #141613;
     color: #ffffff;
-    font-family: Consolas;
     font-size: 10pt;
 }
 
@@ -387,6 +384,33 @@ QHeaderView::section {
 
 QTableWidget::item {
     padding: 5px;
+}
+
+QFrame#ToastNotification {
+    background: #252823;
+    border: 2px solid #11130f;
+    border-radius: 6px;
+}
+
+QFrame#ToastNotification[toastLevel="success"] {
+    border-color: #77a957;
+}
+
+QFrame#ToastNotification[toastLevel="warning"] {
+    border-color: #d8a84f;
+}
+
+QFrame#ToastNotification[toastLevel="error"] {
+    border-color: #c45c5c;
+}
+
+QLabel#ToastTitle {
+    color: #ffffff;
+    font-weight: 800;
+}
+
+QLabel#ToastMessage {
+    color: #d8dbd3;
 }
 
 QToolTip {

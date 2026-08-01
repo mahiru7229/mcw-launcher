@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from src.core.instance.settings_manager import SettingsManager
+from src.core.instance.settings_manager import SettingsManager, default_instance_settings
 from src.models.instance.instance import Instance
 
 
@@ -205,3 +205,13 @@ def test_public_dict_codec_returns_canonical_independent_data(monkeypatch) -> No
     assert normalized["window"]["height"] == 720
     assert normalized["window"]["fullscreen"] is True
     assert normalized["launch"]["lan_auth_mode"] == "private_offline"
+
+
+def test_default_instance_settings_is_available_without_class_factory() -> None:
+    first = default_instance_settings()
+    second = default_instance_settings()
+
+    first["java"]["path"] = "C:/changed/javaw.exe"
+
+    assert second["java"]["path"] == ""
+    assert SettingsManager.default_dict() == second

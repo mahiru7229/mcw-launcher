@@ -290,7 +290,9 @@ class InstancesPage(BasePage):
         return self.selected_manage_loader()
 
     def set_busy(self, busy: bool) -> None:
-        self.setEnabled(not busy)
+        self.set_interaction_locked(busy)
+        if not busy:
+            self._render_instance(self.current_instance_name())
 
     def _queue_version_filter(self, _checked: bool) -> None:
         self._version_filter_timer.start()

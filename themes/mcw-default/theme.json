@@ -1,9 +1,9 @@
 {
-  "schema_version": 1,
+  "schema_version": 6,
   "id": "mcw-default",
   "name": "MCW Default PNG",
   "author": "mahiru7229",
-  "description": "Optional PNG overrides for the built-in MCW CSS theme. Missing files fall back safely.",
+  "description": "Default MCW theme with safe PNG fallbacks and theme-driven sprite animations.",
   "assets": {
     "background.window": "backgrounds/window.png",
     "background.center": "backgrounds/center.png",
@@ -133,5 +133,177 @@
   "text_assets": {
     "control.launch": "button.launch",
     "control.cancel": "button.cancel"
-  }
+  },
+  "capabilities": {
+    "animated_assets": true,
+    "sprite_sheets": true,
+    "animated_progress": true,
+    "motion_configuration": true,
+    "toast_notifications": true,
+    "motion_performance": true
+  },
+  "animations": {
+    "progress.chunk": {
+      "type": "spritesheet",
+      "path": "animations/progress/chunk_spritesheet.png",
+      "fallback_asset": "progress.chunk",
+      "frame_size": [
+        16,
+        16
+      ],
+      "frame_count": 8,
+      "columns": 8,
+      "frame_duration_ms": 80,
+      "loop": true,
+      "render_mode": "tile_x",
+      "filtering": "nearest"
+    },
+    "progress.indeterminate": {
+      "type": "spritesheet",
+      "path": "animations/progress/indeterminate_spritesheet.png",
+      "fallback_asset": "progress.chunk",
+      "frame_size": [
+        64,
+        16
+      ],
+      "frame_count": 12,
+      "columns": 12,
+      "frame_duration_ms": 70,
+      "loop": true,
+      "render_mode": "stretch",
+      "filtering": "nearest"
+    },
+    "state.busy": {
+      "type": "spritesheet",
+      "path": "animations/states/busy_spritesheet.png",
+      "fallback_asset": "icon.state.busy",
+      "frame_size": [
+        24,
+        24
+      ],
+      "frame_count": 8,
+      "columns": 8,
+      "frame_duration_ms": 90,
+      "loop": true,
+      "render_mode": "contain",
+      "filtering": "nearest"
+    },
+    "state.success": {
+      "type": "spritesheet",
+      "path": "animations/states/success_spritesheet.png",
+      "fallback_asset": "icon.state.success",
+      "frame_size": [
+        24,
+        24
+      ],
+      "frame_count": 8,
+      "columns": 8,
+      "frame_duration_ms": 90,
+      "loop": true,
+      "render_mode": "contain",
+      "filtering": "nearest"
+    },
+    "state.warning": {
+      "type": "spritesheet",
+      "path": "animations/states/warning_spritesheet.png",
+      "fallback_asset": "icon.state.warning",
+      "frame_size": [
+        24,
+        24
+      ],
+      "frame_count": 8,
+      "columns": 8,
+      "frame_duration_ms": 90,
+      "loop": true,
+      "render_mode": "contain",
+      "filtering": "nearest"
+    },
+    "state.error": {
+      "type": "spritesheet",
+      "path": "animations/states/error_spritesheet.png",
+      "fallback_asset": "icon.state.error",
+      "frame_size": [
+        24,
+        24
+      ],
+      "frame_count": 8,
+      "columns": 8,
+      "frame_duration_ms": 90,
+      "loop": true,
+      "render_mode": "contain",
+      "filtering": "nearest"
+    }
+  },
+  "motion": {
+    "page": {
+      "type": "fade_slide",
+      "duration_ms": 170,
+      "easing": "out_cubic",
+      "distance_px": 18
+    },
+    "button": {
+      "hover_duration_ms": 100,
+      "press_duration_ms": 70,
+      "easing": "out_quad",
+      "hover_strength": 0.08,
+      "press_strength": 0.18
+    },
+    "dialog": {
+      "type": "fade",
+      "duration_ms": 160,
+      "easing": "out_cubic"
+    },
+    "sidebar": {
+      "duration_ms": 220,
+      "easing": "out_cubic",
+      "collapsed_width": 72
+    },
+    "launch_control": {
+      "type": "fade",
+      "duration_ms": 140,
+      "easing": "out_cubic"
+    },
+    "toast": {
+      "type": "slide_fade",
+      "duration_ms": 180,
+      "visible_duration_ms": 3000,
+      "easing": "out_cubic",
+      "distance_px": 24,
+      "max_visible": 3
+    },
+    "performance": {
+      "full_fps": 60,
+      "reduced_fps": 30,
+      "pause_when_hidden": true
+    }
+  },
+  "palette": {
+    "primary": "#63984a",
+    "primary_hover": "#7db45e",
+    "primary_pressed": "#4d7938",
+    "primary_text": "#ffffff",
+    "focus": "#8ed35b",
+    "selection": "#4f6d3c",
+    "selection_text": "#ffffff",
+    "link": "#8ed35b",
+    "success": "#8ed35b",
+    "warning": "#d6a93c",
+    "error": "#c47a7a"
+  },
+  "accent_assets": [
+    "button.primary",
+    "button.primary_hover",
+    "button.primary_pressed",
+    "button.launch",
+    "button.launch_hover",
+    "button.launch_pressed",
+    "button.nav_selected",
+    "input.focus",
+    "checkbox.checked",
+    "progress.chunk",
+    "progress.indeterminate",
+    "scrollbar.handle",
+    "scrollbar.horizontal_handle",
+    "badge.status"
+  ]
 }

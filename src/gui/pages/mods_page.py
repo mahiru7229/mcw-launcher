@@ -343,6 +343,7 @@ class ModsPage(BasePage):
 
     def set_busy(self, busy: bool) -> None:
         self._busy = bool(busy)
+        self.set_interaction_locked(self._busy)
         self.provider_combo.setEnabled(not self._busy)
         self.loader_combo.setEnabled(not self._busy)
         self.search_input.setEnabled(not self._busy)

@@ -7,7 +7,10 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Stable-v0.10.0-brightgreen" alt="Current stable version">
+    <img src="https://img.shields.io/badge/Stable-v0.11.0-brightgreen" alt="Current stable version">
+  </a>
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases">
+    <img src="https://img.shields.io/badge/Tester-opt--in-orange" alt="Experimental builds require tester opt-in">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -22,13 +25,12 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v0.10.0.md">v0.10.0 release notes</a> ·
-  <a href="docs/RELEASE-v0.10.0-beta.2.md">Beta 2 history</a> ·
+  <a href="docs/RELEASE-v0.11.0.md">v0.11.0 release notes</a> ·
   <a href="docs/UPDATE_PACKAGES.md">Updater packages</a>
 </p>
 
 > [!NOTE]
-> `v0.10.0` là bản Stable hiện tại và kênh Stable vẫn là mặc định. Tester program tiếp tục là tùy chọn chủ động cho các bản thử nghiệm trong tương lai.
+> `v0.11.0` là bản Stable hiện tại. Stable là kênh mặc định; bản thử nghiệm chỉ được nhận khi người dùng chủ động tham gia tester program.
 
 ---
 
@@ -40,20 +42,18 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
-### Nền tảng ổn định từ `v0.9.0`
+### Điểm nổi bật của `v0.11.0`
 
-- Thêm **Repair Center** cho từng instance với **Quick Check** và **Full Verification**.
-- Kiểm tra Minecraft client, libraries, natives, assets, Java, mod loader, file modpack được quản lý, LAN Agent và metadata của instance.
-- Lập repair plan trước khi sửa, hiển thị số vấn đề cùng dung lượng tải dự kiến và cho phép sửa mục đã chọn hoặc toàn bộ mục có thể tự động sửa.
-- Tạo recovery point trước khi sửa thành phần thuộc instance và tự động rollback nếu một bước sửa thất bại; world, save và file không do launcher quản lý không bị thay thế.
-- Hợp nhất tải file qua **Download Engine 2** với kết nối dùng chung, giới hạn đồng thời toàn cục/theo host và bandwidth limit dùng chung.
-- Tải vào file `.part`, xác minh size/checksum rồi atomic replace; hỗ trợ HTTP Range và khôi phục phần tải hợp lệ sau khi launcher khởi động lại.
-- Phân loại lỗi retry, tôn trọng `Retry-After`, hỗ trợ nguồn dự phòng và lưu download journal đã lọc dữ liệu nhạy cảm.
-- Có **Pause / Resume** và **Cancel** riêng. Việc hủy an toàn giữ lại file `.part` hợp lệ để lần tải sau có thể tiếp tục.
-- Hiển thị bản xem trước chính xác trước khi cập nhật modpack Modrinth: thêm, thay thế, xóa, giữ file người dùng, file không đổi và dung lượng tải dự kiến.
-- Tạo backup đầy đủ trước khi áp dụng update modpack, phát hiện xung đột trước khi xác nhận và vẫn xác minh lại file khi thực thi.
-- Xuất diagnostics ZIP có giới hạn dung lượng, lọc token/thông tin nhạy cảm và không chứa account database, world hoặc nội dung mod JAR.
-- Sửa chuỗi tác vụ preview → update bị báo nhầm đang có tác vụ khác, đồng thời thêm fallback an toàn khi Windows chặn đổi tên thư mục staging như `.fabric` lúc restore backup.
+- Thêm **Theme Animation Engine** dùng chung cho spritesheet, progress xác định/không xác định và animated state assets.
+- Theme có thể đóng gói custom font `.ttf`/`.otf` và áp dụng cho toàn bộ chữ do Qt render.
+- Thêm chuyển trang, sidebar collapse, button feedback, dialog fade, Launch Control motion và toast notification.
+- Có các chế độ **Full / Reduced / Off**, giới hạn FPS và tự pause khi launcher bị ẩn hoặc minimize.
+- Thêm **Theme Authoring Toolkit**: validation chi tiết, live reload, duplicate, import/export ZIP, checksum và preview.
+- Khóa **Theme Runtime Contract v1** cùng Theme Schema 6, asset catalog và package format machine-readable cho MCW Theme Studio.
+- Theme hỗ trợ palette và `accent_assets`; Launcher Settings cho phép dùng màu theme hoặc chọn màu chủ đạo tùy chỉnh.
+- Đồng bộ accent với QPalette, QSS, focus, selection, progress, scrollbar, splash và PNG/spritesheet opt-in.
+- Giữ tương thích theme schema 1–6 và updater từ v0.10.0.
+- Bao gồm các hotfix startup splash và circular import đã xác minh trong RC2.
 
 ### Tính năng mới trong `v0.10.0`
 
@@ -83,7 +83,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.10.0` là bản Stable hiện tại dành cho người dùng thông thường.
+- `v0.11.0` là bản Stable hiện tại dành cho người dùng thông thường.
 - Stable là kênh mặc định. Để nhận bản thử nghiệm, người dùng phải chủ động bật:
 
 ```text
@@ -140,14 +140,14 @@ Hoặc chạy thủ công:
 python -m tools.release_preflight
 python -m pytest test -q
 python -m PyInstaller --clean --noconfirm mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.10.0"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.11.0"
 ```
 
 Kết quả updater package:
 
 ```text
-MCW-Launcher-v0.10.0-windows-x64.zip
-MCW-Launcher-v0.10.0-windows-x64.zip.sha256
+MCW-Launcher-v0.11.0-windows-x64.zip
+MCW-Launcher-v0.11.0-windows-x64.zip.sha256
 ```
 
 Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -162,20 +162,18 @@ MCW Launcher is an open-source Minecraft launcher centered around **isolated ins
 
 Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
 
-### Stable foundation from `v0.9.0`
+### `v0.11.0` highlights
 
-- Add a per-instance **Repair Center** with **Quick Check** and **Full Verification**.
-- Check the Minecraft client, libraries, natives, assets, Java, mod loader, managed modpack files, LAN Agent, and instance metadata.
-- Build a repair plan before applying changes, including issue totals and estimated download size, with selective and repair-all actions.
-- Create a recovery point before instance-scoped repairs and roll back automatically when a repair step fails; worlds, saves, and unmanaged files are not replaced.
-- Route file transfers through **Download Engine 2** with shared connections, global/per-host concurrency, and a shared bandwidth limit.
-- Download into `.part` files, verify size/checksums, then replace atomically; support HTTP Range and recover valid partial data after a launcher restart.
-- Classify retryable failures, respect `Retry-After`, support verified fallback sources, and keep a sanitized persistent download journal.
-- Provide separate **Pause / Resume** and **Cancel** controls. Safe cancellation keeps valid `.part` data available for a later resume.
-- Preview exact Modrinth modpack update changes before confirmation: add, replace, remove, preserve, unchanged, and estimated download totals.
-- Create a full backup before applying a modpack update, detect conflicts during preview, and revalidate files during the real operation.
-- Export bounded, privacy-filtered diagnostic ZIP bundles without account databases, worlds, or mod JAR contents.
-- Fix preview → update task chains being rejected as already busy, and add a safe fallback when Windows blocks renaming staged folders such as `.fabric` during backup restore.
+- Add a shared **Theme Animation Engine** for sprite sheets, determinate/indeterminate progress, and animated state assets.
+- Allow themes to bundle `.ttf`/`.otf` fonts and apply them across Qt-rendered text.
+- Add page transitions, sidebar collapse, button feedback, dialog fades, Launch Control motion, and toast notifications.
+- Provide **Full / Reduced / Off** motion modes, FPS limits, and automatic pause while hidden or minimized.
+- Add a **Theme Authoring Toolkit** with detailed validation, live reload, duplication, ZIP import/export, checksums, and previews.
+- Freeze **Theme Runtime Contract v1** with Theme Schema 6, a machine-readable asset catalog, and package format for MCW Theme Studio.
+- Add theme palettes and `accent_assets`, plus a Launcher Settings option for theme or custom accent colors.
+- Synchronize accents with QPalette, QSS, focus, selection, progress, scrollbars, the splash, and opt-in PNG/sprite assets.
+- Preserve compatibility with theme schemas 1–6 and updater paths from v0.10.0.
+- Include the verified RC2 startup splash and circular-import hotfixes.
 
 ### New in `v0.10.0`
 
@@ -205,7 +203,7 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 Packaged Windows builds are published on the **Releases** page:
 
 - [Open releases](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.10.0` is the current Stable release for regular users.
+- `v0.11.0` is the current Stable release for regular users.
 - Stable is the default channel. Experimental builds require explicitly enabling:
 
 ```text
@@ -262,14 +260,14 @@ Or run each step manually:
 python -m tools.release_preflight
 python -m pytest test -q
 python -m PyInstaller --clean --noconfirm mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.10.0"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.11.0"
 ```
 
 Expected updater assets:
 
 ```text
-MCW-Launcher-v0.10.0-windows-x64.zip
-MCW-Launcher-v0.10.0-windows-x64.zip.sha256
+MCW-Launcher-v0.11.0-windows-x64.zip
+MCW-Launcher-v0.11.0-windows-x64.zip.sha256
 ```
 
 See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -381,8 +379,8 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
-| [`docs/RELEASE-v0.10.0.md`](docs/RELEASE-v0.10.0.md) | Complete v0.10.0 Stable release notes |
-| [`docs/RELEASE-v0.10.0-beta.2.md`](docs/RELEASE-v0.10.0-beta.2.md) | v0.10.0 Beta 2 global instance settings and import review notes |
+| [`docs/RELEASE-v0.11.0.md`](docs/RELEASE-v0.11.0.md) | Complete v0.11.0 Stable release notes |
+| [`docs/RELEASE-v0.11.0-rc.2.md`](docs/RELEASE-v0.11.0-rc.2.md) | Final v0.11.0 release candidate: theme palette and user accent color |
 | [`docs/RELEASE-v0.9.0.md`](docs/RELEASE-v0.9.0.md) | Complete v0.9.0 Stable release notes |
 | [`docs/RELEASE-v0.8.1.md`](docs/RELEASE-v0.8.1.md) | v0.8.1 CurseForge and managed-modpack hotfix notes |
 | [`docs/RELEASE-v0.8.0.md`](docs/RELEASE-v0.8.0.md) | Complete v0.8.0 Stable release notes |
@@ -396,11 +394,12 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 | [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md) | Updater-compatible release ZIPs |
 | [`docs/LANGUAGE_PACKS.md`](docs/LANGUAGE_PACKS.md) | Language pack format |
 | [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) | PNG theme assets and sizes |
+| [`docs/THEME_RUNTIME_CONTRACT.md`](docs/THEME_RUNTIME_CONTRACT.md) | Frozen schema 6, asset catalog, validation API and package contract |
 | [`docs/gui-api.en.md`](docs/gui-api.en.md) / [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API |
 
 ## Support status
 
-| Component | Status in v0.10.0 |
+| Component | Status in v0.11.0 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |
@@ -412,7 +411,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 | Microsoft accounts | Available |
 | Offline accounts | Available |
 | English / Vietnamese | Available |
-| PNG themes | Available |
+| Theme schema 1–6 | Available — animation, custom fonts, authoring tools, palette and custom accent support |
 | NeoForge / Quilt | Not supported |
 | CurseForge Gateway mods | Available — Fabric/Forge install, required dependencies, transactional apply, public gateway, cache and manual fallback |
 | CurseForge modpacks | Available — Fabric/Forge manifest-driven install with universal dependency support |

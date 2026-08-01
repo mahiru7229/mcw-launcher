@@ -13,6 +13,10 @@ from src.models.instance.instance import Instance
 from src.models.instance.settings import InstanceSettings
 
 
+def default_instance_settings() -> dict[str, Any]:
+    return copy.deepcopy(SettingsManager.DEFAULT_SETTINGS)
+
+
 class SettingsManager:
     DEFAULT_SETTINGS = {
         "java": {
@@ -51,11 +55,11 @@ class SettingsManager:
 
     @staticmethod
     def save_default(instance: Instance) -> None:
-        SettingsManager.save_dict(instance, SettingsManager.default_dict())
+        SettingsManager.save_dict(instance, default_instance_settings())
 
-    @staticmethod
-    def default_dict() -> dict[str, Any]:
-        return copy.deepcopy(SettingsManager.DEFAULT_SETTINGS)
+    @classmethod
+    def default_dict(cls) -> dict[str, Any]:
+        return copy.deepcopy(cls.DEFAULT_SETTINGS)
 
     @staticmethod
     def from_dict(data: dict[str, Any] | InstanceSettings | None) -> InstanceSettings:

@@ -7,7 +7,7 @@ from PySide6.QtCore import QByteArray, Signal
 from src.core.config.curseforge_config_manager import CurseForgeConfigManager
 from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.config.managed_content_policy import ManagedContentPolicy
-from src.core.instance.settings_manager import SettingsManager
+from src.core.instance.settings_manager import SettingsManager, default_instance_settings
 from src.core.language.language_manager import tr
 from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
 from src.core.network.download_manager import download_manager
@@ -29,6 +29,10 @@ class GuiSettingsController(BaseController):
         "tester_mode": False,
         "theme": "mcw-default",
         "show_static_text": False,
+        "motion_mode": "full",
+        "live_theme_reload": False,
+        "accent_mode": "theme",
+        "accent_color": "#8ed35b",
         "modrinth_include_beta": False,
         "modrinth_include_alpha": False,
         "block_launch_on_modrinth_failure": True,
@@ -37,7 +41,7 @@ class GuiSettingsController(BaseController):
         "curseforge_gateway_urls": (),
         "download_limit_mbps": 0.0,
         "download_concurrency": 0,
-        "instance_defaults": SettingsManager.default_dict(),
+        "instance_defaults": default_instance_settings(),
     }
 
     def __init__(self) -> None:
@@ -76,6 +80,10 @@ class GuiSettingsController(BaseController):
             "tester_mode": str(updates.get("channel", self.DEFAULTS["update_channel"])).strip().lower() == "beta",
             "theme": str(appearance.get("theme", self.DEFAULTS["theme"])),
             "show_static_text": bool(appearance.get("show_static_text", self.DEFAULTS["show_static_text"])),
+            "motion_mode": str(appearance.get("motion_mode", self.DEFAULTS["motion_mode"])),
+            "live_theme_reload": bool(appearance.get("live_theme_reload", self.DEFAULTS["live_theme_reload"])),
+            "accent_mode": str(appearance.get("accent_mode", self.DEFAULTS["accent_mode"])),
+            "accent_color": str(appearance.get("accent_color", self.DEFAULTS["accent_color"])),
             "modrinth_include_beta": bool(modrinth.get("include_beta", self.DEFAULTS["modrinth_include_beta"])),
             "modrinth_include_alpha": bool(modrinth.get("include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
             "block_launch_on_modrinth_failure": ManagedContentPolicy.normalize_global(managed_content.get("modrinth_failure_policy")) == ManagedContentPolicy.BLOCK,
@@ -118,6 +126,10 @@ class GuiSettingsController(BaseController):
             "tester_mode": tester_mode,
             "theme": str(data.get("theme", self.DEFAULTS["theme"])),
             "show_static_text": bool(data.get("show_static_text", self.DEFAULTS["show_static_text"])),
+            "motion_mode": str(data.get("motion_mode", self.DEFAULTS["motion_mode"])),
+            "live_theme_reload": bool(data.get("live_theme_reload", self.DEFAULTS["live_theme_reload"])),
+            "accent_mode": str(data.get("accent_mode", self.DEFAULTS["accent_mode"])),
+            "accent_color": str(data.get("accent_color", self.DEFAULTS["accent_color"])),
             "modrinth_include_beta": bool(data.get("modrinth_include_beta", self.DEFAULTS["modrinth_include_beta"])),
             "modrinth_include_alpha": bool(data.get("modrinth_include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
             "block_launch_on_modrinth_failure": bool(data.get("block_launch_on_modrinth_failure", self.DEFAULTS["block_launch_on_modrinth_failure"])),
@@ -140,7 +152,7 @@ class GuiSettingsController(BaseController):
                 "auto_check": self._current["auto_check_updates"],
                 "channel": self._current["update_channel"],
             },
-            "appearance": {"theme": self._current["theme"], "show_static_text": self._current["show_static_text"]},
+            "appearance": {"theme": self._current["theme"], "show_static_text": self._current["show_static_text"], "motion_mode": self._current["motion_mode"], "live_theme_reload": self._current["live_theme_reload"], "accent_mode": self._current["accent_mode"], "accent_color": self._current["accent_color"]},
             "modrinth": {
                 "include_beta": self._current["modrinth_include_beta"],
                 "include_alpha": self._current["modrinth_include_alpha"],

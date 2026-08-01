@@ -40,6 +40,8 @@ def _launcher_settings() -> dict:
         "tester_mode": False,
         "theme": "mcw-default",
         "show_static_text": False,
+        "accent_mode": "theme",
+        "accent_color": "#8ed35b",
         "modrinth_include_beta": False,
         "modrinth_include_alpha": False,
         "block_launch_on_modrinth_failure": True,
@@ -91,3 +93,28 @@ def test_launcher_settings_has_five_masked_gateway_slots(gui_app):
     assert all(field.echoMode() == QLineEdit.EchoMode.Password for field in page.curseforge_gateway_inputs)
     assert page.curseforge_gateway_inputs[0].text() == "https://one.example/api/curseforge"
     assert page.form_data()["curseforge_gateway_urls"][1:] == ["", "", "", ""]
+
+
+def test_launcher_settings_round_trips_motion_mode(gui_app):
+    page = LauncherSettingsPage()
+    settings = _launcher_settings()
+    settings["motion_mode"] = "reduced"
+
+    page.set_settings(settings)
+
+    assert page.current_motion_mode() == "reduced"
+    assert page.form_data()["motion_mode"] == "reduced"
+
+
+def test_launcher_settings_round_trips_custom_accent(gui_app):
+    page = LauncherSettingsPage()
+    settings = _launcher_settings()
+    settings["accent_mode"] = "custom"
+    settings["accent_color"] = "#b26cff"
+
+    page.set_settings(settings)
+
+    assert page.current_accent_mode() == "custom"
+    assert page.current_accent_color() == "#b26cff"
+    assert page.form_data()["accent_mode"] == "custom"
+    assert page.form_data()["accent_color"] == "#b26cff"

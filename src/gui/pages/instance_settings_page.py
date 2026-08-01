@@ -335,6 +335,7 @@ class InstanceSettingsPage(BasePage):
         self._set_dirty(False)
 
     def set_busy(self, busy: bool) -> None:
+        self.set_interaction_locked(busy)
         enabled = not busy
         self.instance_combo.setEnabled(enabled)
         self.lan_auth_mode.setEnabled(enabled)
