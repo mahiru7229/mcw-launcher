@@ -5,6 +5,7 @@ from PySide6.QtCore import Signal, Slot
 from src.core.modloader.fabric.fabric_meta_client import FabricMetaClient
 from src.core.modloader.forge.forge_metadata_client import ForgeMetadataClient
 from src.core.modloader.neoforge.neoforge_metadata_client import NeoForgeMetadataClient
+from src.core.modloader.quilt.quilt_meta_client import QuiltMetaClient
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 
@@ -13,6 +14,7 @@ class ModLoaderController(BaseController):
     fabric_versions_changed = Signal(str, list)
     forge_versions_changed = Signal(str, list)
     neoforge_versions_changed = Signal(str, list)
+    quilt_versions_changed = Signal(str, list)
 
     def __init__(self, task_runner: TaskRunner) -> None:
         super().__init__()
@@ -22,6 +24,9 @@ class ModLoaderController(BaseController):
 
     def load_fabric_versions(self, game_version: str) -> None:
         self._load_versions("fabric", game_version, FabricMetaClient.list_loader_versions, "Fabric")
+
+    def load_quilt_versions(self, game_version: str) -> None:
+        self._load_versions("quilt", game_version, QuiltMetaClient.list_loader_versions, "Quilt")
 
     def load_forge_versions(self, game_version: str) -> None:
         self._load_versions("forge", game_version, ForgeMetadataClient.list_versions, "Forge")
@@ -44,6 +49,9 @@ class ModLoaderController(BaseController):
         if task_id.startswith("fabric.versions:"):
             self.fabric_versions_changed.emit(game_version, list(versions))
             title = "Fabric"
+        elif task_id.startswith("quilt.versions:"):
+            self.quilt_versions_changed.emit(game_version, list(versions))
+            title = "Quilt"
         elif task_id.startswith("forge.versions:"):
             self.forge_versions_changed.emit(game_version, list(versions))
             title = "Forge"
@@ -60,6 +68,9 @@ class ModLoaderController(BaseController):
         if task_id.startswith("fabric.versions:"):
             self.fabric_versions_changed.emit(game_version, [])
             title = "Fabric Loader"
+        elif task_id.startswith("quilt.versions:"):
+            self.quilt_versions_changed.emit(game_version, [])
+            title = "Quilt Loader"
         elif task_id.startswith("forge.versions:"):
             self.forge_versions_changed.emit(game_version, [])
             title = "Minecraft Forge"

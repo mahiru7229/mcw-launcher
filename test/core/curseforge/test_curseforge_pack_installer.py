@@ -40,6 +40,12 @@ def test_parses_primary_neoforge_loader() -> None:
     assert CurseForgePackInstaller._parse_loader(manifest) == ("1.21.1", "neoforge", "21.1.200")
 
 
+
+def test_parses_primary_quilt_loader() -> None:
+    manifest = {"minecraft": {"version": "1.20.1", "modLoaders": [{"id": "quilt-0.27.1", "primary": True}]}}
+
+    assert CurseForgePackInstaller._parse_loader(manifest) == ("1.20.1", "quilt", "0.27.1")
+
 def test_rejects_ambiguous_or_unsupported_modpack_loaders() -> None:
     mixed = {
         "minecraft": {
@@ -54,8 +60,7 @@ def test_rejects_ambiguous_or_unsupported_modpack_loaders() -> None:
         "minecraft": {
             "version": "1.20.1",
             "modLoaders": [
-                {"id": "quilt-0.27.1", "primary": True},
-                {"id": "fabric-0.16.0"},
+                {"id": "liteloader-1.12.2", "primary": True},
             ],
         }
     }

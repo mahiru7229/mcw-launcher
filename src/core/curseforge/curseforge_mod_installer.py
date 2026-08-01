@@ -48,7 +48,7 @@ class CurseForgeModInstaller:
     def install(instance: Instance, project_id: int, file_id: int, install_dependencies: bool = True, allowed_release_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None, allow_unverified: bool = False) -> CurseForgeModInstallResult:
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         if loader_name not in ModLoaderManager.MODDED_LOADERS:
-            raise RuntimeError("CurseForge mod installation requires a Fabric, Forge, or NeoForge instance.")
+            raise RuntimeError("CurseForge mod installation requires a Fabric, Quilt, Forge, or NeoForge instance.")
         if InstanceRunLock.is_active(instance):
             raise RuntimeError("Close Minecraft before installing or updating mods.")
 

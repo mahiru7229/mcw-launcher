@@ -317,3 +317,57 @@ def test_search_network_error_does_not_return_empty_default_cache(monkeypatch, t
             ttl=600,
             force_refresh=True,
         )
+
+
+def test_quilt_search_uses_quilt_and_fabric_facets(monkeypatch):
+    captured = {}
+
+    def get_json(path, params=None, **kwargs):
+        captured.update(params or {})
+        return {"hits": [], "total_hits": 0, "offset": 0, "limit": 25}
+
+    monkeypatch.setattr(ModrinthClient, "_get_json", get_json)
+
+    ModrinthClient.search_projects("mod", "example", loader="quilt")
+
+    facets = json.loads(captured["facets"])
+    assert ["categories:quilt", "categories:fabric"] in facets
+
+
+def test_quilt_version_query_preserves_exact_loader_priority(monkeypatch):
+    payload = [
+        {
+            "id": "fabric-version",
+            "project_id": "project",
+            "name": "Fabric fallback",
+            "version_number": "1.0.0",
+            "version_type": "release",
+            "game_versions": ["1.20.1"],
+            "loaders": ["fabric"],
+            "files": [],
+            "date_published": "2026-01-02T00:00:00Z",
+        },
+        {
+            "id": "quilt-version",
+            "project_id": "project",
+            "name": "Quilt exact",
+            "version_number": "0.9.0",
+            "version_type": "release",
+            "game_versions": ["1.20.1"],
+            "loaders": ["quilt"],
+            "files": [],
+            "date_published": "2026-01-01T00:00:00Z",
+        },
+    ]
+    captured = {}
+
+    def get_json(path, params=None, **kwargs):
+        captured.update(params or {})
+        return payload
+
+    monkeypatch.setattr(ModrinthClient, "_get_json", get_json)
+
+    versions = ModrinthClient.list_project_versions("project", loader="quilt", game_version="1.20.1")
+
+    assert json.loads(captured["loaders"]) == ["quilt", "fabric"]
+    assert [version.version_id for version in versions] == ["quilt-version", "fabric-version"]

@@ -1,0 +1,172 @@
+from pathlib import Path
+
+import httpx
+import pytest
+
+from src.core.fs.paths import Paths
+from src.core.modloader.quilt.quilt_meta_client import QuiltMetaClient
+from src.core.modloader.quilt.quilt_version_manager import QuiltVersionManager
+from src.core.network.httpx_downloader import HttpDownloader
+from src.models.minecraft.version import Version
+from src.models.modloader.quilt_component import QuiltComponent
+from src.models.modloader.quilt_install_metadata import QuiltInstallMetadata
+
+
+def make_base_version(tmp_path: Path, extra: dict | None = None) -> Version:
+    raw = {
+        "id": "1.20.1",
+        "type": "release",
+        "arguments": {"jvm": ["-Dvanilla=true"], "game": ["--username", "${auth_player_name}"]},
+        "assetIndex": {"id": "5", "url": "https://example/assets", "sha1": "a" * 40, "size": 1, "totalSize": 1},
+        "assets": "5",
+        "downloads": {"client": {"url": "https://example/client.jar", "sha1": "b" * 40, "size": 1}},
+        "javaVersion": {"majorVersion": 17},
+        "libraries": [{"name": "vanilla:library:1", "downloads": {"artifact": {"path": "vanilla/library/1/library-1.jar", "url": "https://example/library.jar", "sha1": "c" * 40, "size": 1}}}],
+        "mainClass": "net.minecraft.client.main.Main",
+    }
+    raw.update(extra or {})
+    path = tmp_path / "1.20.1.json"
+    path.write_text("{}", encoding="utf-8")
+    return Version(id="1.20.1", path=path, libraries=raw["libraries"], downloads=raw["downloads"], asset_index=raw["assetIndex"], assets="5", main_class=raw["mainClass"], java_version=raw["javaVersion"], raw_json=raw, type="release", arguments=raw["arguments"], minecraft_arguments=None)
+
+
+def make_metadata() -> QuiltInstallMetadata:
+    return QuiltInstallMetadata(
+        game=QuiltComponent(uid="net.minecraft", version="1.20.1"),
+        mappings=QuiltComponent(uid="org.quiltmc.hashed", version="1.20.1", maven="org.quiltmc:hashed:1.20.1"),
+        loader=QuiltComponent(uid="org.quiltmc.quilt-loader", version="0.27.1", maven="org.quiltmc:quilt-loader:0.27.1"),
+        main_class="org.quiltmc.loader.impl.launch.knot.KnotClient",
+        libraries=(),
+    )
+
+
+def make_profile():
+    return {
+        "id": "quilt-loader-0.27.1-1.20.1",
+        "mainClass": "org.quiltmc.loader.impl.launch.knot.KnotClient",
+        "arguments": {"jvm": ["-Dquilt=true"], "game": []},
+        "libraries": [
+            {"name": "org.quiltmc:hashed:1.20.1", "url": "https://maven.quiltmc.org/repository/release/"},
+            {"name": "org.quiltmc:quilt-loader:0.27.1", "url": "https://maven.quiltmc.org/repository/release/"},
+        ],
+    }
+
+
+def test_merges_quilt_profile_with_component_metadata(tmp_path):
+    base = make_base_version(tmp_path)
+    quilt = make_profile()
+    for index, library in enumerate(quilt["libraries"]):
+        library["downloads"] = {"artifact": {"path": f"quilt/{index}.jar", "url": f"https://example/{index}.jar", "sha1": "d" * 40, "size": 1}}
+
+    merged = QuiltVersionManager._merge_profiles(base.raw_json, quilt, make_metadata())
+
+    assert merged["inheritsFrom"] == "1.20.1"
+    assert merged["mainClass"].endswith("KnotClient")
+    assert merged["arguments"]["jvm"] == ["-Dvanilla=true", "-Dquilt=true"]
+    assert len(merged["libraries"]) == 3
+    assert merged["quilt"]["schemaVersion"] == QuiltVersionManager.CACHE_SCHEMA_VERSION
+    assert merged["quilt"]["mappingsVersion"] == "1.20.1"
+    assert [component["uid"] for component in merged["quilt"]["components"]] == ["net.minecraft", "org.quiltmc.hashed", "org.quiltmc.quilt-loader"]
+
+
+def test_installs_and_reuses_cached_profile(tmp_path, monkeypatch):
+    base = make_base_version(tmp_path)
+    monkeypatch.setattr(Paths, "CACHE_ROOT", tmp_path / "cache")
+    calls = []
+
+    def get_metadata(game_version, loader_version, force_refresh=False):
+        calls.append(("metadata", game_version, loader_version, force_refresh))
+        return make_metadata()
+
+    def get_profile(game_version, loader_version, force_refresh=False):
+        calls.append(("profile", game_version, loader_version, force_refresh))
+        return make_profile()
+
+    monkeypatch.setattr(QuiltMetaClient, "get_install_metadata", get_metadata)
+    monkeypatch.setattr(QuiltMetaClient, "get_profile", get_profile)
+    monkeypatch.setattr(QuiltVersionManager, "_load_artifact_metadata", lambda artifact, force=False, reporter=None: ("e" * 40, 123))
+
+    first = QuiltVersionManager.install(base, "0.27.1")
+    second = QuiltVersionManager.install(base, "0.27.1")
+
+    assert first.id == "quilt-loader-0.27.1-1.20.1"
+    assert second.id == first.id
+    assert calls == [("metadata", "1.20.1", "0.27.1", False), ("profile", "1.20.1", "0.27.1", False)]
+    assert Paths.client(first) == Paths.CACHE_ROOT / "versions" / "1.20.1" / "1.20.1.jar"
+
+
+def test_cache_is_invalidated_when_vanilla_metadata_changes(tmp_path, monkeypatch):
+    monkeypatch.setattr(Paths, "CACHE_ROOT", tmp_path / "cache")
+    base = make_base_version(tmp_path)
+    changed = make_base_version(tmp_path, {"releaseTime": "later"})
+    calls = []
+    monkeypatch.setattr(QuiltMetaClient, "get_install_metadata", lambda *args, **kwargs: make_metadata())
+    monkeypatch.setattr(QuiltMetaClient, "get_profile", lambda *args, **kwargs: calls.append(1) or make_profile())
+    monkeypatch.setattr(QuiltVersionManager, "_load_artifact_metadata", lambda artifact, force=False, reporter=None: ("e" * 40, 123))
+
+    QuiltVersionManager.install(base, "0.27.1")
+    QuiltVersionManager.install(changed, "0.27.1")
+
+    assert calls == [1, 1]
+
+
+def test_repair_forces_metadata_refresh_and_library_fallback_refresh(tmp_path, monkeypatch):
+    base = make_base_version(tmp_path)
+    monkeypatch.setattr(Paths, "CACHE_ROOT", tmp_path / "cache")
+    calls = []
+    monkeypatch.setattr(QuiltMetaClient, "get_install_metadata", lambda *args, **kwargs: calls.append(("metadata", kwargs["force_refresh"])) or make_metadata())
+    monkeypatch.setattr(QuiltMetaClient, "get_profile", lambda *args, **kwargs: calls.append(("profile", kwargs["force_refresh"])) or make_profile())
+    monkeypatch.setattr(QuiltVersionManager, "_load_artifact_metadata", lambda artifact, force=False, reporter=None: calls.append(("artifact", force)) or ("e" * 40, 123))
+
+    QuiltVersionManager.repair(base, "0.27.1")
+
+    assert ("metadata", True) in calls
+    assert ("profile", True) in calls
+    assert ("artifact", True) in calls
+
+
+def test_missing_remote_sha1_downloads_and_hashes_artifact(tmp_path, monkeypatch):
+    monkeypatch.setattr(Paths, "CACHE_ROOT", tmp_path / "cache")
+    artifact = type("Artifact", (), {"url": "https://example/quilt.jar", "path": Path("org/quiltmc/quilt.jar")})()
+
+    class Response:
+        text = "missing"
+        headers = {}
+
+        def raise_for_status(self):
+            request = httpx.Request("GET", "https://example/quilt.jar.sha1")
+            response = httpx.Response(404, request=request)
+            raise httpx.HTTPStatusError("missing", request=request, response=response)
+
+    class Client:
+        def get(self, *args, **kwargs):
+            return Response()
+
+    monkeypatch.setattr(HttpDownloader, "get_client", lambda: Client())
+    monkeypatch.setattr(HttpDownloader, "download_and_hash", lambda **kwargs: (kwargs["path"], "f" * 40, 456))
+
+    assert QuiltVersionManager._load_artifact_metadata(artifact) == ("f" * 40, 456)
+
+
+def test_quilt_library_replaces_same_maven_module_from_base_profile():
+    base_library = {"name": "example:shared:1.0.0"}
+    quilt_library = {"name": "example:shared:2.0.0"}
+    assert QuiltVersionManager._merge_libraries([base_library], [quilt_library]) == [quilt_library]
+
+
+def test_recommended_loader_prefers_first_stable_version(monkeypatch):
+    versions = [
+        type("Loader", (), {"version": "0.28.0-beta", "stable": False})(),
+        type("Loader", (), {"version": "0.27.1", "stable": True})(),
+        type("Loader", (), {"version": "0.26.4", "stable": True})(),
+    ]
+    monkeypatch.setattr(QuiltMetaClient, "list_loader_versions", lambda game_version: versions)
+    assert QuiltVersionManager.recommended_loader_version("1.20.1") == "0.27.1"
+
+
+def test_recommended_loader_rejects_automatic_unstable_version(monkeypatch):
+    versions = [type("Loader", (), {"version": "0.28.0-beta", "stable": False})()]
+    monkeypatch.setattr(QuiltMetaClient, "list_loader_versions", lambda game_version: versions)
+
+    with pytest.raises(RuntimeError, match="No stable Quilt Loader"):
+        QuiltVersionManager.recommended_loader_version("1.20.1")

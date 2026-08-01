@@ -155,7 +155,7 @@ class ModrinthPackInstaller:
         with zipfile.ZipFile(pack_path, "r") as archive:
             index = ModrinthPackInstaller._read_index(archive)
             minecraft_version, loader_name, loader_version = ModrinthPackInstaller._parse_dependencies(index)
-        return {"name": str(index.get("name") or ""), "summary": str(index.get("summary") or ""), "minecraft": minecraft_version, "loader": loader_name, "loader_version": loader_version, "fabric_loader": loader_version if loader_name == ModLoaderManager.FABRIC else "", "forge": loader_version if loader_name == ModLoaderManager.FORGE else "", "neoforge": loader_version if loader_name == ModLoaderManager.NEOFORGE else "", "files": len(index.get("files", []))}
+        return {"name": str(index.get("name") or ""), "summary": str(index.get("summary") or ""), "minecraft": minecraft_version, "loader": loader_name, "loader_version": loader_version, "fabric_loader": loader_version if loader_name == ModLoaderManager.FABRIC else "", "quilt_loader": loader_version if loader_name == ModLoaderManager.QUILT else "", "forge": loader_version if loader_name == ModLoaderManager.FORGE else "", "neoforge": loader_version if loader_name == ModLoaderManager.NEOFORGE else "", "files": len(index.get("files", []))}
 
     @staticmethod
     def _read_index(archive: zipfile.ZipFile) -> dict:
@@ -184,17 +184,15 @@ class ModrinthPackInstaller:
         dependencies = index.get("dependencies", {})
         minecraft_version = str(dependencies.get("minecraft") or "").strip()
         fabric_loader = str(dependencies.get("fabric-loader") or "").strip()
+        quilt_loader = str(dependencies.get("quilt-loader") or "").strip()
         forge_loader = str(dependencies.get("forge") or "").strip()
         neoforge_loader = str(dependencies.get("neoforge") or "").strip()
-        unsupported_loaders = [key for key in ("quilt-loader",) if dependencies.get(key)]
-        if unsupported_loaders:
-            raise RuntimeError(f"This modpack uses an unsupported loader: {', '.join(unsupported_loaders)}")
         if not minecraft_version:
             raise RuntimeError("The modpack does not declare a Minecraft version.")
-        declared = [(ModLoaderManager.FABRIC, fabric_loader), (ModLoaderManager.FORGE, forge_loader), (ModLoaderManager.NEOFORGE, neoforge_loader)]
+        declared = [(ModLoaderManager.FABRIC, fabric_loader), (ModLoaderManager.QUILT, quilt_loader), (ModLoaderManager.FORGE, forge_loader), (ModLoaderManager.NEOFORGE, neoforge_loader)]
         selected = [(name, version) for name, version in declared if version]
         if not selected:
-            raise RuntimeError("The modpack does not declare a supported Fabric, Forge, or NeoForge loader.")
+            raise RuntimeError("The modpack does not declare a supported Fabric, Quilt, Forge, or NeoForge loader.")
         if len(selected) != 1:
             raise RuntimeError("The modpack declares more than one supported loader and cannot be installed safely.")
         loader_name, loader_version = selected[0]

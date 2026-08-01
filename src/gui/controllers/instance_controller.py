@@ -8,6 +8,7 @@ from typing import Any
 from PySide6.QtCore import Signal, Slot
 
 from src.core.diagnostics.forge_diagnostics_manager import ForgeDiagnosticsManager
+from src.core.diagnostics.quilt_diagnostics_manager import QuiltDiagnosticsManager
 from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.minecraft.library_manager import DownloadLibraryManager
@@ -181,9 +182,11 @@ class InstanceController(BaseController):
 
         def task() -> Path:
             instance = InstanceManager.load(name)
-            return ForgeDiagnosticsManager.export(instance, output_path, launcher_version=VERSION_ID)
+            loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
+            manager = QuiltDiagnosticsManager if loader_name == ModLoaderManager.QUILT else ForgeDiagnosticsManager
+            return manager.export(instance, output_path, launcher_version=VERSION_ID)
 
-        self._task_runner.run(self.FORGE_DIAGNOSTICS_TASK_ID, task, f"Exporting Forge-family diagnostics for '{name}'...", blocking=False)
+        self._task_runner.run(self.FORGE_DIAGNOSTICS_TASK_ID, task, f"Exporting mod-loader diagnostics for '{name}'...", blocking=False)
 
 
     def repair_instance(self, name: str) -> None:
@@ -337,8 +340,8 @@ class InstanceController(BaseController):
             self.status_changed.emit(f"Restored {loader_text} for '{selected_name}'")
         elif task_id == self.FORGE_DIAGNOSTICS_TASK_ID:
             self.forge_diagnostics_finished.emit(result)
-            self.status_changed.emit("Forge-family diagnostics export completed")
-            self.log_created.emit(f"Forge-family diagnostics exported to: {result}")
+            self.status_changed.emit("Mod-loader diagnostics export completed")
+            self.log_created.emit(f"Mod-loader diagnostics exported to: {result}")
             return
         elif task_id == self.REPAIR_TASK_ID:
             selected_name = result.instance_name

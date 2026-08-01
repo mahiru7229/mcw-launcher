@@ -141,7 +141,7 @@ class LanAgentManager:
             f"[MCW Launcher] Runtime agent: {runtime_path.resolve()}\n"
             f"[MCW Launcher] Named target aliases: {cls.TARGET_CLASS.replace('/', '.')}#setUsesAuthentication{cls.TARGET_DESCRIPTOR}; "
             f"{cls.TARGET_CLASS.replace('/', '.')}#setOnlineMode{cls.TARGET_DESCRIPTOR}\n"
-            "[MCW Launcher] Runtime targets: resolved from Mojang, Fabric, Forge, and NeoForge mappings during launch\n",
+            "[MCW Launcher] Runtime targets: resolved from Mojang, Fabric, Quilt, Forge, and NeoForge mappings during launch\n",
             encoding="utf-8",
         )
         return path

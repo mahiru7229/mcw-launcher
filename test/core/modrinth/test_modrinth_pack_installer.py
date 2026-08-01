@@ -31,7 +31,7 @@ def make_pack(path: Path, file_content: bytes = b"fabric-mod", loader: str = "fa
             "downloads": ["https://cdn.modrinth.com/data/project/example.jar"],
             "fileSize": len(file_content),
         }],
-        "dependencies": {"minecraft": "1.20.1", {"fabric": "fabric-loader", "forge": "forge", "neoforge": "neoforge"}[loader]: loader_version},
+        "dependencies": {"minecraft": "1.20.1", {"fabric": "fabric-loader", "quilt": "quilt-loader", "forge": "forge", "neoforge": "neoforge"}[loader]: loader_version},
     }
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("modrinth.index.json", json.dumps(index))
@@ -208,3 +208,17 @@ def test_selected_files_preserve_artifact_without_download_url_for_manual_fallba
     assert skipped_optional == 0
     assert skipped_server == 0
     assert ModrinthPackInstaller._managed_download_entries(selected)[0]["downloads"] == []
+
+
+def test_parse_dependencies_accepts_quilt_loader():
+    assert ModrinthPackInstaller._parse_dependencies({"dependencies": {"minecraft": "1.20.1", "quilt-loader": "0.27.1"}}) == ("1.20.1", "quilt", "0.27.1")
+
+
+def test_inspect_reports_quilt_loader(tmp_path):
+    pack = make_pack(tmp_path / "quilt-pack.mrpack", loader="quilt", loader_version="0.27.1")
+
+    details = ModrinthPackInstaller.inspect(pack)
+
+    assert details["loader"] == "quilt"
+    assert details["quilt_loader"] == "0.27.1"
+    assert details["fabric_loader"] == ""

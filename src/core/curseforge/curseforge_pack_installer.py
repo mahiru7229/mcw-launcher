@@ -32,7 +32,7 @@ class CurseForgePackInstaller:
     MAX_WORKERS = 8
     RESERVED_ROOT_NAMES = {"instance.json", "settings.json", ".mcw"}
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
-    SUPPORTED_LOADERS = (ModLoaderManager.FABRIC, ModLoaderManager.FORGE, ModLoaderManager.NEOFORGE)
+    SUPPORTED_LOADERS = (ModLoaderManager.FABRIC, ModLoaderManager.QUILT, ModLoaderManager.FORGE, ModLoaderManager.NEOFORGE)
 
     @staticmethod
     def install(project_id: int, file_id: int, instance_name: str, install_optional_files: bool = True, allowed_release_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None, expected_loader: str = "") -> CurseForgeModpackInstallResult:
@@ -212,7 +212,7 @@ class CurseForgePackInstaller:
                 raise RuntimeError("The CurseForge modpack declares multiple supported mod-loader families and cannot be installed safely.")
             selected = supported[0] if supported else None
         if selected is None:
-            raise RuntimeError("The CurseForge modpack does not declare a supported Fabric, Forge, or NeoForge loader.")
+            raise RuntimeError("The CurseForge modpack does not declare a supported Fabric, Quilt, Forge, or NeoForge loader.")
         loader_name, loader_version = selected
         return game_version, loader_name, loader_version
 

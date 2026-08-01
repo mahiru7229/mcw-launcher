@@ -109,7 +109,8 @@ class ModrinthClient:
     def _search_payload(project_type: str, query: str, game_version: str, loader: str, index: str, offset: int, limit: int, force_refresh: bool, allow_stale_on_error: bool = True) -> dict:
         facets: list[list[str]] = [[f"project_type:{project_type}"]]
         if loader:
-            facets.append([f"categories:{loader}"])
+            loader_facets = [f"categories:{item}" for item in ModrinthClient.compatible_loaders(loader)]
+            facets.append(loader_facets)
         # Provider game-version labels are advisory. Omitting the strict facet
         # keeps nearby patch builds visible; callers rank them locally.
 
@@ -143,7 +144,7 @@ class ModrinthClient:
         categories = {str(item).strip().lower() for item in project.categories if str(item).strip()}
         known_loaders = {"fabric", "forge", "neoforge", "quilt"}
         explicit_loaders = categories & known_loaders
-        return normalized_loader in explicit_loaders or not explicit_loaders
+        return bool(set(ModrinthClient.compatible_loaders(normalized_loader)) & explicit_loaders) or not explicit_loaders
 
     @staticmethod
     def get_project(project_id: str, force_refresh: bool = False) -> ModrinthProject:
@@ -158,7 +159,7 @@ class ModrinthClient:
         identifier = ModrinthClient._required(project_id, "Project ID")
         params: dict[str, str] = {"include_changelog": "false"}
         if loader:
-            params["loaders"] = json.dumps([str(loader).strip().lower()], separators=(",", ":"))
+            params["loaders"] = json.dumps(list(ModrinthClient.compatible_loaders(loader)), separators=(",", ":"))
         payload = ModrinthClient._get_json(f"/project/{quote(identifier, safe='')}/version", params=params, ttl=ModrinthClient.VERSIONS_TTL_SECONDS, force_refresh=force_refresh)
         if not isinstance(payload, list):
             raise RuntimeError(f"Modrinth versions for '{identifier}' are unavailable.")
@@ -166,6 +167,7 @@ class ModrinthClient:
         allowed_types = ModrinthClient.normalize_version_types(version_types)
         versions = [version for version in versions if version.version_type in allowed_types]
         versions.sort(key=ModrinthClient._version_sort_key, reverse=True)
+        versions.sort(key=lambda version: ModrinthClient._loader_rank(version.loaders, loader))
         versions.sort(key=lambda version: provider_game_version_rank(game_version, version.game_versions))
         return versions
 
@@ -184,6 +186,25 @@ class ModrinthClient:
             raise RuntimeError(f"No allowed {loader.title()} version of this project is available.")
         return versions[0]
 
+
+    @staticmethod
+    def compatible_loaders(loader: str) -> tuple[str, ...]:
+        normalized = str(loader).strip().casefold()
+        if normalized == "quilt":
+            return "quilt", "fabric"
+        return (normalized,) if normalized else ()
+
+    @staticmethod
+    def _loader_rank(loaders: tuple[str, ...] | list[str] | set[str], loader: str) -> int:
+        normalized = {str(item).strip().casefold() for item in loaders if str(item).strip()}
+        requested = str(loader).strip().casefold()
+        if not requested:
+            return 0
+        if requested in normalized:
+            return 0
+        if requested == "quilt" and "fabric" in normalized:
+            return 1
+        return 2
 
     @staticmethod
     def normalize_version_types(version_types: tuple[str, ...] | list[str] | set[str] | None = None) -> tuple[str, ...]:

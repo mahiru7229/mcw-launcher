@@ -123,7 +123,7 @@ class ModController(BaseController):
         if instance is None or not project_ids:
             return
         if ModLoaderManager.normalize(instance.mod_loader)[0] not in ModLoaderManager.MODDED_LOADERS:
-            self._emit_error("Manage mods", "Modrinth update actions require a Fabric, Forge, or NeoForge instance.")
+            self._emit_error("Manage mods", "Modrinth update actions require a Fabric, Quilt, Forge, or NeoForge instance.")
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
@@ -135,7 +135,7 @@ class ModController(BaseController):
         if instance is None:
             return
         if ModLoaderManager.normalize(instance.mod_loader)[0] not in ModLoaderManager.MODDED_LOADERS:
-            self._emit_error("Manage mods", "Modrinth update actions require a Fabric, Forge, or NeoForge instance.")
+            self._emit_error("Manage mods", "Modrinth update actions require a Fabric, Quilt, Forge, or NeoForge instance.")
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)

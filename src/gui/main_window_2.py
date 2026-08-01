@@ -260,6 +260,7 @@ class MainWindow(QMainWindow):
         self.instances_page.selected_instance_changed.connect(self.instance_controller.select)
         self.instances_page.create_requested.connect(self.instance_controller.create)
         self.instances_page.fabric_versions_requested.connect(self.mod_loader_controller.load_fabric_versions)
+        self.instances_page.quilt_versions_requested.connect(self.mod_loader_controller.load_quilt_versions)
         self.instances_page.forge_versions_requested.connect(self.mod_loader_controller.load_forge_versions)
         self.instances_page.neoforge_versions_requested.connect(self.mod_loader_controller.load_neoforge_versions)
         self.instances_page.loader_change_requested.connect(self.instance_controller.change_loader)
@@ -338,6 +339,7 @@ class MainWindow(QMainWindow):
         self.version_controller.versions_changed.connect(self.instances_page.set_versions)
         self.version_controller.versions_changed.connect(lambda versions: self.home_page.set_manifest_count(len(versions)))
         self.mod_loader_controller.fabric_versions_changed.connect(self.instances_page.set_fabric_versions)
+        self.mod_loader_controller.quilt_versions_changed.connect(self.instances_page.set_quilt_versions)
         self.mod_loader_controller.forge_versions_changed.connect(self.instances_page.set_forge_versions)
         self.mod_loader_controller.neoforge_versions_changed.connect(self.instances_page.set_neoforge_versions)
 

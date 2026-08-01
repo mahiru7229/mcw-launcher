@@ -341,16 +341,26 @@ class CurseForgeClient:
             return "universal"
         if normalized_loader and normalized_loader in normalized:
             return "compatible"
+        if normalized_loader == "quilt" and "fabric" in normalized:
+            return "compatible"
         if not normalized:
             return "unknown"
         return "unverified"
 
     @staticmethod
     def _loader_rank(loaders: tuple[str, ...] | list[str] | set[str], loader: str) -> int:
-        if not CurseForgeClient.normalize_loader(loader):
+        normalized_loader = CurseForgeClient.normalize_loader(loader)
+        if not normalized_loader:
             return 0
+        normalized = {str(value).strip().casefold() for value in loaders if str(value).strip()}
         status = CurseForgeClient._loader_compatibility(loaders, loader)
-        return {"compatible": 0, "universal": 1, "unknown": 2, "unverified": 3}.get(status, 4)
+        if status == "universal":
+            return 2
+        if normalized_loader in normalized:
+            return 0
+        if normalized_loader == "quilt" and "fabric" in normalized:
+            return 1
+        return {"unknown": 3, "unverified": 4}.get(status, 5)
 
     @staticmethod
     def normalize_release_types(release_types: tuple[str, ...] | list[str] | set[str] | None = None) -> tuple[str, ...]:

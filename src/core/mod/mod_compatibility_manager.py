@@ -29,6 +29,11 @@ class ModCompatibilityManager:
         installed_versions["minecraft"] = instance.version_id
         if loader_name == ModLoaderManager.FABRIC:
             installed_versions["fabricloader"] = loader_version
+        elif loader_name == ModLoaderManager.QUILT:
+            installed_versions["quilt_loader"] = loader_version
+            installed_versions["quiltloader"] = loader_version
+            # Quilt Loader exposes Fabric Loader compatibility for Fabric mods.
+            installed_versions["fabricloader"] = loader_version
         elif loader_name == ModLoaderManager.FORGE:
             installed_versions["forge"] = loader_version
             installed_versions["javafml"] = loader_version

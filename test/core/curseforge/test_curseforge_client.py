@@ -465,3 +465,25 @@ def test_gateway_v011_credentials_rejected_is_permanent():
     setattr(error, "gateway_status", 503)
 
     assert CurseForgeClient.is_permanent_error(error) is True
+
+
+def test_quilt_loader_compatibility_accepts_fabric_as_fallback() -> None:
+    fabric_file = CurseForgeClient._parse_file({
+        "id": 1,
+        "modId": 2,
+        "fileName": "fabric.jar",
+        "gameVersions": ["1.20.1", "Fabric"],
+        "hashes": [],
+        "dependencies": [],
+    })
+    quilt_file = CurseForgeClient._parse_file({
+        "id": 2,
+        "modId": 2,
+        "fileName": "quilt.jar",
+        "gameVersions": ["1.20.1", "Quilt"],
+        "hashes": [],
+        "dependencies": [],
+    })
+
+    assert CurseForgeClient.loader_compatibility(fabric_file, "quilt") == "compatible"
+    assert CurseForgeClient._loader_rank(quilt_file.loaders, "quilt") < CurseForgeClient._loader_rank(fabric_file.loaders, "quilt")

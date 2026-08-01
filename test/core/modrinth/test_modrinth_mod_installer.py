@@ -177,3 +177,26 @@ def test_accepts_advisory_nearby_patch_metadata_for_jar_validation():
     )
 
     ModrinthModInstaller._validate_version(version, "1.20.1", "fabric")
+
+
+def test_installs_fabric_tagged_mod_into_quilt_instance(tmp_path, monkeypatch):
+    instance_dir = tmp_path / "quilt-instance"
+    instance_dir.mkdir()
+    instance = Instance(instance_id="quilt-id", name="Quilt", version_id="1.20.1", instance_dir=instance_dir, mod_loader=("quilt", "0.27.1"))
+    root = make_version("fabric-compatible", "project", "fabric-compatible.jar", loader="fabric")
+
+    monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: root)
+    monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: ModrinthProject(project_id=project_id, slug="compatible", title="Compatible", description="", project_type="mod", client_side="required"))
+
+    def fake_download(file, destination, **kwargs):
+        write_fabric_mod(destination, "compatible_mod")
+        return destination
+
+    monkeypatch.setattr(ModrinthDownloader, "download_file", fake_download)
+
+    result = ModrinthModInstaller.install(instance, root)
+
+    installed = ModManager.list_mods(instance)
+    assert result.installed_files == ("fabric-compatible.jar",)
+    assert installed[0].loader == "quilt"
+    assert installed[0].metadata_format == "fabric.mod.json (Quilt compatibility)"

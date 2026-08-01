@@ -64,7 +64,7 @@ class ForgeChangeManager:
     def restore_previous(cls, instance: Instance, reporter: ProgressReporter | None = None) -> Instance:
         snapshot = cls.load_snapshot(instance)
         if snapshot is None:
-            raise RuntimeError("No previous Forge installation is available for this instance.")
+            raise RuntimeError("No previous mod-loader installation is available for this instance.")
 
         previous_loader = cls._snapshot_loader(snapshot, "previous_loader")
         current_loader = ModLoaderManager.normalize(instance.mod_loader)
@@ -176,7 +176,7 @@ class ForgeChangeManager:
     def _snapshot_loader(snapshot: dict, key: str) -> tuple[str, str]:
         raw = snapshot.get(key)
         if not isinstance(raw, list) or len(raw) != 2:
-            raise RuntimeError("The Forge rollback snapshot is invalid.")
+            raise RuntimeError("The mod-loader rollback snapshot is invalid.")
         return ModLoaderManager.normalize((str(raw[0]), str(raw[1])))
 
     @staticmethod

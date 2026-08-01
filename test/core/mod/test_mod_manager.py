@@ -468,3 +468,96 @@ def test_reads_modern_neoforge_metadata_and_dependencies(tmp_path):
     assert added[0].dependencies["neoforge"] == "[4,)"
     assert added[0].dependencies["minecraft"] == "[1.21.1,1.22)"
 
+
+
+def make_quilt_mod(path: Path, mod_id="quilt_example", name="Quilt Example", version="1.0.0") -> Path:
+    metadata = {
+        "schema_version": 1,
+        "quilt_loader": {
+            "group": "dev.mcw",
+            "id": mod_id,
+            "version": version,
+            "metadata": {
+                "name": name,
+                "description": "A Quilt test mod.",
+                "contributors": {"Mahiru": "Owner"},
+                "license": "MIT",
+            },
+            "depends": [
+                {"id": "quilt_loader", "versions": ">=0.20.0"},
+                {"id": "minecraft", "versions": "1.20.1"},
+            ],
+            "recommends": {"qsl": "*"},
+        },
+        "minecraft": {"environment": "client"},
+    }
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("quilt.mod.json", json.dumps(metadata))
+    return path
+
+
+def test_adds_and_reads_quilt_mod(tmp_path):
+    instance = make_instance(tmp_path, loader=("quilt", "0.27.1"))
+    source = make_quilt_mod(tmp_path / "quilt-example.jar")
+
+    added = ModManager.add_mods(instance, [source])
+
+    assert added[0].mod_id == "quilt_example"
+    assert added[0].name == "Quilt Example"
+    assert added[0].loader == "quilt"
+    assert added[0].metadata_format == "quilt.mod.json"
+    assert added[0].dependencies["quilt_loader"] == ">=0.20.0"
+    assert added[0].dependencies["minecraft"] == "1.20.1"
+    assert added[0].recommends["qsl"] == "*"
+    assert added[0].authors == ("Mahiru",)
+
+
+def test_fabric_mod_is_read_as_quilt_compatible_in_quilt_instance(tmp_path):
+    instance = make_instance(tmp_path, loader=("quilt", "0.27.1"))
+    source = make_mod(tmp_path / "fabric-compatible.jar")
+
+    added = ModManager.add_mods(instance, [source])
+
+    assert added[0].loader == "quilt"
+    assert added[0].metadata_format == "fabric.mod.json (Quilt compatibility)"
+    assert added[0].dependencies["fabricloader"] == ">=0.15.0"
+
+
+def test_quilt_mod_is_rejected_by_fabric_instance(tmp_path):
+    instance = make_instance(tmp_path, loader=("fabric", "0.16.0"))
+    source = make_quilt_mod(tmp_path / "quilt-only.jar")
+
+    with pytest.raises(RuntimeError, match="Quilt mod"):
+        ModManager.add_mods(instance, [source])
+
+
+def test_dual_quilt_and_fabric_metadata_prefers_instance_loader(tmp_path):
+    path = tmp_path / "dual-quilt-fabric.jar"
+    fabric = {
+        "schemaVersion": 1,
+        "id": "dual_example",
+        "name": "Fabric View",
+        "version": "1.0.0",
+        "depends": {"fabricloader": "*"},
+    }
+    quilt = {
+        "schema_version": 1,
+        "quilt_loader": {
+            "group": "dev.mcw",
+            "id": "dual_example",
+            "version": "1.0.0",
+            "metadata": {"name": "Quilt View"},
+            "depends": [{"id": "quilt_loader", "versions": "*"}],
+        },
+    }
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("fabric.mod.json", json.dumps(fabric))
+        archive.writestr("quilt.mod.json", json.dumps(quilt))
+
+    quilt_mod = ModManager.read_mod(path, preferred_loader="quilt")
+    fabric_mod = ModManager.read_mod(path, preferred_loader="fabric")
+
+    assert quilt_mod.loader == "quilt"
+    assert quilt_mod.name == "Quilt View"
+    assert fabric_mod.loader == "fabric"
+    assert fabric_mod.name == "Fabric View"

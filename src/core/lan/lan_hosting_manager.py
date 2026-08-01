@@ -80,7 +80,7 @@ class LanHostingManager:
         if components:
             loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
             if loader_name not in LanHostingManager.SUPPORTED_LOADERS:
-                raise RuntimeError("The selected tunnel provider requires a Fabric, Forge, or NeoForge instance.")
+                raise RuntimeError("The selected tunnel provider requires a Fabric, Quilt, Forge, or NeoForge instance.")
 
         return LanHostingPlan(
             auth_mode=normalized_auth,

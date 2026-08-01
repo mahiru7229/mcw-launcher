@@ -190,7 +190,8 @@ class ModrinthModInstaller:
     @staticmethod
     def _validate_version(version: ModrinthVersion, game_version: str, loader_name: str) -> None:
         normalized_loaders = {str(loader).strip().lower() for loader in version.loaders}
-        if loader_name not in normalized_loaders:
+        compatible_loaders = set(ModrinthClient.compatible_loaders(loader_name))
+        if not compatible_loaders.intersection(normalized_loaders):
             raise RuntimeError(f"Modrinth version '{version.version_number}' does not support {loader_name.title()}.")
         # Modrinth game-version labels are advisory. Nearby patch releases can
         # share a compatible JAR, so installation is gated by loader and actual
@@ -206,5 +207,5 @@ class ModrinthModInstaller:
     def _normalize_loader(loader_name: str) -> str:
         normalized = str(loader_name or "").strip().lower()
         if normalized not in ModrinthModInstaller.SUPPORTED_LOADERS:
-            raise RuntimeError("Modrinth mod installation requires a Fabric, Forge, or NeoForge instance.")
+            raise RuntimeError("Modrinth mod installation requires a Fabric, Quilt, Forge, or NeoForge instance.")
         return normalized

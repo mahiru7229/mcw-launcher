@@ -167,3 +167,52 @@ def test_neoforge_satisfies_legacy_forge_runtime_dependency_for_dual_loader_mod(
 
     assert not any(issue.code == "dependency-missing" and "forge" in issue.mod_ids for issue in report.issues)
     assert not any(issue.code == "loader-mismatch" for issue in report.issues)
+
+
+def write_quilt_mod(path: Path, mod_id: str, *, depends=None) -> Path:
+    metadata = {
+        "schema_version": 1,
+        "quilt_loader": {
+            "group": "dev.mcw",
+            "id": mod_id,
+            "version": "1.0.0",
+            "metadata": {"name": mod_id},
+            "depends": depends or [],
+        },
+    }
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("quilt.mod.json", json.dumps(metadata))
+    return path
+
+
+def test_quilt_runtime_satisfies_quilt_and_fabric_loader_dependencies(tmp_path):
+    instance_dir = tmp_path / "quilt-instance"
+    mods = instance_dir / "mods"
+    mods.mkdir(parents=True)
+    instance = Instance(instance_id="quilt", name="Quilt", version_id="1.20.1", instance_dir=instance_dir, mod_loader=("quilt", "0.27.1"))
+    write_quilt_mod(
+        mods / "consumer.jar",
+        "consumer",
+        depends=[
+            {"id": "quilt_loader", "versions": ">=0.20.0"},
+            {"id": "fabricloader", "versions": "*"},
+            {"id": "minecraft", "versions": "1.20.1"},
+        ],
+    )
+
+    report = ModCompatibilityManager.scan(instance)
+
+    assert not any(issue.code.startswith("dependency-") for issue in report.issues)
+    assert not any(issue.code == "loader-mismatch" for issue in report.issues)
+
+
+def test_quilt_instance_rejects_forge_only_mod(tmp_path):
+    instance_dir = tmp_path / "quilt-forge-mismatch"
+    mods = instance_dir / "mods"
+    mods.mkdir(parents=True)
+    instance = Instance(instance_id="quilt-forge", name="Quilt", version_id="1.20.1", instance_dir=instance_dir, mod_loader=("quilt", "0.27.1"))
+    write_forge_mod(mods / "forge-only.jar", "forge_only")
+
+    report = ModCompatibilityManager.scan(instance)
+
+    assert any(issue.code == "loader-mismatch" for issue in report.issues)

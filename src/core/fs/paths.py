@@ -246,6 +246,43 @@ class Paths:
         return Paths.fabric_metadata_root() / "profiles" / game / f"{loader}.json"
 
     @staticmethod
+    def quilt_version_dir(game_version: str, loader_version: str) -> Path:
+        profile_id = f"quilt-loader-{loader_version}-{game_version}"
+        return Paths.CACHE_ROOT / "versions" / profile_id
+
+    @staticmethod
+    def quilt_version_json(game_version: str, loader_version: str) -> Path:
+        directory = Paths.quilt_version_dir(game_version, loader_version)
+        return directory / f"{directory.name}.json"
+
+    @staticmethod
+    def quilt_metadata_root() -> Path:
+        return Paths.CACHE_ROOT / "modloaders" / "quilt"
+
+    @staticmethod
+    def quilt_catalog_json(game_version: str) -> Path:
+        from urllib.parse import quote
+
+        filename = quote(game_version, safe="") or "unknown"
+        return Paths.quilt_metadata_root() / "catalogs" / f"{filename}.json"
+
+    @staticmethod
+    def quilt_install_metadata_json(game_version: str, loader_version: str) -> Path:
+        from urllib.parse import quote
+
+        game = quote(game_version, safe="") or "unknown"
+        loader = quote(loader_version, safe="") or "unknown"
+        return Paths.quilt_metadata_root() / "install" / game / f"{loader}.json"
+
+    @staticmethod
+    def quilt_profile_json(game_version: str, loader_version: str) -> Path:
+        from urllib.parse import quote
+
+        game = quote(game_version, safe="") or "unknown"
+        loader = quote(loader_version, safe="") or "unknown"
+        return Paths.quilt_metadata_root() / "profiles" / game / f"{loader}.json"
+
+    @staticmethod
     def neoforge_root() -> Path:
         directory = Paths.CACHE_ROOT / "modloaders" / "neoforge"
         directory.mkdir(parents=True, exist_ok=True)
@@ -332,7 +369,7 @@ class Paths:
 
         raw_loader = getattr(instance, "mod_loader", None)
         loader_name = str(raw_loader[0] if isinstance(raw_loader, (tuple, list)) and raw_loader else raw_loader or "").strip().casefold()
-        loader_title = "NeoForge" if loader_name == "neoforge" else "Forge"
+        loader_title = {"neoforge": "NeoForge", "quilt": "Quilt"}.get(loader_name, "Forge")
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         safe_name = "".join(character if character.isalnum() or character in {"-", "_"} else "-" for character in instance.name).strip("-") or "instance"
         return Paths.logs_root() / f"MCW-{loader_title}-Diagnostics-{safe_name}-{timestamp}.zip"

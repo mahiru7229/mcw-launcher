@@ -66,6 +66,7 @@ class ModrinthBrowserDialog(QDialog):
         self.loader_label.setObjectName("MutedLabel")
         self.loader_combo = QComboBox()
         self.loader_combo.addItem("Fabric", ModLoaderManager.FABRIC)
+        self.loader_combo.addItem("Quilt", ModLoaderManager.QUILT)
         self.loader_combo.addItem("Forge", ModLoaderManager.FORGE)
         self.loader_combo.addItem("NeoForge", ModLoaderManager.NEOFORGE)
         self.loader_combo.currentIndexChanged.connect(self._loader_changed)

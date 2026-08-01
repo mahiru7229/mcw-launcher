@@ -65,7 +65,7 @@ class ModManagerDialog(QDialog):
 
         self.title_label = QLabel("No instance selected")
         self.title_label.setObjectName("PageTitle")
-        self.summary_label = QLabel("Choose a Fabric, Forge, or NeoForge instance to manage its mods.")
+        self.summary_label = QLabel("Choose a Fabric, Quilt, Forge, or NeoForge instance to manage its mods.")
         self.summary_label.setObjectName("MutedLabel")
         self.summary_label.setWordWrap(True)
         self.health_label = QLabel("")
@@ -177,20 +177,20 @@ class ModManagerDialog(QDialog):
 
         if instance is None:
             self.title_label.setText(tr("No instance selected"))
-            self.summary_label.setText(tr("Choose a Fabric, Forge, or NeoForge instance to manage its mods."))
+            self.summary_label.setText(tr("Choose a Fabric, Quilt, Forge, or NeoForge instance to manage its mods."))
             self._set_actions_enabled(False)
             return
 
         loader_name, loader_version = ModLoaderManager.normalize(instance.mod_loader)
         self.title_label.setText(tr("Mods — {name}", name=instance.name))
         if loader_name in ModLoaderManager.MODDED_LOADERS:
-            loader_title = {ModLoaderManager.FABRIC: "Fabric Loader", ModLoaderManager.FORGE: "Minecraft Forge", ModLoaderManager.NEOFORGE: "NeoForge"}.get(loader_name, loader_name.title())
+            loader_title = {ModLoaderManager.FABRIC: "Fabric Loader", ModLoaderManager.QUILT: "Quilt Loader", ModLoaderManager.FORGE: "Minecraft Forge", ModLoaderManager.NEOFORGE: "NeoForge"}.get(loader_name, loader_name.title())
             self.summary_label.setText(tr("Minecraft {version} • {loader} {loader_version} • Drop .jar files into this window to add them.", version=instance.version_id, loader=loader_title, loader_version=loader_version))
             for widget in (self.check_updates_button, self.update_selected_button, self.update_all_button, self.lock_button, self.unlock_button):
                 widget.setVisible(loader_name in ModLoaderManager.MODDED_LOADERS)
             self._set_actions_enabled(not self._busy)
         else:
-            self.summary_label.setText(tr("This instance is Vanilla. Apply Fabric, Forge, or NeoForge from the Instances page before adding mods."))
+            self.summary_label.setText(tr("This instance is Vanilla. Apply Fabric, Quilt, Forge, or NeoForge from the Instances page before adding mods."))
             self._set_actions_enabled(False)
 
     def set_mods(self, mods: list[ModInfo]) -> None:
