@@ -347,13 +347,21 @@ def build_theme_runtime_contract_v1() -> dict[str, Any]:
     }
 
 
+def _write_utf8_lf(path: Path, text: str) -> None:
+    # Contract hashes are defined over UTF-8 bytes with LF line endings.
+    # Explicit newline handling prevents Windows from translating ``\n``
+    # into CRLF and invalidating the shipped SHA-256 values.
+    with path.open("w", encoding="utf-8", newline="\n") as stream:
+        stream.write(text)
+
+
 def write_contract_documents(directory: Path) -> tuple[Path, Path, Path]:
     root = Path(directory)
     root.mkdir(parents=True, exist_ok=True)
     schema_path = root / SCHEMA_FILENAME
     catalog_path = root / ASSET_CATALOG_FILENAME
     contract_path = root / CONTRACT_FILENAME
-    schema_path.write_text(pretty_json_text(build_theme_schema_v6()), encoding="utf-8")
-    catalog_path.write_text(pretty_json_text(build_theme_asset_catalog_v1()), encoding="utf-8")
-    contract_path.write_text(pretty_json_text(build_theme_runtime_contract_v1()), encoding="utf-8")
+    _write_utf8_lf(schema_path, pretty_json_text(build_theme_schema_v6()))
+    _write_utf8_lf(catalog_path, pretty_json_text(build_theme_asset_catalog_v1()))
+    _write_utf8_lf(contract_path, pretty_json_text(build_theme_runtime_contract_v1()))
     return schema_path, catalog_path, contract_path

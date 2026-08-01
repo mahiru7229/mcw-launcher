@@ -20,6 +20,7 @@ from src.core.theme.theme_contract import (
     build_theme_runtime_contract_v1,
     build_theme_schema_v6,
     pretty_json_text,
+    write_contract_documents,
 )
 from src.core.theme.theme_catalog import THEME_ASSET_BY_KEY
 from src.core.theme.theme_manager import ThemeManager
@@ -51,6 +52,14 @@ def test_shipped_contract_documents_match_runtime_generators() -> None:
         path = SCHEMA_ROOT / filename
         assert path.is_file()
         assert json.loads(path.read_text(encoding="utf-8")) == payload
+
+
+def test_contract_writer_uses_lf_line_endings(tmp_path: Path) -> None:
+    paths = write_contract_documents(tmp_path)
+    for path in paths:
+        payload = path.read_bytes()
+        assert b"\r\n" not in payload
+        assert payload.endswith(b"\n")
 
 
 def test_contract_document_hashes_match_shipped_files() -> None:
