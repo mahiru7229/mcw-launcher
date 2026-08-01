@@ -35,6 +35,12 @@ class ModCompatibilityManager:
             installed_versions["fml"] = loader_version
         elif loader_name == ModLoaderManager.NEOFORGE:
             installed_versions["neoforge"] = loader_version
+            # NeoForge-compatible Forge-family mods can retain a legacy
+            # mandatory dependency on the virtual ``forge`` runtime. The
+            # loader-mismatch check still blocks genuinely Forge-only mods,
+            # while provider-approved dual-loader mods such as e4mc can pass
+            # their own metadata preflight on a NeoForge instance.
+            installed_versions["forge"] = loader_version
             installed_versions["javafml"] = loader_version
             installed_versions["fml"] = loader_version
 

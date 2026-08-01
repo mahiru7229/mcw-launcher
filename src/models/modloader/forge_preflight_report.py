@@ -8,6 +8,7 @@ from src.models.mod.mod_issue import ModIssue
 @dataclass(frozen=True, slots=True)
 class ForgePreflightReport:
     issues: tuple[ModIssue, ...]
+    loader: str = "forge"
 
     @property
     def errors(self) -> tuple[ModIssue, ...]:

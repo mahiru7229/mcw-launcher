@@ -16,7 +16,7 @@ class ForgePreflightManager:
         loader_name, loader_version = ModLoaderManager.normalize(getattr(instance, "mod_loader", (ModLoaderManager.VANILLA, "-1")))
         manager = ForgePreflightManager._manager(loader_name)
         if manager is None:
-            return ForgePreflightReport(issues=())
+            return ForgePreflightReport(issues=(), loader=loader_name)
 
         issues = [
             ModIssue(severity="error", code=f"{loader_name}-installation", message=message)
@@ -24,7 +24,7 @@ class ForgePreflightManager:
         ]
         issues.extend(ModCompatibilityManager.scan(instance).issues)
         issues.sort(key=lambda item: ({"error": 0, "warning": 1, "info": 2}.get(item.severity, 3), item.message.casefold()))
-        return ForgePreflightReport(issues=tuple(issues))
+        return ForgePreflightReport(issues=tuple(issues), loader=loader_name)
 
     @staticmethod
     def validate_runtime_files(instance: Instance, version: Version) -> tuple[str, ...]:
@@ -43,7 +43,10 @@ class ForgePreflightManager:
         if not blocking_errors:
             return
         details = "\n".join(f"- {issue.message}" for issue in blocking_errors)
-        loader = "NeoForge" if any(issue.code == "neoforge-installation" for issue in blocking_errors) else "Forge"
+        loader_name = str(getattr(report, "loader", "")).strip().casefold()
+        if loader_name not in ModLoaderManager.FORGE_FAMILY:
+            loader_name = ModLoaderManager.NEOFORGE if any(issue.code == "neoforge-installation" for issue in blocking_errors) else ModLoaderManager.FORGE
+        loader = "NeoForge" if loader_name == ModLoaderManager.NEOFORGE else "Forge"
         raise RuntimeError(
             f"{loader} pre-launch check failed:\n"
             f"{len(blocking_errors)} blocking error(s), {getattr(report, 'warning_count', len(getattr(report, 'warnings', ())))} warning(s)\n"

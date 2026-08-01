@@ -105,3 +105,16 @@ def test_broken_neoforge_installation_still_blocks() -> None:
 
     with pytest.raises(RuntimeError, match="NeoForge pre-launch check failed"):
         ForgePreflightManager.raise_for_errors(report, block_compatibility_errors=False)
+
+
+
+def test_neoforge_compatibility_error_uses_neoforge_heading() -> None:
+    report = SimpleNamespace(
+        loader="neoforge",
+        errors=(ModIssue(severity="error", code="dependency-missing", message="e4mc requires missing dependency 'forge' (*)."),),
+        warnings=(),
+        warning_count=0,
+    )
+
+    with pytest.raises(RuntimeError, match="NeoForge pre-launch check failed"):
+        ForgePreflightManager.raise_for_errors(report)

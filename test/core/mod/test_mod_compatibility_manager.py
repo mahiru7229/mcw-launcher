@@ -137,3 +137,33 @@ def test_neoforge_loader_dependency_matches_installed_version(tmp_path):
     assert not any(issue.code == "dependency-version" for issue in report.issues)
     assert not any(issue.code == "loader-mismatch" for issue in report.issues)
 
+
+
+
+def test_neoforge_satisfies_legacy_forge_runtime_dependency_for_dual_loader_mod(tmp_path):
+    instance_dir = tmp_path / "neoforge-e4mc"
+    mods = instance_dir / "mods"
+    mods.mkdir(parents=True)
+    instance = Instance(instance_id="neoforge-e4mc", name="NeoForge e4mc", version_id="1.20.1", instance_dir=instance_dir, mod_loader=("neoforge", "47.1.106"))
+    metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[47,)"\n'
+        'license="MIT"\n\n'
+        '[[mods]]\n'
+        'modId="e4mc_minecraft"\n'
+        'version="5.0.0"\n'
+        'displayName="e4mc"\n\n'
+        '[[dependencies.e4mc_minecraft]]\n'
+        'modId="forge"\n'
+        'mandatory=true\n'
+        'versionRange="*"\n'
+        'ordering="NONE"\n'
+        'side="BOTH"\n'
+    )
+    with zipfile.ZipFile(mods / "e4mc.jar", "w") as archive:
+        archive.writestr("META-INF/mods.toml", metadata)
+
+    report = ModCompatibilityManager.scan(instance)
+
+    assert not any(issue.code == "dependency-missing" and "forge" in issue.mod_ids for issue in report.issues)
+    assert not any(issue.code == "loader-mismatch" for issue in report.issues)
