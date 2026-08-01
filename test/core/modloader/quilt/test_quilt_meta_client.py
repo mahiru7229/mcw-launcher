@@ -60,6 +60,23 @@ def install_payload(loader_version="0.27.1", game_version="1.20.1", mapping_kind
     }
 
 
+def install_payload_without_mappings(loader_version="0.20.0-beta.9"):
+    return {
+        "loader": {
+            "version": loader_version,
+            "stable": False,
+            "maven": f"org.quiltmc:quilt-loader:{loader_version}",
+        },
+        "launcherMeta": {
+            "mainClass": {"client": "org.quiltmc.loader.impl.launch.knot.KnotClient"},
+            "libraries": {
+                "common": [{"name": "org.ow2.asm:asm:9.9", "url": "https://maven.quiltmc.org/repository/release/"}],
+                "client": [],
+            },
+        },
+    }
+
+
 @pytest.fixture(autouse=True)
 def isolate_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(Paths, "CACHE_ROOT", tmp_path / "cache")
@@ -135,6 +152,20 @@ def test_loads_install_components(monkeypatch):
     assert metadata.loader.uid == "org.quiltmc.quilt-loader"
     assert metadata.main_class.endswith("KnotClient")
     assert metadata.libraries[0]["name"] == "org.ow2.asm:asm:9.7"
+
+
+def test_accepts_named_runtime_metadata_without_mappings(monkeypatch):
+    url = QuiltMetaClient.BASE_URL + "/versions/loader/26.2/0.20.0-beta.9"
+    client = FakeClient({url: install_payload_without_mappings()})
+    monkeypatch.setattr(HttpDownloader, "get_client", lambda: client)
+
+    metadata = QuiltMetaClient.get_install_metadata("26.2", "0.20.0-beta.9")
+
+    assert metadata.game.version == "26.2"
+    assert metadata.mappings is None
+    assert metadata.loader.version == "0.20.0-beta.9"
+    assert metadata.main_class.endswith("KnotClient")
+    assert metadata.libraries[0]["name"] == "org.ow2.asm:asm:9.9"
 
 
 def test_loads_profile_and_reuses_cache(monkeypatch):

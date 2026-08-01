@@ -64,20 +64,22 @@ class QuiltMetaClient:
         loader = data.get("loader")
         mappings = QuiltMetaClient._mappings_component(data)
         launcher_meta = data.get("launcherMeta")
-        if not isinstance(loader, dict) or not isinstance(mappings, dict) or not isinstance(launcher_meta, dict):
+        if not isinstance(loader, dict) or not isinstance(launcher_meta, dict):
             raise RuntimeError("Quilt installation metadata is incomplete.")
 
         resolved_loader_version = str(loader.get("version", "")).strip()
-        mappings_version = str(mappings.get("version", "")).strip()
+        mappings_version = str(mappings.get("version", "")).strip() if isinstance(mappings, dict) else ""
         loader_maven = str(loader.get("maven", "")).strip()
-        mappings_maven = str(mappings.get("maven", "")).strip()
+        mappings_maven = str(mappings.get("maven", "")).strip() if isinstance(mappings, dict) else ""
         main_classes = launcher_meta.get("mainClass", {})
         main_class = str(main_classes.get("client", "")).strip() if isinstance(main_classes, dict) else ""
 
         if resolved_loader_version != loader_version:
             raise RuntimeError(f"Quilt Meta resolved Loader {resolved_loader_version or 'unknown'} instead of {loader_version}.")
-        if not mappings_version or not loader_maven or not mappings_maven or not main_class:
+        if not loader_maven or not main_class:
             raise RuntimeError("Quilt installation metadata is missing a required component.")
+        if bool(mappings_version) != bool(mappings_maven):
+            raise RuntimeError("Quilt installation metadata contains an incomplete mappings component.")
 
         libraries_data = launcher_meta.get("libraries", {})
         libraries: list[dict] = []
@@ -87,11 +89,17 @@ class QuiltMetaClient:
                 if isinstance(values, list):
                     libraries.extend(item for item in values if isinstance(item, dict))
 
-        mappings_uid = QuiltMetaClient._component_uid(mappings_maven, "org.quiltmc.hashed")
+        mappings_component = None
+        if mappings_version and mappings_maven:
+            mappings_component = QuiltComponent(
+                uid=QuiltMetaClient._component_uid(mappings_maven, "org.quiltmc.hashed"),
+                version=mappings_version,
+                maven=mappings_maven,
+            )
         loader_uid = QuiltMetaClient._component_uid(loader_maven, "org.quiltmc.quilt-loader")
         return QuiltInstallMetadata(
             game=QuiltComponent(uid="net.minecraft", version=game_version),
-            mappings=QuiltComponent(uid=mappings_uid, version=mappings_version, maven=mappings_maven),
+            mappings=mappings_component,
             loader=QuiltComponent(uid=loader_uid, version=resolved_loader_version, maven=loader_maven),
             main_class=main_class,
             libraries=tuple(libraries),

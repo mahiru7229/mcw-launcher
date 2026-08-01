@@ -20,7 +20,7 @@ from src.models.progress.progress_stage import ProgressStage
 
 
 class QuiltVersionManager:
-    CACHE_SCHEMA_VERSION = 1
+    CACHE_SCHEMA_VERSION = 2
     _locks: dict[str, Lock] = {}
     _locks_guard = Lock()
 
@@ -109,7 +109,11 @@ class QuiltVersionManager:
             return None
         if quilt_data.get("baseFingerprint") != QuiltVersionManager._fingerprint(base):
             return None
-        if not quilt_data.get("mappingsVersion") or not quilt_data.get("components"):
+        components = quilt_data.get("components")
+        if not isinstance(components, list) or not components:
+            return None
+        component_uids = {str(item.get("uid", "")).strip() for item in components if isinstance(item, dict)}
+        if "net.minecraft" not in component_uids or "org.quiltmc.quilt-loader" not in component_uids:
             return None
         if not data.get("mainClass") or not data.get("libraries"):
             return None
@@ -213,20 +217,23 @@ class QuiltVersionManager:
         if base_legacy or quilt_legacy:
             merged["minecraftArguments"] = " ".join(value for value in (base_legacy, quilt_legacy) if value)
 
-        components = [
-            {"uid": metadata.game.uid, "version": metadata.game.version},
-            {"uid": metadata.mappings.uid, "version": metadata.mappings.version, "maven": metadata.mappings.maven},
-            {"uid": metadata.loader.uid, "version": metadata.loader.version, "maven": metadata.loader.maven},
-        ]
-        merged["quilt"] = {
+        components = [{"uid": metadata.game.uid, "version": metadata.game.version}]
+        if metadata.mappings is not None:
+            components.append({"uid": metadata.mappings.uid, "version": metadata.mappings.version, "maven": metadata.mappings.maven})
+        components.append({"uid": metadata.loader.uid, "version": metadata.loader.version, "maven": metadata.loader.maven})
+
+        quilt_metadata = {
             "schemaVersion": QuiltVersionManager.CACHE_SCHEMA_VERSION,
             "gameVersion": game_version,
             "loaderVersion": loader_version,
-            "mappingsVersion": metadata.mappings.version,
+            "mappingNamespace": metadata.mappings.uid if metadata.mappings is not None else "named",
             "profileId": profile_id,
             "baseFingerprint": QuiltVersionManager._fingerprint(base),
             "components": components,
         }
+        if metadata.mappings is not None:
+            quilt_metadata["mappingsVersion"] = metadata.mappings.version
+        merged["quilt"] = quilt_metadata
         return merged
 
     @staticmethod

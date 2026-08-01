@@ -40,6 +40,16 @@ def make_metadata() -> QuiltInstallMetadata:
     )
 
 
+def make_named_metadata() -> QuiltInstallMetadata:
+    return QuiltInstallMetadata(
+        game=QuiltComponent(uid="net.minecraft", version="26.2"),
+        mappings=None,
+        loader=QuiltComponent(uid="org.quiltmc.quilt-loader", version="0.20.0-beta.9", maven="org.quiltmc:quilt-loader:0.20.0-beta.9"),
+        main_class="org.quiltmc.loader.impl.launch.knot.KnotClient",
+        libraries=(),
+    )
+
+
 def make_profile():
     return {
         "id": "quilt-loader-0.27.1-1.20.1",
@@ -69,6 +79,24 @@ def test_merges_quilt_profile_with_component_metadata(tmp_path):
     assert [component["uid"] for component in merged["quilt"]["components"]] == ["net.minecraft", "org.quiltmc.hashed", "org.quiltmc.quilt-loader"]
 
 
+def test_merges_named_runtime_profile_without_mappings(tmp_path):
+    base = make_base_version(tmp_path)
+    base.id = "26.2"
+    base.raw_json["id"] = "26.2"
+    profile = {
+        "id": "quilt-loader-0.20.0-beta.9-26.2",
+        "mainClass": "org.quiltmc.loader.impl.launch.knot.KnotClient",
+        "arguments": {"jvm": ["-Dquilt=true"], "game": []},
+        "libraries": [{"name": "org.quiltmc:quilt-loader:0.20.0-beta.9"}],
+    }
+
+    merged = QuiltVersionManager._merge_profiles(base.raw_json, profile, make_named_metadata())
+
+    assert merged["quilt"]["mappingNamespace"] == "named"
+    assert "mappingsVersion" not in merged["quilt"]
+    assert [component["uid"] for component in merged["quilt"]["components"]] == ["net.minecraft", "org.quiltmc.quilt-loader"]
+
+
 def test_installs_and_reuses_cached_profile(tmp_path, monkeypatch):
     base = make_base_version(tmp_path)
     monkeypatch.setattr(Paths, "CACHE_ROOT", tmp_path / "cache")
@@ -93,6 +121,51 @@ def test_installs_and_reuses_cached_profile(tmp_path, monkeypatch):
     assert second.id == first.id
     assert calls == [("metadata", "1.20.1", "0.27.1", False), ("profile", "1.20.1", "0.27.1", False)]
     assert Paths.client(first) == Paths.CACHE_ROOT / "versions" / "1.20.1" / "1.20.1.jar"
+
+
+def test_named_runtime_cache_does_not_require_mappings_component(tmp_path):
+    base = make_base_version(tmp_path)
+    base.id = "26.2"
+    base.raw_json["id"] = "26.2"
+    path = tmp_path / "quilt.json"
+    profile = {
+        "id": "quilt-loader-0.20.0-beta.9-26.2",
+        "mainClass": "org.quiltmc.loader.impl.launch.knot.KnotClient",
+        "arguments": {"jvm": [], "game": []},
+        "libraries": [{"name": "org.quiltmc:quilt-loader:0.20.0-beta.9"}],
+    }
+    merged = QuiltVersionManager._merge_profiles(base.raw_json, profile, make_named_metadata())
+    path.write_text(__import__("json").dumps(merged), encoding="utf-8")
+
+    cached = QuiltVersionManager._load_cached(path, base.raw_json, "26.2", "0.20.0-beta.9")
+
+    assert cached is not None
+    assert cached["quilt"]["mappingNamespace"] == "named"
+
+
+def test_installs_named_runtime_without_mappings(tmp_path, monkeypatch):
+    base = make_base_version(tmp_path)
+    base.id = "26.2"
+    base.raw_json["id"] = "26.2"
+    monkeypatch.setattr(Paths, "CACHE_ROOT", tmp_path / "cache")
+    monkeypatch.setattr(QuiltMetaClient, "get_install_metadata", lambda *args, **kwargs: make_named_metadata())
+    monkeypatch.setattr(
+        QuiltMetaClient,
+        "get_profile",
+        lambda *args, **kwargs: {
+            "id": "quilt-loader-0.20.0-beta.9-26.2",
+            "mainClass": "org.quiltmc.loader.impl.launch.knot.KnotClient",
+            "arguments": {"jvm": ["-Dquilt=true"], "game": []},
+            "libraries": [{"name": "org.quiltmc:quilt-loader:0.20.0-beta.9", "url": "https://maven.quiltmc.org/repository/release/"}],
+        },
+    )
+    monkeypatch.setattr(QuiltVersionManager, "_load_artifact_metadata", lambda artifact, force=False, reporter=None: ("e" * 40, 123))
+
+    version = QuiltVersionManager.install(base, "0.20.0-beta.9")
+
+    assert version.id == "quilt-loader-0.20.0-beta.9-26.2"
+    assert version.raw_json["quilt"]["mappingNamespace"] == "named"
+    assert "mappingsVersion" not in version.raw_json["quilt"]
 
 
 def test_cache_is_invalidated_when_vanilla_metadata_changes(tmp_path, monkeypatch):
