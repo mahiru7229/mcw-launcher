@@ -25,8 +25,11 @@ def configure_forced_dark_attributes() -> None:
             QCoreApplication.setAttribute(attribute, True)
 
 
-def create_forced_dark_palette(base_palette: QPalette | None = None) -> QPalette:
+def create_forced_dark_palette(base_palette: QPalette | None = None, selection_color: QColor | None = None, selection_text_color: QColor | None = None, link_color: QColor | None = None) -> QPalette:
     palette = QPalette(base_palette) if base_palette is not None else QPalette()
+    selected = QColor(selection_color) if selection_color is not None else (base_palette.color(QPalette.ColorRole.Highlight) if base_palette is not None else QColor(DARK_SELECTION))
+    selected_text = QColor(selection_text_color) if selection_text_color is not None else (base_palette.color(QPalette.ColorRole.HighlightedText) if base_palette is not None else QColor(DARK_TEXT))
+    link = QColor(link_color) if link_color is not None else (base_palette.color(QPalette.ColorRole.Link) if base_palette is not None else QColor(DARK_TEXT))
 
     colors = {
         QPalette.ColorRole.Window: QColor(DARK_WINDOW),
@@ -39,10 +42,10 @@ def create_forced_dark_palette(base_palette: QPalette | None = None) -> QPalette
         QPalette.ColorRole.Button: QColor(DARK_BUTTON),
         QPalette.ColorRole.ButtonText: QColor(DARK_TEXT),
         QPalette.ColorRole.BrightText: QColor(DARK_TEXT),
-        QPalette.ColorRole.Highlight: QColor(DARK_SELECTION),
-        QPalette.ColorRole.HighlightedText: QColor(DARK_TEXT),
-        QPalette.ColorRole.Link: QColor(DARK_TEXT),
-        QPalette.ColorRole.LinkVisited: QColor(DARK_TEXT),
+        QPalette.ColorRole.Highlight: selected,
+        QPalette.ColorRole.HighlightedText: selected_text,
+        QPalette.ColorRole.Link: link,
+        QPalette.ColorRole.LinkVisited: link,
         QPalette.ColorRole.PlaceholderText: QColor(DARK_TEXT),
         QPalette.ColorRole.Light: QColor(DARK_BORDER),
         QPalette.ColorRole.Midlight: QColor(DARK_SURFACE_ALT),
@@ -60,5 +63,5 @@ def create_forced_dark_palette(base_palette: QPalette | None = None) -> QPalette
 
 def apply_forced_dark_theme(application: QApplication) -> None:
     application.setStyle("Fusion")
-    application.setPalette(create_forced_dark_palette(application.palette()))
+    application.setPalette(create_forced_dark_palette(application.palette(), QColor(DARK_SELECTION), QColor(DARK_TEXT), QColor(DARK_TEXT)))
     application.setStyleSheet(FORCED_DARK_APPLICATION_STYLE)

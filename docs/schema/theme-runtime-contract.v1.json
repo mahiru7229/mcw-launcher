@@ -4,6 +4,7 @@
   "compatibility_policy": {
     "existing_fields_will_not_change_meaning": true,
     "future_breaking_changes_require_new_schema_version": true,
+    "new_schema_6_fields_must_be_optional": true,
     "schema_6_frozen": true,
     "unknown_future_schema_versions_are_rejected": true
   },
@@ -37,7 +38,7 @@
   "schema_file": "theme.schema.v6.json",
   "sha256": {
     "theme-assets.v1.json": "e5e958cd7de36e39a1506777c3595ed68dfb46f4be9c2d706d635e6b5c1584b9",
-    "theme.schema.v6.json": "80bdc60bfbf7890dc9a16e6ffd7ed221ab2180724b009b7d75f8ae48e4917934"
+    "theme.schema.v6.json": "4fff77e48768f97eaba40114ea3c301726863a31a39067136f2f4b53b2865dce"
   },
   "supported_theme_schema_versions": [
     1,
@@ -49,6 +50,10 @@
   ],
   "theme_schema_version": 6,
   "validation_codes": {
+    "THEME_ACCENT_ASSET_INVALID": {
+      "category": "palette",
+      "default_severity": "error"
+    },
     "THEME_ANIMATION_INVALID": {
       "category": "animation",
       "default_severity": "error"
@@ -103,6 +108,10 @@
     },
     "THEME_NOT_INSTALLED": {
       "category": "manifest",
+      "default_severity": "error"
+    },
+    "THEME_PALETTE_INVALID": {
+      "category": "palette",
       "default_severity": "error"
     },
     "THEME_SCHEMA_INVALID": {

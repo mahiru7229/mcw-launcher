@@ -27,6 +27,8 @@ class ThemeValidationCode:
     THEME_ANIMATION_SHEET_TOO_SMALL = "THEME_ANIMATION_SHEET_TOO_SMALL"
     THEME_FONT_INVALID = "THEME_FONT_INVALID"
     THEME_MOTION_INVALID = "THEME_MOTION_INVALID"
+    THEME_PALETTE_INVALID = "THEME_PALETTE_INVALID"
+    THEME_ACCENT_ASSET_INVALID = "THEME_ACCENT_ASSET_INVALID"
     THEME_STYLESHEET_INVALID = "THEME_STYLESHEET_INVALID"
     THEME_CAPABILITY_INVALID = "THEME_CAPABILITY_INVALID"
     THEME_SECURITY_VIOLATION = "THEME_SECURITY_VIOLATION"
@@ -130,6 +132,7 @@ class ThemeValidator:
                 ThemeValidationCode.THEME_ASSET_UNKNOWN_KEY,
                 ThemeValidationCode.THEME_TEXT_ASSET_INVALID,
                 ThemeValidationCode.THEME_CAPABILITY_INVALID,
+                ThemeValidationCode.THEME_ACCENT_ASSET_INVALID,
             }
             issues = tuple(
                 ThemeValidationIssue("error", issue.category, issue.message, issue.code, issue.field, issue.path)
@@ -169,6 +172,14 @@ class ThemeValidator:
         elif "theme id is invalid" in lowered:
             code = ThemeValidationCode.THEME_ID_INVALID
             field = "id"
+        elif lowered.startswith("unknown accent asset key:"):
+            code = ThemeValidationCode.THEME_ACCENT_ASSET_INVALID
+            key = message.split(":", 1)[1].strip()
+            field = "accent_assets"
+            path = key or None
+        elif "theme palette" in lowered:
+            code = ThemeValidationCode.THEME_PALETTE_INVALID
+            field = "palette"
         elif lowered.startswith("unknown asset key:"):
             code = ThemeValidationCode.THEME_ASSET_UNKNOWN_KEY
             key = message.split(":", 1)[1].strip()
@@ -228,6 +239,8 @@ class ThemeValidator:
     @staticmethod
     def _category(message: str) -> str:
         lowered = message.casefold()
+        if "palette" in lowered or "accent asset" in lowered:
+            return "palette"
         if "font" in lowered:
             return "font"
         if "animation" in lowered or "sprite" in lowered:

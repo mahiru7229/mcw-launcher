@@ -124,7 +124,7 @@ class MainWindow(QMainWindow):
         self._connect_signals()
         self.launch_control.set_motion_runtime(self.motion_runtime)
 
-        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(self._startup_settings.get("theme", "mcw-default")))
+        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(self._startup_settings.get("theme", "mcw-default")), bool(self._startup_settings.get("show_static_text", False)), str(self._startup_settings.get("accent_mode", "theme")), str(self._startup_settings.get("accent_color", "#8ed35b")))
         self.motion_runtime.apply(self._startup_settings.get("motion_mode", "full"))
         self._initialize_data()
 
@@ -310,6 +310,7 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.reload_theme_requested.connect(self._preview_theme)
         self.launcher_settings_page.live_theme_reload_requested.connect(self._reload_theme_silently)
         self.launcher_settings_page.motion_mode_changed.connect(self._preview_motion)
+        self.launcher_settings_page.accent_changed.connect(self._preview_accent)
         self.launcher_settings_page.preview_toast_requested.connect(
             lambda: self.toast_manager.show(
                 tr("motion.preview.toast.message"),
@@ -1462,11 +1463,11 @@ class MainWindow(QMainWindow):
         curseforge_available = bool(settings.get("curseforge_gateway_urls", ()))
         self.instances_page.browse_curseforge_modpacks_button.setVisible(curseforge_available)
         self.mod_manager_dialog.curseforge_button.setVisible(curseforge_available)
-        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")), bool(settings.get("show_static_text", False)))
+        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")), bool(settings.get("show_static_text", False)), str(settings.get("accent_mode", "theme")), str(settings.get("accent_color", "#8ed35b")))
         self.motion_runtime.apply(settings.get("motion_mode", "full"))
 
     def _preview_theme(self, theme_id: str) -> None:
-        selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked())
+        selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked(), self.launcher_settings_page.current_accent_mode(), self.launcher_settings_page.current_accent_color())
         self.motion_runtime.apply(self.launcher_settings_page.current_motion_mode())
         self.logs_page.append(f"Theme preview: {selected}")
         self.toast_manager.show(
@@ -1476,12 +1477,16 @@ class MainWindow(QMainWindow):
         )
 
     def _reload_theme_silently(self, theme_id: str) -> None:
-        selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked())
+        selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked(), self.launcher_settings_page.current_accent_mode(), self.launcher_settings_page.current_accent_color())
         self.motion_runtime.apply(self.launcher_settings_page.current_motion_mode())
         self.logs_page.append(f"Theme live reload: {selected}")
 
     def _preview_motion(self, mode: str) -> None:
         self.motion_runtime.apply(mode)
+
+    def _preview_accent(self, mode: str, color: str) -> None:
+        theme_id = str(self.launcher_settings_page.theme_combo.currentData() or "mcw-default")
+        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked(), mode, color)
 
     def _set_modrinth_channel_preferences(self, include_beta: bool, include_alpha: bool) -> None:
         self.mods_page.set_channel_preferences(include_beta, include_alpha)

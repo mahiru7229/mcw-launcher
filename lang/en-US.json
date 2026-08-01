@@ -1154,7 +1154,15 @@
     "theme.authoring.preview.dialog.title": "Theme dialog preview",
     "theme.authoring.preview.dialog.message": "This dialog previews the current theme font, surface, buttons, and motion.",
     "theme.authoring.combo.issues": "({count} issue(s), fallback active)",
-    "theme.authoring.category.style": "Stylesheet"
+    "theme.authoring.category.style": "Stylesheet",
+    "appearance.accent.mode.label": "Accent color",
+    "appearance.accent.mode.theme": "Use theme color",
+    "appearance.accent.mode.custom": "Use custom color",
+    "appearance.accent.reset": "Reset to theme color",
+    "appearance.accent.choose": "Choose launcher accent color",
+    "appearance.accent.color_value": "Accent preview: {color}",
+    "appearance.accent.detail.theme": "The launcher is using the selected theme accent ({color}).",
+    "appearance.accent.detail.custom": "The custom accent ({color}) overrides the theme primary color while semantic warning and error colors remain unchanged."
   },
   "aliases": {
     "MCW Launcher": "app.name",

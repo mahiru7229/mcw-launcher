@@ -276,5 +276,34 @@
       "reduced_fps": 30,
       "pause_when_hidden": true
     }
-  }
+  },
+  "palette": {
+    "primary": "#63984a",
+    "primary_hover": "#7db45e",
+    "primary_pressed": "#4d7938",
+    "primary_text": "#ffffff",
+    "focus": "#8ed35b",
+    "selection": "#4f6d3c",
+    "selection_text": "#ffffff",
+    "link": "#8ed35b",
+    "success": "#8ed35b",
+    "warning": "#d6a93c",
+    "error": "#c47a7a"
+  },
+  "accent_assets": [
+    "button.primary",
+    "button.primary_hover",
+    "button.primary_pressed",
+    "button.launch",
+    "button.launch_hover",
+    "button.launch_pressed",
+    "button.nav_selected",
+    "input.focus",
+    "checkbox.checked",
+    "progress.chunk",
+    "progress.indeterminate",
+    "scrollbar.handle",
+    "scrollbar.horizontal_handle",
+    "badge.status"
+  ]
 }

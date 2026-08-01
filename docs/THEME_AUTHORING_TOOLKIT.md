@@ -120,3 +120,9 @@ A minimal template is available in [`docs/theme-template`](theme-template).
 MCW Launcher `v0.11.0-rc.1` đóng băng schema 6 và package format 1 để chuẩn bị cho MCW Theme Studio. Công cụ bên ngoài nên đọc [`THEME_RUNTIME_CONTRACT.md`](THEME_RUNTIME_CONTRACT.md) và các tệp trong [`docs/schema`](schema) thay vì hard-code asset key hoặc giới hạn runtime.
 
 MCW Launcher `v0.11.0-rc.1` freezes schema 6 and package format 1 for MCW Theme Studio. External tools should consume [`THEME_RUNTIME_CONTRACT.md`](THEME_RUNTIME_CONTRACT.md) and the machine-readable files under [`docs/schema`](schema) instead of hard-coding runtime limits or asset keys.
+
+## Palette and accent preview — RC2
+
+The Appearance page now previews the effective accent and lets the user choose between the theme palette and a custom accent. Theme editors should expose the schema 6 `palette` object as semantic color fields and `accent_assets` as an opt-in asset checklist. Do not implement blanket recoloring: only listed assets are tintable.
+
+The machine-readable source of truth remains `docs/schema/theme.schema.v6.json`. RC2 adds optional fields only, so existing schema 6 projects remain valid.

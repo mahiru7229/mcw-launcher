@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QProgressBar, QStyle, QStyleOptionProgressBar, QWi
 
 from src.core.theme.theme_manager import ThemeManager, theme_manager
 from src.gui.animation.theme_animation_player import ThemeAnimationPlayer
+from src.gui.theme.accent_runtime import theme_accent_runtime
 
 
 class ThemedProgressBar(QProgressBar):
@@ -79,7 +80,8 @@ class ThemedProgressBar(QProgressBar):
         animation = self._theme_manager.resolve_animation(key, fallback_to_default=True)
         self._animation_player.set_animation(animation)
         fallback = self._theme_manager.resolve_animation_fallback(key, fallback_to_default=True)
-        self._fallback_pixmap = QPixmap(str(fallback)) if fallback is not None else QPixmap()
+        fallback_pixmap = QPixmap(str(fallback)) if fallback is not None else QPixmap()
+        self._fallback_pixmap = theme_accent_runtime.tint_pixmap(fallback_pixmap, key)
         if self.isVisible() and animation is not None:
             self._animation_player.start()
 

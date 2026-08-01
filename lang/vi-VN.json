@@ -1154,7 +1154,15 @@
     "theme.authoring.preview.dialog.title": "Xem trước hộp thoại theme",
     "theme.authoring.preview.dialog.message": "Hộp thoại này dùng để xem trước font, bề mặt, nút và chuyển động của theme hiện tại.",
     "theme.authoring.combo.issues": "({count} vấn đề, đang dùng fallback)",
-    "theme.authoring.category.style": "Stylesheet"
+    "theme.authoring.category.style": "Stylesheet",
+    "appearance.accent.mode.label": "Màu chủ đạo",
+    "appearance.accent.mode.theme": "Dùng màu của theme",
+    "appearance.accent.mode.custom": "Dùng màu tùy chỉnh",
+    "appearance.accent.reset": "Đặt lại theo màu theme",
+    "appearance.accent.choose": "Chọn màu chủ đạo của launcher",
+    "appearance.accent.color_value": "Xem trước màu: {color}",
+    "appearance.accent.detail.theme": "Launcher đang sử dụng màu chủ đạo của theme đã chọn ({color}).",
+    "appearance.accent.detail.custom": "Màu tùy chỉnh ({color}) ghi đè màu chính của theme, còn màu cảnh báo và lỗi vẫn được giữ nguyên."
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

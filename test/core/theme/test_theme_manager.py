@@ -568,3 +568,52 @@ def test_schema_6_requires_normalized_theme_id_but_legacy_schema_remains_compati
 
     assert manager.select("Not Normalized").theme_id == ThemeManager.FALLBACK_THEME_ID
     assert manager.select("Legacy Theme").theme_id == "Legacy Theme"
+
+
+def test_schema_six_loads_palette_and_accent_assets(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "accented"
+    theme_root.mkdir(parents=True)
+    write_png(theme_root / "controls" / "primary.png")
+    (theme_root / "theme.json").write_text(json.dumps({
+        "schema_version": 6,
+        "id": "accented",
+        "assets": {"button.primary": "controls/primary.png"},
+        "palette": {
+            "primary": "#3366cc",
+            "primary_hover": "#4477dd",
+            "primary_pressed": "#224499",
+        },
+        "accent_assets": ["button.primary"],
+    }), encoding="utf-8")
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("accented")
+
+    assert selected.palette.primary == "#3366cc"
+    assert selected.palette.primary_hover == "#4477dd"
+    assert selected.palette.primary_text == "#ffffff"
+    assert selected.accent_assets == frozenset({"button.primary"})
+    assert "theme_palette" in selected.capabilities
+    assert "accent_tint" in selected.capabilities
+    assert selected.issues == ()
+
+
+def test_invalid_palette_and_unknown_accent_asset_are_reported_without_crashing(tmp_path: Path) -> None:
+    theme_root = tmp_path / "themes" / "accented"
+    theme_root.mkdir(parents=True)
+    (theme_root / "theme.json").write_text(json.dumps({
+        "schema_version": 6,
+        "id": "accented",
+        "assets": {},
+        "palette": {"primary": "blue"},
+        "accent_assets": ["button.missing"],
+    }), encoding="utf-8")
+
+    manager = ThemeManager(tmp_path / "themes")
+    selected = manager.select("accented")
+
+    assert selected.theme_id == "accented"
+    assert selected.palette.primary == "#63984a"
+    assert selected.accent_assets == frozenset()
+    assert any("#RRGGBB" in issue for issue in selected.issues)
+    assert any("Unknown accent asset key" in issue for issue in selected.issues)

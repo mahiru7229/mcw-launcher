@@ -134,13 +134,13 @@ def test_theme_and_modrinth_channels_are_created_and_persisted(tmp_path: Path) -
     manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
 
     data = manager.load()
-    assert data["appearance"] == {"theme": "mcw-default", "show_static_text": False, "motion_mode": "full", "live_theme_reload": False}
+    assert data["appearance"] == {"theme": "mcw-default", "show_static_text": False, "motion_mode": "full", "live_theme_reload": False, "accent_mode": "theme", "accent_color": "#8ed35b"}
     assert data["modrinth"] == {"include_beta": False, "include_alpha": False}
 
-    manager.save({"appearance": {"theme": "pixel-night", "show_static_text": "off", "motion_mode": "reduced", "live_theme_reload": "yes"}, "modrinth": {"include_beta": True, "include_alpha": "yes"}})
+    manager.save({"appearance": {"theme": "pixel-night", "show_static_text": "off", "motion_mode": "reduced", "live_theme_reload": "yes", "accent_mode": "custom", "accent_color": "#B26CFF"}, "modrinth": {"include_beta": True, "include_alpha": "yes"}})
     updated = manager.load()
 
-    assert updated["appearance"] == {"theme": "pixel-night", "show_static_text": False, "motion_mode": "reduced", "live_theme_reload": True}
+    assert updated["appearance"] == {"theme": "pixel-night", "show_static_text": False, "motion_mode": "reduced", "live_theme_reload": True, "accent_mode": "custom", "accent_color": "#b26cff"}
     assert updated["modrinth"] == {"include_beta": True, "include_alpha": True}
 
 
@@ -217,3 +217,17 @@ def test_managed_content_failure_defaults_are_source_specific_and_persisted(tmp_
         "curseforge_failure_policy": "block",
         "forge_preflight_failure_policy": "allow",
     }
+
+
+def test_accent_settings_are_normalized_and_migrated(tmp_path: Path) -> None:
+    manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
+
+    manager.update_section("appearance", {"accent_mode": "CUSTOM", "accent_color": "#12ABef"})
+    appearance = manager.load()["appearance"]
+    assert appearance["accent_mode"] == "custom"
+    assert appearance["accent_color"] == "#12abef"
+
+    manager.update_section("appearance", {"accent_mode": "unknown", "accent_color": "blue"})
+    appearance = manager.load()["appearance"]
+    assert appearance["accent_mode"] == "theme"
+    assert appearance["accent_color"] == "#8ed35b"

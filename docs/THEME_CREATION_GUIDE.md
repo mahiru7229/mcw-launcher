@@ -318,3 +318,41 @@ QSS không được dùng `@import` hoặc `url()`; asset hình ảnh tiếp t�
 Từ `v0.11.0-rc.1`, schema 6, asset catalog 1, validation report 1 và package ZIP 1 được đóng băng. Theme editor không nên sao chép danh sách key hoặc giới hạn từ GUI; hãy đọc [`schema/theme.schema.v6.json`](schema/theme.schema.v6.json), [`schema/theme-assets.v1.json`](schema/theme-assets.v1.json) và [`THEME_RUNTIME_CONTRACT.md`](THEME_RUNTIME_CONTRACT.md).
 
 Schema 6 yêu cầu ID dạng chữ thường như `my-pixel-theme`. Field cấp cao không thuộc contract sẽ bị từ chối. Schema 1–5 vẫn được launcher đọc để giữ tương thích với theme cũ.
+
+## Màu chủ đạo và palette — RC2
+
+Theme schema 6 có thể khai báo `palette` để Theme Studio và launcher hiểu màu theo vai trò thay vì phải tìm-thay thế mã màu trong QSS. Tất cả field đều optional; giá trị thiếu sẽ dùng palette mặc định an toàn.
+
+```json
+{
+  "palette": {
+    "primary": "#5b8def",
+    "primary_hover": "#77a2ff",
+    "primary_pressed": "#3f6fc7",
+    "primary_text": "#ffffff",
+    "focus": "#77a2ff",
+    "selection": "#34598f",
+    "selection_text": "#ffffff",
+    "link": "#8bb2ff",
+    "success": "#78c978",
+    "warning": "#d6a93c",
+    "error": "#c47a7a"
+  }
+}
+```
+
+Để một PNG hoặc animation đổi theo accent, thêm key của nó vào `accent_assets`:
+
+```json
+{
+  "accent_assets": [
+    "button.primary",
+    "button.primary_hover",
+    "button.primary_pressed",
+    "progress.chunk",
+    "progress.indeterminate"
+  ]
+}
+```
+
+Không thêm logo, ảnh nhân vật hoặc background vào danh sách nếu không muốn launcher nhuộm chúng. Trong Launcher Settings, **Dùng màu của theme** sử dụng `palette`; **Dùng màu tùy chỉnh** ghi đè nhóm primary nhưng giữ success/warning/error của theme.

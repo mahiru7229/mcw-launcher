@@ -35,6 +35,7 @@ from src.core.theme.theme_contract import (
 from src.core.theme.theme_catalog import THEME_ASSET_BY_KEY
 from src.core.theme.theme_font import ResolvedThemeFont, ThemeFontDefinition
 from src.core.theme.theme_motion import ButtonMotionDefinition, MotionPerformanceDefinition, MotionTransitionDefinition, SidebarMotionDefinition, ThemeMotionDefinition, ToastMotionDefinition
+from src.core.theme.theme_palette import DEFAULT_THEME_PALETTE, PALETTE_FIELDS, ThemePaletteDefinition, normalize_hex_color
 
 
 class ThemeError(RuntimeError):
@@ -61,6 +62,8 @@ class ThemeDefinition:
     animations: dict[str, ThemeAnimationDefinition] = field(default_factory=dict)
     font: ThemeFontDefinition | None = None
     motion: ThemeMotionDefinition = field(default_factory=ThemeMotionDefinition)
+    palette: ThemePaletteDefinition = field(default_factory=ThemePaletteDefinition)
+    accent_assets: frozenset[str] = frozenset()
     stylesheet: str | None = None
     capabilities: frozenset[str] = frozenset()
     issues: tuple[str, ...] = ()
@@ -103,6 +106,8 @@ class ThemeManager:
         "animations",
         "font",
         "motion",
+        "palette",
+        "accent_assets",
         "stylesheet",
         "capabilities",
     })
@@ -205,6 +210,12 @@ class ThemeManager:
             return resolved
         fallback = self._default_theme()
         return self._resolve_font_for_theme(fallback) if fallback is not None else None
+
+    def resolve_palette(self, theme: ThemeDefinition | None = None) -> ThemePaletteDefinition:
+        return (theme or self.current).palette
+
+    def is_accent_asset(self, key: str, theme: ThemeDefinition | None = None) -> bool:
+        return str(key) in (theme or self.current).accent_assets
 
     def resolve_stylesheet(self, theme: ThemeDefinition | None = None) -> str:
         selected = theme or self.current
@@ -314,11 +325,17 @@ class ThemeManager:
             raise ThemeManifestError("Theme animations must be an object.")
         raw_font = payload.get("font")
         raw_motion = payload.get("motion")
+        raw_palette = payload.get("palette")
+        raw_accent_assets = payload.get("accent_assets", ())
         raw_stylesheet = payload.get("stylesheet")
         if raw_font is not None and not isinstance(raw_font, dict):
             raise ThemeManifestError("Theme font must be an object.")
         if raw_motion is not None and not isinstance(raw_motion, dict):
             raise ThemeManifestError("Theme motion must be an object.")
+        if raw_palette is not None and not isinstance(raw_palette, dict):
+            raise ThemeManifestError("Theme palette must be an object.")
+        if not isinstance(raw_accent_assets, (list, tuple)):
+            raise ThemeManifestError("Theme accent_assets must be an array.")
         if raw_stylesheet is not None and not isinstance(raw_stylesheet, str):
             raise ThemeManifestError("Theme stylesheet must be a string path.")
 
@@ -327,6 +344,8 @@ class ThemeManager:
         animations: dict[str, ThemeAnimationDefinition] = {}
         font: ThemeFontDefinition | None = None
         motion = ThemeMotionDefinition()
+        palette = DEFAULT_THEME_PALETTE
+        accent_assets: set[str] = set()
         stylesheet: str | None = None
         issues: list[str] = []
         for key, value in raw_assets.items():
@@ -399,6 +418,19 @@ class ThemeManager:
             except ThemeAssetError as error:
                 issues.append(str(error))
 
+        if raw_palette is not None:
+            try:
+                palette = self._parse_palette(raw_palette)
+            except ThemeAssetError as error:
+                issues.append(str(error))
+
+        for raw_key in raw_accent_assets:
+            normalized_key = str(raw_key).strip()
+            if normalized_key not in assets and normalized_key not in animations:
+                issues.append(f"Unknown accent asset key: {normalized_key}")
+                continue
+            accent_assets.add(normalized_key)
+
         if raw_stylesheet is not None:
             try:
                 stylesheet_path = self._safe_stylesheet_path(directory, raw_stylesheet)
@@ -414,6 +446,10 @@ class ThemeManager:
             capabilities = frozenset({*capabilities, "custom_font"})
         if raw_motion is not None:
             capabilities = frozenset({*capabilities, "motion_configuration"})
+        if raw_palette is not None:
+            capabilities = frozenset({*capabilities, "theme_palette"})
+        if accent_assets:
+            capabilities = frozenset({*capabilities, "accent_tint"})
         if stylesheet is not None:
             capabilities = frozenset({*capabilities, "custom_stylesheet"})
 
@@ -428,6 +464,8 @@ class ThemeManager:
             animations=animations,
             font=font,
             motion=motion,
+            palette=palette,
+            accent_assets=frozenset(accent_assets),
             stylesheet=stylesheet,
             capabilities=capabilities,
             issues=tuple(issues),
@@ -453,10 +491,15 @@ class ThemeManager:
             value = payload.get(field_name)
             if isinstance(value, str) and not value.strip():
                 raise ThemeManifestError(f"Theme schema 6 field {field_name} must not be empty.")
-        for object_name in ("assets", "text_assets", "animations", "font", "motion"):
+        for object_name in ("assets", "text_assets", "animations", "font", "motion", "palette"):
             value = payload.get(object_name)
             if value is not None and not isinstance(value, dict):
                 raise ThemeManifestError(f"Theme {object_name} must be an object.")
+        accent_assets = payload.get("accent_assets")
+        if accent_assets is not None and (not isinstance(accent_assets, list) or any(not isinstance(item, str) for item in accent_assets)):
+            raise ThemeManifestError("Theme accent_assets must be an array of strings.")
+        if isinstance(accent_assets, list) and len(accent_assets) != len(set(accent_assets)):
+            raise ThemeManifestError("Theme accent_assets must not contain duplicate keys.")
         stylesheet = payload.get("stylesheet")
         if stylesheet is not None and not isinstance(stylesheet, str):
             raise ThemeManifestError("Theme stylesheet must be a string path.")
@@ -472,6 +515,21 @@ class ThemeManager:
         animations = payload.get("animations")
         if isinstance(animations, dict) and any(not isinstance(key, str) or not isinstance(value, dict) for key, value in animations.items()):
             raise ThemeManifestError("Theme schema 6 animations must map string keys to objects.")
+
+    @staticmethod
+    def _parse_palette(value: object) -> ThemePaletteDefinition:
+        if not isinstance(value, dict):
+            raise ThemeAssetError("Theme palette must be an object.")
+        unknown = sorted(str(key) for key in value if str(key) not in PALETTE_FIELDS)
+        if unknown:
+            raise ThemeAssetError(f"Theme palette contains unknown field: {unknown[0]}")
+        colors = DEFAULT_THEME_PALETTE.to_dict()
+        for key, raw_color in value.items():
+            try:
+                colors[str(key)] = normalize_hex_color(raw_color, str(key))
+            except ValueError as error:
+                raise ThemeAssetError(str(error)) from error
+        return ThemePaletteDefinition(**colors)
 
     def _parse_motion(self, value: object) -> ThemeMotionDefinition:
         if not isinstance(value, dict):

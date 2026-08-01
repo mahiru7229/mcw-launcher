@@ -7,6 +7,7 @@ import re
 from typing import Any
 
 from src.core.theme.theme_catalog import THEME_ASSET_SPECS
+from src.core.theme.theme_palette import HEX_COLOR_PATTERN_TEXT, PALETTE_FIELDS
 
 THEME_RUNTIME_CONTRACT_VERSION = 1
 THEME_SCHEMA_VERSION = 6
@@ -60,6 +61,8 @@ THEME_VALIDATION_CODES_V1: dict[str, dict[str, str]] = {
     "THEME_ANIMATION_SHEET_TOO_SMALL": {"category": "animation", "default_severity": "error"},
     "THEME_FONT_INVALID": {"category": "font", "default_severity": "error"},
     "THEME_MOTION_INVALID": {"category": "motion", "default_severity": "error"},
+    "THEME_PALETTE_INVALID": {"category": "palette", "default_severity": "error"},
+    "THEME_ACCENT_ASSET_INVALID": {"category": "palette", "default_severity": "error"},
     "THEME_STYLESHEET_INVALID": {"category": "style", "default_severity": "error"},
     "THEME_CAPABILITY_INVALID": {"category": "manifest", "default_severity": "warning"},
     "THEME_SECURITY_VIOLATION": {"category": "security", "default_severity": "error"},
@@ -162,6 +165,19 @@ def build_theme_schema_v6() -> dict[str, Any]:
             },
             "font": {"$ref": "#/$defs/font"},
             "motion": {"$ref": "#/$defs/motion"},
+            "palette": {"$ref": "#/$defs/palette"},
+            "accent_assets": {
+                "type": "array",
+                "items": {
+                    "oneOf": [
+                        {"type": "string", "enum": asset_keys},
+                        {"type": "string", "pattern": ANIMATION_KEY_PATTERN_TEXT},
+                    ]
+                },
+                "maxItems": MAX_ANIMATION_FRAMES + len(asset_keys),
+                "uniqueItems": True,
+                "default": [],
+            },
             "stylesheet": {"type": "string", "pattern": _SAFE_QSS_PATH_PATTERN},
             "capabilities": {
                 "oneOf": [
@@ -223,6 +239,11 @@ def build_theme_schema_v6() -> dict[str, Any]:
                         "uniqueItems": True,
                     },
                 },
+            },
+            "palette": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {field: {"type": "string", "pattern": HEX_COLOR_PATTERN_TEXT} for field in sorted(PALETTE_FIELDS)},
             },
             "motion": {
                 "type": "object",
@@ -316,6 +337,7 @@ def build_theme_runtime_contract_v1() -> dict[str, Any]:
             "schema_6_frozen": True,
             "existing_fields_will_not_change_meaning": True,
             "future_breaking_changes_require_new_schema_version": True,
+            "new_schema_6_fields_must_be_optional": True,
             "unknown_future_schema_versions_are_rejected": True,
         },
         "sha256": {

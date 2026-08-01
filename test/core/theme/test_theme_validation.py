@@ -51,3 +51,21 @@ def test_schema_6_unknown_asset_is_error_but_legacy_theme_keeps_warning_compatib
 
     assert validator.validate("strict").issues[0].severity == "error"
     assert validator.validate("legacy").issues[0].severity == "warning"
+
+
+def test_palette_validation_uses_stable_codes(tmp_path: Path) -> None:
+    root = tmp_path / "themes" / "palette"
+    root.mkdir(parents=True)
+    (root / "theme.json").write_text(json.dumps({
+        "schema_version": 6,
+        "id": "palette",
+        "assets": {},
+        "palette": {"primary": "not-a-color"},
+        "accent_assets": ["missing.slot"],
+    }), encoding="utf-8")
+
+    report = ThemeValidator(ThemeManager(tmp_path / "themes")).validate_directory(root)
+    codes = {issue.code for issue in report.issues}
+
+    assert ThemeValidationCode.THEME_PALETTE_INVALID in codes
+    assert ThemeValidationCode.THEME_ACCENT_ASSET_INVALID in codes

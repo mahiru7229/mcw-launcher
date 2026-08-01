@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QLabel, QWidget
 
 from src.core.theme.theme_manager import ThemeManager, theme_manager
 from src.gui.animation.theme_animation_player import ThemeAnimationPlayer
+from src.gui.theme.accent_runtime import theme_accent_runtime
 
 
 class ThemedAnimatedLabel(QLabel):
@@ -87,6 +88,7 @@ class ThemedAnimatedLabel(QLabel):
         self._player.stop()
         path = self._theme_manager.resolve_asset(self._static_asset_key, fallback_to_default=True) if self._static_asset_key else None
         pixmap = QPixmap(str(path)) if path is not None else QPixmap()
+        pixmap = theme_accent_runtime.tint_pixmap(pixmap, self._static_asset_key)
         if pixmap.isNull():
             self.setPixmap(QPixmap())
             return

@@ -4,8 +4,11 @@ from PySide6.QtCore import QElapsedTimer, Qt, QTimer
 from PySide6.QtGui import QColor, QGuiApplication, QPalette
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
+from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.language.language_manager import tr
+from src.core.theme.theme_manager import theme_manager
 from src.gui.config import VERSION_ID
+from src.gui.theme.accent_runtime import theme_accent_runtime
 from src.gui.widget.themed_progress_bar import ThemedProgressBar
 
 
@@ -25,6 +28,7 @@ class StartupSplash(QWidget):
         self._message_key = "startup.starting"
         self._detail_key = "startup.please_wait"
         self._failed = False
+        self._prepare_theme()
 
         self._build_ui()
         self._apply_palette()
@@ -76,14 +80,15 @@ class StartupSplash(QWidget):
         layout.addStretch(1)
         layout.addWidget(self.progress_bar)
 
+        colors = theme_accent_runtime.palette
         self.setStyleSheet(
-            """
+            f"""
             QWidget#StartupSplash {
                 background: transparent;
             }
             QFrame#StartupCard {
                 background: #20231f;
-                border: 2px solid #596451;
+                border: 2px solid {colors.primary_pressed};
                 border-radius: 12px;
             }
             QLabel#StartupEyebrow {
@@ -112,23 +117,35 @@ class StartupSplash(QWidget):
             }
             QProgressBar#StartupProgress {
                 background: #111310;
-                border: 1px solid #4d5549;
+                border: 1px solid {colors.primary_pressed};
                 border-radius: 5px;
             }
             QProgressBar#StartupProgress::chunk {
-                background: #8ed35b;
+                background: {colors.primary};
                 border-radius: 4px;
             }
             """
         )
+
+    def _prepare_theme(self) -> None:
+        try:
+            settings = LauncherSettingsManager().load()
+            appearance = settings.get("appearance", {}) if isinstance(settings.get("appearance"), dict) else {}
+            theme_manager.reload()
+            selected = theme_manager.select(str(appearance.get("theme", "mcw-default")))
+            theme_accent_runtime.configure(selected, str(appearance.get("accent_mode", "theme")), str(appearance.get("accent_color", "#8ed35b")))
+        except Exception:
+            selected = theme_manager.select(theme_manager.DEFAULT_THEME_ID)
+            theme_accent_runtime.configure(selected, "theme", "#8ed35b")
 
     def _apply_palette(self) -> None:
         palette = self.palette()
         palette.setColor(QPalette.ColorRole.Window, QColor("#20231f"))
         palette.setColor(QPalette.ColorRole.WindowText, QColor("#ffffff"))
         palette.setColor(QPalette.ColorRole.Text, QColor("#ffffff"))
-        palette.setColor(QPalette.ColorRole.Highlight, QColor("#8ed35b"))
-        palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
+        colors = theme_accent_runtime.palette
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(colors.selection))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(colors.selection_text))
         self.setPalette(palette)
 
     def _center_on_primary_screen(self) -> None:

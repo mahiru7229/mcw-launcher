@@ -14,6 +14,7 @@ from src.core.theme.theme_contract import (
 )
 from src.core.theme.theme_font import ResolvedThemeFont, ThemeFontDefinition
 from src.core.theme.theme_manager import ThemeDefinition, ThemeManager, theme_manager
+from src.core.theme.theme_palette import DEFAULT_THEME_PALETTE, PALETTE_FIELDS, ThemePaletteDefinition, derive_custom_accent, normalize_hex_color
 from src.core.theme.theme_package import ThemePackage, ThemePackageChecksumReport, ThemePackageError
 from src.core.theme.theme_validation import ThemeValidationCode, ThemeValidationIssue, ThemeValidationReport, ThemeValidator
 
@@ -33,6 +34,11 @@ __all__ = [
     "ThemePackageError",
     "ThemeDefinition",
     "ThemeManager",
+    "ThemePaletteDefinition",
+    "DEFAULT_THEME_PALETTE",
+    "PALETTE_FIELDS",
+    "derive_custom_accent",
+    "normalize_hex_color",
     "theme_manager",
     "THEME_RUNTIME_CONTRACT_VERSION",
     "THEME_SCHEMA_VERSION",

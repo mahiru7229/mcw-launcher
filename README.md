@@ -357,6 +357,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
+| [`docs/RELEASE-v0.11.0-rc.2.md`](docs/RELEASE-v0.11.0-rc.2.md) | Final v0.11.0 release candidate: theme palette and user accent color |
 | [`docs/RELEASE-v0.9.0.md`](docs/RELEASE-v0.9.0.md) | Complete v0.9.0 Stable release notes |
 | [`docs/RELEASE-v0.8.1.md`](docs/RELEASE-v0.8.1.md) | v0.8.1 CurseForge and managed-modpack hotfix notes |
 | [`docs/RELEASE-v0.8.0.md`](docs/RELEASE-v0.8.0.md) | Complete v0.8.0 Stable release notes |

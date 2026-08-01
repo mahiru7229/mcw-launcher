@@ -4,13 +4,14 @@ import copy
 from pathlib import Path
 
 from PySide6.QtCore import QSignalBlocker, QTimer, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton
+from PySide6.QtGui import QColor, QDesktopServices
+from PySide6.QtWidgets import QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton
 
 from src.core.instance.settings_manager import SettingsManager, default_instance_settings
 from src.core.language.language_manager import language_manager, tr
 from src.core.theme.theme_authoring import ThemeAuthoringError, ThemeAuthoringService
 from src.core.theme.theme_manager import theme_manager
+from src.core.theme.theme_palette import normalize_hex_color
 from src.gui.config import NAVIGATION_ITEMS, VERSION
 from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
 from src.gui.dialogs.protected_value_reveal_dialog import confirm_reveal_protected_values
@@ -32,6 +33,7 @@ class LauncherSettingsPage(BasePage):
     reload_theme_requested = Signal(str)
     live_theme_reload_requested = Signal(str)
     motion_mode_changed = Signal(str)
+    accent_changed = Signal(str, str)
     preview_toast_requested = Signal()
     scan_java_requested = Signal()
     open_java_requested = Signal(object)
@@ -44,6 +46,7 @@ class LauncherSettingsPage(BasePage):
         self._theme_live_reload = ThemeLiveReload(self)
         self._theme_live_reload.reload_requested.connect(self._handle_live_theme_reload)
         self._instance_defaults = default_instance_settings()
+        self._accent_color = "#8ed35b"
         self._tracking_suspended = True
         self._dirty = False
         self._saved_data: dict = {}
@@ -277,6 +280,27 @@ class LauncherSettingsPage(BasePage):
         appearance_card.layout.addWidget(self.theme_status_label)
         appearance_card.layout.addLayout(authoring_row)
         appearance_card.layout.addLayout(package_row)
+        self.accent_mode_label = QLabel(tr("appearance.accent.mode.label"))
+        self.accent_mode_combo = QComboBox()
+        self._reload_accent_modes()
+        self.accent_mode_combo.currentIndexChanged.connect(self._accent_mode_changed)
+        self.accent_color_button = QPushButton()
+        self.accent_color_button.setMinimumHeight(36)
+        self.accent_color_button.clicked.connect(self._choose_accent_color)
+        self.accent_reset_button = QPushButton(tr("appearance.accent.reset"))
+        self.accent_reset_button.clicked.connect(self._reset_accent)
+        accent_row = QHBoxLayout()
+        accent_row.setContentsMargins(0, 0, 0, 0)
+        accent_row.addWidget(self.accent_color_button, 1)
+        accent_row.addWidget(self.accent_reset_button)
+        self.accent_detail_label = QLabel()
+        self.accent_detail_label.setObjectName("MutedLabel")
+        self.accent_detail_label.setWordWrap(True)
+        appearance_card.layout.addWidget(self.accent_mode_label)
+        appearance_card.layout.addWidget(self.accent_mode_combo)
+        appearance_card.layout.addLayout(accent_row)
+        appearance_card.layout.addWidget(self.accent_detail_label)
+        self._update_accent_controls()
         self.motion_mode_label = QLabel(tr("motion.mode.label"))
         self.motion_mode_detail = QLabel(tr("motion.mode.detail"))
         self.motion_mode_detail.setObjectName("MutedLabel")
@@ -377,6 +401,7 @@ class LauncherSettingsPage(BasePage):
         self.theme_combo.currentIndexChanged.connect(self._on_theme_selection_changed)
         self.theme_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.motion_mode_combo.currentIndexChanged.connect(self._refresh_dirty_state)
+        self.accent_mode_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.show_static_text.toggled.connect(self._refresh_dirty_state)
         self.live_theme_reload.toggled.connect(self._refresh_dirty_state)
 
@@ -451,6 +476,68 @@ class LauncherSettingsPage(BasePage):
         value = str(self.motion_mode_combo.currentData() or "full").strip().lower()
         return value if value in {"full", "reduced", "off"} else "full"
 
+    def _reload_accent_modes(self) -> None:
+        current = self.accent_mode_combo.currentData() if hasattr(self, "accent_mode_combo") else "theme"
+        self.accent_mode_combo.blockSignals(True)
+        self.accent_mode_combo.clear()
+        self.accent_mode_combo.addItem(tr("appearance.accent.mode.theme"), "theme")
+        self.accent_mode_combo.addItem(tr("appearance.accent.mode.custom"), "custom")
+        index = self.accent_mode_combo.findData(current or "theme")
+        self.accent_mode_combo.setCurrentIndex(max(0, index))
+        self.accent_mode_combo.blockSignals(False)
+
+    def current_accent_mode(self) -> str:
+        value = str(self.accent_mode_combo.currentData() or "theme").strip().lower()
+        return value if value in {"theme", "custom"} else "theme"
+
+    def current_accent_color(self) -> str:
+        try:
+            return normalize_hex_color(self._accent_color)
+        except ValueError:
+            return "#8ed35b"
+
+    def _theme_accent_color(self) -> str:
+        theme = self._selected_theme()
+        return theme.palette.primary if theme is not None else "#63984a"
+
+    def _accent_mode_changed(self, _index: int) -> None:
+        self._update_accent_controls()
+        self.accent_changed.emit(self.current_accent_mode(), self.current_accent_color())
+
+    def _choose_accent_color(self) -> None:
+        selected = QColorDialog.getColor(QColor(self.current_accent_color()), self, tr("appearance.accent.choose"))
+        if not selected.isValid():
+            return
+        self._accent_color = selected.name(QColor.NameFormat.HexRgb).lower()
+        custom_index = self.accent_mode_combo.findData("custom")
+        with QSignalBlocker(self.accent_mode_combo):
+            self.accent_mode_combo.setCurrentIndex(max(0, custom_index))
+        self._update_accent_controls()
+        self._refresh_dirty_state()
+        self.accent_changed.emit("custom", self.current_accent_color())
+
+    def _reset_accent(self) -> None:
+        self._accent_color = "#8ed35b"
+        theme_index = self.accent_mode_combo.findData("theme")
+        with QSignalBlocker(self.accent_mode_combo):
+            self.accent_mode_combo.setCurrentIndex(max(0, theme_index))
+        self._update_accent_controls()
+        self._refresh_dirty_state()
+        self.accent_changed.emit("theme", self.current_accent_color())
+
+    def _update_accent_controls(self) -> None:
+        if not hasattr(self, "accent_color_button"):
+            return
+        mode = self.current_accent_mode()
+        color = self.current_accent_color() if mode == "custom" else self._theme_accent_color()
+        self.accent_color_button.setEnabled(True)
+        self.accent_reset_button.setEnabled(mode == "custom")
+        self.accent_color_button.setText(tr("appearance.accent.color_value", color=color))
+        text_color = "#111111" if QColor(color).lightnessF() > 0.62 else "#ffffff"
+        self.accent_color_button.setStyleSheet(f"QPushButton {{ background-color: {color}; color: {text_color}; border: 2px solid {color}; }}")
+        key = "appearance.accent.detail.custom" if mode == "custom" else "appearance.accent.detail.theme"
+        self.accent_detail_label.setText(tr(key, color=color))
+
     def _emit_motion_mode_changed(self, _index: int) -> None:
         self.motion_mode_changed.emit(self.current_motion_mode())
 
@@ -476,6 +563,7 @@ class LauncherSettingsPage(BasePage):
             self.language_changed.emit(str(pending_data.get("language", "en-US")))
             self.reload_theme_requested.emit(str(pending_data.get("theme", "mcw-default")))
             self.motion_mode_changed.emit(str(pending_data.get("motion_mode", "full")))
+            self.accent_changed.emit(str(pending_data.get("accent_mode", "theme")), str(pending_data.get("accent_color", "#8ed35b")))
 
     def form_data(self) -> dict:
         return {
@@ -490,6 +578,8 @@ class LauncherSettingsPage(BasePage):
             "show_static_text": self.show_static_text.isChecked(),
             "motion_mode": self.current_motion_mode(),
             "live_theme_reload": self.live_theme_reload.isChecked(),
+            "accent_mode": self.current_accent_mode(),
+            "accent_color": self.current_accent_color(),
             "modrinth_include_beta": self.modrinth_include_beta.isChecked(),
             "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
             "block_launch_on_modrinth_failure": self.block_modrinth_failure.isChecked(),
@@ -521,6 +611,7 @@ class LauncherSettingsPage(BasePage):
         self.language_changed.emit(str(self._saved_data.get("language", "en-US")))
         self.reload_theme_requested.emit(str(self._saved_data.get("theme", "mcw-default")))
         self.motion_mode_changed.emit(str(self._saved_data.get("motion_mode", "full")))
+        self.accent_changed.emit(str(self._saved_data.get("accent_mode", "theme")), str(self._saved_data.get("accent_color", "#8ed35b")))
 
     def set_update_status(self, message: str) -> None:
         self.update_status_label.setText(message)
@@ -548,6 +639,10 @@ class LauncherSettingsPage(BasePage):
         self.edit_instance_defaults_button.setText(tr("instance_defaults.launcher.edit"))
         self.motion_mode_label.setText(tr("motion.mode.label"))
         self.motion_mode_detail.setText(tr("motion.mode.detail"))
+        self.accent_mode_label.setText(tr("appearance.accent.mode.label"))
+        self.accent_reset_button.setText(tr("appearance.accent.reset"))
+        self._reload_accent_modes()
+        self._update_accent_controls()
         self.reload_theme_button.setText(tr("theme.authoring.reload"))
         self.live_theme_reload.setText(tr("theme.authoring.live_reload"))
         self.live_theme_reload.setToolTip(tr("theme.authoring.live_reload.detail"))
@@ -595,6 +690,7 @@ class LauncherSettingsPage(BasePage):
             self.language_combo,
             self.theme_combo,
             self.motion_mode_combo,
+            self.accent_mode_combo,
             self.show_static_text,
             self.live_theme_reload,
             *self.curseforge_gateway_inputs,
@@ -638,6 +734,13 @@ class LauncherSettingsPage(BasePage):
         self.theme_combo.blockSignals(False)
         motion_index = self.motion_mode_combo.findData(str(settings.get("motion_mode", "full")))
         self.motion_mode_combo.setCurrentIndex(max(0, motion_index))
+        accent_index = self.accent_mode_combo.findData(str(settings.get("accent_mode", "theme")))
+        self.accent_mode_combo.setCurrentIndex(max(0, accent_index))
+        try:
+            self._accent_color = normalize_hex_color(settings.get("accent_color", "#8ed35b"))
+        except ValueError:
+            self._accent_color = "#8ed35b"
+        self._update_accent_controls()
         self.show_static_text.setChecked(bool(settings.get("show_static_text", False)))
         self.live_theme_reload.setChecked(bool(settings.get("live_theme_reload", False)))
         self._set_live_theme_reload(self.live_theme_reload.isChecked())
@@ -696,6 +799,7 @@ class LauncherSettingsPage(BasePage):
 
     def _on_theme_selection_changed(self, _index: int) -> None:
         self._update_theme_authoring_state()
+        self._update_accent_controls()
         self._watch_selected_theme()
 
     def _update_theme_authoring_state(self) -> None:

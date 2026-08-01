@@ -12,10 +12,11 @@ from typing import Any
 from src.core.config.managed_content_policy import ManagedContentPolicy
 from src.core.fs.paths import Paths
 from src.core.instance.settings_manager import SettingsManager, default_instance_settings
+from src.core.theme.theme_palette import normalize_hex_color
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 12
+    SCHEMA_VERSION = 13
     UPDATE_CHANNEL_POLICY_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
@@ -36,6 +37,8 @@ class LauncherSettingsManager:
             "show_static_text": False,
             "motion_mode": "full",
             "live_theme_reload": False,
+            "accent_mode": "theme",
+            "accent_color": "#8ed35b",
         },
         "modrinth": {
             "include_beta": False,
@@ -183,6 +186,12 @@ class LauncherSettingsManager:
         motion_mode = str(appearance.get("motion_mode") or "full").strip().lower()
         appearance["motion_mode"] = motion_mode if motion_mode in {"full", "reduced", "off"} else "full"
         appearance["live_theme_reload"] = self._as_bool(appearance.get("live_theme_reload"), False)
+        accent_mode = str(appearance.get("accent_mode") or "theme").strip().lower()
+        appearance["accent_mode"] = accent_mode if accent_mode in {"theme", "custom"} else "theme"
+        try:
+            appearance["accent_color"] = normalize_hex_color(appearance.get("accent_color") or "#8ed35b")
+        except ValueError:
+            appearance["accent_color"] = "#8ed35b"
 
         modrinth = normalized.setdefault("modrinth", {})
         modrinth["include_beta"] = self._as_bool(modrinth.get("include_beta"), False)

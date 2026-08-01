@@ -157,3 +157,36 @@ Schema 6 đã được đóng băng để MCW Theme Studio và các công cụ n
 - `theme-runtime-contract.v1.json`
 
 Package export từ RC 1 dùng ZIP deterministic và `theme-checksums.json` format 1. Xem [`docs/THEME_RUNTIME_CONTRACT.md`](../docs/THEME_RUNTIME_CONTRACT.md).
+
+## Theme Palette & Accent Color của v0.11.0-rc.2
+
+Schema 6 hỗ trợ palette màu chủ đạo trực tiếp trong `theme.json`. Theme có thể cung cấp màu mặc định, còn người dùng có thể chọn **Use theme color** hoặc một màu custom trong Launcher Settings.
+
+```json
+{
+  "schema_version": 6,
+  "palette": {
+    "primary": "#63984a",
+    "primary_hover": "#7db45e",
+    "primary_pressed": "#4d7938",
+    "primary_text": "#ffffff",
+    "focus": "#8ed35b",
+    "selection": "#4f6d3c",
+    "selection_text": "#ffffff",
+    "link": "#8ed35b",
+    "success": "#8ed35b",
+    "warning": "#d6a93c",
+    "error": "#c47a7a"
+  },
+  "accent_assets": [
+    "button.primary",
+    "button.primary_hover",
+    "button.primary_pressed",
+    "progress.chunk"
+  ]
+}
+```
+
+`accent_assets` là opt-in: launcher chỉ tint những PNG được theme chủ động đánh dấu. Logo, artwork và icon không nằm trong danh sách sẽ giữ nguyên màu gốc. Theme schema 1–5 và theme schema 6 không có palette vẫn dùng fallback tương thích.
+
+Xem [`docs/THEME_RUNTIME_CONTRACT.md`](../docs/THEME_RUNTIME_CONTRACT.md) và [`docs/THEME_CREATION_GUIDE.md`](../docs/THEME_CREATION_GUIDE.md) để biết thứ tự ưu tiên màu, validation code và quy tắc tint asset.

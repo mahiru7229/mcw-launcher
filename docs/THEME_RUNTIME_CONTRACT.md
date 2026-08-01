@@ -142,3 +142,33 @@ python tools/validate_theme.py themes/my-theme --json
 ### Deterministic package format
 
 Package v1 fixes ZIP ordering, timestamps, permissions, path separators, and checksum structure. Imports reject missing, extra, modified, duplicated, unsafe, or mismatched files. Beta 2 checksum manifests remain import-compatible.
+
+## RC2 optional palette extension
+
+`v0.11.0-rc.2` adds two optional schema 6 fields without changing any frozen field:
+
+```json
+{
+  "palette": {
+    "primary": "#63984a",
+    "primary_hover": "#7db45e",
+    "primary_pressed": "#4d7938",
+    "primary_text": "#ffffff",
+    "focus": "#8ed35b",
+    "selection": "#4f6d3c",
+    "selection_text": "#ffffff",
+    "link": "#8ed35b",
+    "success": "#8ed35b",
+    "warning": "#d6a93c",
+    "error": "#c47a7a"
+  },
+  "accent_assets": [
+    "button.primary",
+    "progress.chunk"
+  ]
+}
+```
+
+Mọi màu dùng định dạng `#RRGGBB`. `accent_assets` là danh sách opt-in: launcher chỉ nhuộm những PNG hoặc spritesheet được theme chủ động liệt kê. Logo, hình nền và icon không bị đổi màu ngoài ý muốn. Khi người dùng chọn màu tùy chỉnh, nhóm primary/focus/selection/link được tạo từ màu đó; success, warning và error vẫn giữ ý nghĩa màu của theme.
+
+These fields are optional and therefore remain compatible with the frozen schema 6 policy. Themes without `palette` keep their existing QSS and PNG appearance. A user custom accent may still override primary controls, but assets are tinted only when explicitly listed in `accent_assets`.

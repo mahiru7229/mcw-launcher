@@ -5,6 +5,7 @@ from PySide6.QtGui import QPixmap
 
 from src.core.theme.theme_animation import ResolvedThemeAnimation
 from src.gui.animation.animation_clock import AnimationClock
+from src.gui.theme.accent_runtime import theme_accent_runtime
 
 
 class ThemeAnimationPlayer(QObject):
@@ -110,6 +111,7 @@ class ThemeAnimationPlayer(QObject):
                 definition.frame_height,
             )
             frame = sheet.copy(rect)
+            frame = theme_accent_runtime.tint_pixmap(frame, definition.key)
             if frame.isNull():
                 return ()
             frames.append(frame)
