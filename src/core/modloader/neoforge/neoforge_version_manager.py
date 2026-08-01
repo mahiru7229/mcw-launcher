@@ -205,7 +205,7 @@ class NeoForgeVersionManager:
             if coordinate.startswith("net.neoforged:"):
                 return True
         arguments = profile.get("arguments") if isinstance(profile.get("arguments"), dict) else {}
-        game_arguments = arguments.get("game") if isinstance(arguments.get("game"), list) else []
+        game_arguments = NeoForgeVersionManager._argument_tokens(arguments.get("game"))
         legacy_arguments = str(profile.get("minecraftArguments") or "")
         return any(value in {"--fml.neoForgeVersion", "--fml.forgeVersion"} for value in game_arguments) or "--fml.neoForgeVersion" in legacy_arguments or "--fml.forgeVersion" in legacy_arguments
 
@@ -398,13 +398,33 @@ class NeoForgeVersionManager:
                 return True
 
         arguments = raw.get("arguments") if isinstance(raw.get("arguments"), dict) else {}
-        game_arguments = arguments.get("game") if isinstance(arguments.get("game"), list) else []
+        game_arguments = NeoForgeVersionManager._argument_tokens(arguments.get("game"))
         for index, value in enumerate(game_arguments[:-1]):
-            if value in {"--fml.neoForgeVersion", "--fml.forgeVersion"} and str(game_arguments[index + 1]) == neoforge_version:
+            if value in {"--fml.neoForgeVersion", "--fml.forgeVersion"} and game_arguments[index + 1] == neoforge_version:
                 return True
 
         legacy_arguments = str(raw.get("minecraftArguments") or "")
         return ("--fml.neoForgeVersion" in legacy_arguments or "--fml.forgeVersion" in legacy_arguments) and neoforge_version in legacy_arguments
+
+    @staticmethod
+    def _argument_tokens(value: object) -> tuple[str, ...]:
+        tokens: list[str] = []
+
+        def collect(item: object) -> None:
+            if isinstance(item, str):
+                normalized = item.strip()
+                if normalized:
+                    tokens.append(normalized)
+                return
+            if isinstance(item, (list, tuple)):
+                for child in item:
+                    collect(child)
+                return
+            if isinstance(item, dict):
+                collect(item.get("value"))
+
+        collect(value)
+        return tuple(tokens)
 
     @staticmethod
     def _sha1(path: Path) -> str:

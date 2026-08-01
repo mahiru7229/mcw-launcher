@@ -143,3 +143,29 @@ def test_repair_restores_previous_profile_when_reinstall_fails(monkeypatch, tmp_
     assert cache.read_bytes() == previous
     assert "previous cached profile was restored" in (neoforge_root / "logs" / "neoforge-repair-1.21.1-21.1.200.log").read_text(encoding="utf-8")
 
+
+
+def test_profile_match_accepts_rule_wrapped_game_arguments() -> None:
+    profile = {
+        "id": "custom-profile",
+        "arguments": {
+            "game": [
+                {"rules": [{"action": "allow", "os": {"name": "windows"}}], "value": ["--fml.neoForgeVersion", "21.1.200"]},
+            ]
+        },
+    }
+
+    assert NeoForgeVersionManager._profile_matches_neoforge(profile, "custom-profile", "21.1.200") is True
+
+
+def test_runtime_detection_accepts_rule_wrapped_game_arguments() -> None:
+    raw = {
+        "arguments": {
+            "game": [
+                {"rules": [{"action": "allow"}], "value": "--fml.neoForgeVersion"},
+                {"rules": [{"action": "allow"}], "value": ["21.1.200"]},
+            ]
+        }
+    }
+
+    assert NeoForgeVersionManager._has_neoforge_runtime([], raw, "21.1.200") is True
