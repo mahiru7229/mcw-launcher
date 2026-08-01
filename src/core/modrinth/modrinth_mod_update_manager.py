@@ -148,6 +148,6 @@ class ModrinthModUpdateManager:
     @staticmethod
     def _supported_loader(instance: Instance) -> str:
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
-            raise RuntimeError("Mod updates require a Fabric or Forge instance.")
+        if loader_name not in ModLoaderManager.MODDED_LOADERS:
+            raise RuntimeError("Mod updates require a Fabric, Forge, or NeoForge instance.")
         return loader_name

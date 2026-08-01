@@ -146,7 +146,7 @@ class RightPanelWidget(QFrame):
         loader_name = loader[0] if loader else "vanilla"
         loader_version = loader[1] if len(loader) > 1 else "-1"
         loader_text = loader_name if loader_version in {"", "-1"} else f"{loader_name} {loader_version}"
-        is_modded = str(loader_name).casefold() in {"fabric", "forge"}
+        is_modded = str(loader_name).casefold() in {"fabric", "forge", "neoforge"}
         self.manage_mods_button.setEnabled(is_modded)
         self.manage_mods_button.setToolTip("" if is_modded else tr("right_panel.mods.apply_loader"))
         self.instance_name.setText(instance.name)

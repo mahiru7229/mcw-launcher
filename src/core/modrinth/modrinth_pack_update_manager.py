@@ -375,7 +375,7 @@ class ModrinthPackUpdateManager:
     @staticmethod
     def _registry_loader(registry: dict) -> str:
         loader_name = str(registry.get("loader") or ModLoaderManager.FABRIC).strip().lower()
-        if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+        if loader_name not in ModLoaderManager.MODDED_LOADERS:
             raise RuntimeError(f"Unsupported Modrinth modpack loader: {loader_name or 'unknown'}")
         return loader_name
 

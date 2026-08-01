@@ -34,6 +34,12 @@ def test_parses_primary_fabric_loader() -> None:
     assert CurseForgePackInstaller._parse_loader(manifest) == ("1.20.1", "fabric", "0.16.0")
 
 
+def test_parses_primary_neoforge_loader() -> None:
+    manifest = {"minecraft": {"version": "1.21.1", "modLoaders": [{"id": "neoforge-21.1.200", "primary": True}]}}
+
+    assert CurseForgePackInstaller._parse_loader(manifest) == ("1.21.1", "neoforge", "21.1.200")
+
+
 def test_rejects_ambiguous_or_unsupported_modpack_loaders() -> None:
     mixed = {
         "minecraft": {
@@ -54,7 +60,7 @@ def test_rejects_ambiguous_or_unsupported_modpack_loaders() -> None:
         }
     }
 
-    with pytest.raises(RuntimeError, match="both Fabric and Forge"):
+    with pytest.raises(RuntimeError, match="multiple supported mod-loader families"):
         CurseForgePackInstaller._parse_loader(mixed)
     with pytest.raises(RuntimeError, match="unsupported loader"):
         CurseForgePackInstaller._parse_loader(unsupported)
@@ -139,6 +145,47 @@ def test_installs_fabric_modpack_as_fabric_instance(tmp_path: Path, monkeypatch)
     )
     assert registry["loader"] == "fabric"
     assert registry["loaderVersion"] == "0.16.0"
+
+
+def test_installs_neoforge_modpack_as_neoforge_instance(tmp_path: Path, monkeypatch) -> None:
+    pack_path = tmp_path / "neoforge-pack.zip"
+    manifest = {
+        "minecraft": {
+            "version": "1.21.1",
+            "modLoaders": [{"id": "neoforge-21.1.200", "primary": True}],
+        },
+        "files": [],
+        "overrides": "overrides",
+    }
+    with zipfile.ZipFile(pack_path, "w") as archive:
+        archive.writestr("manifest.json", json.dumps(manifest))
+        archive.writestr("overrides/config/neoforge.toml", "enabled=true")
+
+    calls: list[tuple[str, ...]] = []
+    base_version = SimpleNamespace(id="1.21.1")
+    project = SimpleNamespace(name="NeoForge Pack")
+    file = SimpleNamespace(display_name="NeoForge Pack 1.0")
+
+    def create_instance(name: str, version: object, mod_loader: tuple[str, str]) -> Instance:
+        instance_dir = tmp_path / "instances" / name
+        instance_dir.mkdir(parents=True)
+        return Instance(instance_id="neoforge-pack", name=name, version_id=version.id, instance_dir=instance_dir, mod_loader=mod_loader)
+
+    monkeypatch.setattr(CurseForgePackInstaller, "_resolve_files", staticmethod(lambda *_args, **_kwargs: ([], 0)))
+    monkeypatch.setattr(VersionManager, "load", staticmethod(lambda version_id: base_version))
+    monkeypatch.setattr(ModLoaderManager, "resolve", staticmethod(lambda game_version, loader_name, loader_version="auto": calls.append(("resolve", game_version, loader_name, loader_version)) or (loader_name, loader_version)))
+    monkeypatch.setattr(ModLoaderManager, "prepare", staticmethod(lambda version, loader_name, loader_version, reporter=None: calls.append(("prepare", loader_name, loader_version)) or version))
+    monkeypatch.setattr(InstanceManager, "create", staticmethod(create_instance))
+
+    result = CurseForgePackInstaller._install_from_archive(31, 32, "NeoForge Instance", True, project, file, pack_path, None, expected_loader="neoforge")
+
+    assert result.instance.mod_loader == ("neoforge", "21.1.200")
+    assert ("resolve", "1.21.1", "neoforge", "21.1.200") in calls
+    assert ("prepare", "neoforge", "21.1.200") in calls
+    assert (result.instance.instance_dir / "config" / "neoforge.toml").is_file()
+    registry = json.loads((result.instance.instance_dir / ".mcw" / "curseforge-pack.json").read_text(encoding="utf-8"))
+    assert registry["loader"] == "neoforge"
+    assert registry["loaderVersion"] == "21.1.200"
 
 
 @pytest.mark.parametrize("value", ["../outside", "/absolute", "C:/windows", "folder/../../escape", ""])

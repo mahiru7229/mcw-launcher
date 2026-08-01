@@ -33,6 +33,10 @@ class ModCompatibilityManager:
             installed_versions["forge"] = loader_version
             installed_versions["javafml"] = loader_version
             installed_versions["fml"] = loader_version
+        elif loader_name == ModLoaderManager.NEOFORGE:
+            installed_versions["neoforge"] = loader_version
+            installed_versions["javafml"] = loader_version
+            installed_versions["fml"] = loader_version
 
         issues: list[ModIssue] = []
         ModCompatibilityManager._append_file_issues(mods, issues)

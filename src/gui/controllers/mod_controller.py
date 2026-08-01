@@ -55,7 +55,7 @@ class ModController(BaseController):
             return
 
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+        if loader_name not in ModLoaderManager.MODDED_LOADERS:
             self.mods_changed.emit([])
             return
 
@@ -110,7 +110,7 @@ class ModController(BaseController):
         if instance is None:
             return
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+        if loader_name not in ModLoaderManager.MODDED_LOADERS:
             self.updates_changed.emit(ModrinthModUpdateReport(entries=()))
             return
         instance_id = instance.instance_id
@@ -122,8 +122,8 @@ class ModController(BaseController):
         instance = self._require_instance()
         if instance is None or not project_ids:
             return
-        if ModLoaderManager.normalize(instance.mod_loader)[0] not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
-            self._emit_error("Manage mods", "Modrinth update actions require a Fabric or Forge instance.")
+        if ModLoaderManager.normalize(instance.mod_loader)[0] not in ModLoaderManager.MODDED_LOADERS:
+            self._emit_error("Manage mods", "Modrinth update actions require a Fabric, Forge, or NeoForge instance.")
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
@@ -134,8 +134,8 @@ class ModController(BaseController):
         instance = self._require_instance()
         if instance is None:
             return
-        if ModLoaderManager.normalize(instance.mod_loader)[0] not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
-            self._emit_error("Manage mods", "Modrinth update actions require a Fabric or Forge instance.")
+        if ModLoaderManager.normalize(instance.mod_loader)[0] not in ModLoaderManager.MODDED_LOADERS:
+            self._emit_error("Manage mods", "Modrinth update actions require a Fabric, Forge, or NeoForge instance.")
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)

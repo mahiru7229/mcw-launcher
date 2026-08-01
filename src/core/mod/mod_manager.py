@@ -157,7 +157,8 @@ class ModManager:
                 if "META-INF/neoforge.mods.toml" in names:
                     return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/neoforge.mods.toml"), loader="neoforge", metadata_format="neoforge.mods.toml", manifest=manifest, provider_version=provider_version)
                 if has_forge:
-                    return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/mods.toml"), loader="forge", metadata_format="mods.toml", manifest=manifest, provider_version=provider_version)
+                    loader = ModLoaderManager.NEOFORGE if normalized_preference == ModLoaderManager.NEOFORGE else ModLoaderManager.FORGE
+                    return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/mods.toml"), loader=loader, metadata_format="mods.toml", manifest=manifest, provider_version=provider_version)
                 if "mcmod.info" in names:
                     return ModManager._read_legacy_forge_mod(path, file_name, enabled, archive.read("mcmod.info"))
                 fml_mod_type = str(manifest.get("fmlmodtype") or "").strip().upper()
@@ -195,6 +196,8 @@ class ModManager:
     def _read_universal_fabric_forge_mod(path: Path, file_name: str, enabled: bool, fabric_metadata: bytes, forge_metadata: bytes, preferred_loader: str, manifest: dict[str, str] | None = None, provider_version: str = "") -> ModInfo:
         if preferred_loader == ModLoaderManager.FORGE:
             return ModManager._read_forge_mod(path, file_name, enabled, forge_metadata, loader="forge", metadata_format="mods.toml", manifest=manifest, provider_version=provider_version)
+        if preferred_loader == ModLoaderManager.NEOFORGE:
+            return ModManager._read_forge_mod(path, file_name, enabled, forge_metadata, loader="neoforge", metadata_format="mods.toml", manifest=manifest, provider_version=provider_version)
         if preferred_loader == ModLoaderManager.FABRIC:
             return ModManager._read_fabric_mod(path, file_name, enabled, fabric_metadata, manifest, provider_version)
 
@@ -411,8 +414,8 @@ class ModManager:
     @staticmethod
     def _ensure_modifiable(instance: Instance, launch_lock_token: str | None = None) -> None:
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
-            raise RuntimeError("This instance does not use Fabric or Forge.")
+        if loader_name not in ModLoaderManager.MODDED_LOADERS:
+            raise RuntimeError("This instance does not use Fabric, Forge, or NeoForge.")
         if InstanceRunLock.is_active(instance) and not InstanceRunLock.owns_preparing_lock(instance, launch_lock_token):
             raise InstanceModChangeBlockedError(instance.name)
 

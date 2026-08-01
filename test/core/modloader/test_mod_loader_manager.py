@@ -4,6 +4,7 @@ from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.fabric.fabric_version_manager import FabricVersionManager
 from src.core.modloader.forge.forge_version_manager import ForgeVersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.modloader.neoforge.neoforge_version_manager import NeoForgeVersionManager
 
 
 def test_loads_vanilla_version(monkeypatch):
@@ -62,7 +63,7 @@ def test_repair_rejects_vanilla_instance():
 
     import pytest
 
-    with pytest.raises(RuntimeError, match="Only Fabric instances"):
+    with pytest.raises(RuntimeError, match="Only Fabric, Forge, or NeoForge"):
         ModLoaderManager.repair(instance)
 
 
@@ -87,5 +88,29 @@ def test_repairs_forge_instance(monkeypatch):
     base_version = object()
     monkeypatch.setattr(VersionManager, "load", lambda version_id: base_version)
     monkeypatch.setattr(ForgeVersionManager, "repair", lambda version, loader_version, reporter=None: expected)
+
+    assert ModLoaderManager.repair(instance) is expected
+
+
+def test_loads_neoforge_version(monkeypatch):
+    expected = object()
+    monkeypatch.setattr(NeoForgeVersionManager, "load", lambda game_version, loader_version, reporter=None: expected)
+    instance = SimpleNamespace(version_id="1.21.1", mod_loader=("neoforge", "21.1.200"))
+
+    assert ModLoaderManager.load(instance) is expected
+
+
+def test_resolve_neoforge_auto_uses_recommended_loader(monkeypatch):
+    monkeypatch.setattr(NeoForgeVersionManager, "recommended_loader_version", lambda game_version: "21.1.200")
+
+    assert ModLoaderManager.resolve("1.21.1", "neoforge", "auto") == ("neoforge", "21.1.200")
+
+
+def test_repairs_neoforge_instance(monkeypatch):
+    expected = object()
+    instance = SimpleNamespace(version_id="1.21.1", mod_loader=("neoforge", "21.1.200"))
+    base_version = object()
+    monkeypatch.setattr(VersionManager, "load", lambda version_id: base_version)
+    monkeypatch.setattr(NeoForgeVersionManager, "repair", lambda version, loader_version, reporter=None: expected)
 
     assert ModLoaderManager.repair(instance) is expected

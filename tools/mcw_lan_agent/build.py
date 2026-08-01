@@ -122,6 +122,7 @@ def verify_agent(agent_jar: Path) -> None:
             [
                 java,
                 "-Dmcw.lan.offline=true",
+                "-Dmcw.lan.loader=neoforge",
                 "-Dmcw.lan.targets=net/minecraft/server/Wrong#missing;net/minecraft/server/MinecraftServer#setUsesAuthentication",
                 f"-Dmcw.lan.log={agent_log.as_posix()}",
                 f"-javaagent:{agent_jar}",
@@ -142,6 +143,7 @@ def verify_agent(agent_jar: Path) -> None:
         log_text = agent_log.read_text(encoding="utf-8")
         expected_log_messages = (
             "premain entered",
+            "loader=neoforge",
             "enabled with 2 resolved target candidate(s)",
             "candidate: net.minecraft.server.MinecraftServer#setUsesAuthentication(boolean)",
             "target class loaded by",

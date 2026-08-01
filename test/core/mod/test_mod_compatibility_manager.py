@@ -114,3 +114,26 @@ def test_maven_range_rejects_outside_version() -> None:
     assert ModCompatibilityManager._matches_requirement("46.0.0", "[47,)") is False
     assert ModCompatibilityManager._matches_requirement("47.3.0", "[47,)") is True
     assert ModCompatibilityManager._matches_requirement("1.21.0", "[1.20.1,1.21)") is False
+
+def test_neoforge_loader_dependency_matches_installed_version(tmp_path):
+    instance_dir = tmp_path / "neoforge-instance"
+    mods = instance_dir / "mods"
+    mods.mkdir(parents=True)
+    instance = Instance(instance_id="neoforge", name="NeoForge", version_id="1.21.1", instance_dir=instance_dir, mod_loader=("neoforge", "21.1.200"))
+    metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[21.1,)"\n'
+        'license="MIT"\n\n'
+        '[[mods]]\n'
+        'modId="consumer"\n'
+        'version="1.0.0"\n'
+        'displayName="consumer"\n'
+    )
+    with zipfile.ZipFile(mods / "consumer.jar", "w") as archive:
+        archive.writestr("META-INF/neoforge.mods.toml", metadata)
+
+    report = ModCompatibilityManager.scan(instance)
+
+    assert not any(issue.code == "dependency-version" for issue in report.issues)
+    assert not any(issue.code == "loader-mismatch" for issue in report.issues)
+

@@ -10,6 +10,7 @@ from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.forge.forge_version_manager import ForgeVersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.modloader.neoforge.neoforge_version_manager import NeoForgeVersionManager
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.instance.instance import Instance
 from src.models.progress.progress_stage import ProgressStage
@@ -47,7 +48,7 @@ class ForgeChangeManager:
             cls._write_snapshot(instance, snapshot)
             cls._write_log(
                 instance,
-                "Forge loader change completed.\n"
+                "Mod-loader change completed.\n"
                 f"Previous: {cls._display_loader(previous_loader)}\n"
                 f"Current: {cls._display_loader(resolved_loader)}\n",
             )
@@ -133,18 +134,15 @@ class ForgeChangeManager:
         reporter: ProgressReporter | None,
     ) -> None:
         loader_name, loader_version = loader
-        if loader_name != ModLoaderManager.FORGE:
+        if loader_name not in ModLoaderManager.FORGE_FAMILY:
             return
         DownloadLibraryManager.load(prepared, reporter=reporter)
-        issues = ForgeVersionManager.validate_installation(
-            prepared,
-            game_version,
-            loader_version,
-            verify_files=True,
-        )
+        manager = NeoForgeVersionManager if loader_name == ModLoaderManager.NEOFORGE else ForgeVersionManager
+        issues = manager.validate_installation(prepared, game_version, loader_version, verify_files=True)
         if issues:
             details = "\n".join(f"- {issue}" for issue in issues)
-            raise RuntimeError(f"Forge version change validation failed:\n{details}")
+            title = "NeoForge" if loader_name == ModLoaderManager.NEOFORGE else "Forge"
+            raise RuntimeError(f"{title} version change validation failed:\n{details}")
 
     @classmethod
     def _build_snapshot(

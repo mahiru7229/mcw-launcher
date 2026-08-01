@@ -64,7 +64,7 @@ def test_private_manual_profile_does_not_require_a_mod_loader(tmp_path: Path) ->
 def test_tunnel_provider_requires_fabric_or_forge(tmp_path: Path) -> None:
     instance = make_instance(tmp_path, "vanilla")
 
-    with pytest.raises(RuntimeError, match="tunnel provider requires a Fabric or Forge"):
+    with pytest.raises(RuntimeError, match="tunnel provider requires a Fabric, Forge, or NeoForge"):
         LanHostingManager.plan(instance, "private_offline", "e4mc")
 
 

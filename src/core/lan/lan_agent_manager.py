@@ -33,7 +33,7 @@ class LanAgentManager:
     AUTH_PRIVATE_OFFLINE = "private_offline"
     AGENT_FILENAME = "mcw-lan-agent.jar"
     AGENT_LOG_FILENAME = "mcw-lan-agent.log"
-    AGENT_SHA256 = "ba8a66ee3ec7f85901d0d9aa32788406d0078ecb92f7bb20cd3816d06227823b"
+    AGENT_SHA256 = "c682cd51fbfc9b5e3ed34520eb38a667212c183a68e37ad17694f14f4eace4dc"
     TARGET_CLASS = "net/minecraft/server/MinecraftServer"
     TARGET_METHOD = "setUsesAuthentication"
     TARGET_DESCRIPTOR = "(Z)V"
@@ -104,6 +104,7 @@ class LanAgentManager:
             )
             arguments = [
                 "-Dmcw.lan.offline=true",
+                f"-Dmcw.lan.loader={resolution.loader}",
                 f"-Dmcw.lan.targets={resolution.encoded_targets}",
                 f"-Dmcw.lan.log={path.resolve().as_posix()}",
                 f"-javaagent:{installation.path}",
@@ -140,7 +141,7 @@ class LanAgentManager:
             f"[MCW Launcher] Runtime agent: {runtime_path.resolve()}\n"
             f"[MCW Launcher] Named target aliases: {cls.TARGET_CLASS.replace('/', '.')}#setUsesAuthentication{cls.TARGET_DESCRIPTOR}; "
             f"{cls.TARGET_CLASS.replace('/', '.')}#setOnlineMode{cls.TARGET_DESCRIPTOR}\n"
-            "[MCW Launcher] Runtime targets: resolved from Mojang/Fabric mappings during launch\n",
+            "[MCW Launcher] Runtime targets: resolved from Mojang, Fabric, Forge, and NeoForge mappings during launch\n",
             encoding="utf-8",
         )
         return path

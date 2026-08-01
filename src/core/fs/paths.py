@@ -246,6 +246,42 @@ class Paths:
         return Paths.fabric_metadata_root() / "profiles" / game / f"{loader}.json"
 
     @staticmethod
+    def neoforge_root() -> Path:
+        directory = Paths.CACHE_ROOT / "modloaders" / "neoforge"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def neoforge_version_dir(game_version: str, neoforge_version: str) -> Path:
+        directory = Paths.CACHE_ROOT / "versions" / f"neoforge-{game_version}-{neoforge_version}"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def neoforge_version_json(game_version: str, neoforge_version: str) -> Path:
+        directory = Paths.neoforge_version_dir(game_version, neoforge_version)
+        return directory / f"{directory.name}.json"
+
+    @staticmethod
+    def neoforge_installer_path(game_version: str, neoforge_version: str) -> Path:
+        directory = Paths.neoforge_root() / "installers" / game_version
+        directory.mkdir(parents=True, exist_ok=True)
+        if str(game_version).strip() == "1.20.1":
+            artifact = "forge"
+            prefix = f"{game_version}-"
+            coordinate_version = neoforge_version if str(neoforge_version).startswith(prefix) else f"{prefix}{neoforge_version}"
+        else:
+            artifact = "neoforge"
+            coordinate_version = neoforge_version
+        return directory / f"{artifact}-{coordinate_version}-installer.jar"
+
+    @staticmethod
+    def neoforge_staging_dir(game_version: str, neoforge_version: str) -> Path:
+        directory = Paths.neoforge_root() / "staging" / f"{game_version}-{neoforge_version}"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
     def forge_root() -> Path:
         directory = Paths.CACHE_ROOT / "modloaders" / "forge"
         directory.mkdir(parents=True, exist_ok=True)
@@ -294,9 +330,12 @@ class Paths:
     def forge_diagnostics_default_path(instance: Instance) -> Path:
         from datetime import datetime
 
+        raw_loader = getattr(instance, "mod_loader", None)
+        loader_name = str(raw_loader[0] if isinstance(raw_loader, (tuple, list)) and raw_loader else raw_loader or "").strip().casefold()
+        loader_title = "NeoForge" if loader_name == "neoforge" else "Forge"
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         safe_name = "".join(character if character.isalnum() or character in {"-", "_"} else "-" for character in instance.name).strip("-") or "instance"
-        return Paths.logs_root() / f"MCW-Forge-Diagnostics-{safe_name}-{timestamp}.zip"
+        return Paths.logs_root() / f"MCW-{loader_title}-Diagnostics-{safe_name}-{timestamp}.zip"
 
     @staticmethod
     def curseforge_root() -> Path:

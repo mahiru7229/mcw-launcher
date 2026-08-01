@@ -132,6 +132,6 @@ class ModrinthController(BaseController):
     @staticmethod
     def _normalize_loader(loader: str) -> str:
         normalized = str(loader or "").strip().lower()
-        if normalized not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+        if normalized not in ModLoaderManager.MODDED_LOADERS:
             raise RuntimeError(f"Unsupported Modrinth loader filter: {normalized or 'unknown'}")
         return normalized

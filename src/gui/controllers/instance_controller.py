@@ -120,8 +120,8 @@ class InstanceController(BaseController):
         loader_name, loader_version = ModLoaderManager.normalize((loader_name, loader_version))
         if not name:
             return
-        if loader_name == ModLoaderManager.FABRIC and not loader_version:
-            self._emit_error("Change mod loader", "Select a Fabric Loader version first.")
+        if loader_name in ModLoaderManager.MODDED_LOADERS and not loader_version:
+            self._emit_error("Change mod loader", "Select a mod-loader version first.")
             return
 
         reporter = ProgressReporter(self._on_loader_progress)
@@ -131,7 +131,7 @@ class InstanceController(BaseController):
             if InstanceRunLock.is_active(instance):
                 raise RuntimeError("Close Minecraft before changing this instance's mod loader.")
             current_loader, _ = ModLoaderManager.normalize(instance.mod_loader)
-            if current_loader == ModLoaderManager.FORGE or loader_name == ModLoaderManager.FORGE:
+            if current_loader in ModLoaderManager.FORGE_FAMILY or loader_name in ModLoaderManager.FORGE_FAMILY:
                 return ForgeChangeManager.change(instance, loader_name, loader_version, reporter=reporter)
             version = VersionManager.load(instance.version_id)
             resolved_loader = ModLoaderManager.resolve(version.id, loader_name, loader_version)
@@ -153,7 +153,7 @@ class InstanceController(BaseController):
                 raise RuntimeError("Close Minecraft before repairing this instance's mod loader.")
             version = ModLoaderManager.repair(instance, reporter=reporter)
             loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-            if loader_name != ModLoaderManager.FORGE:
+            if loader_name not in ModLoaderManager.FORGE_FAMILY:
                 DownloadLibraryManager.load(version, reporter=reporter)
             return instance
 
@@ -169,10 +169,10 @@ class InstanceController(BaseController):
         def task() -> Any:
             instance = InstanceManager.load(name)
             if InstanceRunLock.is_active(instance):
-                raise RuntimeError("Close Minecraft before restoring the previous Forge installation.")
+                raise RuntimeError("Close Minecraft before restoring the previous mod-loader installation.")
             return ForgeChangeManager.restore_previous(instance, reporter=reporter)
 
-        self._task_runner.run(self.FORGE_RESTORE_TASK_ID, task, f"Restoring previous Forge installation for '{name}'...")
+        self._task_runner.run(self.FORGE_RESTORE_TASK_ID, task, f"Restoring previous mod-loader installation for '{name}'...")
 
     def export_forge_diagnostics(self, name: str, output_path: Path) -> None:
         name = name.strip()
@@ -183,7 +183,7 @@ class InstanceController(BaseController):
             instance = InstanceManager.load(name)
             return ForgeDiagnosticsManager.export(instance, output_path, launcher_version=VERSION_ID)
 
-        self._task_runner.run(self.FORGE_DIAGNOSTICS_TASK_ID, task, f"Exporting Forge diagnostics for '{name}'...", blocking=False)
+        self._task_runner.run(self.FORGE_DIAGNOSTICS_TASK_ID, task, f"Exporting Forge-family diagnostics for '{name}'...", blocking=False)
 
 
     def repair_instance(self, name: str) -> None:
@@ -337,8 +337,8 @@ class InstanceController(BaseController):
             self.status_changed.emit(f"Restored {loader_text} for '{selected_name}'")
         elif task_id == self.FORGE_DIAGNOSTICS_TASK_ID:
             self.forge_diagnostics_finished.emit(result)
-            self.status_changed.emit("Forge diagnostics export completed")
-            self.log_created.emit(f"Forge diagnostics exported to: {result}")
+            self.status_changed.emit("Forge-family diagnostics export completed")
+            self.log_created.emit(f"Forge-family diagnostics exported to: {result}")
             return
         elif task_id == self.REPAIR_TASK_ID:
             selected_name = result.instance_name

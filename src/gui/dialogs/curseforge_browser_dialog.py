@@ -82,6 +82,7 @@ class CurseForgeBrowserDialog(QDialog):
         self.loader_combo = QComboBox()
         self.loader_combo.addItem("Fabric", ModLoaderManager.FABRIC)
         self.loader_combo.addItem("Forge", ModLoaderManager.FORGE)
+        self.loader_combo.addItem("NeoForge", ModLoaderManager.NEOFORGE)
         self.loader_combo.currentIndexChanged.connect(self._loader_changed)
         self.sort_combo = QComboBox()
         self.sort_combo.addItem("Popularity", "popularity")
@@ -185,7 +186,7 @@ class CurseForgeBrowserDialog(QDialog):
     def loader(self) -> str:
         if self.project_type == "modpack":
             loader = str(self.loader_combo.currentData() or ModLoaderManager.FABRIC).strip().casefold()
-            return loader if loader in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE} else ModLoaderManager.FABRIC
+            return loader if loader in ModLoaderManager.MODDED_LOADERS else ModLoaderManager.FABRIC
         if self._instance is not None:
             return ModLoaderManager.normalize(self._instance.mod_loader)[0]
         return self._catalog_loader
@@ -235,7 +236,7 @@ class CurseForgeBrowserDialog(QDialog):
 
     def set_catalog_loader(self, loader: str) -> None:
         normalized = CurseForgeClient.normalize_loader(loader)
-        if normalized not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+        if normalized not in ModLoaderManager.MODDED_LOADERS:
             raise RuntimeError(f"Unsupported CurseForge loader: {loader or 'unknown'}")
         self.set_instance(None)
         self._catalog_loader = normalized

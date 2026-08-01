@@ -486,6 +486,8 @@ class RepairService:
             path = Paths.fabric_version_json(base_version.id, loader_version)
         elif loader_name == ModLoaderManager.FORGE:
             path = Paths.forge_version_json(base_version.id, loader_version)
+        elif loader_name == ModLoaderManager.NEOFORGE:
+            path = Paths.neoforge_version_json(base_version.id, loader_version)
         else:
             issue = RepairIssue(
                 component=RepairComponent.MOD_LOADER,

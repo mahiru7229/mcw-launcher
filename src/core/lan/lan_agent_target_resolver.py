@@ -101,15 +101,17 @@ class LanAgentTargetResolver:
             except Exception as error:
                 warnings.append(f"Fabric mapping resolution failed safely: {type(error).__name__}: {error}")
 
-        if loader == ModLoaderManager.FORGE and official_target is not None:
+        if loader in ModLoaderManager.FORGE_FAMILY and official_target is not None:
+            loader_title = "NeoForge" if loader == ModLoaderManager.NEOFORGE else "Forge"
             try:
                 forge_target = cls._resolve_forge_srg_target(version, game_version, official_target)
                 if forge_target is None:
-                    warnings.append("Forge SRG runtime artifacts did not contain the LAN authentication setter.")
+                    warnings.append(f"{loader_title} SRG runtime artifacts did not contain the LAN authentication setter; named and official targets remain available.")
                 else:
-                    targets.insert(0, forge_target)
+                    namespace = "neoforge-srg" if loader == ModLoaderManager.NEOFORGE else "forge-srg"
+                    targets.insert(0, LanAgentTarget(namespace, forge_target.class_name, forge_target.method_name))
             except Exception as error:
-                warnings.append(f"Forge SRG mapping resolution failed safely: {type(error).__name__}: {error}")
+                warnings.append(f"{loader_title} SRG mapping resolution failed safely: {type(error).__name__}: {error}")
 
         return LanAgentTargetResolution(
             game_version=game_version,
@@ -264,11 +266,12 @@ class LanAgentTargetResolver:
         raw_json = getattr(version, "raw_json", {}) or {}
         arguments = getattr(version, "arguments", None) or raw_json.get("arguments", {})
         game_arguments = arguments.get("game", []) if isinstance(arguments, dict) else []
-        for index, value in enumerate(game_arguments):
-            if value == "--fml.mcpVersion" and index + 1 < len(game_arguments):
-                next_value = game_arguments[index + 1]
-                if isinstance(next_value, str):
-                    return next_value.strip()
+        for flag in ("--fml.neoFormVersion", "--fml.mcpVersion"):
+            for index, value in enumerate(game_arguments):
+                if value == flag and index + 1 < len(game_arguments):
+                    next_value = game_arguments[index + 1]
+                    if isinstance(next_value, str):
+                        return next_value.strip()
         return ""
 
     @classmethod

@@ -21,7 +21,7 @@ from src.models.progress.progress_stage import ProgressStage
 
 class ModrinthModInstaller:
     MAX_DEPENDENCIES = 64
-    SUPPORTED_LOADERS = {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}
+    SUPPORTED_LOADERS = ModLoaderManager.MODDED_LOADERS
 
     @staticmethod
     def install(instance: Instance, version_id: str, install_dependencies: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> ModrinthModInstallResult:
@@ -206,5 +206,5 @@ class ModrinthModInstaller:
     def _normalize_loader(loader_name: str) -> str:
         normalized = str(loader_name or "").strip().lower()
         if normalized not in ModrinthModInstaller.SUPPORTED_LOADERS:
-            raise RuntimeError("Modrinth mod installation requires a Fabric or Forge instance.")
+            raise RuntimeError("Modrinth mod installation requires a Fabric, Forge, or NeoForge instance.")
         return normalized

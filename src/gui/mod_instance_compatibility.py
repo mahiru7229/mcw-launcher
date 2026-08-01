@@ -26,6 +26,6 @@ def compatible_instances(instances: Iterable[Instance], version: CompatibleModVe
 
 def normalize_supported_loader(loader: str) -> str:
     normalized = str(loader or "").strip().lower()
-    if normalized not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+    if normalized not in ModLoaderManager.MODDED_LOADERS:
         raise RuntimeError(f"Unsupported mod loader: {normalized or 'unknown'}")
     return normalized

@@ -23,6 +23,7 @@ class InstancesPage(BasePage):
     export_requested = Signal(str, object, bool)
     fabric_versions_requested = Signal(str)
     forge_versions_requested = Signal(str)
+    neoforge_versions_requested = Signal(str)
     loader_change_requested = Signal(str, str, str)
     repair_loader_requested = Signal(str)
     restore_forge_requested = Signal(str)
@@ -42,11 +43,12 @@ class InstancesPage(BasePage):
     apply_modpack_update_requested = Signal(str)
 
     def __init__(self) -> None:
-        super().__init__("Instances", "Create and manage isolated Minecraft instances with Vanilla, Fabric, or Forge.", "instances")
+        super().__init__("Instances", "Create and manage isolated Minecraft instances with Vanilla, Fabric, Forge, or NeoForge.", "instances")
         self._instances: dict[str, object] = {}
         self._versions: list[object] = []
         self._fabric_versions: dict[str, list[object]] = {}
         self._forge_versions: dict[str, list[object]] = {}
+        self._neoforge_versions: dict[str, list[object]] = {}
         self._pending_manage_loader_version = ""
         self._synchronizing = False
         self._modpack_update_info: object | None = None
@@ -77,7 +79,7 @@ class InstancesPage(BasePage):
         selected_card.layout.addLayout(selected_actions)
         self.root_layout.addWidget(selected_card)
 
-        create_card = CardWidget("Create instance", "Choose Vanilla, Fabric, or Forge. Automatic mode selects a compatible loader version.")
+        create_card = CardWidget("Create instance", "Choose Vanilla, Fabric, Forge, or NeoForge. Automatic mode selects a compatible loader version.")
         self.create_name_input = QLineEdit()
         self.create_name_input.setPlaceholderText("New instance name")
         self.version_combo = QComboBox()
@@ -87,7 +89,8 @@ class InstancesPage(BasePage):
         self.create_loader_combo.addItem("Vanilla", "vanilla")
         self.create_loader_combo.addItem("Fabric", "fabric")
         self.create_loader_combo.addItem("Forge", "forge")
-        self.create_loader_status = QLabel("Fabric and Forge versions can be changed later under Manage selected instance.")
+        self.create_loader_combo.addItem("NeoForge", "neoforge")
+        self.create_loader_status = QLabel("Fabric, Forge, and NeoForge versions can be changed later under Manage selected instance.")
         self.create_loader_status.setObjectName("MutedLabel")
         self.create_loader_status.setWordWrap(True)
         create_button = set_theme_icon(QPushButton("Create instance"), "icon.action.add")
@@ -111,11 +114,12 @@ class InstancesPage(BasePage):
         create_card.layout.addWidget(self.browse_curseforge_modpacks_button)
         self.root_layout.addWidget(create_card)
 
-        manage_card = CardWidget("Manage selected instance", "Change the selected instance's Fabric or Forge version without recreating it.")
+        manage_card = CardWidget("Manage selected instance", "Change the selected instance's Fabric, Forge, or NeoForge version without recreating it.")
         self.manage_loader_combo = QComboBox()
         self.manage_loader_combo.addItem("Vanilla", "vanilla")
         self.manage_loader_combo.addItem("Fabric", "fabric")
         self.manage_loader_combo.addItem("Forge", "forge")
+        self.manage_loader_combo.addItem("NeoForge", "neoforge")
         self.manage_loader_combo.currentTextChanged.connect(self._manage_loader_selected)
         self.manage_loader_version_combo = QComboBox()
         self.manage_loader_version_combo.setEnabled(False)
@@ -126,17 +130,17 @@ class InstancesPage(BasePage):
         self.apply_loader_button.clicked.connect(self._request_loader_change)
         self.apply_loader_button.setEnabled(False)
         self.repair_loader_button = set_theme_icon(QPushButton("Repair mod loader"), "icon.action.repair")
-        self.repair_loader_button.setToolTip("Rebuild Fabric or Forge metadata and verify loader libraries without changing mods or saves.")
+        self.repair_loader_button.setToolTip("Rebuild Fabric, Forge, or NeoForge metadata and verify loader libraries without changing mods or saves.")
         self.repair_loader_button.clicked.connect(self._request_loader_repair)
         self.repair_loader_button.setEnabled(False)
         self.restore_forge_button = set_theme_icon(QPushButton("Restore previous loader"), "icon.action.restore")
-        self.restore_forge_button.setToolTip("Restore the mod-loader installation recorded before the last Forge change.")
+        self.restore_forge_button.setToolTip("Restore the mod-loader installation recorded before the last Forge-family change.")
         self.restore_forge_button.clicked.connect(self._request_restore_forge)
         self.restore_forge_button.setEnabled(False)
-        self.open_forge_logs_button = set_theme_icon(QPushButton("Open Forge logs"), "icon.action.folder")
+        self.open_forge_logs_button = set_theme_icon(QPushButton("Open loader logs"), "icon.action.folder")
         self.open_forge_logs_button.clicked.connect(lambda: self.open_forge_logs_requested.emit(self.current_instance_name()))
         self.open_forge_logs_button.setEnabled(False)
-        self.export_forge_diagnostics_button = set_theme_icon(QPushButton("Export Forge diagnostics"), "icon.action.export")
+        self.export_forge_diagnostics_button = set_theme_icon(QPushButton("Export loader diagnostics"), "icon.action.export")
         self.export_forge_diagnostics_button.setToolTip("Export Forge profile, logs, mod metadata, and pre-launch results without accounts, tokens, worlds, or mod JAR contents.")
         self.export_forge_diagnostics_button.clicked.connect(lambda: self.export_forge_diagnostics_requested.emit(self.current_instance_name()))
         self.export_forge_diagnostics_button.setEnabled(False)
@@ -243,11 +247,16 @@ class InstancesPage(BasePage):
     def set_forge_versions(self, game_version: str, versions: list) -> None:
         self._forge_versions[game_version] = list(versions)
         instance = self._instances.get(self.current_instance_name())
-        if instance is None or instance.version_id != game_version:
-            return
-        if self.manage_loader_combo.currentData() != "forge":
+        if instance is None or instance.version_id != game_version or self.manage_loader_combo.currentData() != "forge":
             return
         self._populate_manage_forge_versions(instance, versions)
+
+    def set_neoforge_versions(self, game_version: str, versions: list) -> None:
+        self._neoforge_versions[game_version] = list(versions)
+        instance = self._instances.get(self.current_instance_name())
+        if instance is None or instance.version_id != game_version or self.manage_loader_combo.currentData() != "neoforge":
+            return
+        self._populate_manage_neoforge_versions(instance, versions)
 
     def set_instances(self, instances: list, selected_name: str) -> None:
         self._instances = {instance.name: instance for instance in instances}
@@ -283,7 +292,7 @@ class InstancesPage(BasePage):
 
     def selected_manage_loader(self) -> tuple[str, str]:
         loader_name = str(self.manage_loader_combo.currentData() or "vanilla")
-        loader_version = str(self.manage_loader_version_combo.currentData() or "").strip() if loader_name in {"fabric", "forge"} else "-1"
+        loader_version = str(self.manage_loader_version_combo.currentData() or "").strip() if loader_name in {"fabric", "forge", "neoforge"} else "-1"
         return loader_name, loader_version
 
     def selected_loader(self) -> tuple[str, str]:
@@ -341,15 +350,15 @@ class InstancesPage(BasePage):
         self.instance_info.setText(f"{tr('Minecraft {version}', version=instance.version_id)} • {loader_text} • {instance.instance_dir}")
         self.target_name_input.setText(instance.name)
         self._set_manage_loader_available(True)
-        self._pending_manage_loader_version = loader_version if loader_name in {"fabric", "forge"} else ""
+        self._pending_manage_loader_version = loader_version if loader_name in {"fabric", "forge", "neoforge"} else ""
 
         self.manage_loader_combo.blockSignals(True)
         self.manage_loader_combo.setCurrentIndex(max(0, self.manage_loader_combo.findData(loader_name)))
         self.manage_loader_combo.blockSignals(False)
         self.open_instance_folder_button.setEnabled(True)
-        self.manage_mods_button.setEnabled(loader_name in {"fabric", "forge"})
-        self.repair_loader_button.setEnabled(loader_name in {"fabric", "forge"})
-        is_forge = loader_name == "forge"
+        self.manage_mods_button.setEnabled(loader_name in {"fabric", "forge", "neoforge"})
+        self.repair_loader_button.setEnabled(loader_name in {"fabric", "forge", "neoforge"})
+        is_forge = loader_name in {"forge", "neoforge"}
         rollback_path = Path(instance.instance_dir) / ".mcw" / "forge" / "previous-installation.json"
         self.restore_forge_button.setEnabled(rollback_path.is_file())
         self.open_forge_logs_button.setEnabled(is_forge)
@@ -392,13 +401,13 @@ class InstancesPage(BasePage):
 
         selected_loader = str(self.manage_loader_combo.currentData() or "vanilla")
         current_loader_name, current_loader_version = self._instance_loader(instance)
-        is_modded = selected_loader in {"fabric", "forge"}
-        current_is_modded = current_loader_name in {"fabric", "forge"}
+        is_modded = selected_loader in {"fabric", "forge", "neoforge"}
+        current_is_modded = current_loader_name in {"fabric", "forge", "neoforge"}
         self.manage_loader_version_combo.clear()
         self.manage_loader_version_combo.setEnabled(is_modded)
         self.manage_mods_button.setEnabled(current_is_modded)
         self.repair_loader_button.setEnabled(current_is_modded)
-        current_is_forge = current_loader_name == "forge"
+        current_is_forge = current_loader_name in {"forge", "neoforge"}
         rollback_path = Path(instance.instance_dir) / ".mcw" / "forge" / "previous-installation.json"
         self.restore_forge_button.setEnabled(rollback_path.is_file())
         self.open_forge_logs_button.setEnabled(current_is_forge)
@@ -420,13 +429,23 @@ class InstancesPage(BasePage):
             self._populate_manage_fabric_versions(instance, versions)
             return
 
-        versions = self._forge_versions.get(instance.version_id)
-        if versions is None:
-            self.manage_loader_status.setText(tr("Loading compatible Minecraft Forge versions..."))
-            self.apply_loader_button.setEnabled(False)
-            self.forge_versions_requested.emit(instance.version_id)
+        if selected_loader == "forge":
+            versions = self._forge_versions.get(instance.version_id)
+            if versions is None:
+                self.manage_loader_status.setText(tr("Loading compatible Minecraft Forge versions..."))
+                self.apply_loader_button.setEnabled(False)
+                self.forge_versions_requested.emit(instance.version_id)
+                return
+            self._populate_manage_forge_versions(instance, versions)
             return
-        self._populate_manage_forge_versions(instance, versions)
+
+        versions = self._neoforge_versions.get(instance.version_id)
+        if versions is None:
+            self.manage_loader_status.setText(tr("Loading compatible NeoForge versions..."))
+            self.apply_loader_button.setEnabled(False)
+            self.neoforge_versions_requested.emit(instance.version_id)
+            return
+        self._populate_manage_neoforge_versions(instance, versions)
 
     def _populate_manage_fabric_versions(self, instance: object, versions: list) -> None:
         current_loader_name, current_loader_version = self._instance_loader(instance)
@@ -443,6 +462,13 @@ class InstancesPage(BasePage):
         self._pending_manage_loader_version = ""
         entries = [(version.forge_version, version.forge_version) for version in versions]
         self._populate_loader_versions("forge", current_loader_name, current_loader_version, preferred, entries)
+
+    def _populate_manage_neoforge_versions(self, instance: object, versions: list) -> None:
+        current_loader_name, current_loader_version = self._instance_loader(instance)
+        preferred = self._pending_manage_loader_version
+        self._pending_manage_loader_version = ""
+        entries = [(version.neoforge_version, version.neoforge_version) for version in versions]
+        self._populate_loader_versions("neoforge", current_loader_name, current_loader_version, preferred, entries)
 
     def _populate_loader_versions(self, loader_name: str, current_loader_name: str, current_loader_version: str, preferred: str, entries: list[tuple[str, str]]) -> None:
         self.manage_loader_version_combo.blockSignals(True)
@@ -462,7 +488,7 @@ class InstancesPage(BasePage):
         has_version = self.manage_loader_version_combo.count() > 0
         self.manage_loader_version_combo.setEnabled(has_version)
         self.apply_loader_button.setEnabled(has_version)
-        title = "Fabric Loader" if loader_name == "fabric" else "Minecraft Forge"
+        title = {"fabric": "Fabric Loader", "forge": "Minecraft Forge", "neoforge": "NeoForge"}.get(loader_name, loader_name.title())
         if entries:
             selected = str(self.manage_loader_version_combo.currentData() or "")
             current_text = tr(" Current: {version}.", version=current_loader_version) if current_loader_name == loader_name else ""
@@ -544,7 +570,7 @@ class InstancesPage(BasePage):
         if not name:
             return
         loader_name, loader_version = self.selected_manage_loader()
-        if loader_name in {"fabric", "forge"} and not loader_version:
+        if loader_name in {"fabric", "forge", "neoforge"} and not loader_version:
             QMessageBox.information(self, tr("Mod loader"), tr("Select a mod loader version first."))
             return
         self.loader_change_requested.emit(name, loader_name, loader_version)
@@ -552,7 +578,7 @@ class InstancesPage(BasePage):
     def _request_loader_repair(self) -> None:
         name = self.current_instance_name()
         instance = self._instances.get(name)
-        if instance is None or self._instance_loader(instance)[0] not in {"fabric", "forge"}:
+        if instance is None or self._instance_loader(instance)[0] not in {"fabric", "forge", "neoforge"}:
             return
         self.repair_loader_requested.emit(name)
 

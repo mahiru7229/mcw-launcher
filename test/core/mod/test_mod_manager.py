@@ -392,3 +392,45 @@ def test_unresolved_version_placeholder_becomes_unknown(tmp_path):
     mod = ModManager.read_mod(source)
 
     assert mod.version == "Unknown"
+
+
+def test_reads_legacy_mods_toml_as_neoforge_for_neoforge_instance(tmp_path):
+    instance = make_instance(tmp_path, loader=("neoforge", "47.1.106"))
+    source = make_forge_mod(tmp_path / "legacy-neoforge.jar", mod_id="legacy_neoforge")
+
+    added = ModManager.add_mods(instance, [source])
+
+    assert added[0].loader == "neoforge"
+    assert added[0].metadata_format == "mods.toml"
+    assert added[0].mod_id == "legacy_neoforge"
+
+def test_reads_modern_neoforge_metadata_and_dependencies(tmp_path):
+    instance = make_instance(tmp_path, loader=("neoforge", "21.1.200"))
+    source = tmp_path / "modern-neoforge.jar"
+    metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[4,)"\n'
+        'license="MIT"\n\n'
+        '[[mods]]\n'
+        'modId="modern_neoforge"\n'
+        'version="1.2.3"\n'
+        'displayName="Modern NeoForge"\n\n'
+        '[[dependencies.modern_neoforge]]\n'
+        'modId="minecraft"\n'
+        'type="required"\n'
+        'versionRange="[1.21.1,1.22)"\n'
+        'ordering="NONE"\n'
+        'side="BOTH"\n'
+    )
+    with zipfile.ZipFile(source, "w") as archive:
+        archive.writestr("META-INF/neoforge.mods.toml", metadata)
+
+    added = ModManager.add_mods(instance, [source])
+
+    assert added[0].loader == "neoforge"
+    assert added[0].metadata_format == "neoforge.mods.toml"
+    assert added[0].mod_id == "modern_neoforge"
+    assert added[0].version == "1.2.3"
+    assert added[0].dependencies["neoforge"] == "[4,)"
+    assert added[0].dependencies["minecraft"] == "[1.21.1,1.22)"
+

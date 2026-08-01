@@ -6,6 +6,7 @@ import pytest
 from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
 from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManager
 from src.core.modloader.forge.forge_version_manager import ForgeVersionManager
+from src.core.modloader.neoforge.neoforge_version_manager import NeoForgeVersionManager
 from src.models.instance.instance import Instance
 from src.models.mod.mod_issue import ModHealthReport, ModIssue
 
@@ -85,4 +86,22 @@ def test_broken_forge_installation_still_blocks_when_compatibility_errors_are_al
     )
 
     with pytest.raises(RuntimeError, match="Forge pre-launch check failed"):
+        ForgePreflightManager.raise_for_errors(report, block_compatibility_errors=False)
+
+
+def test_scan_validates_neoforge_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    instance = make_instance(tmp_path)
+    instance.mod_loader = ("neoforge", "21.1.200")
+    monkeypatch.setattr(NeoForgeVersionManager, "validate_installation", lambda *args, **kwargs: ["NeoForge profile is broken."])
+    monkeypatch.setattr(ModCompatibilityManager, "scan", lambda _instance: ModHealthReport(issues=(), enabled_mods=0, disabled_mods=0))
+
+    report = ForgePreflightManager.scan(instance, SimpleNamespace(raw_json={}))
+
+    assert report.errors[0].code == "neoforge-installation"
+
+
+def test_broken_neoforge_installation_still_blocks() -> None:
+    report = SimpleNamespace(errors=(ModIssue(severity="error", code="neoforge-installation", message="NeoForge profile is broken."),), warnings=(), warning_count=0)
+
+    with pytest.raises(RuntimeError, match="NeoForge pre-launch check failed"):
         ForgePreflightManager.raise_for_errors(report, block_compatibility_errors=False)

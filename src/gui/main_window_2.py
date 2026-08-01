@@ -261,6 +261,7 @@ class MainWindow(QMainWindow):
         self.instances_page.create_requested.connect(self.instance_controller.create)
         self.instances_page.fabric_versions_requested.connect(self.mod_loader_controller.load_fabric_versions)
         self.instances_page.forge_versions_requested.connect(self.mod_loader_controller.load_forge_versions)
+        self.instances_page.neoforge_versions_requested.connect(self.mod_loader_controller.load_neoforge_versions)
         self.instances_page.loader_change_requested.connect(self.instance_controller.change_loader)
         self.instances_page.repair_loader_requested.connect(self.instance_controller.repair_loader)
         self.instances_page.restore_forge_requested.connect(self.instance_controller.restore_previous_forge)
@@ -337,6 +338,7 @@ class MainWindow(QMainWindow):
         self.version_controller.versions_changed.connect(lambda versions: self.home_page.set_manifest_count(len(versions)))
         self.mod_loader_controller.fabric_versions_changed.connect(self.instances_page.set_fabric_versions)
         self.mod_loader_controller.forge_versions_changed.connect(self.instances_page.set_forge_versions)
+        self.mod_loader_controller.neoforge_versions_changed.connect(self.instances_page.set_neoforge_versions)
 
         self.account_controller.accounts_changed.connect(self.account_page.set_accounts)
         self.account_controller.selected_account_changed.connect(self._account_selected)
@@ -616,7 +618,7 @@ class MainWindow(QMainWindow):
         self.mod_manager_dialog.raise_()
         self.mod_manager_dialog.activateWindow()
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE} and not self.task_runner.is_task_active("mods.update.check"):
+        if loader_name in ModLoaderManager.MODDED_LOADERS and not self.task_runner.is_task_active("mods.update.check"):
             QTimer.singleShot(0, lambda: self.mod_controller.check_updates(self.mod_manager_dialog.allowed_version_types, force_refresh=False))
 
     def _open_modrinth_mod_browser(self) -> None:
@@ -948,7 +950,7 @@ class MainWindow(QMainWindow):
             return
         instance = self.mod_controller.current_instance
         loader = ModLoaderManager.normalize(instance.mod_loader)[0] if instance is not None else ""
-        if instance is None or loader not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+        if instance is None or loader not in ModLoaderManager.MODDED_LOADERS:
             QMessageBox.information(self, tr("curseforge.title"), tr("curseforge.mod.no_instance"))
             return
         self.curseforge_mod_dialog.set_instance(instance)
@@ -1830,10 +1832,11 @@ class MainWindow(QMainWindow):
         try:
             instance = InstanceManager.load(name)
         except Exception as error:
-            self._show_error(tr("Forge logs"), str(error))
+            self._show_error(tr("forge.logs.title"), str(error))
             return
+        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         instance_logs = Paths.forge_instance_root(instance) / "logs"
-        global_logs = Paths.forge_root() / "logs"
+        global_logs = (Paths.neoforge_root() if loader_name == ModLoaderManager.NEOFORGE else Paths.forge_root()) / "logs"
         target = instance_logs if instance_logs.exists() and any(instance_logs.iterdir()) else global_logs
         target.mkdir(parents=True, exist_ok=True)
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(target.resolve())))
@@ -1842,24 +1845,24 @@ class MainWindow(QMainWindow):
         try:
             instance = InstanceManager.load(name)
         except Exception as error:
-            self._show_error(tr("Forge diagnostics"), str(error))
+            self._show_error(tr("forge.diagnostics.title"), str(error))
             return
         suggested = Paths.forge_diagnostics_default_path(instance)
         selected, _ = QFileDialog.getSaveFileName(
             self,
             tr("forge.export_diagnostics"),
             str(suggested),
-            tr("ZIP archive (*.zip)"),
+            tr("forge.diagnostics.filter"),
         )
         if selected:
             self.instance_controller.export_forge_diagnostics(name, Path(selected))
 
     def _forge_diagnostics_finished(self, path: object) -> None:
-        self.logs_page.append(tr("Forge diagnostics exported to: {path}", path=path))
+        self.logs_page.append(tr("forge.diagnostics.success", path=path))
         QMessageBox.information(
             self,
-            tr("Forge diagnostics"),
-            tr("Forge diagnostics exported to: {path}", path=path),
+            tr("forge.diagnostics.title"),
+            tr("forge.diagnostics.success", path=path),
         )
 
     def _open_logs_folder(self) -> None:
