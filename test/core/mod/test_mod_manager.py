@@ -317,3 +317,78 @@ def test_allow_unverified_installs_fabric_jar_into_forge_instance(tmp_path):
 
     assert added[0].loader == "fabric"
     assert (ModManager.mods_dir(instance) / source.name).is_file()
+
+
+def make_forge_placeholder_mod(path: Path, version: str, manifest: str = "", extra_properties: str = "") -> Path:
+    metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[47,)"\n'
+        'license="MIT"\n'
+        f'{extra_properties}\n'
+        '[[mods]]\n'
+        'modId="placeholder_example"\n'
+        f'version="{version}"\n'
+        'displayName="Placeholder Example"\n'
+        'description="Version placeholder test."\n'
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("META-INF/mods.toml", metadata)
+        if manifest:
+            archive.writestr("META-INF/MANIFEST.MF", manifest)
+    return path
+
+
+def test_resolves_file_jar_version_from_manifest(tmp_path):
+    source = make_forge_placeholder_mod(
+        tmp_path / "flywheel.jar",
+        "${file.jarVersion}",
+        "Manifest-Version: 1.0\nImplementation-Version: 0.6.8\n",
+    )
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.version == "0.6.8"
+
+
+def test_resolves_jar_version_with_case_insensitive_continued_manifest_attribute(tmp_path):
+    source = make_forge_placeholder_mod(
+        tmp_path / "continued.jar",
+        "${file.jarVersion}",
+        "Manifest-Version: 1.0\niMpLeMeNtAtIoN-vErSiOn: 0.6.\n 8\n",
+    )
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.version == "0.6.8"
+
+
+def test_resolves_generic_file_property_from_mod_metadata(tmp_path):
+    source = make_forge_placeholder_mod(tmp_path / "property.jar", "${file.someKey}", extra_properties='someKey="2.4.1"')
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.version == "2.4.1"
+
+
+def test_uses_provider_version_when_placeholder_cannot_be_resolved(tmp_path):
+    source = make_forge_placeholder_mod(tmp_path / "provider.jar", "${file.jarVersion}")
+
+    mod = ModManager.read_mod(source, provider_version="3.1.4")
+
+    assert mod.version == "3.1.4"
+
+
+def test_infers_version_from_filename_after_placeholder_fallbacks(tmp_path):
+    source = make_forge_placeholder_mod(tmp_path / "flywheel-forge-0.6.8.jar", "${file.jarVersion}")
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.version == "0.6.8"
+
+
+def test_unresolved_version_placeholder_becomes_unknown(tmp_path):
+    source = make_forge_placeholder_mod(tmp_path / "flywheel.jar", "${file.jarVersion}")
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.version == "Unknown"

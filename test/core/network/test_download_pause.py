@@ -107,7 +107,7 @@ def test_http_download_pauses_and_resumes_same_worker(tmp_path: Path, monkeypatc
     assert destination.with_name(destination.name + ".part").exists() is False
 
 
-def test_cancel_keeps_partial_and_next_launch_uses_range_resume(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cancel_removes_partial_and_next_launch_restarts_full(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     content = b"abcdef"
     destination = tmp_path / "example.jar"
     info = type("Info", (), {"url": "https://example.com/example.jar", "sha1": hashlib.sha1(content).hexdigest(), "size": len(content)})()
@@ -115,9 +115,9 @@ def test_cancel_keeps_partial_and_next_launch_uses_range_resume(tmp_path: Path, 
     phase = {"value": 1}
 
     class Response:
-        def __init__(self, resumed: bool) -> None:
-            self.status_code = 206 if resumed else 200
-            self.headers = {"Content-Length": "3", "Content-Range": "bytes 3-5/6"} if resumed else {"Content-Length": "6"}
+        def __init__(self) -> None:
+            self.status_code = 200
+            self.headers = {"Content-Length": "6"}
 
         def __enter__(self):
             return self
@@ -134,12 +134,12 @@ def test_cancel_keeps_partial_and_next_launch_uses_range_resume(tmp_path: Path, 
                 download_pause_controller.request_cancel()
                 yield b"def"
                 return
-            yield b"def"
+            yield content
 
     class Client:
         def stream(self, method: str, url: str, *, headers: dict[str, str], timeout: float):
             requests.append(headers.get("Range"))
-            return Response(resumed=phase["value"] == 2)
+            return Response()
 
     monkeypatch.setattr(HttpDownloader, "get_client", lambda: Client())
 
@@ -148,7 +148,7 @@ def test_cancel_keeps_partial_and_next_launch_uses_range_resume(tmp_path: Path, 
         HttpDownloader.download(info, destination, max_retry=1)
 
     partial = destination.with_name(destination.name + ".part")
-    assert partial.read_bytes() == b"abc"
+    assert partial.exists() is False
     assert destination.exists() is False
 
     download_pause_controller.finish()
@@ -159,4 +159,4 @@ def test_cancel_keeps_partial_and_next_launch_uses_range_resume(tmp_path: Path, 
 
     assert result.read_bytes() == content
     assert partial.exists() is False
-    assert requests == [None, "bytes=3-"]
+    assert requests == [None, None]

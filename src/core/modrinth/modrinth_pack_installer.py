@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path, PurePosixPath
 from uuid import uuid4
 import hashlib
@@ -16,9 +15,14 @@ from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_downloader import ModrinthDownloader
+from src.core.modrinth.modrinth_errors import ModrinthModpackManualDownloadRequired
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
+from src.core.network.artifact_download_service import ArtifactDownloadError, artifact_download_service
+from src.core.network.download_pause import download_pause_controller
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.modrinth.install_result import ModrinthModpackInstallResult
+from src.models.modrinth.manual_download import ModrinthManualDownload
+from src.models.network.artifact import ArtifactRequest
 from src.models.progress.progress_stage import ProgressStage
 
 
@@ -42,7 +46,6 @@ class ModrinthPackInstaller:
         normalized_name = base_name if requested_name else InstanceManager.next_available_name(base_name)
         if requested_name and InstanceManager.is_instance_exist(normalized_name):
             raise RuntimeError(f"Instance '{normalized_name}' already exists.")
-
         if project.project_type != "modpack":
             raise RuntimeError(f"'{project.title}' is not a Modrinth modpack.")
         version = ModrinthClient.get_version(version_id)
@@ -53,15 +56,72 @@ class ModrinthPackInstaller:
             raise RuntimeError(f"Modrinth modpack version '{version.version_number}' uses the disabled {version.version_type} channel.")
         pack_file = version.primary_file(".mrpack")
         pack_path = Paths.modrinth_pack_cache(project.project_id, version.version_id, pack_file.filename)
-        if reporter is None:
-            ModrinthDownloader.download_file(pack_file, pack_path)
-        else:
-            ModrinthDownloader.download_file(pack_file, pack_path, reporter=reporter, progress_stage=ProgressStage.DOWNLOADING_MODPACK, progress_message=f"Downloading {project.title} manifest...")
+        project_url = f"https://modrinth.com/modpack/{project.slug or project.project_id}"
+        version_url = f"{project_url}/version/{version.version_id}"
+        try:
+            ModrinthDownloader.download_file(
+                pack_file,
+                pack_path,
+                reporter=reporter,
+                progress_stage=ProgressStage.DOWNLOADING_MODPACK,
+                progress_message=f"Downloading {project.title} manifest...",
+                purpose="modpack-archive",
+                page_url=version_url,
+                project_url=project_url,
+                project_id=project.project_id,
+                version_id=version.version_id,
+            )
+        except ArtifactDownloadError as error:
+            requirement = ModrinthManualDownload(
+                project_id=project.project_id,
+                version_id=version.version_id,
+                project_name=project.title,
+                file_name=pack_file.filename,
+                file_size=pack_file.size,
+                sha1=pack_file.sha1,
+                sha512=pack_file.sha512,
+                project_url=error.failure.project_url or project_url,
+                version_url=error.failure.page_url or version_url,
+                direct_url=error.failure.url or pack_file.url,
+                reason=f"Automatic download failed ({error.failure.reason.value}): {error.failure.detail}",
+                failure_reason=error.failure.reason.value,
+                http_status=error.failure.http_status,
+                attempts=error.failure.attempts,
+                retryable=error.failure.retryable,
+                managed_kind="modpack_archive",
+            )
+            raise ModrinthModpackManualDownloadRequired(requirement, project.project_id, version.version_id, normalized_name, install_optional_files, allowed_types, expected_loader) from error
+        return ModrinthPackInstaller._install_archive(project, version, pack_path, normalized_name, install_optional_files, reporter, expected_loader)
 
+    @staticmethod
+    def install_manual_archive(request: ModrinthModpackManualDownloadRequired, source: Path, reporter: ProgressReporter | None = None) -> ModrinthModpackInstallResult:
+        project = ModrinthClient.get_project(request.project_id)
+        version = ModrinthClient.get_version(request.version_id)
+        requirement = request.requirement
+        pack_path = Paths.modrinth_pack_cache(project.project_id, version.version_id, requirement.file_name)
+        artifact_request = ArtifactRequest(
+            provider="modrinth",
+            purpose="manual-modpack-archive",
+            destination=pack_path,
+            urls=(requirement.direct_url,) if requirement.direct_url else (),
+            page_url=requirement.version_url,
+            project_url=requirement.project_url,
+            expected_filename=requirement.file_name,
+            expected_size=requirement.file_size,
+            hashes={key: value for key, value in {"sha1": requirement.sha1, "sha512": requirement.sha512}.items() if value},
+            project_id=requirement.project_id,
+            version_id=requirement.version_id,
+        )
+        artifact_download_service.accept_manual_file(artifact_request, Path(source))
+        return ModrinthPackInstaller._install_archive(project, version, pack_path, request.instance_name, request.install_optional_files, reporter, request.expected_loader)
+
+    @staticmethod
+    def _install_archive(project, version, pack_path: Path, normalized_name: str, install_optional_files: bool, reporter: ProgressReporter | None, expected_loader: str) -> ModrinthModpackInstallResult:
         staging = Paths.modrinth_staging_root() / uuid4().hex
         staging.mkdir(parents=True, exist_ok=False)
         created_instance = None
         try:
+            download_pause_controller.raise_if_requested()
             with zipfile.ZipFile(pack_path, "r") as archive:
                 index = ModrinthPackInstaller._read_index(archive)
                 minecraft_version, loader_name, loader_version = ModrinthPackInstaller._parse_dependencies(index)
@@ -71,13 +131,14 @@ class ModrinthPackInstaller:
                     managed_files[entry["path"].casefold()] = entry
                 for entry in ModrinthPackInstaller._extract_layer(archive, "client-overrides", staging):
                     managed_files[entry["path"].casefold()] = entry
-
+            download_pause_controller.raise_if_requested()
             selected_loader = str(expected_loader or "").strip().lower()
             if selected_loader and selected_loader != loader_name:
                 raise RuntimeError(f"This modpack uses {loader_name.title()}, but the browser filter is set to {selected_loader.title()}.")
             base_version = VersionManager.load(minecraft_version)
             resolved_loader = ModLoaderManager.resolve(minecraft_version, loader_name, loader_version)
             ModLoaderManager.prepare(base_version, *resolved_loader, reporter=reporter)
+            download_pause_controller.raise_if_requested()
             created_instance = InstanceManager.create(name=normalized_name, version=base_version, mod_loader=resolved_loader)
             shutil.copytree(staging, created_instance.instance_dir, dirs_exist_ok=True)
             ModrinthPackInstaller._write_metadata(created_instance.instance_dir, project.project_id, version.version_id, project.title, version.version_number, minecraft_version, loader_name, loader_version, list(managed_files.values()), install_optional_files)
@@ -162,8 +223,8 @@ class ModrinthPackInstaller:
             if not str(hashes.get("sha1") or "") or not str(hashes.get("sha512") or ""):
                 raise RuntimeError(f"Modpack file '{item.get('path')}' is missing required hashes.")
             downloads = item.get("downloads", [])
-            if not isinstance(downloads, list) or not downloads:
-                raise RuntimeError(f"Modpack file '{item.get('path')}' has no download URL.")
+            if not isinstance(downloads, list):
+                raise RuntimeError(f"Modpack file '{item.get('path')}' has an invalid download URL list.")
             file_size = int(item.get("fileSize", 0) or 0)
             if file_size < 0:
                 raise RuntimeError(f"Modpack file '{item.get('path')}' has an invalid size.")
@@ -175,23 +236,27 @@ class ModrinthPackInstaller:
 
     @staticmethod
     def _download_files(files: list[dict], staging: Path, reporter: ProgressReporter | None = None) -> None:
-        def download(item: dict) -> Path:
-            relative = ModrinthPackInstaller._safe_relative_path(str(item.get("path") or ""))
-            hashes = item.get("hashes", {})
-            return ModrinthDownloader.download_urls(urls=tuple(str(url) for url in item.get("downloads", [])), destination=staging.joinpath(*relative.parts), sha1=str(hashes.get("sha1") or ""), sha512=str(hashes.get("sha512") or ""), expected_size=int(item.get("fileSize", 0) or 0), restrict_hosts=True)
-
         total = len(files)
-        completed = 0
         if reporter is not None:
             reporter.files(stage=ProgressStage.DOWNLOADING_MODPACK, message="Downloading modpack files...", current=0, total=total)
-
-        with ThreadPoolExecutor(max_workers=min(ModrinthPackInstaller.MAX_WORKERS, max(1, total))) as executor:
-            futures = [executor.submit(download, item) for item in files]
-            for future in as_completed(futures):
-                future.result()
-                completed += 1
-                if reporter is not None:
-                    reporter.files(stage=ProgressStage.DOWNLOADING_MODPACK, message="Downloading modpack files...", current=completed, total=total)
+        for completed, item in enumerate(files, start=1):
+            download_pause_controller.raise_if_requested()
+            relative = ModrinthPackInstaller._safe_relative_path(str(item.get("path") or ""))
+            hashes = item.get("hashes", {})
+            ModrinthDownloader.download_urls(
+                urls=tuple(str(url) for url in item.get("downloads", [])),
+                destination=staging.joinpath(*relative.parts),
+                sha1=str(hashes.get("sha1") or ""),
+                sha512=str(hashes.get("sha512") or ""),
+                expected_size=int(item.get("fileSize", 0) or 0),
+                restrict_hosts=True,
+                purpose="modpack-artifact",
+                reporter=reporter,
+                progress_stage=ProgressStage.DOWNLOADING_MODPACK,
+                progress_message=f"Downloading {relative.name}...",
+            )
+            if reporter is not None:
+                reporter.files(stage=ProgressStage.DOWNLOADING_MODPACK, message="Downloading modpack files...", current=completed, total=total)
 
     @staticmethod
     def _managed_download_entries(files: list[dict]) -> list[dict]:

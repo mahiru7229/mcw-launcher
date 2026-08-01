@@ -128,7 +128,7 @@ class ModManager:
         return changed
 
     @staticmethod
-    def read_mod(path: Path, preferred_loader: str = "") -> ModInfo:
+    def read_mod(path: Path, preferred_loader: str = "", provider_version: str = "") -> ModInfo:
         path = Path(path)
         enabled = not path.name.endswith(ModManager.DISABLED_SUFFIX)
         file_name = path.name[:-len(ModManager.DISABLED_SUFFIX)] if not enabled else path.name
@@ -137,6 +137,7 @@ class ModManager:
         try:
             with zipfile.ZipFile(path, "r") as archive:
                 names = set(archive.namelist())
+                manifest = ModManager._manifest_attributes(archive.read("META-INF/MANIFEST.MF")) if "META-INF/MANIFEST.MF" in names else {}
                 has_fabric = "fabric.mod.json" in names
                 has_forge = "META-INF/mods.toml" in names
 
@@ -148,16 +149,17 @@ class ModManager:
                         archive.read("fabric.mod.json"),
                         archive.read("META-INF/mods.toml"),
                         normalized_preference,
+                        manifest,
+                        provider_version,
                     )
                 if has_fabric:
-                    return ModManager._read_fabric_mod(path, file_name, enabled, archive.read("fabric.mod.json"))
+                    return ModManager._read_fabric_mod(path, file_name, enabled, archive.read("fabric.mod.json"), manifest, provider_version)
                 if "META-INF/neoforge.mods.toml" in names:
-                    return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/neoforge.mods.toml"), loader="neoforge", metadata_format="neoforge.mods.toml")
+                    return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/neoforge.mods.toml"), loader="neoforge", metadata_format="neoforge.mods.toml", manifest=manifest, provider_version=provider_version)
                 if has_forge:
-                    return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/mods.toml"), loader="forge", metadata_format="mods.toml")
+                    return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/mods.toml"), loader="forge", metadata_format="mods.toml", manifest=manifest, provider_version=provider_version)
                 if "mcmod.info" in names:
                     return ModManager._read_legacy_forge_mod(path, file_name, enabled, archive.read("mcmod.info"))
-                manifest = ModManager._manifest_attributes(archive.read("META-INF/MANIFEST.MF")) if "META-INF/MANIFEST.MF" in names else {}
                 fml_mod_type = str(manifest.get("fmlmodtype") or "").strip().upper()
                 if fml_mod_type in {"LANGPROVIDER", "LIBRARY", "GAMELIBRARY"}:
                     label = {
@@ -190,14 +192,14 @@ class ModManager:
             return ModManager._invalid_mod(path, file_name, enabled, "Broken JAR", str(error))
 
     @staticmethod
-    def _read_universal_fabric_forge_mod(path: Path, file_name: str, enabled: bool, fabric_metadata: bytes, forge_metadata: bytes, preferred_loader: str) -> ModInfo:
+    def _read_universal_fabric_forge_mod(path: Path, file_name: str, enabled: bool, fabric_metadata: bytes, forge_metadata: bytes, preferred_loader: str, manifest: dict[str, str] | None = None, provider_version: str = "") -> ModInfo:
         if preferred_loader == ModLoaderManager.FORGE:
-            return ModManager._read_forge_mod(path, file_name, enabled, forge_metadata, loader="forge", metadata_format="mods.toml")
+            return ModManager._read_forge_mod(path, file_name, enabled, forge_metadata, loader="forge", metadata_format="mods.toml", manifest=manifest, provider_version=provider_version)
         if preferred_loader == ModLoaderManager.FABRIC:
-            return ModManager._read_fabric_mod(path, file_name, enabled, fabric_metadata)
+            return ModManager._read_fabric_mod(path, file_name, enabled, fabric_metadata, manifest, provider_version)
 
-        fabric = ModManager._read_fabric_mod(path, file_name, enabled, fabric_metadata)
-        forge = ModManager._read_forge_mod(path, file_name, enabled, forge_metadata, loader="forge", metadata_format="mods.toml")
+        fabric = ModManager._read_fabric_mod(path, file_name, enabled, fabric_metadata, manifest, provider_version)
+        forge = ModManager._read_forge_mod(path, file_name, enabled, forge_metadata, loader="forge", metadata_format="mods.toml", manifest=manifest, provider_version=provider_version)
         fabric_valid = fabric.status not in ModManager._INVALID_STATUSES
         forge_valid = forge.status not in ModManager._INVALID_STATUSES
         if fabric_valid and forge_valid:
@@ -209,7 +211,7 @@ class ModManager:
         return fabric
 
     @staticmethod
-    def _read_fabric_mod(path: Path, file_name: str, enabled: bool, raw_metadata: bytes) -> ModInfo:
+    def _read_fabric_mod(path: Path, file_name: str, enabled: bool, raw_metadata: bytes, manifest: dict[str, str] | None = None, provider_version: str = "") -> ModInfo:
         try:
             data = json.loads(raw_metadata.decode("utf-8-sig"))
         except (UnicodeError, json.JSONDecodeError) as error:
@@ -218,7 +220,7 @@ class ModManager:
             return ModManager._invalid_mod(path, file_name, enabled, "Broken JAR", "fabric.mod.json must contain an object.")
 
         mod_id = str(data.get("id") or "").strip()
-        version = str(data.get("version") or "Unknown").strip()
+        version = ModManager._resolve_mod_version(data.get("version"), manifest, data, provider_version, file_name)
         name = str(data.get("name") or mod_id or Path(file_name).stem).strip()
         environment = str(data.get("environment") or "*").strip()
         status = "Server only" if environment == "server" else "Ready"
@@ -249,7 +251,7 @@ class ModManager:
         )
 
     @staticmethod
-    def _read_forge_mod(path: Path, file_name: str, enabled: bool, raw_metadata: bytes, loader: str, metadata_format: str) -> ModInfo:
+    def _read_forge_mod(path: Path, file_name: str, enabled: bool, raw_metadata: bytes, loader: str, metadata_format: str, manifest: dict[str, str] | None = None, provider_version: str = "") -> ModInfo:
         try:
             data = tomllib.loads(raw_metadata.decode("utf-8-sig"))
         except (UnicodeError, tomllib.TOMLDecodeError) as error:
@@ -259,7 +261,7 @@ class ModManager:
         metadata = next((item for item in mods if isinstance(item, dict)), {})
         mod_id = str(metadata.get("modId") or "").strip()
         name = str(metadata.get("displayName") or mod_id or Path(file_name).stem).strip()
-        version = str(metadata.get("version") or "Unknown").strip()
+        version = ModManager._resolve_mod_version(metadata.get("version"), manifest, {**data, **metadata}, provider_version, file_name)
         authors = ModManager._parse_authors(metadata.get("authors"))
         license_value = data.get("license") or metadata.get("license")
         if not mod_id:
@@ -464,6 +466,38 @@ class ModManager:
             if normalized:
                 attributes[normalized] = value.strip()
         return attributes
+
+    @staticmethod
+    def _resolve_mod_version(raw_version: object, manifest: dict[str, str] | None, properties: dict | None, provider_version: str, file_name: str) -> str:
+        raw = str(raw_version or "").strip()
+        manifest_values = {str(key).casefold(): str(value).strip() for key, value in dict(manifest or {}).items() if str(value).strip()}
+        property_values = {str(key).casefold(): str(value).strip() for key, value in dict(properties or {}).items() if not isinstance(value, (dict, list, tuple)) and str(value).strip()}
+        placeholder = re.fullmatch(r"\$\{file\.([^}]+)\}", raw, flags=re.IGNORECASE)
+        if raw and placeholder is None:
+            return raw
+        if placeholder is not None:
+            key = placeholder.group(1).strip().casefold()
+            candidates: list[str] = []
+            if key == "jarversion":
+                candidates.extend((manifest_values.get("implementation-version", ""), manifest_values.get("specification-version", "")))
+            normalized_keys = {
+                key,
+                key.replace("_", "-"),
+                re.sub(r"(?<!^)(?=[A-Z])", "-", placeholder.group(1)).casefold(),
+            }
+            for candidate_key in normalized_keys:
+                candidates.extend((property_values.get(candidate_key, ""), manifest_values.get(candidate_key, "")))
+            resolved = next((value for value in candidates if value and "${file." not in value.casefold()), "")
+            if resolved:
+                return resolved
+        provider = str(provider_version or "").strip()
+        if provider and "${file." not in provider.casefold():
+            return provider
+        stem = Path(file_name).stem
+        matches = re.findall(r"(?<![A-Za-z0-9])v?(\d+(?:[._-]\d+)+(?:[-+._A-Za-z0-9]*)?)", stem)
+        if matches:
+            return matches[-1].replace("_", ".")
+        return "Unknown"
 
     @staticmethod
     def _invalid_mod(path: Path, file_name: str, enabled: bool, status: str, error: str, loader: str = "unknown", metadata_format: str = "unknown") -> ModInfo:

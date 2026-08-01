@@ -58,7 +58,7 @@ def test_installs_required_dependencies_and_registry(tmp_path, monkeypatch):
     monkeypatch.setattr(ModrinthClient, "select_version", lambda project_id, game_version, loader="fabric", version_types=None: dependency)
     monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: projects[project_id])
 
-    def fake_download(file, destination, force=False):
+    def fake_download(file, destination, force=False, **kwargs):
         mod_id = "dependency" if file.filename.startswith("dependency") else "root"
         write_fabric_mod(destination, mod_id)
         return destination
@@ -114,7 +114,7 @@ def test_installs_forge_mod_and_resolves_forge_dependencies(tmp_path, monkeypatc
     monkeypatch.setattr(ModrinthClient, "select_version", lambda project_id, game_version, loader="fabric", version_types=None: selected_loaders.append(loader) or dependency)
     monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: projects[project_id])
 
-    def fake_download(file, destination, force=False):
+    def fake_download(file, destination, force=False, **kwargs):
         mod_id = "dependency" if file.filename.startswith("dependency") else "root"
         write_forge_mod(destination, mod_id)
         return destination

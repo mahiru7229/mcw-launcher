@@ -60,7 +60,7 @@ def test_download_round_forwards_launch_lock_token_to_managed_mod_install(tmp_pa
         "sha1": "",
         "size": 0,
     }
-    missing = [{"kind": "pack", "key": "pack:1:2", "path": "mods/example.jar", "entry": entry}]
+    missing = [{"kind": "mod", "key": "mod:1:2", "path": "mods/example.jar", "entry": entry}]
 
     result = CurseForgeContentManager._download_round(instance, missing, None, 1, "owned-token")
 
@@ -75,6 +75,36 @@ def test_download_round_forwards_launch_lock_token_to_managed_mod_install(tmp_pa
     }
     assert entry["pendingDownload"] is False
     assert entry["lastDownloadError"] == ""
+
+
+def test_download_round_places_manifest_managed_zip_without_mod_validation(tmp_path, monkeypatch):
+    from hashlib import sha1
+
+    instance_dir = tmp_path / "instance"
+    instance_dir.mkdir()
+    instance = Instance(instance_id="id", name="Pack", version_id="1.18.2", instance_dir=instance_dir, mod_loader=("forge", "40.2.0"))
+    content = b"manifest managed archive"
+    digest = sha1(content, usedforsecurity=False).hexdigest()
+    cache_path = tmp_path / "cache" / "archive.zip"
+    file = CurseForgeFile(file_id=4, project_id=3, display_name="Archive", file_name="archive.zip", release_type="release", file_date="", file_length=len(content), download_url="https://example.invalid/archive.zip", sha1=digest, game_versions=("1.18.2",), dependencies=(), loaders=())
+
+    monkeypatch.setattr(Paths, "curseforge_file_cache", staticmethod(lambda *args: cache_path))
+
+    def fake_download(_file, destination, **kwargs):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content)
+        return destination
+
+    monkeypatch.setattr(CurseForgeDownloader, "download_file", staticmethod(fake_download))
+    monkeypatch.setattr(ModManager, "add_mods", staticmethod(lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("managed ZIP must not use ModManager"))))
+    entry = {"projectId": 3, "fileId": 4, "fileName": "archive.zip", "path": "mods/archive.zip", "sha1": digest, "size": len(content), "downloadUrl": file.download_url}
+    missing = [{"kind": "pack", "key": "pack:3:4", "path": "mods/archive.zip", "entry": entry}]
+
+    result = CurseForgeContentManager._download_round(instance, missing, None, 1)
+
+    assert result["errors"] == {}
+    assert (instance_dir / "mods" / "archive.zip").read_bytes() == content
+    assert entry["path"] == "mods/archive.zip"
 
 
 def test_manual_download_errors_are_grouped_without_request_ids():
@@ -129,5 +159,42 @@ def test_launch_failure_exposes_manual_import_requirements(tmp_path, monkeypatch
     requirement = error.requirements[0]
     assert requirement.managed_kind == "pack"
     assert requirement.managed_path == "mods/restricted.jar"
-    assert requirement.project_url == "https://www.curseforge.com/minecraft/mc-mods/restricted-mod/files/202"
+    assert requirement.project_url == "https://www.curseforge.com/minecraft/mc-mods/restricted-mod"
+    assert requirement.version_url == "https://www.curseforge.com/minecraft/mc-mods/restricted-mod/files/202"
     assert requirement.sha1 == "b" * 40
+
+
+def test_manual_requirements_preserve_structured_failure_and_all_links(monkeypatch):
+    from src.models.curseforge.manual_download import CurseForgeManualDownload
+
+    existing = CurseForgeManualDownload(
+        project_id=11,
+        file_id=22,
+        project_name="Example",
+        file_name="example.zip",
+        file_size=7,
+        sha1="c" * 40,
+        project_url="https://www.curseforge.com/minecraft/mc-mods/example",
+        version_url="https://www.curseforge.com/minecraft/mc-mods/example/files/22",
+        direct_url="https://edge.forgecdn.net/example.zip",
+        reason="Automatic download failed (HTTP_404): HTTP 404.",
+        failure_reason="HTTP_404",
+        http_status=404,
+        attempts=5,
+        retryable=False,
+        managed_kind="pack",
+        managed_path="mods/example.zip",
+    )
+    entry = {"projectId": 11, "fileId": 22, "fileName": "example.zip", "path": "mods/example.zip", "sha1": "c" * 40, "size": 7}
+    missing = [{"kind": "pack", "key": "pack:11:22", "path": "mods/example.zip", "entry": entry}]
+    monkeypatch.setattr(CurseForgeClient, "get_projects_batch", staticmethod(lambda _ids: {}))
+
+    requirements = CurseForgeContentManager._manual_requirements(missing, {"pack:11:22": {"message": str(existing.reason), "retryable": False, "requirement": existing}})
+
+    requirement = requirements[0]
+    assert requirement.direct_url == existing.direct_url
+    assert requirement.version_url == existing.version_url
+    assert requirement.project_url == existing.project_url
+    assert requirement.failure_reason == "HTTP_404"
+    assert requirement.http_status == 404
+    assert requirement.attempts == 5

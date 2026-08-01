@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from src.models.instance.instance import Instance
+from src.models.modrinth.manual_download import ModrinthManualDownload
 
 
 @dataclass(frozen=True, slots=True)
@@ -10,6 +11,8 @@ class ModrinthModInstallResult:
     installed_projects: tuple[str, ...]
     installed_files: tuple[str, ...]
     warnings: tuple[str, ...] = ()
+    manual_downloads: tuple[ModrinthManualDownload, ...] = ()
+    instance_name: str = ""
 
 
 @dataclass(frozen=True, slots=True)

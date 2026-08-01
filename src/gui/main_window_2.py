@@ -17,6 +17,7 @@ from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.language.language_manager import language_manager, tr
 from src.core.lan.lan_agent_manager import LanAgentManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.modrinth.modrinth_errors import ModrinthManagedFilesRequired, ModrinthModpackManualDownloadRequired
 from src.core.network.download_pause import is_download_cancelled, is_download_paused
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.core.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
@@ -115,6 +116,8 @@ class MainWindow(QMainWindow):
         self._selected_instance: object | None = None
         self._restoring_instance_selection = False
         self._pending_mod_install_after_create: dict[str, object] | None = None
+        self._modrinth_manual_instance_name = ""
+        self._modrinth_pending_modpack_install: ModrinthModpackManualDownloadRequired | None = None
         self._curseforge_manual_instance_name = ""
         self._curseforge_pending_modpack_install: CurseForgeModpackManualDownloadRequired | None = None
         self.running_instances_timer.setInterval(1000)
@@ -205,6 +208,7 @@ class MainWindow(QMainWindow):
         self.mod_manager_dialog = ModManagerDialog(self)
         self.modrinth_mod_dialog = ModrinthBrowserDialog("mod", self)
         self.modrinth_modpack_dialog = ModrinthBrowserDialog("modpack", self)
+        self.modrinth_manual_dialog = CurseForgeManualDownloadDialog(self)
         self.curseforge_mod_dialog = CurseForgeBrowserDialog("mod", self)
         self.curseforge_modpack_dialog = CurseForgeBrowserDialog("modpack", self)
         self.curseforge_manual_dialog = CurseForgeManualDownloadDialog(self)
@@ -386,7 +390,10 @@ class MainWindow(QMainWindow):
         self.modrinth_controller.search_failed.connect(self._set_modrinth_search_error)
         self.modrinth_controller.versions_changed.connect(self._set_modrinth_versions)
         self.modrinth_controller.mod_installed.connect(self._modrinth_mod_installed)
+        self.modrinth_controller.manual_files_installed.connect(self._modrinth_manual_files_installed)
         self.modrinth_controller.modpack_installed.connect(self._modrinth_modpack_installed)
+        self.modrinth_controller.modpack_manual_download_required.connect(self._modrinth_modpack_manual_download_required)
+        self.modrinth_manual_dialog.files_selected.connect(self._install_manual_modrinth_files)
 
         self.curseforge_mod_dialog.search_requested.connect(self._search_curseforge_mods)
         self.curseforge_modpack_dialog.search_requested.connect(self._search_curseforge_modpacks)
@@ -772,14 +779,88 @@ class MainWindow(QMainWindow):
         message = tr("modrinth.mod.installed", count=count)
         if warnings:
             message += "\n\n" + "\n".join(str(item) for item in warnings)
+        manual_downloads = tuple(getattr(result, "manual_downloads", ()) or ())
+        if manual_downloads:
+            message += "\n\n" + tr("artifact.manual.pending", provider="Modrinth", count=len(manual_downloads))
         QMessageBox.information(self, tr("modrinth.mod.install"), message)
+        if manual_downloads:
+            self._modrinth_pending_modpack_install = None
+            self._modrinth_manual_instance_name = str(getattr(result, "instance_name", ""))
+            try:
+                manual_instance = InstanceManager.load(self._modrinth_manual_instance_name)
+                self.modrinth_manual_dialog.set_instance_context(manual_instance.name, manual_instance.instance_dir)
+            except Exception:
+                self.modrinth_manual_dialog.set_instance_context(self._modrinth_manual_instance_name, None)
+            self.modrinth_manual_dialog.set_requirements(manual_downloads)
+            self.modrinth_manual_dialog.show()
+            self.modrinth_manual_dialog.raise_()
+            self.modrinth_manual_dialog.activateWindow()
 
     def _modrinth_modpack_installed(self, result: object) -> None:
         instance = getattr(result, "instance", None)
         selected_name = str(getattr(instance, "name", ""))
         self.instance_controller.refresh(selected_name=selected_name)
         self.modrinth_modpack_dialog.close()
+        if self._modrinth_pending_modpack_install is not None:
+            self.modrinth_manual_dialog.mark_installed(self._modrinth_pending_modpack_install.requirement)
+            self.modrinth_manual_dialog.close()
+            self._modrinth_pending_modpack_install = None
         QMessageBox.information(self, tr("modrinth.modpack.install"), tr("modrinth.modpack.installed", name=selected_name))
+
+    def _install_manual_modrinth_files(self, sources: object) -> None:
+        paths = [Path(source) for source in sources] if isinstance(sources, (list, tuple)) else []
+        if not paths:
+            return
+        if self._modrinth_pending_modpack_install is not None:
+            if len(paths) != 1:
+                QMessageBox.warning(self, tr("artifact.manual.modpack_archive_title", provider="Modrinth"), tr("artifact.manual.modpack_single_file", provider="Modrinth"))
+                return
+            self.modrinth_controller.install_manual_modpack(self._modrinth_pending_modpack_install, paths[0])
+            return
+        if not self._modrinth_manual_instance_name:
+            QMessageBox.warning(self, tr("artifact.manual.title", provider="Modrinth"), tr("curseforge.mod.no_instance"))
+            return
+        self.modrinth_controller.install_manual_files(self._modrinth_manual_instance_name, self.modrinth_manual_dialog.remaining_requirements, paths)
+
+    def _modrinth_manual_files_installed(self, instance_name: str, result: object) -> None:
+        imported = tuple(getattr(result, "imported", ()) or ())
+        added_mods = tuple(getattr(result, "added_mods", ()) or ())
+        rejected = tuple(getattr(result, "rejected", ()) or ())
+        for item in imported:
+            requirement = getattr(item, "requirement", None)
+            if requirement is not None:
+                self.modrinth_manual_dialog.mark_installed(requirement)
+        if self.mod_controller.current_instance is not None and self.mod_controller.current_instance.name == instance_name:
+            self.mod_controller.refresh()
+        lines = []
+        if imported:
+            lines.append(tr("artifact.manual.batch_imported", provider="Modrinth", count=len(imported)))
+        if added_mods:
+            lines.append(tr("curseforge.manual.batch_added", count=len(added_mods)))
+        if rejected:
+            lines.append(tr("curseforge.manual.batch_rejected", count=len(rejected)))
+            lines.append("\n".join(f"- {message}" for message in rejected[:12]))
+        if self.modrinth_manual_dialog.remaining_count == 0:
+            lines.append(tr("curseforge.manual.all_imported"))
+        elif imported:
+            lines.append(tr("curseforge.manual.remaining", count=self.modrinth_manual_dialog.remaining_count))
+        message = "\n\n".join(lines) or tr("curseforge.manual.batch_no_files")
+        if rejected:
+            QMessageBox.warning(self, tr("artifact.manual.title", provider="Modrinth"), message)
+        else:
+            QMessageBox.information(self, tr("artifact.manual.title", provider="Modrinth"), message)
+
+    def _modrinth_modpack_manual_download_required(self, request: object) -> None:
+        if not isinstance(request, ModrinthModpackManualDownloadRequired):
+            self._show_error(tr("modrinth.modpack.install"), "Invalid Modrinth manual download request.")
+            return
+        self._modrinth_pending_modpack_install = request
+        self._modrinth_manual_instance_name = ""
+        self.modrinth_manual_dialog.set_instance_context(request.instance_name, None)
+        self.modrinth_manual_dialog.set_requirements([request.requirement])
+        self.modrinth_manual_dialog.show()
+        self.modrinth_manual_dialog.raise_()
+        self.modrinth_manual_dialog.activateWindow()
 
 
     def _require_curseforge_gateway(self) -> bool:
@@ -1013,7 +1094,7 @@ class MainWindow(QMainWindow):
         if warnings:
             message += "\n\n" + "\n".join(str(item) for item in warnings)
         if manual_downloads:
-            message += "\n\n" + tr("curseforge.manual.pending", count=len(manual_downloads))
+            message += "\n\n" + tr("artifact.manual.pending", provider="CurseForge", count=len(manual_downloads))
         QMessageBox.information(self, tr("curseforge.mod.install"), message)
         if manual_downloads:
             self._curseforge_pending_modpack_install = None
@@ -1629,13 +1710,27 @@ class MainWindow(QMainWindow):
                 self._curseforge_manual_instance_name = error.instance_name
                 self.curseforge_manual_dialog.set_instance_context(error.instance_name, error.instance_dir)
                 self.curseforge_manual_dialog.set_requirements(error.requirements)
-                status = tr("curseforge.manual.launch_blocked", count=len(error.requirements))
-                self.launch_control.set_failed(status, tr("curseforge.manual.launch_blocked_detail"))
+                status = tr("artifact.manual.launch_blocked", provider="CurseForge", count=len(error.requirements))
+                self.launch_control.set_failed(status, tr("artifact.manual.launch_blocked_detail", provider="CurseForge"))
                 self.home_page.set_status(status)
                 self.right_panel.set_status(status)
                 self.curseforge_manual_dialog.show()
                 self.curseforge_manual_dialog.raise_()
                 self.curseforge_manual_dialog.activateWindow()
+                self.instance_controller.refresh_running(force=True)
+                return
+            if isinstance(error, ModrinthManagedFilesRequired):
+                self._modrinth_pending_modpack_install = None
+                self._modrinth_manual_instance_name = error.instance_name
+                self.modrinth_manual_dialog.set_instance_context(error.instance_name, error.instance_dir)
+                self.modrinth_manual_dialog.set_requirements(error.requirements)
+                status = tr("artifact.manual.launch_blocked", provider="Modrinth", count=len(error.requirements))
+                self.launch_control.set_failed(status, tr("artifact.manual.launch_blocked_detail", provider="Modrinth"))
+                self.home_page.set_status(status)
+                self.right_panel.set_status(status)
+                self.modrinth_manual_dialog.show()
+                self.modrinth_manual_dialog.raise_()
+                self.modrinth_manual_dialog.activateWindow()
                 self.instance_controller.refresh_running(force=True)
                 return
             view = LaunchErrorPresenter.present(error)

@@ -29,7 +29,7 @@ def test_java_download_uses_shared_bandwidth_limiter(tmp_path: Path, monkeypatch
     assert sum(throttled) == len(content)
 
 
-def test_java_download_cancel_keeps_partial_and_resumes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_java_download_cancel_removes_partial_and_restarts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from src.core.network.download_pause import DownloadCancelledError, download_pause_controller
 
     content = b"java-archive"
@@ -39,9 +39,9 @@ def test_java_download_cancel_keeps_partial_and_resumes(tmp_path: Path, monkeypa
     ranges: list[str | None] = []
 
     class Response:
-        def __init__(self, resumed: bool) -> None:
-            self.status_code = 206 if resumed else 200
-            self.headers = {"Content-Length": "7", "Content-Range": "bytes 5-11/12"} if resumed else {"Content-Length": str(len(content))}
+        def __init__(self) -> None:
+            self.status_code = 200
+            self.headers = {"Content-Length": str(len(content))}
 
         def __enter__(self):
             return self
@@ -58,12 +58,12 @@ def test_java_download_cancel_keeps_partial_and_resumes(tmp_path: Path, monkeypa
                 download_pause_controller.request_cancel()
                 yield b"archive"
                 return
-            yield b"archive"
+            yield content
 
     class Client:
         def stream(self, method: str, url: str, *, headers: dict[str, str], timeout: float):
             ranges.append(headers.get("Range"))
-            return Response(resumed=phase["value"] == 2)
+            return Response()
 
     monkeypatch.setattr(HttpDownloader, "get_client", lambda: Client())
     download_pause_controller.begin()
@@ -71,7 +71,7 @@ def test_java_download_cancel_keeps_partial_and_resumes(tmp_path: Path, monkeypa
         JavaArchiveDownloader.download(release, destination, max_retry=1)
 
     partial = destination.with_name(destination.name + ".part")
-    assert partial.read_bytes() == b"java-"
+    assert partial.exists() is False
 
     download_pause_controller.finish()
     phase["value"] = 2
@@ -80,4 +80,4 @@ def test_java_download_cancel_keeps_partial_and_resumes(tmp_path: Path, monkeypa
     download_pause_controller.finish()
 
     assert destination.read_bytes() == content
-    assert ranges == [None, "bytes=5-"]
+    assert ranges == [None, None]

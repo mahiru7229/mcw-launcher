@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import re
 
@@ -12,7 +11,8 @@ from src.core.curseforge.curseforge_registry import CurseForgeRegistry
 from src.core.fs.paths import Paths
 from src.core.mod.mod_manager import ModManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
-from src.core.network.download_pause import is_download_paused
+from src.core.network.artifact_download_service import artifact_download_service
+from src.core.network.download_pause import download_pause_controller, is_download_paused
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.curseforge.file import CurseForgeFile
 from src.models.curseforge.manual_download import CurseForgeManualDownload
@@ -169,74 +169,103 @@ class CurseForgeContentManager:
         if reporter is not None:
             reporter.files(stage=ProgressStage.DOWNLOADING_MODS, message=message, current=0, total=len(missing))
 
-        def download(item: dict) -> tuple[dict, Path, CurseForgeFile]:
+        for completed, item in enumerate(missing, start=1):
+            download_pause_controller.raise_if_requested()
             entry = item["entry"]
-            file = CurseForgeContentManager._file_from_entry(entry)
-            if not file.file_name or not file.sha1:
-                file = CurseForgeClient.get_file(file.project_id, file.file_id, force_refresh=True)
-            cache = Paths.curseforge_file_cache(file.project_id, file.file_id, file.file_name)
-            CurseForgeDownloader.download_file(file, cache, reporter=None, project_name=str(entry.get("displayName") or file.display_name))
-            return item, cache, file
+            try:
+                file = CurseForgeContentManager._file_from_entry(entry)
+                if not file.file_name or not file.sha1:
+                    file = CurseForgeClient.get_file(file.project_id, file.file_id, force_refresh=True)
+                cache = Paths.curseforge_file_cache(file.project_id, file.file_id, file.file_name)
+                CurseForgeDownloader.download_file(
+                    file,
+                    cache,
+                    reporter=reporter,
+                    project_name=str(entry.get("displayName") or file.display_name),
+                    purpose="modpack-artifact" if item["kind"] == "pack" else "mod",
+                    managed_kind=str(item["kind"]),
+                    managed_path=str(item["path"]),
+                )
+                download_pause_controller.raise_if_requested()
 
-        completed = 0
-        with ThreadPoolExecutor(max_workers=min(CurseForgeContentManager.MAX_WORKERS, max(1, len(missing)))) as executor:
-            futures = {executor.submit(download, item): item for item in missing}
-            for future in as_completed(futures):
-                item = futures[future]
-                entry = item["entry"]
-                try:
-                    _, cache, file = future.result()
+                compatibility_warning = ""
+                if item["kind"] == "pack":
+                    target, relative = CurseForgePackRegistry.managed_path(instance, str(item["path"]), file.file_name)
+                    request = CurseForgeContentManager._artifact_request(file, target, item)
+                    artifact_download_service.accept_manual_file(request, cache)
+                    entry["fileName"] = target.name
+                    entry["path"] = relative
+                    if target.suffix.casefold() == ".jar":
+                        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
+                        metadata = ModManager.read_mod(target, preferred_loader=loader_name, provider_version=file.display_name)
+                        compatibility_warning = ModManager.compatibility_warning(instance, metadata)
+                else:
                     loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-                    metadata = ModManager.read_mod(cache, preferred_loader=loader_name)
+                    metadata = ModManager.read_mod(cache, preferred_loader=loader_name, provider_version=file.display_name)
                     compatibility_warning = ModManager.compatibility_warning(instance, metadata)
-                    added = ModManager.add_mods(
-                        instance,
-                        [cache],
-                        replace=True,
-                        launch_lock_token=launch_lock_token,
-                        allow_unverified=True,
-                    )
+                    added = ModManager.add_mods(instance, [cache], replace=True, launch_lock_token=launch_lock_token, allow_unverified=True)
                     if not added:
                         raise RuntimeError("Downloaded file could not be added to the instance.")
                     entry["fileName"] = added[0].file_name
                     entry["path"] = f"mods/{added[0].file_name}"
-                    entry["sha1"] = file.sha1 or str(entry.get("sha1") or "")
-                    entry["size"] = file.file_length or int(entry.get("size", 0) or 0)
-                    entry["downloadUrl"] = file.download_url or str(entry.get("downloadUrl") or "")
-                    entry["pendingDownload"] = False
-                    entry["lastDownloadError"] = ""
-                    entry["retryableDownload"] = True
-                    entry["acceptedUnverified"] = bool(compatibility_warning)
-                    entry["compatibilityWarning"] = compatibility_warning
-                    downloaded += 1
-                    accepted_unverified += int(bool(compatibility_warning))
-                except Exception as error:
-                    if is_download_paused(error):
-                        raise
-                    retryable = not isinstance(error, CurseForgeManualDownloadRequired) and not CurseForgeClient.is_permanent_error(error)
-                    entry["pendingDownload"] = True
-                    entry["lastDownloadError"] = str(error)
-                    entry["retryableDownload"] = retryable
-                    error_payload: dict[str, object] = {"message": str(error), "retryable": retryable}
-                    if isinstance(error, CurseForgeManualDownloadRequired):
-                        requirement = error.requirement
-                        error_payload["requirement"] = CurseForgeManualDownload(
-                            project_id=requirement.project_id,
-                            file_id=requirement.file_id,
-                            project_name=str(entry.get("displayName") or requirement.project_name),
-                            file_name=requirement.file_name,
-                            file_size=requirement.file_size,
-                            sha1=requirement.sha1,
-                            project_url=requirement.project_url,
-                            reason=requirement.reason,
-                            managed_kind=str(item.get("kind") or "mod"),
-                            managed_path=str(item.get("path") or ""),
-                        )
-                    errors[item["key"]] = error_payload
-                completed += 1
-                if reporter is not None:
-                    reporter.files(stage=ProgressStage.DOWNLOADING_MODS, message=message, current=completed, total=len(missing))
+
+                entry["sha1"] = file.sha1 or str(entry.get("sha1") or "")
+                entry["size"] = file.file_length or int(entry.get("size", 0) or 0)
+                entry["downloadUrl"] = file.download_url or str(entry.get("downloadUrl") or "")
+                entry["pendingDownload"] = False
+                entry["lastDownloadError"] = ""
+                entry["retryableDownload"] = True
+                entry["acceptedUnverified"] = bool(compatibility_warning)
+                entry["compatibilityWarning"] = compatibility_warning
+                downloaded += 1
+                accepted_unverified += int(bool(compatibility_warning))
+            except Exception as error:
+                if is_download_paused(error):
+                    raise
+                retryable = not isinstance(error, CurseForgeManualDownloadRequired) and not CurseForgeClient.is_permanent_error(error)
+                entry["pendingDownload"] = True
+                entry["lastDownloadError"] = str(error)
+                entry["retryableDownload"] = retryable
+                error_payload: dict[str, object] = {"message": str(error), "retryable": retryable}
+                if isinstance(error, CurseForgeManualDownloadRequired):
+                    requirement = error.requirement
+                    error_payload["requirement"] = CurseForgeManualDownload(
+                        project_id=requirement.project_id,
+                        file_id=requirement.file_id,
+                        project_name=str(entry.get("displayName") or requirement.project_name),
+                        file_name=requirement.file_name,
+                        file_size=requirement.file_size,
+                        sha1=requirement.sha1,
+                        project_url=requirement.project_url,
+                        reason=requirement.reason,
+                        managed_kind=str(item.get("kind") or "mod"),
+                        managed_path=str(item.get("path") or ""),
+                        direct_url=requirement.direct_url,
+                        version_url=requirement.version_url,
+                        failure_reason=requirement.failure_reason,
+                        http_status=requirement.http_status,
+                        attempts=requirement.attempts,
+                        retryable=requirement.retryable,
+                    )
+                errors[item["key"]] = error_payload
+            if reporter is not None:
+                reporter.files(stage=ProgressStage.DOWNLOADING_MODS, message=message, current=completed, total=len(missing))
         return {"errors": errors, "downloaded": downloaded, "acceptedUnverified": accepted_unverified}
+
+    @staticmethod
+    def _artifact_request(file: CurseForgeFile, destination: Path, item: dict):
+        from src.models.network.artifact import ArtifactRequest
+        return ArtifactRequest(
+            provider="curseforge",
+            purpose="modpack-artifact",
+            destination=destination,
+            urls=(file.download_url,) if file.download_url else (),
+            expected_filename=Path(str(item.get("path") or file.file_name)).name,
+            expected_size=file.file_length,
+            hashes={"sha1": file.sha1} if file.sha1 else {},
+            project_id=str(file.project_id),
+            file_id=str(file.file_id),
+        )
 
     @staticmethod
     def _file_from_entry(entry: dict) -> CurseForgeFile:
@@ -280,12 +309,13 @@ class CurseForgeContentManager:
             project = projects.get(project_id)
             project_name = str(getattr(project, "name", "") or entry.get("displayName") or entry.get("fileName") or f"CurseForge project {project_id}").strip()
             project_url = str(getattr(project, "project_url", "") or getattr(existing, "project_url", "") or "").rstrip("/")
-            if project_url and file_id > 0 and "/files/" not in project_url:
-                project_url = f"{project_url}/files/{file_id}"
             if not project_url:
                 project_url = f"https://www.curseforge.com/minecraft/mc-mods/{project_id}"
+            version_url = str(getattr(existing, "version_url", "") or "").strip()
+            if not version_url and project_url and file_id > 0:
+                version_url = f"{project_url}/files/{file_id}"
             raw_reason = str(error_payload.get("message") or entry.get("lastDownloadError") or "File is missing or invalid")
-            reason = CurseForgeContentManager._normalized_error(raw_reason)
+            reason = str(getattr(existing, "reason", "") or CurseForgeContentManager._normalized_error(raw_reason))
             requirements.append(
                 CurseForgeManualDownload(
                     project_id=project_id,
@@ -298,6 +328,12 @@ class CurseForgeContentManager:
                     reason=reason,
                     managed_kind=str(item.get("kind") or "mod"),
                     managed_path=str(item.get("path") or ""),
+                    direct_url=str(getattr(existing, "direct_url", "") or entry.get("downloadUrl") or "").strip(),
+                    version_url=version_url,
+                    failure_reason=str(getattr(existing, "failure_reason", "") or "UNKNOWN"),
+                    http_status=getattr(existing, "http_status", None),
+                    attempts=max(1, int(getattr(existing, "attempts", 1) or 1)),
+                    retryable=bool(getattr(existing, "retryable", False)),
                 )
             )
         return tuple(requirements)
@@ -332,7 +368,8 @@ class CurseForgeContentManager:
     @staticmethod
     def _item(entry: dict, kind: str) -> dict:
         filename = Path(str(entry.get("fileName") or "")).name
-        path = str(entry.get("path") or f"mods/{filename}").replace("\\", "/").lstrip("/")
+        raw_path = str(entry.get("path") or f"mods/{filename}")
+        path = CurseForgePackRegistry.safe_relative_path(raw_path, filename)
         key = f"{kind}:{entry.get('projectId')}:{entry.get('fileId')}"
         return {"kind": kind, "key": key, "path": path, "sha1": str(entry.get("sha1") or "").lower(), "size": max(0, int(entry.get("size", 0) or 0)), "entry": entry}
 
