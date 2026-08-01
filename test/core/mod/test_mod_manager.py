@@ -309,6 +309,40 @@ def test_reads_forge_language_provider_from_manifest(tmp_path):
     assert "LANGPROVIDER" in mod.metadata_format
 
 
+def test_reads_fml_managed_library_as_neoforge_for_neoforge_instance(tmp_path):
+    instance = make_instance(tmp_path, loader=("neoforge", "47.1.106"))
+    source = tmp_path / "kotlinforforge-4.12.0-all.jar"
+    with zipfile.ZipFile(source, "w") as archive:
+        archive.writestr(
+            "META-INF/MANIFEST.MF",
+            "Manifest-Version: 1.0\nFMLModType: LIBRARY\n",
+        )
+
+    metadata = ModManager.read_mod(source, preferred_loader="neoforge", provider_version="4.12.0")
+    ModManager.validate_mod_for_instance(instance, metadata)
+    added = ModManager.add_mods(instance, [source])
+
+    assert metadata.loader == "neoforge"
+    assert metadata.version == "4.12.0"
+    assert metadata.description == "Neoforge managed library"
+    assert added[0].loader == "neoforge"
+    assert added[0].status == "Ready"
+
+
+def test_fml_managed_library_defaults_to_forge_without_family_preference(tmp_path):
+    source = tmp_path / "forge-library.jar"
+    with zipfile.ZipFile(source, "w") as archive:
+        archive.writestr(
+            "META-INF/MANIFEST.MF",
+            "Manifest-Version: 1.0\nFMLModType: LIBRARY\nImplementation-Version: 1.2.3\n",
+        )
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.loader == "forge"
+    assert mod.version == "1.2.3"
+
+
 def test_allow_unverified_installs_fabric_jar_into_forge_instance(tmp_path):
     instance = make_instance(tmp_path, loader=("forge", "47.3.0"))
     source = make_mod(tmp_path / "fabric-api-port.jar")

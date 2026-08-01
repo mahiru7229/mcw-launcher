@@ -163,10 +163,11 @@ class ModManager:
                     return ModManager._read_legacy_forge_mod(path, file_name, enabled, archive.read("mcmod.info"))
                 fml_mod_type = str(manifest.get("fmlmodtype") or "").strip().upper()
                 if fml_mod_type in {"LANGPROVIDER", "LIBRARY", "GAMELIBRARY"}:
+                    loader = normalized_preference if normalized_preference in ModLoaderManager.FORGE_FAMILY else ModLoaderManager.FORGE
                     label = {
-                        "LANGPROVIDER": "Forge language provider",
-                        "LIBRARY": "Forge managed library",
-                        "GAMELIBRARY": "Forge game library",
+                        "LANGPROVIDER": f"{loader.title()} language provider",
+                        "LIBRARY": f"{loader.title()} managed library",
+                        "GAMELIBRARY": f"{loader.title()} game library",
                     }[fml_mod_type]
                     return ModInfo(
                         path=path,
@@ -174,8 +175,8 @@ class ModManager:
                         enabled=enabled,
                         mod_id="unknown",
                         name=Path(file_name).stem,
-                        version=str(manifest.get("implementation-version") or manifest.get("specification-version") or "Unknown").strip(),
-                        loader="forge",
+                        version=str(manifest.get("implementation-version") or manifest.get("specification-version") or provider_version or "Unknown").strip(),
+                        loader=loader,
                         metadata_format=f"MANIFEST.MF:FMLModType={fml_mod_type}",
                         status="Ready",
                         description=label,
