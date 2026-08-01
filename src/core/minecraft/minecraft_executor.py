@@ -11,6 +11,7 @@ from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.instance.settings_manager import SettingsManager
 from src.core.lan.lan_agent_manager import LanAgentManager
 from src.core.lan.lan_hosting_manager import LanHostingManager
+from src.core.java.java_major_policy import JavaMajorPolicy
 from src.core.java.java_resolver import JavaResolver
 from src.core.java.java_runtime import JavaRuntime
 from src.core.minecraft.asset_manager import AssetManager
@@ -123,9 +124,11 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.SELECTING_JAVA, message="Selecting Java runtime...")
-            java_major = version.java_version.get("majorVersion") or 8
-            java = JavaResolver.resolve(java_major, reporter)
-            LanAgentManager.append_log_path(lan_log_path, f"Java selected: {java} (major {java_major}).")
+            required_java_major = int(version.java_version.get("majorVersion") or 8)
+            java_major = JavaMajorPolicy.resolve(required_java_major)
+            preferred_java = str(getattr(settings, "java_path", "") or "").strip()
+            java = JavaResolver.resolve(required_java_major, reporter, preferred_java) if preferred_java else JavaResolver.resolve(required_java_major, reporter)
+            LanAgentManager.append_log_path(lan_log_path, f"Java selected: {java} (required {required_java_major}; compatibility target {java_major}).")
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.LAUNCHING, message=f"Launching Minecraft {version.id}...")

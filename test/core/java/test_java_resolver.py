@@ -40,3 +40,64 @@ def test_resolve_provisions_java_when_selection_fails(monkeypatch: pytest.Monkey
 
     assert result == installed
     assert calls == [("select", 21), ("provision", 21, reporter)]
+
+
+def test_resolve_maps_java_16_requirement_to_java_17(monkeypatch: pytest.MonkeyPatch):
+    selected = Path("java17/javaw.exe")
+    calls = []
+
+    def select(major):
+        calls.append(major)
+        return selected
+
+    monkeypatch.setattr(JavaSelector, "select_java", select)
+
+    assert JavaResolver.resolve(16) == selected
+    assert calls == [17]
+
+
+def test_resolve_does_not_use_java_25_for_java_17_requirement(monkeypatch: pytest.MonkeyPatch):
+    installed = Path("runtimes/java-17/bin/javaw.exe")
+    calls = []
+
+    def fail_selection(major):
+        calls.append(("select", major))
+        raise RuntimeError("Java 17 was not found.")
+
+    def provision(major, reporter=None):
+        calls.append(("provision", major))
+        return installed
+
+    monkeypatch.setattr(JavaSelector, "select_java", fail_selection)
+    monkeypatch.setattr(JavaProvisioner, "ensure", provision)
+
+    assert JavaResolver.resolve(17) == installed
+    assert calls == [("select", 17), ("provision", 17)]
+
+
+def test_resolve_accepts_compatible_preferred_java(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    java = tmp_path / "jdk-17" / "bin" / "javaw.exe"
+    java.parent.mkdir(parents=True)
+    java.write_bytes(b"")
+    monkeypatch.setattr("src.core.java.java_resolver.JavaManager.get_major_version", lambda path: 17)
+
+    assert JavaResolver.resolve(17, preferred_path=java) == java
+
+
+def test_resolve_rejects_preferred_java_25_for_java_17(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    java = tmp_path / "jdk-25" / "bin" / "javaw.exe"
+    java.parent.mkdir(parents=True)
+    java.write_bytes(b"")
+    monkeypatch.setattr("src.core.java.java_resolver.JavaManager.get_major_version", lambda path: 25)
+
+    with pytest.raises(RuntimeError, match="Java 25 is incompatible.*Required: Java 17"):
+        JavaResolver.resolve(17, preferred_path=java)
+
+
+def test_resolve_accepts_raw_java_16_for_java_16_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    java = tmp_path / "jdk-16" / "bin" / "javaw.exe"
+    java.parent.mkdir(parents=True)
+    java.write_bytes(b"")
+    monkeypatch.setattr("src.core.java.java_resolver.JavaManager.get_major_version", lambda path: 16)
+
+    assert JavaResolver.resolve(16, preferred_path=java) == java

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout
 
 
 class CardWidget(QFrame):
@@ -17,12 +17,14 @@ class CardWidget(QFrame):
         if title:
             self.title_label = QLabel(title)
             self.title_label.setObjectName("CardTitle")
+            self.title_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
             self.layout.addWidget(self.title_label)
 
         if subtitle:
             self.subtitle_label = QLabel(subtitle)
             self.subtitle_label.setObjectName("CardSubtitle")
             self.subtitle_label.setWordWrap(True)
+            self.subtitle_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
             self.layout.addWidget(self.subtitle_label)
 
     def set_compact_mode(self, compact: bool) -> None:

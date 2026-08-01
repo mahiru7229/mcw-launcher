@@ -14,6 +14,15 @@
 - Cập nhật giao diện, bộ lọc loader, bản dịch và tên gói diagnostics cho NeoForge.
 - Cập nhật metadata sang `v0.12.0-beta.2`, kênh `beta`.
 
+
+### Java runtime hotfix
+
+- Sửa Java selector để không dùng Java 25 cho runtime yêu cầu Java 17/21.
+- Thêm trình cài Java do launcher quản lý cho Java 8, 17, 21 và 25.
+- Tra cứu JDK GA mới nhất từ Adoptium và thêm lựa chọn cài trực tiếp, ví dụ Java 26.
+- Giữ Java mới nhất tách biệt khỏi policy chọn runtime Minecraft: cài Java 26 không khiến modpack cũ tự dùng Java 26.
+- Thu gọn bố cục thẻ cài đặt mặc định của instance để loại bỏ khoảng trống giữa tiêu đề, mô tả và tóm tắt.
+
 ### Giới hạn xác minh
 
 - Installer/profile/runtime được kiểm tra bằng test tự động và metadata chính thức của NeoForged.
@@ -33,6 +42,15 @@
 - Rebuilt and pinned the new SHA-256 for `runtime/mcw-lan-agent.jar`.
 - Updated loader filters, UI labels, translations, and NeoForge diagnostics archive naming.
 - Updated release metadata to `v0.12.0-beta.2` on the `beta` channel.
+
+
+### Java runtime hotfix
+
+- Fixed Java selection so Java 25 is not used for runtimes that require Java 17/21.
+- Added launcher-managed installation for Java 8, 17, 21, and 25.
+- Added an Adoptium lookup for the latest GA JDK and a direct install option, such as Java 26.
+- Kept the latest JDK separate from Minecraft compatibility selection: installing Java 26 does not make older modpacks use Java 26.
+- Compacted the Default instance settings card to remove excessive gaps between its title, description, and summary.
 
 ### Validation limitation
 

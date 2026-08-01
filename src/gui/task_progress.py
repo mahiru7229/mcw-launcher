@@ -38,6 +38,8 @@ def task_progress_profile(task_id: str) -> TaskProgressProfile | None:
     if task in exact:
         return exact[task]
 
+    if task.startswith("java.install."):
+        return TaskProgressProfile(ProgressStage.INSTALLING_JAVA, "java.install.completed", "java.install.completed_detail", "java.install.failed")
     if task.startswith("update.check."):
         return TaskProgressProfile(ProgressStage.PREPARING, "update.check.completed", "update.check.completed_detail", "update.check.failed")
     if task in {"instance.create", "instance.loader", "instance.loader.repair", "instance.loader.restore"}:

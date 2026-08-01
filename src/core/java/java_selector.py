@@ -5,7 +5,7 @@ from src.core.java.java_manager import JavaManager
 
 class JavaSelector:
     @staticmethod
-    def select_java(required_major: int, allow_higher: bool = True) -> Path:
+    def select_java(required_major: int, allow_higher: bool = False) -> Path:
         javas = JavaManager.find_installation()
 
         if not javas:

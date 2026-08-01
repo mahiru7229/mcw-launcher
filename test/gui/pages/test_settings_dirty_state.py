@@ -6,6 +6,8 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
+from PySide6.QtWidgets import QSizePolicy
+
 from src.gui.pages.instance_settings_page import InstanceSettingsPage
 from src.gui.pages.launcher_settings_page import LauncherSettingsPage
 
@@ -118,3 +120,38 @@ def test_launcher_settings_round_trips_custom_accent(gui_app):
     assert page.current_accent_color() == "#b26cff"
     assert page.form_data()["accent_mode"] == "custom"
     assert page.form_data()["accent_color"] == "#b26cff"
+
+
+def test_launcher_settings_can_request_managed_java_install(gui_app):
+    page = LauncherSettingsPage()
+    requested = []
+    page.install_java_requested.connect(requested.append)
+
+    index = page.java_install_combo.findData(21)
+    page.java_install_combo.setCurrentIndex(index)
+    page.java_install_button.click()
+
+    assert requested == [21]
+    assert [page.java_install_combo.itemData(index) for index in range(page.java_install_combo.count())] == [8, 17, 21, 25]
+
+    page.set_latest_java_release(26)
+    latest_index = page.java_install_combo.findData(26)
+    page.java_install_combo.setCurrentIndex(latest_index)
+    page.java_install_button.click()
+
+    assert requested == [21, 26]
+    assert [page.java_install_combo.itemData(index) for index in range(page.java_install_combo.count())] == [8, 17, 21, 25, 26]
+    assert "26" in page.java_install_combo.itemText(latest_index)
+
+
+def test_instance_defaults_card_keeps_text_compact_and_places_extra_space_before_button(gui_app):
+    page = LauncherSettingsPage()
+
+    assert page.instance_defaults_card.title_label.sizePolicy().verticalPolicy() == QSizePolicy.Policy.Fixed
+    assert page.instance_defaults_card.subtitle_label.sizePolicy().verticalPolicy() == QSizePolicy.Policy.Fixed
+    assert page.instance_defaults_summary.sizePolicy().verticalPolicy() == QSizePolicy.Policy.Fixed
+
+    button_index = page.instance_defaults_card.layout.indexOf(page.edit_instance_defaults_button)
+    spacer = page.instance_defaults_card.layout.itemAt(button_index - 1).spacerItem()
+    assert spacer is not None
+    assert spacer.expandingDirections()

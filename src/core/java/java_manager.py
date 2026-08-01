@@ -249,6 +249,19 @@ class JavaManager:
         return java_paths or None
 
     @staticmethod
+    def get_major_version(java_path: Path) -> int | None:
+        return JavaManager._get_major_version(java_path)
+
+    @staticmethod
+    def normalize_executable(java_path: Path) -> Path:
+        path = Path(java_path)
+        if path.name.casefold() == "java.exe":
+            javaw_path = path.with_name("javaw.exe")
+            if javaw_path.is_file():
+                return javaw_path
+        return path
+
+    @staticmethod
     def _get_major_version(
         java_path: Path
     ) -> int | None:

@@ -51,3 +51,16 @@ def test_rejects_missing_checksum():
         assert "missing" in str(error).lower()
     else:
         raise AssertionError("Missing checksum must be rejected")
+
+def test_parses_latest_ga_feature_release_without_using_tip_version():
+    payload = {
+        "available_releases": [8, 11, 17, 21, 25, 26],
+        "most_recent_feature_release": 26,
+        "tip_version": 27,
+    }
+
+    assert AdoptiumClient._parse_latest_feature_release(payload) == 26
+
+
+def test_falls_back_to_highest_available_release():
+    assert AdoptiumClient._parse_latest_feature_release({"available_releases": [8, "17", 21, 26]}) == 26

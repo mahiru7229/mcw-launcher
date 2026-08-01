@@ -153,3 +153,10 @@ def test_select_latest_java_raises_when_no_java_found(
         match="No Java found"
     ):
         JavaSelector.select_latest_java()
+
+def test_select_java_does_not_promote_java_17_to_java_25_by_default(monkeypatch: pytest.MonkeyPatch):
+    java_25 = make_java(25, "java25/javaw.exe")
+    monkeypatch.setattr(JavaManager, "find_installation", lambda: [java_25])
+
+    with pytest.raises(RuntimeError, match="Java 17 was not found"):
+        JavaSelector.select_java(17)
