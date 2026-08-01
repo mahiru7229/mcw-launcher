@@ -83,47 +83,47 @@ class StartupSplash(QWidget):
         colors = theme_accent_runtime.palette
         self.setStyleSheet(
             f"""
-            QWidget#StartupSplash {
+            QWidget#StartupSplash {{
                 background: transparent;
-            }
-            QFrame#StartupCard {
+            }}
+            QFrame#StartupCard {{
                 background: #20231f;
                 border: 2px solid {colors.primary_pressed};
                 border-radius: 12px;
-            }
-            QLabel#StartupEyebrow {
+            }}
+            QLabel#StartupEyebrow {{
                 color: #ffffff;
                 font-size: 11px;
                 font-weight: 700;
                 letter-spacing: 2px;
-            }
-            QLabel#StartupTitle {
+            }}
+            QLabel#StartupTitle {{
                 color: #ffffff;
                 font-size: 30px;
                 font-weight: 800;
-            }
-            QLabel#StartupVersion {
+            }}
+            QLabel#StartupVersion {{
                 color: #ffffff;
                 font-size: 12px;
-            }
-            QLabel#StartupStatus {
+            }}
+            QLabel#StartupStatus {{
                 color: #ffffff;
                 font-size: 15px;
                 font-weight: 700;
-            }
-            QLabel#StartupDetail {
+            }}
+            QLabel#StartupDetail {{
                 color: #ffffff;
                 font-size: 12px;
-            }
-            QProgressBar#StartupProgress {
+            }}
+            QProgressBar#StartupProgress {{
                 background: #111310;
                 border: 1px solid {colors.primary_pressed};
                 border-radius: 5px;
-            }
-            QProgressBar#StartupProgress::chunk {
+            }}
+            QProgressBar#StartupProgress::chunk {{
                 background: {colors.primary};
                 border-radius: 4px;
-            }
+            }}
             """
         )
 
