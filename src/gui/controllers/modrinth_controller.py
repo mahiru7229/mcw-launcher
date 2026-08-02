@@ -4,14 +4,14 @@ from pathlib import Path
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.instance.instance_manager import InstanceManager
-from src.core.modloader.mod_loader_manager import ModLoaderManager
-from src.core.modrinth.modrinth_client import ModrinthClient
-from src.core.modrinth.modrinth_errors import ModrinthModpackManualDownloadRequired
-from src.core.modrinth.modrinth_manual_installer import ModrinthManualInstaller
-from src.core.modrinth.modrinth_mod_installer import ModrinthModInstaller
-from src.core.modrinth.modrinth_pack_installer import ModrinthPackInstaller
-from src.core.progress.progress_reporter import ProgressReporter
+from mcw_core.api.instance.instance_manager import InstanceManager
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.modrinth.modrinth_client import ModrinthClient
+from mcw_core.api.modrinth.modrinth_errors import ModrinthModpackManualDownloadRequired
+from mcw_core.api.modrinth.modrinth_manual_installer import ModrinthManualInstaller
+from mcw_core.api.modrinth.modrinth_mod_installer import ModrinthModInstaller
+from mcw_core.api.modrinth.modrinth_pack_installer import ModrinthPackInstaller
+from mcw_core.api.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 

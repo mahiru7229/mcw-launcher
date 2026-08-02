@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QMessageBox, QWidget
 
-from src.core.language.language_manager import tr
+from mcw_core.api.language.language_manager import tr
 from src.gui.dialogs.message_box_compat import apply_message_box_compatibility
 
 

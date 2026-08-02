@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.modloader.fabric.fabric_meta_client import FabricMetaClient
-from src.core.modloader.forge.forge_metadata_client import ForgeMetadataClient
-from src.core.modloader.neoforge.neoforge_metadata_client import NeoForgeMetadataClient
-from src.core.modloader.quilt.quilt_meta_client import QuiltMetaClient
+from mcw_core.api.modloader.fabric.fabric_meta_client import FabricMetaClient
+from mcw_core.api.modloader.forge.forge_metadata_client import ForgeMetadataClient
+from mcw_core.api.modloader.neoforge.neoforge_metadata_client import NeoForgeMetadataClient
+from mcw_core.api.modloader.quilt.quilt_meta_client import QuiltMetaClient
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 

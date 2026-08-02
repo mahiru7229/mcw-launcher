@@ -190,9 +190,14 @@ class LanAgentManager:
     def _bundled_agent_path(cls) -> Path:
         if getattr(sys, "frozen", False):
             bundle_root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
-        else:
-            bundle_root = Paths.root()
-        return bundle_root / "runtime" / cls.AGENT_FILENAME
+            return bundle_root / "runtime" / cls.AGENT_FILENAME
+
+        project_candidate = Paths.root() / "runtime" / cls.AGENT_FILENAME
+        if project_candidate.is_file():
+            return project_candidate
+
+        package_candidate = Path(__file__).resolve().parents[3] / "mcw_core" / "resources" / cls.AGENT_FILENAME
+        return package_candidate
 
 
     @classmethod

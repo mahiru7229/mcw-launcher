@@ -7,12 +7,12 @@ from PySide6.QtCore import QSignalBlocker, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtWidgets import QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy
 
-from src.core.instance.settings_manager import SettingsManager, default_instance_settings
-from src.core.java.java_major_policy import JavaMajorPolicy
-from src.core.language.language_manager import language_manager, tr
-from src.core.theme.theme_authoring import ThemeAuthoringError, ThemeAuthoringService
-from src.core.theme.theme_manager import theme_manager
-from src.core.theme.theme_palette import normalize_hex_color
+from mcw_core.api.instance.settings_manager import SettingsManager, default_instance_settings
+from mcw_core.api.java.java_major_policy import JavaMajorPolicy
+from mcw_core.api.language.language_manager import language_manager, tr
+from mcw_core.api.theme.theme_authoring import ThemeAuthoringError, ThemeAuthoringService
+from mcw_core.api.theme.theme_manager import theme_manager
+from mcw_core.api.theme.theme_palette import normalize_hex_color
 from src.gui.config import NAVIGATION_ITEMS, VERSION
 from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
 from src.gui.dialogs.protected_value_reveal_dialog import confirm_reveal_protected_values

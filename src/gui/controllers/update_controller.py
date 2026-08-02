@@ -4,10 +4,10 @@ from datetime import datetime, timezone
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.config.launcher_settings_manager import LauncherSettingsManager
-from src.core.language.language_manager import tr
-from src.core.progress.progress_reporter import ProgressReporter
-from src.core.update.update_manager import UpdateManager
+from mcw_core.api.config.launcher_settings_manager import LauncherSettingsManager
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.progress.progress_reporter import ProgressReporter
+from mcw_core.api.update.update_manager import UpdateManager
 from src.gui.config import GITHUB_REPOSITORY, UPDATE_CHANNEL, VERSION_ID
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner

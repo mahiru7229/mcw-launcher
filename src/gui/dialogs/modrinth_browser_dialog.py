@@ -5,9 +5,9 @@ import re
 from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
-from src.core.instance.instance_manager import InstanceManager
-from src.core.language.language_manager import tr
-from src.core.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.instance.instance_manager import InstanceManager
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from src.models.instance.instance import Instance
 from src.models.modrinth.project import ModrinthProject, ModrinthSearchResult
 from src.models.modrinth.version import ModrinthVersion

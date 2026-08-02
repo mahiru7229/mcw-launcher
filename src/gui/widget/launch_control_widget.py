@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
-from src.core.language.language_manager import tr
+from mcw_core.api.language.language_manager import tr
 from src.gui.presenters.progress_presenter import ProgressPresenter
 from src.models.progress.progress_state import ProgressState
 from src.gui.theme.runtime import set_theme_icon, set_theme_static_text

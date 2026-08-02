@@ -4,13 +4,13 @@ from pathlib import Path
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.curseforge.curseforge_client import CurseForgeClient
-from src.core.curseforge.curseforge_manual_installer import CurseForgeManualInstaller
-from src.core.curseforge.curseforge_mod_installer import CurseForgeModInstaller
-from src.core.curseforge.curseforge_errors import CurseForgeModpackManualDownloadRequired
-from src.core.curseforge.curseforge_pack_installer import CurseForgePackInstaller
-from src.core.instance.instance_manager import InstanceManager
-from src.core.progress.progress_reporter import ProgressReporter
+from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
+from mcw_core.api.curseforge.curseforge_manual_installer import CurseForgeManualInstaller
+from mcw_core.api.curseforge.curseforge_mod_installer import CurseForgeModInstaller
+from mcw_core.api.curseforge.curseforge_errors import CurseForgeModpackManualDownloadRequired
+from mcw_core.api.curseforge.curseforge_pack_installer import CurseForgePackInstaller
+from mcw_core.api.instance.instance_manager import InstanceManager
+from mcw_core.api.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 from src.models.curseforge.cache import CurseForgeFileListResult

@@ -4,12 +4,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.java.adoptium_client import AdoptiumClient
-from src.core.java.java_diagnostics_manager import JavaDiagnosticsManager
-from src.core.java.java_provisioner import JavaProvisioner
-from src.core.language.language_manager import tr
-from src.core.network.download_pause import download_pause_controller, is_download_cancelled
-from src.core.progress.progress_reporter import ProgressReporter
+from mcw_core.api.language.language_manager import tr
+from mcw_core import get_default_core, is_download_cancelled
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 
@@ -30,37 +26,35 @@ class JavaController(BaseController):
     def __init__(self, task_runner: TaskRunner) -> None:
         super().__init__()
         self._task_runner = task_runner
+        self._core = get_default_core()
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
 
     def scan(self) -> None:
-        reporter = ProgressReporter(self.progress_received.emit)
-        self._task_runner.run(self.SCAN_TASK_ID, lambda: JavaDiagnosticsManager.scan(reporter=reporter), tr("Scanning Java installations..."), blocking=False)
+        self._task_runner.run(self.SCAN_TASK_ID, lambda: self._core.java.scan(self.progress_received.emit), tr("Scanning Java installations..."), blocking=False)
         self.refresh_latest_release()
 
     def refresh_latest_release(self) -> None:
-        self._task_runner.run(self.LATEST_RELEASE_TASK_ID, AdoptiumClient.get_latest_feature_release, tr("launcher_settings.java.latest_checking"), blocking=False)
+        self._task_runner.run(self.LATEST_RELEASE_TASK_ID, self._core.java.latest_feature_release, tr("launcher_settings.java.latest_checking"), blocking=False)
 
     def install(self, major: int) -> None:
-        managed_major = AdoptiumClient.normalize_feature_major(major)
+        managed_major = self._core.java.normalize_feature_major(major)
         task_id = f"{self.INSTALL_TASK_PREFIX}{managed_major}"
-        reporter = ProgressReporter(self.progress_received.emit)
-
         def task() -> Path:
-            download_pause_controller.begin()
+            self._core.operations.begin()
             try:
-                return JavaProvisioner.install_managed(managed_major, reporter=reporter, force=True)
+                return self._core.java.install(managed_major, on_progress=self.progress_received.emit, force=True)
             finally:
-                download_pause_controller.finish()
+                self._core.operations.finish()
 
         started = self._task_runner.run(task_id, task, tr("java.install.task", major=managed_major), blocking=True)
         if not started:
-            download_pause_controller.finish()
+            self._core.operations.finish()
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
         if task_id == self.LATEST_RELEASE_TASK_ID:
-            self.latest_release_changed.emit(AdoptiumClient.normalize_feature_major(result))
+            self.latest_release_changed.emit(self._core.java.normalize_feature_major(result))
             return
         if task_id == self.SCAN_TASK_ID:
             installations = list(result) if isinstance(result, (list, tuple)) else []

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QLabel, QLineEdit, QMessageBox, QVBoxLayout
 
-from src.core.instance.instance_manager import InstanceManager
-from src.core.language.language_manager import tr
+from mcw_core.api.instance.instance_manager import InstanceManager
+from mcw_core.api.language.language_manager import tr
 from src.gui.mod_instance_compatibility import CompatibleModVersion, normalize_supported_loader
 from src.gui.window_sizing import resize_dialog_to_screen
 

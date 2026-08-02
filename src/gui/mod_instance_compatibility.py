@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Protocol
 
-from src.core.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from src.models.instance.instance import Instance
 
 

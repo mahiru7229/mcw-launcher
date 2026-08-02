@@ -7,17 +7,7 @@ from typing import Any
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.diagnostics.forge_diagnostics_manager import ForgeDiagnosticsManager
-from src.core.diagnostics.quilt_diagnostics_manager import QuiltDiagnosticsManager
-from src.core.instance.instance_manager import InstanceManager
-from src.core.instance.instance_run_lock import InstanceRunLock
-from src.core.minecraft.library_manager import DownloadLibraryManager
-from src.core.minecraft.version_manager import VersionManager
-from src.core.modloader.forge.forge_change_manager import ForgeChangeManager
-from src.core.modloader.mod_loader_manager import ModLoaderManager
-from src.core.progress.progress_reporter import ProgressReporter
-from src.core.runtime.instance_repair_manager import InstanceRepairManager
-from src.core.repair.repair_service import RepairService
+from mcw_core import InstanceCreateRequest, LoaderService, get_default_core
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 from src.config import VERSION_ID
@@ -54,6 +44,7 @@ class InstanceController(BaseController):
     def __init__(self, task_runner: TaskRunner) -> None:
         super().__init__()
         self._task_runner = task_runner
+        self._core = get_default_core()
         self._selected_name = ""
         self._running_signature: tuple[tuple[object, ...], ...] | None = None
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
@@ -61,7 +52,7 @@ class InstanceController(BaseController):
 
     def refresh(self, selected_name: str = "") -> None:
         try:
-            instances = sorted(InstanceManager.list_instances(), key=lambda item: item.name.casefold())
+            instances = sorted(self._core.instances.list(), key=lambda item: item.name.casefold())
         except Exception as error:
             self._emit_error("Instances", error)
             return
@@ -76,7 +67,7 @@ class InstanceController(BaseController):
         self.log_created.emit(f"Instances refreshed: {len(instances)} found")
 
     def refresh_running(self, force: bool = False) -> None:
-        running_instances = InstanceRunLock.list_active()
+        running_instances = self._core.instances.list_running()
         signature = tuple((item.instance_id, item.name, item.state, item.launcher_pid, item.minecraft_pid) for item in running_instances)
 
         if not force and signature == self._running_signature:
@@ -91,53 +82,45 @@ class InstanceController(BaseController):
             self.selected_instance_changed.emit(None)
             return
         try:
-            instance = InstanceManager.load(self._selected_name)
+            instance = self._core.instances.load(self._selected_name)
         except Exception as error:
             self._emit_error("Load instance", error)
             return
         self.selected_instance_changed.emit(instance)
 
-    def create(self, name: str, version_id: str, loader_name: str = "vanilla", loader_version: str = ModLoaderManager.AUTO) -> bool:
+    def create(self, name: str, version_id: str, loader_name: str = "vanilla", loader_version: str = LoaderService.AUTO) -> bool:
         name = self._validated_name(name)
         version_id = version_id.strip()
-        loader_name, loader_version = ModLoaderManager.normalize((loader_name, loader_version))
+        loader_name, loader_version = self._core.loaders.normalize((loader_name, loader_version))
         if name is None or not version_id:
             if not version_id:
                 self._emit_error("Create instance", "Select a Minecraft version first.")
             return False
 
-        reporter = ProgressReporter(self._on_loader_progress)
-
         def task() -> Any:
-            version = VersionManager.load(version_id)
-            resolved_loader = ModLoaderManager.resolve(version.id, loader_name, loader_version)
-            ModLoaderManager.prepare(version, *resolved_loader, reporter=reporter)
-            return InstanceManager.create(name=name, version=version, mod_loader=resolved_loader)
+            return self._core.instances.create(
+                InstanceCreateRequest(
+                    name=name,
+                    version_id=version_id,
+                    loader_name=loader_name,
+                    loader_version=loader_version,
+                    on_progress=self._on_loader_progress,
+                )
+            )
 
         return self._task_runner.run(self.CREATE_TASK_ID, task, f"Creating instance '{name}'...")
 
     def change_loader(self, name: str, loader_name: str, loader_version: str) -> None:
         name = name.strip()
-        loader_name, loader_version = ModLoaderManager.normalize((loader_name, loader_version))
+        loader_name, loader_version = self._core.loaders.normalize((loader_name, loader_version))
         if not name:
             return
-        if loader_name in ModLoaderManager.MODDED_LOADERS and not loader_version:
+        if loader_name in LoaderService.MODDED_LOADERS and not loader_version:
             self._emit_error("Change mod loader", "Select a mod-loader version first.")
             return
 
-        reporter = ProgressReporter(self._on_loader_progress)
-
         def task() -> Any:
-            instance = InstanceManager.load(name)
-            if InstanceRunLock.is_active(instance):
-                raise RuntimeError("Close Minecraft before changing this instance's mod loader.")
-            current_loader, _ = ModLoaderManager.normalize(instance.mod_loader)
-            if current_loader in ModLoaderManager.FORGE_FAMILY or loader_name in ModLoaderManager.FORGE_FAMILY:
-                return ForgeChangeManager.change(instance, loader_name, loader_version, reporter=reporter)
-            version = VersionManager.load(instance.version_id)
-            resolved_loader = ModLoaderManager.resolve(version.id, loader_name, loader_version)
-            ModLoaderManager.prepare(version, *resolved_loader, reporter=reporter)
-            return InstanceManager.set_mod_loader(name, resolved_loader)
+            return self._core.instances.change_loader(name, loader_name, loader_version, self._on_loader_progress)
 
         self._task_runner.run(self.LOADER_CHANGE_TASK_ID, task, f"Applying {loader_name.title()} to '{name}'...")
 
@@ -146,17 +129,8 @@ class InstanceController(BaseController):
         if not name:
             return
 
-        reporter = ProgressReporter(self._on_loader_progress)
-
         def task() -> Any:
-            instance = InstanceManager.load(name)
-            if InstanceRunLock.is_active(instance):
-                raise RuntimeError("Close Minecraft before repairing this instance's mod loader.")
-            version = ModLoaderManager.repair(instance, reporter=reporter)
-            loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-            if loader_name not in ModLoaderManager.FORGE_FAMILY:
-                DownloadLibraryManager.load(version, reporter=reporter)
-            return instance
+            return self._core.instances.repair_loader(name, self._on_loader_progress)
 
         self._task_runner.run(self.LOADER_REPAIR_TASK_ID, task, f"Repairing mod loader for '{name}'...")
 
@@ -165,13 +139,8 @@ class InstanceController(BaseController):
         if not name:
             return
 
-        reporter = ProgressReporter(self._on_loader_progress)
-
         def task() -> Any:
-            instance = InstanceManager.load(name)
-            if InstanceRunLock.is_active(instance):
-                raise RuntimeError("Close Minecraft before restoring the previous mod-loader installation.")
-            return ForgeChangeManager.restore_previous(instance, reporter=reporter)
+            return self._core.instances.restore_previous_loader(name, self._on_loader_progress)
 
         self._task_runner.run(self.FORGE_RESTORE_TASK_ID, task, f"Restoring previous mod-loader installation for '{name}'...")
 
@@ -181,10 +150,7 @@ class InstanceController(BaseController):
             return
 
         def task() -> Path:
-            instance = InstanceManager.load(name)
-            loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-            manager = QuiltDiagnosticsManager if loader_name == ModLoaderManager.QUILT else ForgeDiagnosticsManager
-            return manager.export(instance, output_path, launcher_version=VERSION_ID)
+            return self._core.instances.export_loader_diagnostics(name, output_path)
 
         self._task_runner.run(self.FORGE_DIAGNOSTICS_TASK_ID, task, f"Exporting mod-loader diagnostics for '{name}'...", blocking=False)
 
@@ -195,8 +161,7 @@ class InstanceController(BaseController):
             return
 
         def task() -> Any:
-            instance = InstanceManager.load(name)
-            return InstanceRepairManager.repair(instance, on_progress=self._on_repair_progress)
+            return self._core.instances.repair(name, self._on_repair_progress)
 
         self._task_runner.run(self.REPAIR_TASK_ID, task, f"Repairing '{name}'...")
 
@@ -206,8 +171,7 @@ class InstanceController(BaseController):
             return
 
         def task() -> Any:
-            instance = InstanceManager.load(name)
-            return RepairService.scan(instance, mode=mode, on_progress=self._on_repair_progress)
+            return self._core.instances.scan_repair(name, mode, self._on_repair_progress)
 
         self._task_runner.run(self.REPAIR_SCAN_TASK_ID, task, f"Checking instance '{name}'...")
 
@@ -217,8 +181,7 @@ class InstanceController(BaseController):
             return
 
         def task() -> Any:
-            instance = InstanceManager.load(name)
-            return RepairService.repair(instance, plan, on_progress=self._on_repair_progress)
+            return self._core.instances.execute_repair(name, plan, self._on_repair_progress)
 
         self._task_runner.run(self.REPAIR_EXECUTE_TASK_ID, task, f"Repairing selected components for '{name}'...")
 
@@ -241,7 +204,7 @@ class InstanceController(BaseController):
             return
 
         def task() -> dict[str, str]:
-            InstanceManager.rename(source_name, target_name)
+            self._core.instances.rename(source_name, target_name)
             return {"source": source_name, "target": target_name}
 
         self._task_runner.run("instance.rename", task, f"Renaming '{source_name}'...")
@@ -253,7 +216,7 @@ class InstanceController(BaseController):
             return
 
         def task() -> Any:
-            return InstanceManager.clone(source_name=source_name, new_name=target_name, include_saves=include_saves)
+            return self._core.instances.clone(source_name, target_name, include_saves)
 
         self._task_runner.run("instance.clone", task, f"Cloning '{source_name}'...")
 
@@ -261,13 +224,13 @@ class InstanceController(BaseController):
         name = name.strip()
         if not name:
             return
-        self._task_runner.run("instance.delete", lambda: {"name": name, "deleted": InstanceManager.delete_instance(name)}, f"Deleting '{name}'...")
+        self._task_runner.run("instance.delete", lambda: {"name": name, "deleted": self._core.instances.delete(name)}, f"Deleting '{name}'...")
 
     def inspect_package(self, package_path: Path) -> None:
         package_path = Path(package_path)
         self._task_runner.run(
             self.IMPORT_INSPECT_TASK_ID,
-            lambda: InstanceManager.inspect_import(package_path),
+            lambda: self._core.instances.inspect_package(package_path),
             f"Reading '{package_path.name}'...",
         )
 
@@ -276,7 +239,7 @@ class InstanceController(BaseController):
         normalized_override = copy.deepcopy(settings_override)
         self._task_runner.run(
             self.IMPORT_TASK_ID,
-            lambda: InstanceManager.import_instance(
+            lambda: self._core.instances.import_package(
                 package_path,
                 self._on_package_progress,
                 settings_override=normalized_override,
@@ -288,7 +251,7 @@ class InstanceController(BaseController):
         name = name.strip()
         if not name:
             return
-        self._task_runner.run("instance.export", lambda: InstanceManager.export(name, output_path, include_saves, self._on_package_progress), f"Exporting '{name}'...")
+        self._task_runner.run("instance.export", lambda: self._core.instances.export_package(name, output_path, include_saves, self._on_package_progress), f"Exporting '{name}'...")
 
     def _on_package_progress(self, event: object) -> None:
         self.package_progress.emit(event)
@@ -326,17 +289,17 @@ class InstanceController(BaseController):
             self.status_changed.emit(f"Imported '{selected_name}'")
         elif task_id == self.LOADER_CHANGE_TASK_ID:
             selected_name = result.name
-            loader_name, loader_version = ModLoaderManager.normalize(result.mod_loader)
+            loader_name, loader_version = self._core.loaders.normalize(result.mod_loader)
             loader_text = loader_name if loader_name == "vanilla" else f"{loader_name} {loader_version}"
             self.status_changed.emit(f"Applied {loader_text} to '{selected_name}'")
         elif task_id == self.LOADER_REPAIR_TASK_ID:
             selected_name = result.name
-            loader_name, _ = ModLoaderManager.normalize(result.mod_loader)
+            loader_name, _ = self._core.loaders.normalize(result.mod_loader)
             self.status_changed.emit(f"Repaired {loader_name.title()} for '{selected_name}'")
         elif task_id == self.FORGE_RESTORE_TASK_ID:
             selected_name = result.name
-            loader_name, loader_version = ModLoaderManager.normalize(result.mod_loader)
-            loader_text = loader_name.title() if loader_name == ModLoaderManager.VANILLA else f"{loader_name.title()} {loader_version}"
+            loader_name, loader_version = self._core.loaders.normalize(result.mod_loader)
+            loader_text = loader_name.title() if loader_name == LoaderService.VANILLA else f"{loader_name.title()} {loader_version}"
             self.status_changed.emit(f"Restored {loader_text} for '{selected_name}'")
         elif task_id == self.FORGE_DIAGNOSTICS_TASK_ID:
             self.forge_diagnostics_finished.emit(result)

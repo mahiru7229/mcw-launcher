@@ -11,8 +11,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from src.core.instance.settings_manager import SettingsManager
-from src.core.language.language_manager import tr
+from mcw_core.api.instance.settings_manager import SettingsManager
+from mcw_core.api.language.language_manager import tr
 from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
 from src.gui.window_sizing import resize_dialog_to_screen
 from src.models.package.instance_package_preview import InstancePackagePreview

@@ -1,6 +1,6 @@
 from PySide6.QtCore import QObject, Signal
 
-from src.core.security.sensitive_data_redactor import SensitiveDataRedactor
+from mcw_core.api.security.sensitive_data_redactor import SensitiveDataRedactor
 
 
 class BaseController(QObject):

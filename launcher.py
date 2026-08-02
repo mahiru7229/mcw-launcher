@@ -13,13 +13,13 @@ def _run_update_mode() -> int | None:
     if len(sys.argv) != 3:
         return 2
 
-    from src.core.update.update_applier import run_update_applier
+    from mcw_core.api.update.update_applier import run_update_applier
 
     return run_update_applier(Path(sys.argv[2]))
 
 
 def _start_update_cleanup() -> None:
-    from src.core.update.update_cleanup import UpdateCleanupWorker, consume_update_cleanup_arguments
+    from mcw_core.api.update.update_cleanup import UpdateCleanupWorker, consume_update_cleanup_arguments
 
     cleaned_arguments, cleanup_request = consume_update_cleanup_arguments(sys.argv)
     sys.argv = cleaned_arguments
@@ -38,7 +38,7 @@ def _write_startup_error(error: BaseException, stage_key: str = "startup.startin
 
     candidate_directories: list[Path] = []
     try:
-        from src.core.fs.paths import Paths
+        from mcw_core.api.fs.paths import Paths
 
         candidate_directories.append(Paths.LOGS_ROOT)
     except Exception:
@@ -104,7 +104,7 @@ def main() -> None:
     from src.gui.startup_splash import StartupSplash
 
     app = create_application(sys.argv)
-    from src.core.network.network_session import network_session
+    from mcw_core.api.network.network_session import network_session
     app.aboutToQuit.connect(network_session.close)
     splash = StartupSplash()
     splash.show()
@@ -112,8 +112,8 @@ def main() -> None:
     startup_stage_key = "startup.starting"
 
     try:
-        from src.core.bootstrap import initialize_application
-        from src.core.startup_runner import run_startup_task
+        from mcw_core.api.bootstrap import initialize_application
+        from mcw_core.api.startup_runner import run_startup_task
 
         def update_startup_progress(percent: int, message_key: str) -> None:
             nonlocal startup_stage_key
@@ -122,7 +122,7 @@ def main() -> None:
 
         settings = run_startup_task(initialize_application, update_startup_progress, app.processEvents)
 
-        from src.core.theme.theme_manager import theme_manager
+        from mcw_core.api.theme.theme_manager import theme_manager
         from src.gui.theme.font_runtime import theme_font_runtime
 
         appearance_settings = settings.get("appearance", {}) if isinstance(settings, dict) else {}
@@ -132,7 +132,7 @@ def main() -> None:
         splash.update()
         app.processEvents()
 
-        from src.core.language.language_manager import language_manager, tr
+        from mcw_core.api.language.language_manager import language_manager, tr
 
         language_manager.reload()
         language_manager.set_language(settings.get("gui", {}).get("language", "en-US"), notify=False)
@@ -156,8 +156,8 @@ def main() -> None:
         splash.finish(window)
     except Exception as error:
         from PySide6.QtWidgets import QMessageBox
-        from src.core.language.language_manager import tr
-        from src.core.startup_runner import StartupWorkerError
+        from mcw_core.api.language.language_manager import tr
+        from mcw_core.api.startup_runner import StartupWorkerError
 
         traceback_text = error.traceback_text if isinstance(error, StartupWorkerError) else traceback.format_exc()
         error_path = _write_startup_error(error, startup_stage_key, traceback_text)

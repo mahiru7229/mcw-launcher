@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
 
-from src.core.language.language_manager import tr
-from src.core.theme.theme_authoring import ThemeValidationReport
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.theme.theme_authoring import ThemeValidationReport
 
 
 class ThemeIssuesDialog(QDialog):

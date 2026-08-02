@@ -5,8 +5,8 @@ from pathlib import Path
 from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton
 
-from src.core.config.curseforge_config_manager import CurseForgeConfigManager
-from src.core.language.language_manager import tr
+from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
+from mcw_core.api.language.language_manager import tr
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
 from src.gui.theme.runtime import set_theme_icon

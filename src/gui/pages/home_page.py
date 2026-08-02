@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QGridLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
-from src.core.language.language_manager import tr
+from mcw_core.api.language.language_manager import tr
 from src.gui.config import VERSION
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget

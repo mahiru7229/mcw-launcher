@@ -6,7 +6,7 @@ from src.core.fs.paths import Paths
 class ManagedJavaRepository:
     @staticmethod
     def root() -> Path:
-        path = Paths.root() / "runtimes"
+        path = Paths.RUNTIMES_ROOT
         path.mkdir(parents=True, exist_ok=True)
         return path
 

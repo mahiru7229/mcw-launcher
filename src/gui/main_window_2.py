@@ -7,20 +7,20 @@ from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QCloseEvent, QDesktopServices, QGuiApplication, QScreen
 from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget
 
-from src.core.config.curseforge_config_manager import CurseForgeConfigManager
-from src.core.curseforge.curseforge_client import CurseForgeClient
-from src.core.curseforge.curseforge_errors import CurseForgeManagedFilesRequired, CurseForgeModpackManualDownloadRequired
-from src.core.diagnostics.diagnostics_manager import DiagnosticsManager
-from src.core.fs.paths import Paths
-from src.core.instance.instance_manager import InstanceManager
-from src.core.instance.instance_run_lock import InstanceRunLock
-from src.core.language.language_manager import language_manager, tr
-from src.core.lan.lan_agent_manager import LanAgentManager
-from src.core.modloader.mod_loader_manager import ModLoaderManager
-from src.core.modrinth.modrinth_errors import ModrinthManagedFilesRequired, ModrinthModpackManualDownloadRequired
-from src.core.network.download_pause import is_download_cancelled, is_download_paused
-from src.core.runtime.game_runtime_manager import GameRuntimeManager
-from src.core.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
+from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
+from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
+from mcw_core.api.curseforge.curseforge_errors import CurseForgeManagedFilesRequired, CurseForgeModpackManualDownloadRequired
+from mcw_core.api.diagnostics.diagnostics_manager import DiagnosticsManager
+from mcw_core.api.fs.paths import Paths
+from mcw_core.api.instance.instance_manager import InstanceManager
+from mcw_core.api.instance.instance_run_lock import InstanceRunLock
+from mcw_core.api.language.language_manager import language_manager, tr
+from mcw_core.api.lan.lan_agent_manager import LanAgentManager
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.modrinth.modrinth_errors import ModrinthManagedFilesRequired, ModrinthModpackManualDownloadRequired
+from mcw_core.api.network.download_pause import is_download_cancelled, is_download_paused
+from mcw_core.api.runtime.game_runtime_manager import GameRuntimeManager
+from mcw_core.api.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
 from src.gui.application import create_application
 from src.gui.animation.motion_runtime import MotionRuntime
 from src.gui.config import LAUNCHER_NAME, VERSION_ID

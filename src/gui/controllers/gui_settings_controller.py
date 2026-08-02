@@ -4,14 +4,14 @@ import copy
 
 from PySide6.QtCore import QByteArray, Signal
 
-from src.core.config.curseforge_config_manager import CurseForgeConfigManager
-from src.core.config.launcher_settings_manager import LauncherSettingsManager
-from src.core.config.managed_content_policy import ManagedContentPolicy
-from src.core.instance.settings_manager import SettingsManager, default_instance_settings
-from src.core.language.language_manager import tr
-from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
-from src.core.network.download_manager import download_manager
-from src.core.network.network_session import DEFAULT_MAX_CONCURRENT_DOWNLOADS
+from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
+from mcw_core.api.config.launcher_settings_manager import LauncherSettingsManager
+from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
+from mcw_core.api.instance.settings_manager import SettingsManager, default_instance_settings
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.network.download_bandwidth_limiter import download_bandwidth_limiter
+from mcw_core.api.network.download_manager import download_manager
+from mcw_core.api.network.network_session import DEFAULT_MAX_CONCURRENT_DOWNLOADS
 from src.gui.controllers.base_controller import BaseController
 
 

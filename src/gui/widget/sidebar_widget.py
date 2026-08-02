@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Property, QSize, Signal
 from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QStyle, QVBoxLayout
 
-from src.core.language.language_manager import tr
+from mcw_core.api.language.language_manager import tr
 from src.gui.config import DEVELOPER_NAME, LAUNCHER_NAME, NAVIGATION_ITEMS
 from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap
 from src.gui.widget.separator import Separator

@@ -3,9 +3,9 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QAbstractItemView, QDialog, QDialogButtonBox, QHeaderView, QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout
 
-from src.core.instance.instance_run_lock import InstanceRunLock
-from src.core.language.language_manager import tr
-from src.core.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.instance.instance_run_lock import InstanceRunLock
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from src.gui.dialogs.create_compatible_instance_dialog import CreateCompatibleInstanceDialog
 from src.gui.mod_instance_compatibility import CompatibleModVersion, compatible_instances, normalize_supported_loader
 from src.gui.window_sizing import resize_dialog_to_screen

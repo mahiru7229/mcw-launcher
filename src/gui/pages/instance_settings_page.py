@@ -3,9 +3,9 @@ from __future__ import annotations
 from PySide6.QtCore import QSignalBlocker, Qt, Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSlider, QSpinBox, QTextEdit, QVBoxLayout
 
-from src.core.config.managed_content_policy import ManagedContentPolicy
-from src.core.language.language_manager import tr
-from src.core.system.memory import MemoryAllocationPolicy, SystemMemory
+from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.system.memory import MemoryAllocationPolicy, SystemMemory
 from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget

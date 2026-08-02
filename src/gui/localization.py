@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QAbstractButton, QComboBox, QGroupBox, QLabel, QLineEdit, QPlainTextEdit, QTabWidget, QTableWidget, QTextEdit, QWidget
 
-from src.core.language.language_manager import tr
+from mcw_core.api.language.language_manager import tr
 
 _SOURCE_TEXT_PROPERTY = "mcw_i18n_source_text"
 _LAST_TEXT_PROPERTY = "mcw_i18n_last_text"

@@ -4,7 +4,7 @@ from enum import Enum
 
 from PySide6.QtWidgets import QMessageBox, QWidget
 
-from src.core.language.language_manager import tr
+from mcw_core.api.language.language_manager import tr
 
 
 class UnsavedChangesDecision(Enum):

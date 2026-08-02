@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.core.language.language_manager import tr
-from src.core.instance.errors import InstanceAlreadyRunningError
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.instance.errors import InstanceAlreadyRunningError
 
 
 @dataclass(frozen=True, slots=True)

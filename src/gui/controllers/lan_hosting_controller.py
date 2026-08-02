@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.instance.instance_manager import InstanceManager
-from src.core.lan.lan_hosting_manager import LanHostingManager
-from src.core.progress.progress_reporter import ProgressReporter
+from mcw_core.api.instance.instance_manager import InstanceManager
+from mcw_core.api.lan.lan_hosting_manager import LanHostingManager
+from mcw_core.api.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 

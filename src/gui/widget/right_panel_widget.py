@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
-from src.core.language.language_manager import tr
+from mcw_core.api.language.language_manager import tr
 from src.gui.widget.card_widget import CardWidget
 from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap
 

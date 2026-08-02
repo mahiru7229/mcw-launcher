@@ -1,4 +1,6 @@
 from pathlib import Path
+from contextlib import contextmanager
+from collections.abc import Iterator
 from src.models.minecraft.version import Version
 from src.models.minecraft.assets import DownloadAsset
 from src.models.instance.instance import Instance
@@ -11,13 +13,15 @@ else:
 
 
 class Paths:
+    PROJECT_ROOT = PROJECT_ROOT
     CACHE_ROOT = PROJECT_ROOT / "cache" # place that saves minecraft contents
     INSTANCES_ROOT = PROJECT_ROOT / "instances"
     ACCOUNTS_ROOT = PROJECT_ROOT / "accounts"
     CONFIG_ROOT = PROJECT_ROOT / "config"
     LOGS_ROOT = PROJECT_ROOT / "logs"
     BACKUPS_ROOT = PROJECT_ROOT / "backups"
-    THEME_ROOT = PROJECT_ROOT / "themes" 
+    THEME_ROOT = PROJECT_ROOT / "themes"
+    RUNTIMES_ROOT = PROJECT_ROOT / "runtimes"
     INSTANCE_LOCKS_ROOT = INSTANCES_ROOT / ".runtime" / "locks"
     
     @staticmethod
@@ -30,6 +34,7 @@ class Paths:
             Paths.LOGS_ROOT,
             Paths.BACKUPS_ROOT,
             Paths.THEME_ROOT,
+            Paths.RUNTIMES_ROOT,
             Paths.INSTANCE_LOCKS_ROOT,
         ]
 
@@ -68,12 +73,76 @@ class Paths:
         return directory
     @staticmethod
     def root() -> Path:
-        if getattr(sys, "frozen", False):
-            # chạy từ exe
-            return Path(sys.executable).parent
+        return Path(Paths.PROJECT_ROOT)
 
-        # chạy từ source
-        return Path(__file__).resolve().parents[3]
+    @staticmethod
+    def snapshot() -> dict[str, Path]:
+        return {
+            "PROJECT_ROOT": Path(Paths.PROJECT_ROOT),
+            "CACHE_ROOT": Path(Paths.CACHE_ROOT),
+            "INSTANCES_ROOT": Path(Paths.INSTANCES_ROOT),
+            "ACCOUNTS_ROOT": Path(Paths.ACCOUNTS_ROOT),
+            "CONFIG_ROOT": Path(Paths.CONFIG_ROOT),
+            "LOGS_ROOT": Path(Paths.LOGS_ROOT),
+            "BACKUPS_ROOT": Path(Paths.BACKUPS_ROOT),
+            "THEME_ROOT": Path(Paths.THEME_ROOT),
+            "RUNTIMES_ROOT": Path(Paths.RUNTIMES_ROOT),
+            "INSTANCE_LOCKS_ROOT": Path(Paths.INSTANCE_LOCKS_ROOT),
+        }
+
+    @staticmethod
+    def restore(snapshot: dict[str, Path], initialize: bool = False) -> None:
+        required = {
+            "PROJECT_ROOT", "CACHE_ROOT", "INSTANCES_ROOT", "ACCOUNTS_ROOT",
+            "CONFIG_ROOT", "LOGS_ROOT", "BACKUPS_ROOT", "THEME_ROOT",
+            "RUNTIMES_ROOT", "INSTANCE_LOCKS_ROOT",
+        }
+        missing = required.difference(snapshot)
+        if missing:
+            raise ValueError(f"Path snapshot is missing: {', '.join(sorted(missing))}")
+        for name in required:
+            setattr(Paths, name, Path(snapshot[name]).expanduser().resolve(strict=False))
+        if initialize:
+            Paths.initialize()
+
+    @staticmethod
+    def configure(
+        root: Path | str | None = None,
+        *,
+        cache_root: Path | str | None = None,
+        instances_root: Path | str | None = None,
+        accounts_root: Path | str | None = None,
+        config_root: Path | str | None = None,
+        logs_root: Path | str | None = None,
+        backups_root: Path | str | None = None,
+        theme_root: Path | str | None = None,
+        runtimes_root: Path | str | None = None,
+        initialize: bool = True,
+    ) -> dict[str, Path]:
+        previous = Paths.snapshot()
+        base = Path(root if root is not None else Paths.PROJECT_ROOT).expanduser().resolve(strict=False)
+        Paths.PROJECT_ROOT = base
+        Paths.CACHE_ROOT = Path(cache_root).expanduser().resolve(strict=False) if cache_root is not None else base / "cache"
+        Paths.INSTANCES_ROOT = Path(instances_root).expanduser().resolve(strict=False) if instances_root is not None else base / "instances"
+        Paths.ACCOUNTS_ROOT = Path(accounts_root).expanduser().resolve(strict=False) if accounts_root is not None else base / "accounts"
+        Paths.CONFIG_ROOT = Path(config_root).expanduser().resolve(strict=False) if config_root is not None else base / "config"
+        Paths.LOGS_ROOT = Path(logs_root).expanduser().resolve(strict=False) if logs_root is not None else base / "logs"
+        Paths.BACKUPS_ROOT = Path(backups_root).expanduser().resolve(strict=False) if backups_root is not None else base / "backups"
+        Paths.THEME_ROOT = Path(theme_root).expanduser().resolve(strict=False) if theme_root is not None else base / "themes"
+        Paths.RUNTIMES_ROOT = Path(runtimes_root).expanduser().resolve(strict=False) if runtimes_root is not None else base / "runtimes"
+        Paths.INSTANCE_LOCKS_ROOT = Paths.INSTANCES_ROOT / ".runtime" / "locks"
+        if initialize:
+            Paths.initialize()
+        return previous
+
+    @staticmethod
+    @contextmanager
+    def configured(root: Path | str | None = None, **overrides: object) -> Iterator[None]:
+        previous = Paths.configure(root, **overrides)
+        try:
+            yield
+        finally:
+            Paths.restore(previous)
     @staticmethod
     def microsoft_config_root()->Path:
         return Paths.CONFIG_ROOT / "microsoft.json"

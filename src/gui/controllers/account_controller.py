@@ -5,11 +5,11 @@ from threading import Event
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.account.account_manager import AccountManager
-from src.core.auth.microsoft.microsoft_auth_gate import MicrosoftAuthenticationLockedError
-from src.core.auth.microsoft.oauth_callback_server import MicrosoftAuthorizationCancelledError
-from src.core.language.language_manager import tr
-from src.core.security.account_security_manager import AccountSecurityManager
+from mcw_core.api.account.account_manager import AccountManager
+from mcw_core.api.auth.microsoft.microsoft_auth_gate import MicrosoftAuthenticationLockedError
+from mcw_core.api.auth.microsoft.oauth_callback_server import MicrosoftAuthorizationCancelledError
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.security.account_security_manager import AccountSecurityManager
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import QObject, QRect, Signal
 from PySide6.QtGui import QPixmap
 
-from src.core.theme.theme_animation import ResolvedThemeAnimation
+from mcw_core.api.theme.theme_animation import ResolvedThemeAnimation
 from src.gui.animation.animation_clock import AnimationClock
 from src.gui.theme.accent_runtime import theme_accent_runtime
 

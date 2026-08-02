@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.modloader.mod_loader_manager import ModLoaderManager
-from src.core.modrinth.modrinth_client import ModrinthClient
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.modrinth.modrinth_client import ModrinthClient
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 

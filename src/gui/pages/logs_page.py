@@ -7,7 +7,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QHBoxLayout, QPushButton, QTextEdit
 
 from src.gui.pages.base_page import BasePage
-from src.core.security.sensitive_data_redactor import SensitiveDataRedactor
+from mcw_core.api.security.sensitive_data_redactor import SensitiveDataRedactor
 from src.gui.widget.card_widget import CardWidget
 from src.gui.theme.runtime import set_theme_icon
 

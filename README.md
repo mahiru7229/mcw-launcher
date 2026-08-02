@@ -42,13 +42,13 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
-### Điểm nổi bật của `v0.12.0-beta.3`
+### Điểm nổi bật của `v0.12.0-beta.4`
 
-- Thêm **Quilt Loader** như một mod loader độc lập với catalog/profile từ Quilt Meta.
-- Hỗ trợ tạo, đổi phiên bản, repair và rollback instance Quilt.
-- Nhận diện `quilt.mod.json` và các mod Fabric tương thích Quilt; giữ bộ lọc loader từ Modrinth/CurseForge.
-- Hỗ trợ import/update modpack Quilt, diagnostics riêng và MCW LAN Agent với mapping Fabric intermediary hoặc Quilt Hashed.
-- Giữ nguyên NeoForge, Java Manager, Latest JDK và Unified Artifact Pipeline của các beta trước.
+- Thêm package headless **`mcw_core`**, import và sử dụng được mà không cần PySide6.
+- Thêm facade `MCWCore`, `CorePaths`, request/result models và pause/resume/cancel API công khai.
+- Cho phép chương trình Python hoặc CLI bên ngoài load instance, cài Java/mod loader và launch Minecraft bằng cùng core của launcher.
+- Chuyển GUI và entrypoint sang boundary `mcw_core` / `mcw_core.api`, đồng thời khóa chiều phụ thuộc bằng architectural tests.
+- Build được wheel không chứa `src/gui`, nhưng vẫn đóng gói MCW LAN Agent cho Fabric, Quilt, Forge và NeoForge.
 
 ### Điểm nổi bật của `v0.11.0`
 
@@ -183,13 +183,13 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 - Preserve compatibility with theme schemas 1–6 and updater paths from v0.10.0.
 - Include the verified RC2 startup splash and circular-import hotfixes.
 
-### Highlights of `v0.12.0-beta.3`
+### Highlights of `v0.12.0-beta.4`
 
-- Add **Quilt Loader** as an independent mod loader backed by Quilt Meta catalog/profile data.
-- Support Quilt instance creation, version changes, repair, and rollback.
-- Detect `quilt.mod.json` and Quilt-compatible Fabric mods while preserving Modrinth/CurseForge loader filters.
-- Support Quilt modpack import/update, dedicated diagnostics, and MCW LAN Agent targets from Fabric intermediary or Quilt Hashed mappings.
-- Preserve NeoForge, Java Manager, Latest JDK, and the Unified Artifact Pipeline from earlier betas.
+- Add the headless **`mcw_core`** package, importable and usable without PySide6.
+- Add the public `MCWCore` facade, `CorePaths`, request/result models, and pause/resume/cancel controls.
+- Allow external Python programs and the CLI to load instances, install Java/mod loaders, and launch Minecraft through the same launcher core.
+- Move the GUI and launcher entrypoint behind the `mcw_core` / `mcw_core.api` boundary and enforce it with architectural tests.
+- Build a wheel that excludes `src/gui` while still bundling the MCW LAN Agent for Fabric, Quilt, Forge, and NeoForge.
 
 ### New in `v0.10.0`
 
@@ -412,10 +412,11 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 | [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) | PNG theme assets and sizes |
 | [`docs/THEME_RUNTIME_CONTRACT.md`](docs/THEME_RUNTIME_CONTRACT.md) | Frozen schema 6, asset catalog, validation API and package contract |
 | [`docs/gui-api.en.md`](docs/gui-api.en.md) / [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API |
+| [`docs/MCW_CORE_LIBRARY.md`](docs/MCW_CORE_LIBRARY.md) | Headless MCW Core public API and CLI |
 
 ## Support status
 
-| Component | Status in v0.12.0-beta.3 |
+| Component | Status in v0.12.0-beta.4 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |

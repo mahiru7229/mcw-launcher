@@ -4,13 +4,13 @@ from pathlib import Path
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.curseforge.curseforge_registry import CurseForgeRegistry
-from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
-from src.core.mod.mod_manager import ModManager
-from src.core.modloader.mod_loader_manager import ModLoaderManager
-from src.core.modrinth.modrinth_mod_update_manager import ModrinthModUpdateManager
-from src.core.modrinth.modrinth_registry import ModrinthRegistry
-from src.core.progress.progress_reporter import ProgressReporter
+from mcw_core.api.curseforge.curseforge_registry import CurseForgeRegistry
+from mcw_core.api.mod.mod_compatibility_manager import ModCompatibilityManager
+from mcw_core.api.mod.mod_manager import ModManager
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.modrinth.modrinth_mod_update_manager import ModrinthModUpdateManager
+from mcw_core.api.modrinth.modrinth_registry import ModrinthRegistry
+from mcw_core.api.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 from src.models.instance.instance import Instance
