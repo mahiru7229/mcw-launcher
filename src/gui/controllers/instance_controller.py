@@ -39,6 +39,8 @@ class InstanceController(BaseController):
     LOADER_REPAIR_TASK_ID = "instance.loader.repair"
     FORGE_RESTORE_TASK_ID = "instance.loader.restore"
     FORGE_DIAGNOSTICS_TASK_ID = "instance.forge.diagnostics"
+    ICON_CHANGE_TASK_ID = "instance.icon.change"
+    ICON_RESET_TASK_ID = "instance.icon.reset"
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
 
     def __init__(self, task_runner: TaskRunner) -> None:
@@ -247,6 +249,19 @@ class InstanceController(BaseController):
             f"Importing '{package_path.name}'...",
         )
 
+    def change_icon(self, name: str, source_path: Path) -> None:
+        name = name.strip()
+        if not name:
+            return
+        path = Path(source_path)
+        self._task_runner.run(self.ICON_CHANGE_TASK_ID, lambda: self._core.instances.set_icon(name, path), f"Changing icon for '{name}'...")
+
+    def reset_icon(self, name: str) -> None:
+        name = name.strip()
+        if not name:
+            return
+        self._task_runner.run(self.ICON_RESET_TASK_ID, lambda: self._core.instances.reset_icon(name), f"Resetting icon for '{name}'...")
+
     def export_package(self, name: str, output_path: Path, include_saves: bool) -> None:
         name = name.strip()
         if not name:
@@ -306,6 +321,12 @@ class InstanceController(BaseController):
             self.status_changed.emit("Mod-loader diagnostics export completed")
             self.log_created.emit(f"Mod-loader diagnostics exported to: {result}")
             return
+        elif task_id == self.ICON_CHANGE_TASK_ID:
+            selected_name = result.name
+            self.status_changed.emit(f"Changed icon for '{selected_name}'")
+        elif task_id == self.ICON_RESET_TASK_ID:
+            selected_name = result.name
+            self.status_changed.emit(f"Reset icon for '{selected_name}'")
         elif task_id == self.REPAIR_TASK_ID:
             selected_name = result.instance_name
             self.repair_finished.emit(result)

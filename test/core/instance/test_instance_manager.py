@@ -208,7 +208,7 @@ def test_save_metadata_preserves_runtime_and_custom_fields(temporary_paths: Path
     assert saved["total_play_time_seconds"] == 321
     assert saved["last_exit_code"] == 0
     assert saved["custom_extension"] == {"enabled": True}
-    assert saved["metadata_version"] == 2
+    assert saved["metadata_version"] == 3
     assert saved["mod_loader"] == ["fabric", "0.16.9"]
 
 

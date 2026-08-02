@@ -1308,7 +1308,18 @@
     "workspace.editor.nav.version": "Version & Loader",
     "workspace.editor.version": "Version and Mod Loader",
     "workspace.editor.version_detail": "Change or repair the Minecraft loader, inspect managed-pack state, and access advanced loader controls.",
-    "workspace.editor.version_summary": "Minecraft {version}\n{loader}"
+    "workspace.editor.version_summary": "Minecraft {version}\n{loader}",
+    "workspace.action.change_icon": "Change Icon",
+    "workspace.action.reset_icon": "Reset Icon",
+    "workspace.icon.choose_title": "Choose Instance Icon",
+    "workspace.icon.filter": "Images (*.png *.jpg *.jpeg *.webp *.bmp *.ico)",
+    "workspace.icon.reset_title": "Reset Instance Icon",
+    "workspace.icon.reset_confirm": "Reset the icon for '{name}' to the default icon?",
+    "workspace.state.ready": "Ready",
+    "workspace.state.loading": "Loading Minecraft",
+    "workspace.state.running": "Minecraft is running",
+    "workspace.state.crashed": "Last launch crashed",
+    "workspace.state.finished": "Last session finished"
   },
   "aliases": {
     "MCW Launcher": "app.name",

@@ -1308,7 +1308,18 @@
     "workspace.editor.nav.version": "Phiên bản & Loader",
     "workspace.editor.version": "Phiên bản và Mod Loader",
     "workspace.editor.version_detail": "Đổi hoặc sửa mod loader, kiểm tra trạng thái modpack và mở các điều khiển loader nâng cao.",
-    "workspace.editor.version_summary": "Minecraft {version}\n{loader}"
+    "workspace.editor.version_summary": "Minecraft {version}\n{loader}",
+    "workspace.action.change_icon": "Đổi icon",
+    "workspace.action.reset_icon": "Đặt lại icon",
+    "workspace.icon.choose_title": "Chọn icon cho instance",
+    "workspace.icon.filter": "Hình ảnh (*.png *.jpg *.jpeg *.webp *.bmp *.ico)",
+    "workspace.icon.reset_title": "Đặt lại icon instance",
+    "workspace.icon.reset_confirm": "Đặt lại icon của '{name}' về icon mặc định?",
+    "workspace.state.ready": "Sẵn sàng",
+    "workspace.state.loading": "Đang tải Minecraft",
+    "workspace.state.running": "Minecraft đang chạy",
+    "workspace.state.crashed": "Lần chạy gần nhất đã crash",
+    "workspace.state.finished": "Phiên chơi gần nhất đã kết thúc"
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

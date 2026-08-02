@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, QSize, Qt, Signal
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFileDialog,
@@ -27,10 +27,12 @@ from PySide6.QtWidgets import (
 
 from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
 from mcw_core.api.language.language_manager import tr
+from mcw_core.api.theme.theme_manager import theme_manager
 from src.gui.dialogs.create_instance_dialog import CreateInstanceDialog
 from src.gui.dialogs.instance_management_dialog import AdvancedInstanceManagerDialog, InstanceManagementDialog
 from src.gui.pages.base_page import BasePage
 from src.gui.pages.instances_page import InstancesPage
+from src.gui.theme.accent_runtime import theme_accent_runtime
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
 
@@ -61,6 +63,8 @@ class InstanceWorkspacePage(BasePage):
     restore_backup_requested = Signal(str, object)
     open_backups_requested = Signal(str)
     open_instance_folder_requested = Signal(str)
+    change_icon_requested = Signal(str, object)
+    reset_icon_requested = Signal(str)
     scan_modpack_requested = Signal(str)
     repair_modpack_requested = Signal(str)
     check_modpack_update_requested = Signal(str)
@@ -180,6 +184,7 @@ class InstanceWorkspacePage(BasePage):
         self.edit_button = set_theme_icon(QPushButton(), "icon.action.edit")
         self.manage_mods_button = set_theme_icon(QPushButton(), "icon.action.mods")
         self.settings_button = set_theme_icon(QPushButton(), "icon.action.settings")
+        self.change_icon_button = set_theme_icon(QPushButton(), "icon.action.edit")
         self.open_folder_button = set_theme_icon(QPushButton(), "icon.action.folder")
         self.repair_button = set_theme_icon(QPushButton(), "icon.action.repair")
         self.clone_button = set_theme_icon(QPushButton(), "icon.action.clone")
@@ -191,6 +196,7 @@ class InstanceWorkspacePage(BasePage):
         self.edit_button.clicked.connect(self._open_management_dialog)
         self.manage_mods_button.clicked.connect(lambda: self.manage_mods_requested.emit(self.current_instance_name()))
         self.settings_button.clicked.connect(lambda: self.instance_settings_requested.emit(self.current_instance_name()))
+        self.change_icon_button.clicked.connect(self._choose_icon)
         self.open_folder_button.clicked.connect(lambda: self.open_instance_folder_requested.emit(self.current_instance_name()))
         self.repair_button.clicked.connect(lambda: self.repair_instance_requested.emit(self.current_instance_name()))
         self.clone_button.clicked.connect(self._choose_clone)
@@ -206,6 +212,7 @@ class InstanceWorkspacePage(BasePage):
         self.action_panel.layout.addWidget(self.edit_button)
         self.action_panel.layout.addWidget(self.manage_mods_button)
         self.action_panel.layout.addWidget(self.settings_button)
+        self.action_panel.layout.addWidget(self.change_icon_button)
         self.action_panel.layout.addWidget(self.open_folder_button)
         self.action_panel.layout.addWidget(self.repair_button)
         self.action_panel.layout.addStretch(1)
@@ -326,7 +333,7 @@ class InstanceWorkspacePage(BasePage):
 
     def set_running_instances(self, running_instances: list[object]) -> None:
         self._running_instances = list(running_instances)
-        self._render_selected()
+        self._rebuild_library(self.current_instance_name())
 
     def set_busy(self, busy: bool) -> None:
         self._busy = bool(busy)
@@ -373,23 +380,24 @@ class InstanceWorkspacePage(BasePage):
 
     def _instance_item_icon(self, instance: object) -> QIcon:
         icon_path = str(getattr(instance, "icon", "") or "").strip()
-        if icon_path:
+        base_icon = QIcon()
+        if icon_path and icon_path != "grass_block":
             path = Path(icon_path)
             if not path.is_absolute():
                 path = Path(getattr(instance, "instance_dir", ".")) / path
             if path.is_file():
-                icon = QIcon(str(path))
-                if not icon.isNull():
-                    return icon
-        loader_name, _loader_version = self._instance_loader(instance)
-        standard = QStyle.StandardPixmap.SP_ComputerIcon if loader_name == "vanilla" else QStyle.StandardPixmap.SP_DirIcon
-        return self.style().standardIcon(standard)
+                base_icon = QIcon(str(path))
+        if base_icon.isNull():
+            loader_name, _loader_version = self._instance_loader(instance)
+            standard = QStyle.StandardPixmap.SP_ComputerIcon if loader_name == "vanilla" else QStyle.StandardPixmap.SP_DirIcon
+            base_icon = self.style().standardIcon(standard)
+        return self._with_state_badge(base_icon, self._instance_state(instance))
 
-    @classmethod
-    def _instance_item_text(cls, instance: object) -> str:
-        loader_name, loader_version = cls._instance_loader(instance)
+    def _instance_item_text(self, instance: object) -> str:
+        loader_name, loader_version = self._instance_loader(instance)
         loader = loader_name.title() if loader_version in {"", "-1"} else f"{loader_name.title()} {loader_version}"
-        return f"{getattr(instance, 'name', '?')}\n{getattr(instance, 'version_id', '?')} • {loader}"
+        state = self._instance_state(instance)
+        return f"{getattr(instance, 'name', '?')}\n{getattr(instance, 'version_id', '?')} • {loader}\n{self._state_text(state)}"
 
     @classmethod
     def _search_blob(cls, instance: object) -> str:
@@ -409,6 +417,64 @@ class InstanceWorkspacePage(BasePage):
         loader_name = str(loader[0] if loader else "vanilla").strip().lower() or "vanilla"
         loader_version = str(loader[1] if len(loader) > 1 else "-1").strip()
         return loader_name, "-1" if loader_name == "vanilla" else loader_version
+
+    def _instance_state(self, instance: object) -> str:
+        instance_id = str(getattr(instance, "instance_id", "") or "")
+        instance_name = str(getattr(instance, "name", "") or "")
+        running = next(
+            (
+                item
+                for item in self._running_instances
+                if (instance_id and str(getattr(item, "instance_id", "") or "") == instance_id)
+                or str(getattr(item, "name", "") or "") == instance_name
+            ),
+            None,
+        )
+        if running is not None:
+            return "loading" if str(getattr(running, "state", "running")) == "preparing" else "running"
+        if bool(getattr(instance, "last_launch_crashed", False)):
+            return "crashed"
+        if str(getattr(instance, "last_played", "") or ""):
+            return "finished"
+        return "ready"
+
+    @staticmethod
+    def _state_text(state: str) -> str:
+        return {
+            "loading": tr("workspace.state.loading"),
+            "running": tr("workspace.state.running"),
+            "crashed": tr("workspace.state.crashed"),
+            "finished": tr("workspace.state.finished"),
+            "ready": tr("workspace.state.ready"),
+        }.get(state, tr("workspace.state.ready"))
+
+    def _with_state_badge(self, base_icon: QIcon, state: str) -> QIcon:
+        if state == "ready":
+            return base_icon
+        size = max(32, self.instance_list.iconSize().width() or 56)
+        canvas = QPixmap(size, size)
+        canvas.fill(Qt.GlobalColor.transparent)
+        base = base_icon.pixmap(size, size)
+        painter = QPainter(canvas)
+        painter.drawPixmap(0, 0, size, size, base)
+        badge_key = {
+            "loading": "icon.state.busy",
+            "running": "icon.action.launch",
+            "crashed": "icon.state.error",
+            "finished": "icon.state.success",
+        }.get(state, "icon.state.ready")
+        badge_path = theme_manager.resolve_asset(badge_key)
+        badge_size = max(16, round(size * 0.38))
+        badge = QPixmap()
+        if badge_path is not None:
+            badge_path = theme_accent_runtime.tinted_path(badge_path, badge_key)
+            badge = QPixmap(str(badge_path))
+        if badge.isNull():
+            standard = QStyle.StandardPixmap.SP_MessageBoxCritical if state == "crashed" else QStyle.StandardPixmap.SP_DialogApplyButton
+            badge = self.style().standardIcon(standard).pixmap(badge_size, badge_size)
+        painter.drawPixmap(size - badge_size, size - badge_size, badge_size, badge_size, badge)
+        painter.end()
+        return QIcon(canvas)
 
     def _list_selection_changed(self, current: QListWidgetItem | None, _previous: QListWidgetItem | None) -> None:
         name = str(current.data(self.ITEM_NAME_ROLE)) if current is not None else ""
@@ -445,6 +511,7 @@ class InstanceWorkspacePage(BasePage):
             self.launch_button,
             self.edit_button,
             self.settings_button,
+            self.change_icon_button,
             self.open_folder_button,
             self.repair_button,
             self.clone_button,
@@ -474,8 +541,11 @@ class InstanceWorkspacePage(BasePage):
                 path=str(Path(getattr(instance, "instance_dir", ""))),
             )
         )
-        running = next((item for item in self._running_instances if str(getattr(item, "name", "")) == str(instance.name)), None)
-        self.running_label.setText(tr("workspace.selected.running") if running is not None else tr("workspace.selected.ready"))
+        state = self._instance_state(instance)
+        self.running_label.setText(self._state_text(state))
+        self.running_label.setProperty("state", {"crashed": "error", "loading": "busy", "running": "success", "finished": "success"}.get(state, "ready"))
+        self.running_label.style().unpolish(self.running_label)
+        self.running_label.style().polish(self.running_label)
         self.manage_mods_button.setEnabled(enabled and loader_name in {"fabric", "quilt", "forge", "neoforge"})
         self.management_dialog.set_instance(instance)
 
@@ -529,6 +599,32 @@ class InstanceWorkspacePage(BasePage):
     def _request_launch(self) -> None:
         if self.current_instance_name():
             self.launch_requested.emit()
+
+    def _choose_icon(self) -> None:
+        name = self.current_instance_name()
+        if not name:
+            return
+        path, _selected_filter = QFileDialog.getOpenFileName(
+            self,
+            tr("workspace.icon.choose_title"),
+            "",
+            tr("workspace.icon.filter"),
+        )
+        if path:
+            self.change_icon_requested.emit(name, Path(path))
+
+    def _confirm_reset_icon(self) -> None:
+        name = self.current_instance_name()
+        if not name:
+            return
+        answer = QMessageBox.question(
+            self,
+            tr("workspace.icon.reset_title"),
+            tr("workspace.icon.reset_confirm", name=name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.reset_icon_requested.emit(name)
 
     def _choose_import(self) -> None:
         path, _selected_filter = QFileDialog.getOpenFileName(self, tr("Import MCW instance"), "", tr("MCW Package (*.mcwpack *.zip)"))
@@ -608,6 +704,8 @@ class InstanceWorkspacePage(BasePage):
         menu = QMenu(self)
         launch = menu.addAction(tr("workspace.action.launch"))
         edit = menu.addAction(tr("workspace.action.edit"))
+        change_icon = menu.addAction(tr("workspace.action.change_icon"))
+        reset_icon = menu.addAction(tr("workspace.action.reset_icon"))
         manage_mods = menu.addAction(tr("workspace.action.manage_mods"))
         menu.addSeparator()
         open_folder = menu.addAction(tr("workspace.action.open_folder"))
@@ -622,6 +720,10 @@ class InstanceWorkspacePage(BasePage):
             self._request_launch()
         elif chosen is edit:
             self._open_management_dialog()
+        elif chosen is change_icon:
+            self._choose_icon()
+        elif chosen is reset_icon:
+            self._confirm_reset_icon()
         elif chosen is manage_mods:
             self.manage_mods_requested.emit(self.current_instance_name())
         elif chosen is open_folder:
@@ -647,6 +749,7 @@ class InstanceWorkspacePage(BasePage):
         self.edit_button.setText(tr("workspace.action.edit"))
         self.manage_mods_button.setText(tr("workspace.action.manage_mods"))
         self.settings_button.setText(tr("workspace.action.instance_settings"))
+        self.change_icon_button.setText(tr("workspace.action.change_icon"))
         self.open_folder_button.setText(tr("workspace.action.open_folder"))
         self.repair_button.setText(tr("workspace.action.repair"))
         self.clone_button.setText(tr("workspace.action.clone"))

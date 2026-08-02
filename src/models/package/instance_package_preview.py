@@ -13,6 +13,7 @@ class InstancePackagePreview:
     name: str
     version_id: str
     mod_loader: tuple[str, str]
+    icon: str
     settings: dict[str, Any]
     has_package_settings: bool
     package_metadata: PackageMetadata

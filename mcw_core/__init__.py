@@ -4,6 +4,7 @@ from src.config import VERSION_ID as __version__
 from src.models.account.account import Account
 from src.models.auth.authentication import Authentication
 from src.models.instance.instance import Instance
+from src.models.instance.instance_state import InstanceState, InstanceStatus
 from src.models.progress.progress_event import ProgressEvent
 from src.models.progress.progress_stage import ProgressStage
 from src.models.progress.progress_state import ProgressState
@@ -23,6 +24,8 @@ __all__ = [
     "DownloadCancelledError",
     "DownloadInterruptedError",
     "Instance",
+    "InstanceState",
+    "InstanceStatus",
     "InstanceCreateRequest",
     "InstanceService",
     "JavaService",

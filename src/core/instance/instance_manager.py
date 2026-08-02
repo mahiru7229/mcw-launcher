@@ -19,6 +19,12 @@ import uuid
 
 
 class InstanceManager:
+    METADATA_VERSION = 3
+    DEFAULT_ICON = "grass_block"
+    ICON_DIRECTORY = ".mcw"
+    ICON_BASENAME = "instance-icon"
+    ICON_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".ico"}
+    MAX_ICON_BYTES = 8 * 1024 * 1024
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
     WINDOWS_RESERVED_NAMES = {"con", "prn", "aux", "nul", *(f"com{index}" for index in range(1, 10)), *(f"lpt{index}" for index in range(1, 10))}
 
@@ -45,6 +51,10 @@ class InstanceManager:
 
         now = datetime.now(timezone.utc).isoformat()
         created_at = str(existing.get("created_at") or now)
+        last_played = str(instance.last_played or existing.get("last_played") or "")
+        last_exit_code = instance.last_exit_code if instance.last_exit_code is not None else existing.get("last_exit_code")
+        last_launch_crashed = bool(instance.last_launch_crashed)
+        last_launch_state = str(existing.get("last_launch_state") or ("crashed" if last_launch_crashed else "finished" if last_played else "ready"))
         data = dict(existing)
         data.update({
             "id": instance.instance_id,
@@ -54,11 +64,16 @@ class InstanceManager:
             "instance_dir": str(instance_dir),
             "created_at": created_at,
             "updated_at": now,
-            "last_played": str(existing.get("last_played") or ""),
-            "icon": str(existing.get("icon") or "grass_block"),
+            "last_played": last_played,
+            "last_exit_code": last_exit_code,
+            "last_launch_crashed": last_launch_crashed,
+            "last_launch_state": last_launch_state,
+            "last_started_at": str(existing.get("last_started_at") or ""),
+            "last_finished_at": str(existing.get("last_finished_at") or ""),
+            "icon": str(instance.icon or existing.get("icon") or InstanceManager.DEFAULT_ICON),
             "notes": str(existing.get("notes") or ""),
             "launcher_version": VERSION_TAG,
-            "metadata_version": 2,
+            "metadata_version": InstanceManager.METADATA_VERSION,
         })
 
         temporary = path.with_name(f"{path.name}.tmp")
@@ -88,9 +103,24 @@ class InstanceManager:
             if not instance_id or not name or not version_id or not isinstance(raw_loader, (list, tuple)) or len(raw_loader) != 2:
                 raise ValueError("instance.json is missing required fields.")
             mod_loader = (str(raw_loader[0]).strip().lower() or "vanilla", str(raw_loader[1]).strip() or "-1")
+            icon = str(data.get("icon") or InstanceManager.DEFAULT_ICON).strip() or InstanceManager.DEFAULT_ICON
+            last_played = str(data.get("last_played") or "")
+            raw_exit_code = data.get("last_exit_code")
+            last_exit_code = int(raw_exit_code) if raw_exit_code is not None else None
+            last_launch_crashed = bool(data.get("last_launch_crashed", False))
         except (KeyError, TypeError, ValueError) as error:
             raise RuntimeError(f"Invalid instance metadata: {source}") from error
-        return Instance(instance_id=instance_id, name=name, version_id=version_id, mod_loader=mod_loader, instance_dir=instance_dir)
+        return Instance(
+            instance_id=instance_id,
+            name=name,
+            version_id=version_id,
+            mod_loader=mod_loader,
+            instance_dir=instance_dir,
+            icon=icon,
+            last_played=last_played,
+            last_exit_code=last_exit_code,
+            last_launch_crashed=last_launch_crashed,
+        )
 
     @staticmethod
     def list_instances() -> list[Instance]:
@@ -181,6 +211,9 @@ class InstanceManager:
                 "total_play_time_seconds": 0,
                 "last_exit_code": None,
                 "last_launch_crashed": False,
+                "last_launch_state": "ready",
+                "last_started_at": "",
+                "last_finished_at": "",
                 "last_game_log": "",
                 "last_crash_report": "",
             })
@@ -201,6 +234,67 @@ class InstanceManager:
         return PackageManager.export_instance(instance, output_path, include_saves, on_progress)
 
     @staticmethod
+    def set_icon(instance_name: str, source_path: Path) -> Instance:
+        instance = InstanceManager.load(instance_name)
+        source = Path(source_path).expanduser()
+        if not source.is_file():
+            raise RuntimeError("The selected instance icon does not exist.")
+        extension = source.suffix.casefold()
+        if extension not in InstanceManager.ICON_EXTENSIONS:
+            raise RuntimeError("Unsupported instance icon format.")
+        try:
+            size = source.stat().st_size
+        except OSError as error:
+            raise RuntimeError("The selected instance icon cannot be read.") from error
+        if size <= 0 or size > InstanceManager.MAX_ICON_BYTES:
+            raise RuntimeError("Instance icons must be between 1 byte and 8 MiB.")
+
+        icon_dir = Path(instance.instance_dir) / InstanceManager.ICON_DIRECTORY
+        icon_dir.mkdir(parents=True, exist_ok=True)
+        target = icon_dir / f"{InstanceManager.ICON_BASENAME}{extension}"
+        temporary = target.with_name(f".{target.name}.tmp")
+        source_resolved = source.resolve()
+        target_resolved = target.resolve(strict=False)
+        if source_resolved != target_resolved:
+            try:
+                with source.open("rb") as input_file, temporary.open("wb") as output_file:
+                    shutil.copyfileobj(input_file, output_file, length=1024 * 1024)
+                    output_file.flush()
+                    os.fsync(output_file.fileno())
+                temporary.replace(target)
+            except Exception:
+                temporary.unlink(missing_ok=True)
+                raise
+
+        for old_icon in icon_dir.glob(f"{InstanceManager.ICON_BASENAME}.*"):
+            if old_icon != target:
+                old_icon.unlink(missing_ok=True)
+
+        instance.icon = target.relative_to(instance.instance_dir).as_posix()
+        InstanceManager._save_instance_metadata(instance)
+        return InstanceManager.load(instance.name)
+
+    @staticmethod
+    def reset_icon(instance_name: str) -> Instance:
+        instance = InstanceManager.load(instance_name)
+        icon_dir = Path(instance.instance_dir) / InstanceManager.ICON_DIRECTORY
+        for old_icon in icon_dir.glob(f"{InstanceManager.ICON_BASENAME}.*"):
+            old_icon.unlink(missing_ok=True)
+        instance.icon = InstanceManager.DEFAULT_ICON
+        InstanceManager._save_instance_metadata(instance)
+        return InstanceManager.load(instance.name)
+
+    @staticmethod
+    def resolve_icon_path(instance: Instance) -> Path | None:
+        value = str(instance.icon or "").strip()
+        if not value or value == InstanceManager.DEFAULT_ICON:
+            return None
+        path = Path(value)
+        if not path.is_absolute():
+            path = Path(instance.instance_dir) / path
+        return path if path.is_file() else None
+
+    @staticmethod
     def inspect_import(package_path: Path) -> InstancePackagePreview:
         metadata, instance_data, settings_data = PackageManager.inspect_instance(Path(package_path))
         instance = InstanceManager._parse_instance_metadata(instance_data, Path(), package_path)
@@ -212,6 +306,7 @@ class InstanceManager:
             name=instance.name,
             version_id=instance.version_id,
             mod_loader=instance.mod_loader,
+            icon=instance.icon,
             settings=SettingsManager.normalize_dict(settings_data),
             has_package_settings=settings_data is not None,
             package_metadata=metadata,
@@ -533,7 +628,11 @@ class InstanceManager:
             name=instance_data.get("name"),
             version_id=instance_data.get("version_id"),
             mod_loader=instance_data.get("mod_loader"),
-            instance_dir=Paths.load_instance_dir(instance_data.get("name"))
+            instance_dir=Paths.load_instance_dir(instance_data.get("name")),
+            icon=str(instance_data.get("icon") or InstanceManager.DEFAULT_ICON),
+            last_played=str(instance_data.get("last_played") or ""),
+            last_exit_code=instance_data.get("last_exit_code"),
+            last_launch_crashed=bool(instance_data.get("last_launch_crashed", False)),
         )
 
     @staticmethod

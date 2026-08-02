@@ -27,6 +27,7 @@ def _preview(has_settings: bool = True) -> InstancePackagePreview:
         name="Pack",
         version_id="1.20.4",
         mod_loader=("fabric", "0.16.14"),
+        icon="grass_block",
         settings=_settings(4096),
         has_package_settings=has_settings,
         package_metadata=PackageMetadata(

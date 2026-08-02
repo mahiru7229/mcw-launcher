@@ -8,6 +8,7 @@ from src.core.diagnostics.forge_diagnostics_manager import ForgeDiagnosticsManag
 from src.core.diagnostics.quilt_diagnostics_manager import QuiltDiagnosticsManager
 from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.instance_run_lock import InstanceRunLock
+from src.core.instance.instance_status_manager import InstanceStatusManager
 from src.core.java.adoptium_client import AdoptiumClient
 from src.core.java.java_diagnostics_manager import JavaDiagnosticsManager
 from src.core.java.java_provisioner import JavaProvisioner
@@ -19,6 +20,7 @@ from src.core.progress.progress_reporter import ProgressReporter
 from src.core.repair.repair_service import RepairService
 from src.core.runtime.instance_repair_manager import InstanceRepairManager
 from src.models.instance.instance import Instance
+from src.models.instance.instance_state import InstanceStatus
 from src.models.progress.progress_callback import ProgressCallback
 
 from mcw_core.models import InstanceCreateRequest
@@ -69,6 +71,23 @@ class InstanceService:
     @staticmethod
     def is_running(instance: Instance) -> bool:
         return InstanceRunLock.is_active(instance)
+
+    @staticmethod
+    def status(instance: Instance | str) -> InstanceStatus:
+        loaded = instance if isinstance(instance, Instance) else InstanceManager.load(str(instance))
+        return InstanceStatusManager.resolve(loaded)
+
+    @staticmethod
+    def list_statuses() -> list[InstanceStatus]:
+        return InstanceStatusManager.list(InstanceManager.list_instances())
+
+    @staticmethod
+    def set_icon(name: str, source_path: Path) -> Instance:
+        return InstanceManager.set_icon(name, Path(source_path))
+
+    @staticmethod
+    def reset_icon(name: str) -> Instance:
+        return InstanceManager.reset_icon(name)
 
     def create(self, request: InstanceCreateRequest) -> Instance:
         name = InstanceManager.validate_name(request.name)

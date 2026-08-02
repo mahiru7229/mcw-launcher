@@ -152,6 +152,9 @@ class GameRuntimeManager:
             "total_play_time_seconds": total_play_time,
             "last_exit_code": result.exit_code,
             "last_launch_crashed": result.crashed,
+            "last_launch_state": "crashed" if result.crashed else "finished",
+            "last_started_at": result.started_at,
+            "last_finished_at": result.ended_at,
             "last_game_log": str(result.log_path) if result.log_path is not None else "",
             "last_crash_report": str(result.crash_report_path) if result.crash_report_path is not None else "",
         })

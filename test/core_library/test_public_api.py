@@ -8,7 +8,7 @@ import tomllib
 
 import pytest
 
-from mcw_core import CorePaths, LaunchRequest, MCWCore
+from mcw_core import CorePaths, InstanceState, InstanceStatus, LaunchRequest, MCWCore
 from src.core.fs.paths import Paths
 from src.models.instance.instance import Instance
 
@@ -93,6 +93,12 @@ def test_headless_facade_launches_an_offline_instance(monkeypatch: pytest.Monkey
     assert result.minecraft_version == "quilt-loader-0.30.1-1.20.1"
     assert result["warnings"] == ("headless smoke warning",)
 
+
+
+def test_instance_state_types_are_public() -> None:
+    assert InstanceState.RUNNING.value == "running"
+    status = InstanceStatus(instance_id="id", name="Example", state=InstanceState.READY)
+    assert status.state is InstanceState.READY
 
 def _imports(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

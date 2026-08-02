@@ -287,6 +287,8 @@ class MainWindow(QMainWindow):
         self.instances_page.restore_backup_requested.connect(self.backup_controller.restore)
         self.instances_page.open_backups_requested.connect(self._open_backups_folder)
         self.instances_page.open_instance_folder_requested.connect(self._open_instance_folder)
+        self.instances_page.change_icon_requested.connect(self.instance_controller.change_icon)
+        self.instances_page.reset_icon_requested.connect(self.instance_controller.reset_icon)
         self.instances_page.scan_modpack_requested.connect(self.modpack_lifecycle_controller.scan)
         self.instances_page.repair_modpack_requested.connect(self.modpack_lifecycle_controller.repair)
         self.instances_page.check_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.check_update(name, self.modrinth_modpack_dialog.allowed_version_types, force_refresh=True))
@@ -1413,6 +1415,7 @@ class MainWindow(QMainWindow):
         if not selected_name or selected_name == result_name:
             self.launch_control.set_exit_result(result)
         self.instance_controller.refresh_running(force=True)
+        self.instance_controller.refresh(selected_name=result_name or selected_name)
         crashed = bool(getattr(result, "crashed", False))
         instance_name = str(getattr(result, "instance_name", "Minecraft"))
         exit_code = int(getattr(result, "exit_code", -1))

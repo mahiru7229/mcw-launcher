@@ -42,6 +42,14 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
+### Điểm nổi bật của `v0.12.0-beta.6`
+
+- Nâng `instance.json` lên metadata schema 3 với icon, kết quả phiên gần nhất và dữ liệu runtime đã chuẩn hóa.
+- Hiển thị badge **đang tải / đang chạy / đã kết thúc / crash** trực tiếp trên icon từng instance.
+- Cho phép đổi icon bằng PNG, JPEG, WebP, BMP hoặc ICO; icon được chép vào `.mcw/instance-icon.<ext>` để instance tự chứa dữ liệu.
+- `.mcwpack` mang theo icon và thêm `instance_name` / `instance_icon` vào `package.json` để phục vụ preview.
+- Public API bổ sung `InstanceState`, `InstanceStatus`, `status()`, `list_statuses()`, `set_icon()` và `reset_icon()`.
+
 ### Điểm nổi bật của `v0.12.0-beta.5`
 
 - Chuyển màn hình mặc định thành **thư viện instance** dạng icon, có tìm kiếm và panel thao tác nhanh.
@@ -190,6 +198,14 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 - Synchronize accents with QPalette, QSS, focus, selection, progress, scrollbars, the splash, and opt-in PNG/sprite assets.
 - Preserve compatibility with theme schemas 1–6 and updater paths from v0.10.0.
 - Include the verified RC2 startup splash and circular-import hotfixes.
+
+### Highlights of `v0.12.0-beta.6`
+
+- Upgrade `instance.json` to metadata schema 3 with normalized icon and completed-session runtime fields.
+- Show **loading / running / finished / crashed** badges directly on every instance icon.
+- Allow PNG, JPEG, WebP, BMP, and ICO files; selected icons are copied to `.mcw/instance-icon.<ext>` so instances remain self-contained.
+- Include icons in `.mcwpack` exports and add `instance_name` / `instance_icon` to `package.json` for previews.
+- Extend the public API with `InstanceState`, `InstanceStatus`, `status()`, `list_statuses()`, `set_icon()`, and `reset_icon()`.
 
 ### Highlights of `v0.12.0-beta.5`
 
@@ -411,6 +427,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
+| [`docs/RELEASE-v0.12.0-beta.6.md`](docs/RELEASE-v0.12.0-beta.6.md) | Instance icons and runtime-state badges |
 | [`docs/RELEASE-v0.12.0-beta.5.md`](docs/RELEASE-v0.12.0-beta.5.md) | Instance-centered GUI workflow |
 | [`docs/RELEASE-v0.11.0.md`](docs/RELEASE-v0.11.0.md) | Complete v0.11.0 Stable release notes |
 | [`docs/RELEASE-v0.11.0-rc.2.md`](docs/RELEASE-v0.11.0-rc.2.md) | Final v0.11.0 release candidate: theme palette and user accent color |
@@ -433,7 +450,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v0.12.0-beta.5 |
+| Component | Status in v0.12.0-beta.6 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |

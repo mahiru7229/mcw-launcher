@@ -40,3 +40,16 @@ def test_primary_navigation_is_instance_centered() -> None:
     assert navigation is not None
     assert navigation[0][0] == "instances"
     assert {page_id for page_id, _label in navigation} == {"instances", "accounts", "launcher_settings", "logs", "about"}
+
+
+def test_instance_workspace_supports_icons_and_runtime_badges() -> None:
+    path = PROJECT_ROOT / "src" / "gui" / "pages" / "instance_workspace_page.py"
+    source = path.read_text(encoding="utf-8")
+
+    assert "change_icon_requested = Signal(str, object)" in source
+    assert "reset_icon_requested = Signal(str)" in source
+    assert '"loading": "icon.state.busy"' in source
+    assert '"running": "icon.action.launch"' in source
+    assert '"crashed": "icon.state.error"' in source
+    assert '"finished": "icon.state.success"' in source
+    assert "def _instance_state" in source
