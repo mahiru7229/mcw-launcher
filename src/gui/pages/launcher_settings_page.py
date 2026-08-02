@@ -804,7 +804,7 @@ class LauncherSettingsPage(BasePage):
             *self.curseforge_gateway_inputs,
         )
         blockers = [QSignalBlocker(control) for control in persisted_controls]
-        index = self.start_page_combo.findData(settings.get("start_page", "home"))
+        index = self.start_page_combo.findData(settings.get("start_page", "instances"))
         self.start_page_combo.setCurrentIndex(max(0, index))
         self.show_snapshots.setChecked(bool(settings.get("show_snapshots", False)))
         self.debug_mode.setChecked(bool(settings.get("debug_mode", False)))

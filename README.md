@@ -42,6 +42,14 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
+### Điểm nổi bật của `v0.12.0-beta.5`
+
+- Chuyển màn hình mặc định thành **thư viện instance** dạng icon, có tìm kiếm và panel thao tác nhanh.
+- Thêm workflow Add Instance / Import / Modrinth Packs / CurseForge Packs trên cùng một toolbar.
+- Thêm cửa sổ **Edit Instance** theo hướng instance-centered với Overview, Mods, Settings, Maintenance và Diagnostics.
+- Hỗ trợ double-click để launch, menu chuột phải, clone, export, repair và mở thư mục ngay từ thư viện.
+- Rút gọn sidebar và giữ Launch Control cố định; toàn bộ GUI vẫn chỉ gọi public API của `mcw_core`.
+
 ### Điểm nổi bật của `v0.12.0-beta.4`
 
 - Thêm package headless **`mcw_core`**, import và sử dụng được mà không cần PySide6.
@@ -182,6 +190,14 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 - Synchronize accents with QPalette, QSS, focus, selection, progress, scrollbars, the splash, and opt-in PNG/sprite assets.
 - Preserve compatibility with theme schemas 1–6 and updater paths from v0.10.0.
 - Include the verified RC2 startup splash and circular-import hotfixes.
+
+### Highlights of `v0.12.0-beta.5`
+
+- Make the icon-based **instance library** the default screen, with search and a selected-instance action panel.
+- Put Add Instance, Import, Modrinth Packs, CurseForge Packs, and Refresh on one toolbar.
+- Add an instance-centered **Edit Instance** window with Overview, Mods, Settings, Maintenance, and Diagnostics.
+- Support double-click launch, context-menu actions, cloning, export, repair, and folder access directly from the library.
+- Reduce the sidebar while keeping Launch Control permanent; the GUI continues to call only the public `mcw_core` API.
 
 ### Highlights of `v0.12.0-beta.4`
 
@@ -395,6 +411,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
+| [`docs/RELEASE-v0.12.0-beta.5.md`](docs/RELEASE-v0.12.0-beta.5.md) | Instance-centered GUI workflow |
 | [`docs/RELEASE-v0.11.0.md`](docs/RELEASE-v0.11.0.md) | Complete v0.11.0 Stable release notes |
 | [`docs/RELEASE-v0.11.0-rc.2.md`](docs/RELEASE-v0.11.0-rc.2.md) | Final v0.11.0 release candidate: theme palette and user accent color |
 | [`docs/RELEASE-v0.9.0.md`](docs/RELEASE-v0.9.0.md) | Complete v0.9.0 Stable release notes |
@@ -416,7 +433,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v0.12.0-beta.4 |
+| Component | Status in v0.12.0-beta.5 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |

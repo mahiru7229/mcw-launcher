@@ -19,7 +19,7 @@ class GuiSettingsController(BaseController):
     settings_changed = Signal(dict)
 
     DEFAULTS = {
-        "start_page": "home",
+        "start_page": "instances",
         "show_snapshots": False,
         "debug_mode": False,
         "remember_window_size": True,
@@ -70,7 +70,7 @@ class GuiSettingsController(BaseController):
         except (RuntimeError, ValueError):
             curseforge_gateway_urls = ()
         self._current = {
-            "start_page": str(gui.get("start_page", self.DEFAULTS["start_page"])),
+            "start_page": self._normalize_start_page(gui.get("start_page")),
             "show_snapshots": bool(gui.get("show_snapshots", self.DEFAULTS["show_snapshots"])),
             "debug_mode": bool(launch.get("debug_mode", self.DEFAULTS["debug_mode"])),
             "remember_window_size": bool(gui.get("remember_window_size", self.DEFAULTS["remember_window_size"])),
@@ -116,7 +116,7 @@ class GuiSettingsController(BaseController):
         tester_mode = bool(data.get("tester_mode", self.DEFAULTS["tester_mode"]))
         update_channel = "beta" if tester_mode else "stable"
         self._current = {
-            "start_page": str(data.get("start_page", self.DEFAULTS["start_page"])),
+            "start_page": self._normalize_start_page(data.get("start_page")),
             "show_snapshots": bool(data.get("show_snapshots", self.DEFAULTS["show_snapshots"])),
             "debug_mode": bool(data.get("debug_mode", self.DEFAULTS["debug_mode"])),
             "remember_window_size": bool(data.get("remember_window_size", self.DEFAULTS["remember_window_size"])),
@@ -171,6 +171,12 @@ class GuiSettingsController(BaseController):
         self.settings_changed.emit(copy.deepcopy(self._current))
         self.status_changed.emit(tr("Launcher settings saved"))
         self.log_created.emit(tr("GUI preferences saved"))
+
+
+    @classmethod
+    def _normalize_start_page(cls, value: object) -> str:
+        page = str(value or cls.DEFAULTS["start_page"]).strip()
+        return page if page in {"instances", "accounts", "launcher_settings", "logs", "about"} else "instances"
 
     def set_auto_check_updates(self, enabled: bool) -> None:
         self._current["auto_check_updates"] = bool(enabled)

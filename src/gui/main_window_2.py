@@ -56,7 +56,7 @@ from src.gui.pages.about_page import AboutPage
 from src.gui.pages.account_page import AccountPage
 from src.gui.pages.home_page import HomePage
 from src.gui.pages.instance_settings_page import InstanceSettingsPage
-from src.gui.pages.instances_page import InstancesPage
+from src.gui.pages.instance_workspace_page import InstanceWorkspacePage
 from src.gui.pages.launcher_settings_page import LauncherSettingsPage
 from src.gui.pages.logs_page import LogsPage
 from src.gui.pages.mods_page import ModsPage
@@ -199,7 +199,7 @@ class MainWindow(QMainWindow):
 
         self.home_page = HomePage()
         self.account_page = AccountPage()
-        self.instances_page = InstancesPage()
+        self.instances_page = InstanceWorkspacePage()
         self.mods_page = ModsPage()
         self.instance_settings_page = InstanceSettingsPage()
         self.launcher_settings_page = LauncherSettingsPage()
@@ -231,6 +231,7 @@ class MainWindow(QMainWindow):
 
         root_layout.addWidget(self.sidebar)
         root_layout.addWidget(center, 1)
+        self.right_panel.setVisible(False)
         root_layout.addWidget(self.right_panel)
 
     def _connect_signals(self) -> None:
@@ -257,6 +258,9 @@ class MainWindow(QMainWindow):
         self.account_page.security_reprotect_requested.connect(self.account_controller.reprotect_security)
 
         self.instances_page.refresh_requested.connect(self.instance_controller.refresh)
+        self.instances_page.launch_requested.connect(self._request_launch)
+        self.instances_page.instance_settings_requested.connect(self._open_instance_settings_workspace)
+        self.instances_page.manage_accounts_requested.connect(lambda: self.show_page("accounts"))
         self.instances_page.selected_instance_changed.connect(self.instance_controller.select)
         self.instances_page.create_requested.connect(self.instance_controller.create)
         self.instances_page.fabric_versions_requested.connect(self.mod_loader_controller.load_fabric_versions)
@@ -364,6 +368,7 @@ class MainWindow(QMainWindow):
         self.instance_controller.instances_changed.connect(self.instances_page.set_instances)
         self.instance_controller.instances_changed.connect(self.instance_settings_page.set_instances)
         self.instance_controller.running_instances_changed.connect(self.right_panel.set_running_instances)
+        self.instance_controller.running_instances_changed.connect(self.instances_page.set_running_instances)
         self.instance_controller.selected_instance_changed.connect(self._instance_selected)
         self.instance_controller.forge_diagnostics_finished.connect(self._forge_diagnostics_finished)
         self.instance_controller.export_finished.connect(self._show_export_finished)
@@ -512,7 +517,7 @@ class MainWindow(QMainWindow):
         self._apply_display_profile_geometry(preserve_position=restored_geometry)
         QTimer.singleShot(0, lambda: self._apply_display_profile_geometry(preserve_position=True))
 
-        self.show_page(settings.get("start_page", "home"))
+        self.show_page(settings.get("start_page", "instances"))
         self.account_controller.refresh()
         self.account_controller.audit_security()
         self.instance_controller.refresh()
@@ -532,13 +537,13 @@ class MainWindow(QMainWindow):
         self._set_status("Refreshing launcher data...")
 
     def show_page(self, page_id: str) -> None:
-        requested_page = page_id if page_id in self.pages else "home"
+        requested_page = page_id if page_id in self.pages else "instances"
         current_page = self._current_page_id()
         if requested_page != current_page and not self._confirm_unsaved_page(current_page):
             self.sidebar.set_current_page(current_page)
             return
 
-        page = self.pages.get(requested_page, self.home_page)
+        page = self.pages.get(requested_page, self.instances_page)
         self.motion_runtime.switch_page(self.content_stack, page)
         self.sidebar.set_current_page(requested_page)
         if requested_page == "mods" and self.mods_page.selected_provider == "modrinth" and not self.mods_page.has_loaded_search and not self.task_runner.is_task_active(f"{self.mod_catalog_controller.SEARCH_PREFIX}{self.mods_page.selected_loader}"):
@@ -546,7 +551,7 @@ class MainWindow(QMainWindow):
 
     def _current_page_id(self) -> str:
         current = self.content_stack.currentWidget()
-        return next((page_id for page_id, page in self.pages.items() if page is current), "home")
+        return next((page_id for page_id, page in self.pages.items() if page is current), "instances")
 
     def _confirm_unsaved_page(self, page_id: str) -> bool:
         page = {
@@ -595,6 +600,15 @@ class MainWindow(QMainWindow):
     def _request_launch(self) -> None:
         if self._confirm_all_unsaved_settings():
             self.launch_controller.launch()
+
+    def _open_instance_settings_workspace(self, instance_name: str) -> None:
+        name = str(instance_name or "").strip()
+        if not name:
+            return
+        self.instances_page.select_instance(name)
+        self.instance_settings_page.select_instance(name)
+        self.instance_settings_controller.load(name)
+        self.show_page("instance_settings")
 
     def _open_repair_center(self, instance_name: str) -> None:
         name = str(instance_name or "").strip()
@@ -1493,6 +1507,7 @@ class MainWindow(QMainWindow):
     def _account_selected(self, account: object | None) -> None:
         self.home_page.set_account(account)
         self.right_panel.set_account(account)
+        self.instances_page.set_account(account)
         self.launch_controller.set_account(account)
 
     def _instance_selected(self, instance: object | None) -> None:

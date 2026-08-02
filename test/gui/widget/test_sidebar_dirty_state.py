@@ -10,14 +10,14 @@ from src.gui.widget.sidebar_widget import SidebarWidget
 
 def test_sidebar_marks_settings_page_with_unsaved_indicator(gui_app):
     sidebar = SidebarWidget()
-    button = sidebar._buttons["instance_settings"]
+    button = sidebar._buttons["launcher_settings"]
 
-    sidebar.set_page_dirty("instance_settings", True)
+    sidebar.set_page_dirty("launcher_settings", True)
 
     assert button.property("unsavedChanges") is True
     assert button.text().startswith("● ")
 
-    sidebar.set_page_dirty("instance_settings", False)
+    sidebar.set_page_dirty("launcher_settings", False)
 
     assert button.property("unsavedChanges") is False
     assert not button.text().startswith("● ")
@@ -25,17 +25,17 @@ def test_sidebar_marks_settings_page_with_unsaved_indicator(gui_app):
 
 def test_sidebar_collapses_to_icon_only_and_restores_dirty_label(gui_app):
     sidebar = SidebarWidget()
-    sidebar.set_page_dirty("instance_settings", True)
+    sidebar.set_page_dirty("launcher_settings", True)
 
     sidebar.set_collapsed_visual(True)
 
-    assert sidebar._buttons["instance_settings"].text() == ""
-    assert sidebar._buttons["instance_settings"].toolTip()
+    assert sidebar._buttons["launcher_settings"].text() == ""
+    assert sidebar._buttons["launcher_settings"].toolTip()
 
     sidebar.set_collapsed_visual(False)
 
-    assert sidebar._buttons["instance_settings"].text().startswith("● ")
-    assert sidebar._buttons["instance_settings"].toolTip() == ""
+    assert sidebar._buttons["launcher_settings"].text().startswith("● ")
+    assert sidebar._buttons["launcher_settings"].toolTip() == ""
 
 
 def test_sidebar_toggle_uses_large_standard_arrow_icon(gui_app):

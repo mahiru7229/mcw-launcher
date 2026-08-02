@@ -32,7 +32,7 @@ def _instance_settings() -> SimpleNamespace:
 
 def _launcher_settings() -> dict:
     return {
-        "start_page": "home",
+        "start_page": "instances",
         "show_snapshots": False,
         "debug_mode": False,
         "remember_window_size": True,
