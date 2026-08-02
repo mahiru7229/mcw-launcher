@@ -20,11 +20,13 @@ class InstanceStatusManager:
                 last_played=instance.last_played,
                 last_exit_code=instance.last_exit_code,
                 last_launch_crashed=instance.last_launch_crashed,
+                last_launch_state=instance.last_launch_state,
             )
 
-        if instance.last_launch_crashed:
+        last_state = str(getattr(instance, "last_launch_state", "") or "").strip().casefold()
+        if last_state == "crashed" or bool(getattr(instance, "last_launch_crashed", False)):
             state = InstanceState.CRASHED
-        elif instance.last_played:
+        elif last_state == "finished" or bool(getattr(instance, "last_played", "")):
             state = InstanceState.FINISHED
         else:
             state = InstanceState.READY
@@ -36,6 +38,7 @@ class InstanceStatusManager:
             last_played=instance.last_played,
             last_exit_code=instance.last_exit_code,
             last_launch_crashed=instance.last_launch_crashed,
+            last_launch_state=instance.last_launch_state,
         )
 
     @classmethod

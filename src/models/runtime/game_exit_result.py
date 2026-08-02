@@ -14,6 +14,8 @@ class GameExitResult:
     ended_at: str
     duration_seconds: int
     crashed: bool
+    session_id: str | None = None
+    stopped_by_launcher: bool = False
     log_path: Path | None = None
     crash_report_path: Path | None = None
 

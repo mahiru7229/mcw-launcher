@@ -87,3 +87,29 @@ def test_extract_validates_all_members_before_writing_files(tmp_path: Path) -> N
         PackageManager.extract(package, output)
 
     assert not (output / "mods" / "valid.jar").exists()
+
+
+def test_extract_deduplicates_identical_archive_members(tmp_path: Path) -> None:
+    package = tmp_path / "identical-duplicates.mcwpack"
+    with zipfile.ZipFile(package, "w") as archive:
+        archive.writestr("package.json", json.dumps(metadata()))
+        archive.writestr("instance.json", b"{}")
+        archive.writestr("mods/example.jar", b"same-content")
+        archive.writestr("mods/example.jar", b"same-content")
+    output = tmp_path / "output"
+
+    PackageManager.extract(package, output)
+
+    assert (output / "mods" / "example.jar").read_bytes() == b"same-content"
+
+
+def test_extract_rejects_conflicting_duplicate_archive_members(tmp_path: Path) -> None:
+    package = tmp_path / "conflicting-duplicates.mcwpack"
+    with zipfile.ZipFile(package, "w") as archive:
+        archive.writestr("package.json", json.dumps(metadata()))
+        archive.writestr("instance.json", b"{}")
+        archive.writestr("mods/example.jar", b"first")
+        archive.writestr("mods/example.jar", b"second")
+
+    with pytest.raises(RuntimeError, match="conflicting duplicate path"):
+        PackageManager.extract(package, tmp_path / "output")

@@ -136,13 +136,15 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.LAUNCHING, message=f"Launching Minecraft {version.id}...")
+            crash_report_snapshot = GameRuntimeManager.crash_report_snapshot(instance)
             started_at = datetime.now(timezone.utc)
             process = JavaRuntime.run(java, command, instance)
             process_started = True
             LanAgentManager.append_log_path(lan_log_path, f"Minecraft process started; pid={getattr(process, 'pid', 'unknown')}.")
             run_lock.track_process(process)
             ProcessSupervisor.attach(process_session.session_id, process)
-            watched = GameRuntimeManager.watch(process, instance, version.id, started_at, on_exit, process_session.session_id)
+            GameRuntimeManager.record_start(instance, started_at, process_session.session_id)
+            watched = GameRuntimeManager.watch(process, instance, version.id, started_at, on_exit, process_session.session_id, crash_report_snapshot)
             if watched is False and callable(getattr(process, "poll", None)):
                 raise RuntimeError("Minecraft process could not be registered with the runtime manager.")
             reporter.status(stage=ProgressStage.FINISHED, message=f"Minecraft {version.id} launched successfully.")

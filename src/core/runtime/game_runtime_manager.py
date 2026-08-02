@@ -6,7 +6,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 
 from src.core.fs.paths import Paths
 from src.core.java.java_runtime import JavaRuntime
@@ -26,25 +26,27 @@ class GameRuntimeManager:
     _active_processes_lock = threading.RLock()
 
     @classmethod
-    def watch(cls, process: object, instance: Instance, minecraft_version: str, started_at: datetime, on_exit: GameExitCallback | None = None, session_id: str | None = None) -> bool:
+    def watch(cls, process: object, instance: Instance, minecraft_version: str, started_at: datetime, on_exit: GameExitCallback | None = None, session_id: str | None = None, crash_report_snapshot: Mapping[str, tuple[int, int]] | None = None) -> bool:
         poll = getattr(process, "poll", None)
         if not callable(poll):
             return False
 
         cls._register_process(instance, process)
-        watcher = threading.Thread(target=cls._watch_process, args=(process, instance, minecraft_version, started_at, on_exit, session_id), name=f"game-runtime-{instance.name}", daemon=True)
+        snapshot = dict(crash_report_snapshot) if crash_report_snapshot is not None else cls.crash_report_snapshot(instance)
+        watcher = threading.Thread(target=cls._watch_process, args=(process, instance, minecraft_version, started_at, on_exit, session_id, snapshot), name=f"game-runtime-{instance.name}", daemon=True)
         watcher.start()
         return True
 
     @classmethod
-    def _watch_process(cls, process: object, instance: Instance, minecraft_version: str, started_at: datetime, on_exit: GameExitCallback | None, session_id: str | None = None) -> None:
+    def _watch_process(cls, process: object, instance: Instance, minecraft_version: str, started_at: datetime, on_exit: GameExitCallback | None, session_id: str | None = None, crash_report_snapshot: Mapping[str, tuple[int, int]] | None = None) -> None:
         try:
             exit_code = cls._wait_for_exit(process)
             ended_at = datetime.now(timezone.utc)
             log_path = JavaRuntime.log_path(process) or cls.latest_game_log(instance)
             JavaRuntime.close_process_log(process)
-            crash_report_path = cls.latest_crash_report(instance, since=started_at)
-            crashed = exit_code != 0 or crash_report_path is not None
+            crash_report_path = cls.latest_crash_report(instance, since=started_at, previous=crash_report_snapshot)
+            stopped_by_launcher = ProcessSupervisor.stop_requested(session_id)
+            crashed = not stopped_by_launcher and (exit_code != 0 or crash_report_path is not None)
             duration_seconds = max(0, round((ended_at - started_at).total_seconds()))
             pid = getattr(process, "pid", None)
             result = GameExitResult(
@@ -56,6 +58,8 @@ class GameRuntimeManager:
                 ended_at=ended_at.isoformat(),
                 duration_seconds=duration_seconds,
                 crashed=crashed,
+                session_id=session_id,
+                stopped_by_launcher=stopped_by_launcher,
                 log_path=log_path,
                 crash_report_path=crash_report_path,
             )
@@ -77,9 +81,17 @@ class GameRuntimeManager:
 
     @classmethod
     def stop(cls, instance: Instance, graceful_timeout: float = 2.5) -> bool:
+        supervised = ProcessSupervisor.active_for(instance)
+        if supervised is not None:
+            process = cls._active_process(instance)
+            stopped = ProcessSupervisor.stop_instance(instance, graceful_timeout=graceful_timeout)
+            if stopped and process is not None:
+                cls._unregister_process(instance, process)
+            return stopped
+
         process = cls._active_process(instance)
         if process is None:
-            return ProcessSupervisor.stop_instance(instance, graceful_timeout=graceful_timeout)
+            return False
         poll = getattr(process, "poll", None)
         if callable(poll):
             try:
@@ -171,14 +183,53 @@ class GameRuntimeManager:
         return GameRuntimeManager._latest_file(Paths.instance_logs_dir(instance), "minecraft-*.log")
 
     @staticmethod
-    def latest_crash_report(instance: Instance, since: datetime | None = None) -> Path | None:
-        path = GameRuntimeManager._latest_file(Paths.instance_crash_reports_dir(instance), "*.txt")
-        if path is None or since is None:
-            return path
+    def crash_report_snapshot(instance: Instance) -> dict[str, tuple[int, int]]:
+        directory = Paths.instance_crash_reports_dir(instance)
+        snapshot: dict[str, tuple[int, int]] = {}
         try:
-            return path if path.stat().st_mtime >= since.timestamp() - 2.0 else None
+            paths = tuple(directory.glob("*.txt"))
+        except OSError:
+            return snapshot
+        for path in paths:
+            if not path.is_file():
+                continue
+            try:
+                stat_result = path.stat()
+                snapshot[os.path.normcase(str(path.resolve(strict=False)))] = (int(stat_result.st_mtime_ns), int(stat_result.st_size))
+            except OSError:
+                continue
+        return snapshot
+
+    @staticmethod
+    def latest_crash_report(instance: Instance, since: datetime | None = None, previous: Mapping[str, tuple[int, int]] | None = None) -> Path | None:
+        directory = Paths.instance_crash_reports_dir(instance)
+        candidates: list[Path] = []
+        baseline = dict(previous or {})
+        try:
+            paths = tuple(directory.glob("*.txt"))
         except OSError:
             return None
+        for path in paths:
+            if not path.is_file():
+                continue
+            try:
+                stat_result = path.stat()
+            except OSError:
+                continue
+            signature = (int(stat_result.st_mtime_ns), int(stat_result.st_size))
+            key = os.path.normcase(str(path.resolve(strict=False)))
+            if previous is not None:
+                if baseline.get(key) == signature:
+                    continue
+            elif since is not None and stat_result.st_mtime < since.timestamp():
+                continue
+            candidates.append(path)
+        if not candidates:
+            return None
+        try:
+            return max(candidates, key=lambda item: item.stat().st_mtime_ns)
+        except OSError:
+            return sorted(candidates, key=lambda item: item.name.casefold())[-1]
 
     @staticmethod
     def _latest_file(directory: Path, pattern: str) -> Path | None:
@@ -192,6 +243,19 @@ class GameRuntimeManager:
             return max(files, key=lambda path: path.stat().st_mtime)
         except OSError:
             return sorted(files, key=lambda path: path.name.casefold())[-1]
+
+    @classmethod
+    def record_start(cls, instance: Instance, started_at: datetime, session_id: str | None) -> None:
+        path = Paths.instance_metadata(instance.name)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, ValueError):
+            return
+        if not isinstance(data, dict):
+            return
+        data["last_started_at"] = started_at.isoformat()
+        data["last_session_id"] = str(session_id or "")
+        cls._write_json_atomic(path, data)
 
     @classmethod
     def _record_result(cls, instance: Instance, result: GameExitResult) -> None:
@@ -227,6 +291,12 @@ class GameRuntimeManager:
             return
         if not isinstance(data, dict):
             return
+        current_session = str(data.get("last_session_id") or "")
+        if current_session and result.session_id and current_session != result.session_id:
+            return
+        current_started = str(data.get("last_started_at") or "")
+        if current_started and current_started > result.started_at:
+            return
         previous_play_time = data.get("total_play_time_seconds", 0)
         try:
             total_play_time = max(0, int(previous_play_time)) + result.duration_seconds
@@ -241,6 +311,8 @@ class GameRuntimeManager:
             "last_launch_state": "crashed" if result.crashed else "finished",
             "last_started_at": result.started_at,
             "last_finished_at": result.ended_at,
+            "last_session_id": str(result.session_id or current_session),
+            "last_stop_requested": bool(result.stopped_by_launcher),
             "last_game_log": str(result.log_path) if result.log_path is not None else "",
             "last_crash_report": str(result.crash_report_path) if result.crash_report_path is not None else "",
         })

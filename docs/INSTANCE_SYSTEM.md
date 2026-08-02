@@ -81,7 +81,7 @@ Example:
     "icon": ".mcw/instance-icon.png",
     "notes": "",
 
-    "launcher_version": "v0.12.0-beta.8",
+    "launcher_version": "v0.12.0-beta.9",
     "metadata_version": 3
 }
 ```

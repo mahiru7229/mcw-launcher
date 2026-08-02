@@ -52,6 +52,9 @@ def test_instance_workspace_supports_icons_and_runtime_badges() -> None:
     assert '"running": "icon.action.launch"' in source
     assert '"crashed": "icon.state.error"' in source
     assert '"finished": "icon.state.success"' in source
+    assert "QStyle.StandardPixmap.SP_BrowserReload" in source
+    assert "QStyle.StandardPixmap.SP_MediaPlay" in source
+    assert 'if state == "ready":' in source
     assert "def _instance_state" in source
     assert "def set_health_reports" in source
     assert "def _instance_health_state" in source

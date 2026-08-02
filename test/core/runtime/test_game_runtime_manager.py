@@ -153,3 +153,101 @@ def test_process_session_finishes_even_when_runtime_history_write_fails(monkeypa
         GameRuntimeManager._watch_process(FinishedProcess(1), instance, "1.21.1", datetime.now(timezone.utc), None, "session-id")
 
     assert finished == [("session-id", 1, True)]
+
+
+def test_old_crash_report_is_ignored_for_new_session(monkeypatch: pytest.MonkeyPatch, instance) -> None:
+    crash_dir = Paths.instance_crash_reports_dir(instance)
+    old_report = crash_dir / "crash-old.txt"
+    old_report.write_text("old crash", encoding="utf-8")
+    snapshot = GameRuntimeManager.crash_report_snapshot(instance)
+    results = []
+
+    monkeypatch.setattr(JavaRuntime, "log_path", classmethod(lambda cls, process: None))
+    monkeypatch.setattr(JavaRuntime, "close_process_log", classmethod(lambda cls, process: None))
+    monkeypatch.setattr(ProcessSupervisor, "stop_requested", classmethod(lambda cls, session_id: False))
+
+    GameRuntimeManager._watch_process(FinishedProcess(0), instance, "1.21.1", datetime.now(timezone.utc), results.append, "new-session", snapshot)
+
+    assert results[0].crashed is False
+    assert results[0].crash_report_path is None
+
+
+def test_new_crash_report_after_snapshot_is_detected(monkeypatch: pytest.MonkeyPatch, instance) -> None:
+    crash_dir = Paths.instance_crash_reports_dir(instance)
+    old_report = crash_dir / "crash-old.txt"
+    old_report.write_text("old crash", encoding="utf-8")
+    snapshot = GameRuntimeManager.crash_report_snapshot(instance)
+    new_report = crash_dir / "crash-new.txt"
+    new_report.write_text("new crash", encoding="utf-8")
+    results = []
+
+    monkeypatch.setattr(JavaRuntime, "log_path", classmethod(lambda cls, process: None))
+    monkeypatch.setattr(JavaRuntime, "close_process_log", classmethod(lambda cls, process: None))
+    monkeypatch.setattr(ProcessSupervisor, "stop_requested", classmethod(lambda cls, session_id: False))
+
+    GameRuntimeManager._watch_process(FinishedProcess(0), instance, "1.21.1", datetime.now(timezone.utc), results.append, "new-session", snapshot)
+
+    assert results[0].crashed is True
+    assert results[0].crash_report_path == new_report
+
+
+def test_successful_second_session_replaces_previous_crash_state(monkeypatch: pytest.MonkeyPatch, instance) -> None:
+    metadata_path = Paths.instance_metadata(instance.name)
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata.update({
+        "last_launch_crashed": True,
+        "last_launch_state": "crashed",
+        "last_session_id": "first-session",
+        "last_started_at": "2026-08-02T00:00:00+00:00",
+    })
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+    started_at = datetime.now(timezone.utc)
+    GameRuntimeManager.record_start(instance, started_at, "second-session")
+    snapshot = GameRuntimeManager.crash_report_snapshot(instance)
+
+    monkeypatch.setattr(JavaRuntime, "log_path", classmethod(lambda cls, process: None))
+    monkeypatch.setattr(JavaRuntime, "close_process_log", classmethod(lambda cls, process: None))
+    monkeypatch.setattr(ProcessSupervisor, "stop_requested", classmethod(lambda cls, session_id: False))
+
+    GameRuntimeManager._watch_process(FinishedProcess(0), instance, "1.21.1", started_at, None, "second-session", snapshot)
+
+    updated = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert updated["last_session_id"] == "second-session"
+    assert updated["last_launch_crashed"] is False
+    assert updated["last_launch_state"] == "finished"
+    assert updated["last_exit_code"] == 0
+
+
+def test_stop_requested_is_not_classified_as_crash(monkeypatch: pytest.MonkeyPatch, instance) -> None:
+    results = []
+    monkeypatch.setattr(JavaRuntime, "log_path", classmethod(lambda cls, process: None))
+    monkeypatch.setattr(JavaRuntime, "close_process_log", classmethod(lambda cls, process: None))
+    monkeypatch.setattr(ProcessSupervisor, "stop_requested", classmethod(lambda cls, session_id: True))
+
+    GameRuntimeManager._watch_process(FinishedProcess(-9), instance, "1.21.1", datetime.now(timezone.utc), results.append, "stopped-session", {})
+
+    assert results[0].stopped_by_launcher is True
+    assert results[0].crashed is False
+
+
+def test_stale_session_cannot_overwrite_newer_runtime_result(instance) -> None:
+    metadata_path = Paths.instance_metadata(instance.name)
+    newer_started_at = datetime.now(timezone.utc)
+    GameRuntimeManager.record_start(instance, newer_started_at, "newer-session")
+    stale_result = __import__("src.models.runtime.game_exit_result", fromlist=["GameExitResult"]).GameExitResult(
+        instance_name=instance.name,
+        minecraft_version="1.21.1",
+        pid=1,
+        exit_code=1,
+        started_at=(newer_started_at - timedelta(minutes=1)).isoformat(),
+        ended_at=newer_started_at.isoformat(),
+        duration_seconds=60,
+        crashed=True,
+        session_id="older-session",
+    )
+
+    GameRuntimeManager._update_instance_metadata(instance, stale_result)
+
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert metadata["last_session_id"] == "newer-session"
+    assert "last_launch_state" not in metadata

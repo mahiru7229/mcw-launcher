@@ -17,6 +17,7 @@ import json
 import os
 import re
 import shutil
+import time
 import uuid
 
 
@@ -27,6 +28,8 @@ class InstanceManager:
     ICON_BASENAME = "instance-icon"
     ICON_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".ico"}
     MAX_ICON_BYTES = 8 * 1024 * 1024
+    DIRECTORY_COMMIT_ATTEMPTS = 8
+    DIRECTORY_COMMIT_RETRY_SECONDS = 0.15
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
     WINDOWS_RESERVED_NAMES = {"con", "prn", "aux", "nul", *(f"com{index}" for index in range(1, 10)), *(f"lpt{index}" for index in range(1, 10))}
 
@@ -56,7 +59,17 @@ class InstanceManager:
         last_played = str(instance.last_played or existing.get("last_played") or "")
         last_exit_code = instance.last_exit_code if instance.last_exit_code is not None else existing.get("last_exit_code")
         last_launch_crashed = bool(instance.last_launch_crashed)
-        last_launch_state = str(existing.get("last_launch_state") or ("crashed" if last_launch_crashed else "finished" if last_played else "ready"))
+        requested_state = str(getattr(instance, "last_launch_state", "") or "").strip().casefold()
+        existing_state = str(existing.get("last_launch_state") or "").strip().casefold()
+        inferred_state = "crashed" if last_launch_crashed else "finished" if last_played else "ready"
+        if requested_state in {"finished", "crashed"}:
+            last_launch_state = requested_state
+        elif requested_state == "ready" and not last_played:
+            last_launch_state = "ready"
+        elif existing_state in {"ready", "finished", "crashed"}:
+            last_launch_state = existing_state
+        else:
+            last_launch_state = inferred_state
         data = dict(existing)
         data.update({
             "id": instance.instance_id,
@@ -128,6 +141,9 @@ class InstanceManager:
             raw_exit_code = data.get("last_exit_code")
             last_exit_code = int(raw_exit_code) if raw_exit_code is not None else None
             last_launch_crashed = bool(data.get("last_launch_crashed", False))
+            raw_state = str(data.get("last_launch_state") or "").strip().casefold()
+            inferred_state = "crashed" if last_launch_crashed else "finished" if last_played else "ready"
+            last_launch_state = raw_state if raw_state in {"ready", "finished", "crashed"} else inferred_state
         except (KeyError, TypeError, ValueError) as error:
             raise RuntimeError(f"Invalid instance metadata: {source}") from error
         return Instance(
@@ -140,6 +156,7 @@ class InstanceManager:
             last_played=last_played,
             last_exit_code=last_exit_code,
             last_launch_crashed=last_launch_crashed,
+            last_launch_state=last_launch_state,
         )
 
     @staticmethod
@@ -199,7 +216,7 @@ class InstanceManager:
             InstanceManager._save_instance_metadata(instance)
 
             journal.update("committing")
-            staging_dir.rename(target_dir)
+            InstanceManager._commit_staging_directory(staging_dir, target_dir)
             committed = True
             instance.instance_dir = target_dir
             InstanceManager._save_instance_metadata(instance)
@@ -361,7 +378,7 @@ class InstanceManager:
             if InstanceManager.is_instance_exist(instance.name):
                 raise RuntimeError(f"Instance '{instance.name}' already exists.")
 
-            target_dir = Paths.load_instance_dir(instance.name)
+            instance.name, target_dir = InstanceManager._resolve_import_target(instance.name)
             journal = InstanceOperationJournal.begin("import", instance.name, target_path=target_dir, staging_path=staging_dir)
             if settings_override is not None:
                 SettingsManager.save_dict(instance, settings_override)
@@ -382,7 +399,7 @@ class InstanceManager:
             instance.instance_dir = staging_dir
             InstanceManager._save_instance_metadata(instance)
             journal.update("committing")
-            staging_dir.rename(target_dir)
+            InstanceManager._commit_staging_directory(staging_dir, target_dir)
             committed = True
             instance.instance_dir = target_dir
             InstanceManager._save_instance_metadata(instance)
@@ -400,6 +417,53 @@ class InstanceManager:
             except OSError:
                 pass
             raise
+
+
+    @staticmethod
+    def _resolve_import_target(preferred_name: str) -> tuple[str, Path]:
+        name = InstanceManager.validate_name(preferred_name)
+        target = Paths.load_instance_dir(name)
+        if not target.exists():
+            return name, target
+
+        # A valid instance remains a hard conflict. An orphan directory is never
+        # overwritten or deleted silently; choose a deterministic free name.
+        if (target / "instance.json").is_file() or InstanceManager._find_instance_data(name) is not None:
+            raise RuntimeError(f"Instance '{name}' already exists.")
+
+        alternate = InstanceManager.next_available_name(name)
+        return alternate, Paths.load_instance_dir(alternate)
+
+    @staticmethod
+    def _commit_staging_directory(staging_dir: Path, target_dir: Path) -> None:
+        if target_dir.exists():
+            raise RuntimeError(f"Cannot commit instance because the target directory already exists: {target_dir}")
+
+        last_error: OSError | None = None
+        for attempt in range(InstanceManager.DIRECTORY_COMMIT_ATTEMPTS):
+            try:
+                staging_dir.rename(target_dir)
+                return
+            except FileExistsError as error:
+                raise RuntimeError(f"Cannot commit instance because the target directory already exists: {target_dir}") from error
+            except PermissionError as error:
+                last_error = error
+            except OSError as error:
+                if getattr(error, "winerror", None) not in {5, 32, 33}:
+                    raise
+                last_error = error
+
+            if target_dir.exists():
+                raise RuntimeError(f"Cannot commit instance because the target directory became occupied: {target_dir}") from last_error
+            if not staging_dir.exists():
+                raise RuntimeError(f"Cannot commit instance because the staging directory disappeared: {staging_dir}") from last_error
+            if attempt + 1 < InstanceManager.DIRECTORY_COMMIT_ATTEMPTS:
+                time.sleep(InstanceManager.DIRECTORY_COMMIT_RETRY_SECONDS * (attempt + 1))
+
+        raise RuntimeError(
+            f"Windows could not finalize the instance operation after {InstanceManager.DIRECTORY_COMMIT_ATTEMPTS} attempts. "
+            f"Staging: {staging_dir}; target: {target_dir}. Close programs scanning these folders and retry."
+        ) from last_error
 
 
     @staticmethod
@@ -513,7 +577,7 @@ class InstanceManager:
             SettingsManager.save_dict(instance, settings if settings is not None else InstanceManager.default_instance_settings())
 
             journal.update("committing")
-            staging_dir.rename(target_dir)
+            InstanceManager._commit_staging_directory(staging_dir, target_dir)
             committed = True
             instance.instance_dir = target_dir
             InstanceManager._save_instance_metadata(instance)
@@ -688,6 +752,7 @@ class InstanceManager:
             last_played=str(instance_data.get("last_played") or ""),
             last_exit_code=instance_data.get("last_exit_code"),
             last_launch_crashed=bool(instance_data.get("last_launch_crashed", False)),
+            last_launch_state=str(instance_data.get("last_launch_state") or ("crashed" if instance_data.get("last_launch_crashed") else "finished" if instance_data.get("last_played") else "ready")),
         )
 
     @staticmethod

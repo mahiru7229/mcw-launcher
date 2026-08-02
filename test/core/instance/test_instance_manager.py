@@ -323,3 +323,64 @@ def test_clone_commits_without_leaving_staging_or_journal(temporary_paths: Path,
     assert (temporary_paths / "Clone Target" / "instance.json").is_file()
     assert list((temporary_paths / ".runtime" / "staging").iterdir()) == []
     assert list((temporary_paths / ".runtime" / "operations").glob("*.json")) == []
+
+
+def test_import_uses_unique_name_when_orphan_target_directory_exists(temporary_paths: Path, tmp_path: Path) -> None:
+    import json
+    import zipfile
+
+    orphan = temporary_paths / "Orphan Pack"
+    orphan.mkdir(parents=True)
+    (orphan / "unrelated.txt").write_text("keep", encoding="utf-8")
+
+    package_path = tmp_path / "orphan-pack.mcwpack"
+    package_metadata = {
+        "format": "mcwpack",
+        "format_version": 1,
+        "package_type": "instance",
+        "launcher_name": "mcw-launcher",
+        "launcher_version": "v0.12.0-beta.8",
+        "created_at": "2026-08-02T00:00:00+00:00",
+        "include_saves": False,
+    }
+    instance_metadata = {
+        "id": "orphan-pack-id",
+        "name": "Orphan Pack",
+        "version_id": "1.20.1",
+        "mod_loader": ["vanilla", "-1"],
+    }
+    with zipfile.ZipFile(package_path, "w") as archive:
+        archive.writestr("package.json", json.dumps(package_metadata))
+        archive.writestr("instance.json", json.dumps(instance_metadata))
+
+    imported = InstanceManager.import_instance(package_path)
+
+    assert imported.name == "Orphan Pack (2)"
+    assert imported.instance_dir == temporary_paths / "Orphan Pack (2)"
+    assert (imported.instance_dir / "instance.json").is_file()
+    assert (orphan / "unrelated.txt").read_text(encoding="utf-8") == "keep"
+
+
+def test_directory_commit_retries_transient_windows_permission_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / "staging"
+    target = tmp_path / "target"
+    source.mkdir()
+    (source / "instance.json").write_text("{}", encoding="utf-8")
+    attempts = 0
+    original_rename = Path.rename
+
+    def flaky_rename(self: Path, destination: Path):
+        nonlocal attempts
+        if self == source and attempts < 2:
+            attempts += 1
+            raise PermissionError(5, "Access is denied", str(self))
+        return original_rename(self, destination)
+
+    monkeypatch.setattr(Path, "rename", flaky_rename)
+    monkeypatch.setattr(InstanceManager, "DIRECTORY_COMMIT_RETRY_SECONDS", 0)
+
+    InstanceManager._commit_staging_directory(source, target)
+
+    assert attempts == 2
+    assert not source.exists()
+    assert (target / "instance.json").is_file()

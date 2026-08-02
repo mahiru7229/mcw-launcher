@@ -288,7 +288,7 @@ class PackageManager:
         members: list[tuple[ZipInfo, PurePosixPath, Path]] = []
         extracted_bytes = 0
         extracted_files = 0
-        seen_paths: set[str] = set()
+        seen_paths: dict[str, ZipInfo] = {}
         output_root = output_dir.resolve()
 
         for member in archive.infolist():
@@ -300,9 +300,12 @@ class PackageManager:
                 continue
 
             path_key = relative.as_posix().casefold()
-            if path_key in seen_paths:
-                raise RuntimeError(f"Invalid package: duplicate path '{relative.as_posix()}'.")
-            seen_paths.add(path_key)
+            previous = seen_paths.get(path_key)
+            if previous is not None:
+                if PackageManager._duplicate_members_match(previous, member):
+                    continue
+                raise RuntimeError(f"Invalid package: conflicting duplicate path '{relative.as_posix()}'.")
+            seen_paths[path_key] = member
 
             target = output_dir.joinpath(*relative.parts)
             resolved_target = target.resolve(strict=False)
@@ -320,6 +323,14 @@ class PackageManager:
             members.append((member, relative, target))
 
         return members, extracted_bytes
+
+    @staticmethod
+    def _duplicate_members_match(first: ZipInfo, second: ZipInfo) -> bool:
+        if first.is_dir() and second.is_dir():
+            return True
+        if first.is_dir() != second.is_dir():
+            return False
+        return int(first.file_size or 0) == int(second.file_size or 0) and int(first.CRC or 0) == int(second.CRC or 0)
 
     @staticmethod
     def _safe_relative_path(value: str) -> PurePosixPath | None:

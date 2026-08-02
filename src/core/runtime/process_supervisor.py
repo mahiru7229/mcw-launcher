@@ -112,6 +112,15 @@ class ProcessSupervisor:
         return final
 
     @classmethod
+    def stop_requested(cls, session_id: str | None) -> bool:
+        if not session_id:
+            return False
+        try:
+            return cls.load(session_id).state is ProcessSessionState.STOPPING
+        except (FileNotFoundError, RuntimeError):
+            return False
+
+    @classmethod
     def active_for(cls, instance: Instance) -> ProcessSession | None:
         key = cls._instance_key(instance)
         with cls._lock:

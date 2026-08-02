@@ -496,9 +496,10 @@ class InstanceWorkspacePage(BasePage):
         )
         if running is not None:
             return "loading" if str(getattr(running, "state", "running")) == "preparing" else "running"
-        if bool(getattr(instance, "last_launch_crashed", False)):
+        last_state = str(getattr(instance, "last_launch_state", "") or "").strip().casefold()
+        if last_state == "crashed" or bool(getattr(instance, "last_launch_crashed", False)):
             return "crashed"
-        if str(getattr(instance, "last_played", "") or ""):
+        if last_state == "finished" or str(getattr(instance, "last_played", "") or ""):
             return "finished"
         return "ready"
 
@@ -534,7 +535,12 @@ class InstanceWorkspacePage(BasePage):
             badge_path = theme_accent_runtime.tinted_path(badge_path, badge_key)
             badge = QPixmap(str(badge_path))
         if badge.isNull():
-            standard = QStyle.StandardPixmap.SP_MessageBoxCritical if state == "crashed" else QStyle.StandardPixmap.SP_DialogApplyButton
+            standard = {
+                "loading": QStyle.StandardPixmap.SP_BrowserReload,
+                "running": QStyle.StandardPixmap.SP_MediaPlay,
+                "crashed": QStyle.StandardPixmap.SP_MessageBoxCritical,
+                "finished": QStyle.StandardPixmap.SP_DialogApplyButton,
+            }.get(state, QStyle.StandardPixmap.SP_FileIcon)
             badge = self.style().standardIcon(standard).pixmap(badge_size, badge_size)
         painter.drawPixmap(size - badge_size, size - badge_size, badge_size, badge_size, badge)
         painter.end()

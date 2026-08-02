@@ -443,6 +443,7 @@ class MainWindow(QMainWindow):
         self.curseforge_manual_dialog.files_selected.connect(self._install_manual_curseforge_files)
 
         self.launch_controller.progress_received.connect(self._on_progress)
+        self.launch_controller.progress_received.connect(lambda _event: self.instance_controller.refresh_running())
         self.modrinth_controller.progress_received.connect(self._on_progress)
         self.curseforge_controller.progress_received.connect(self._on_progress)
         self.mod_controller.progress_received.connect(self._on_progress)
