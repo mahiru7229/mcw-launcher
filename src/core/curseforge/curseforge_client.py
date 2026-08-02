@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import Event, Lock
 from urllib.parse import quote, urlparse
@@ -161,6 +161,26 @@ class CurseForgeClient:
         if not isinstance(data, dict):
             raise RuntimeError(f"CurseForge project {identifier} is unavailable.")
         return CurseForgeClient._parse_project(data)
+
+    @staticmethod
+    def get_project_details(project_id: int | str, force_refresh: bool = False) -> CurseForgeProject:
+        identifier = CurseForgeClient._positive_int(project_id, "Project ID")
+        project = CurseForgeClient.get_project(identifier, force_refresh=force_refresh)
+        try:
+            lookup = CurseForgeClient._request_json(
+                "GET",
+                "/description",
+                params={"modId": identifier},
+                ttl=CurseForgeClient.PROJECT_TTL_SECONDS,
+                force_refresh=force_refresh,
+                allow_stale_on_error=True,
+                namespace="project-description",
+            )
+        except RuntimeError:
+            return project
+        payload = lookup.payload.get("data") if isinstance(lookup.payload, dict) else ""
+        description = str(payload or "").strip()
+        return replace(project, description=description) if description else project
 
     @staticmethod
     def get_projects_batch(project_ids: list[int] | tuple[int, ...] | set[int]) -> dict[int, CurseForgeProject]:
@@ -528,6 +548,16 @@ class CurseForgeClient:
         if not project_url and slug:
             category = "modpacks" if int(data.get("classId", 0) or 0) == CurseForgeClient.CLASS_MODPACKS else "mc-mods"
             project_url = f"https://www.curseforge.com/minecraft/{category}/{quote(slug, safe='-')}"
+        categories = tuple(
+            str(item.get("name") or "").strip()
+            for item in data.get("categories", [])
+            if isinstance(item, dict) and str(item.get("name") or "").strip()
+        )
+        screenshots = tuple(
+            str(item.get("url") or item.get("thumbnailUrl") or "").strip()
+            for item in data.get("screenshots", [])
+            if isinstance(item, dict) and str(item.get("url") or item.get("thumbnailUrl") or "").strip()
+        )
         return CurseForgeProject(
             project_id=project_id,
             name=str(data.get("name") or "Unknown project").strip(),
@@ -541,6 +571,15 @@ class CurseForgeClient:
             project_url=project_url,
             game_versions=game_versions,
             loaders=loaders,
+            source_url=str(links.get("sourceUrl") or "").strip(),
+            issues_url=str(links.get("issuesUrl") or "").strip(),
+            wiki_url=str(links.get("wikiUrl") or "").strip(),
+            categories=categories,
+            screenshot_urls=screenshots,
+            date_created=str(data.get("dateCreated") or "").strip(),
+            date_released=str(data.get("dateReleased") or "").strip(),
+            status=str(data.get("status") or "").strip(),
+            is_featured=bool(data.get("isFeatured", False)),
         )
 
     @staticmethod

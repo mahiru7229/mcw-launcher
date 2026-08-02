@@ -68,3 +68,30 @@ def test_controller_emits_inline_search_failure(gui_app):
     controller._on_task_failed("modrinth.search.modpack.forge", RuntimeError("network unavailable"))
 
     assert emitted == [("modpack", "forge", "network unavailable")]
+
+
+def test_controller_loads_project_details_through_core_client(gui_app, monkeypatch):
+    task_runner = TaskRunner()
+    controller = ModrinthController(task_runner)
+    calls = []
+    project = object()
+    monkeypatch.setattr(task_runner, "run", lambda task_id, task, message, blocking=False: calls.append((task_id, task(), message, blocking)))
+
+    from src.core.modrinth.modrinth_client import ModrinthClient
+    monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: project)
+
+    controller.load_project_details("mod", "sodium", "fabric")
+
+    assert calls[0][0] == "modrinth.details.mod.fabric.sodium"
+    assert calls[0][1] == ("mod", "sodium", "fabric", project)
+
+
+def test_controller_emits_project_details(gui_app):
+    controller = ModrinthController(TaskRunner())
+    emitted = []
+    project = object()
+    controller.project_details_changed.connect(lambda *args: emitted.append(args))
+
+    controller._on_task_succeeded("modrinth.details.mod.fabric.sodium", ("mod", "sodium", "fabric", project))
+
+    assert emitted == [("mod", "sodium", "fabric", project)]

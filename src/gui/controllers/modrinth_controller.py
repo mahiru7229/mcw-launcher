@@ -20,6 +20,7 @@ class ModrinthController(BaseController):
     search_results_changed = Signal(str, str, object)
     search_failed = Signal(str, str, str)
     versions_changed = Signal(str, str, str, list)
+    project_details_changed = Signal(str, str, str, object)
     mod_installed = Signal(object)
     manual_files_installed = Signal(str, object)
     modpack_installed = Signal(object)
@@ -41,6 +42,11 @@ class ModrinthController(BaseController):
         normalized_loader = self._normalize_loader(loader)
         task_id = f"modrinth.versions.{project_type}.{normalized_loader}.{project_id}"
         self._task_runner.run(task_id, lambda: (project_type, project_id, normalized_loader, ModrinthClient.list_project_versions(project_id, loader=normalized_loader, game_version=game_version, version_types=("release", "beta", "alpha"))), f"Loading compatible Modrinth {normalized_loader.title()} versions...", blocking=False)
+
+    def load_project_details(self, project_type: str, project_id: str, loader: str = ModLoaderManager.FABRIC) -> None:
+        normalized_loader = self._normalize_loader(loader)
+        task_id = f"modrinth.details.{project_type}.{normalized_loader}.{project_id}"
+        self._task_runner.run(task_id, lambda: (project_type, project_id, normalized_loader, ModrinthClient.get_project(project_id)), "Loading Modrinth project details...", blocking=False)
 
     def install_mod(self, instance_name: str, version_id: str, allowed_version_types: tuple[str, ...] = ("release",)) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
@@ -90,6 +96,13 @@ class ModrinthController(BaseController):
             project_type, project_id, loader, versions = result
             self.versions_changed.emit(str(project_type), str(project_id), str(loader), list(versions))
             return
+        if task_id.startswith("modrinth.details."):
+            if not isinstance(result, tuple) or len(result) != 4:
+                self._emit_error("Modrinth", "Modrinth project details returned an invalid result.")
+                return
+            project_type, project_id, loader, project = result
+            self.project_details_changed.emit(str(project_type), str(project_id), str(loader), project)
+            return
         if task_id == "modrinth.install.mod":
             self.status_changed.emit("Modrinth mod installed")
             self.log_created.emit("Installed Modrinth mod and required dependencies")
@@ -111,6 +124,9 @@ class ModrinthController(BaseController):
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if not task_id.startswith("modrinth."):
+            return
+        if task_id.startswith("modrinth.details."):
+            self.log_created.emit(f"Could not load Modrinth project details: {error}")
             return
         if task_id.startswith("modrinth.search."):
             parts = task_id.split(".")

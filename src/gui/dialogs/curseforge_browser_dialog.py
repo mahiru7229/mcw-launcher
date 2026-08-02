@@ -1,17 +1,21 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 import re
 
-from PySide6.QtCore import QTimer, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
+from PySide6.QtCore import QSize, QTimer, Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices, QIcon, QPixmap
+from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
 from mcw_core.api.instance.instance_manager import InstanceManager
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
+from src.gui.media.remote_image_cache import RemoteImageCache
+from src.gui.media.safe_rich_text import safe_external_url, sanitize_html
 from src.gui.theme.runtime import set_theme_icon
+from src.gui.widget.content_project_detail import ContentProjectDetailPanel
 from src.gui.window_sizing import resize_dialog_to_screen
 from src.models.curseforge.cache import CurseForgeCacheInfo
 from src.models.curseforge.file import CurseForgeFile
@@ -23,6 +27,7 @@ class CurseForgeBrowserDialog(QDialog):
     search_requested = Signal(str, str, str, int)
     refresh_requested = Signal(str, str, str, int)
     files_requested = Signal(str, int, str, str, object)
+    project_details_requested = Signal(str, int, str)
     files_refresh_requested = Signal(str, int, str, str, object)
     clear_cache_requested = Signal()
     install_mod_requested = Signal(int, int, object)
@@ -48,6 +53,7 @@ class CurseForgeBrowserDialog(QDialog):
         self._cache_info = CurseForgeClient.cache_status()
         self._refresh_files_after_search = False
         self._busy = False
+        self._image_cache = RemoteImageCache(self)
         self._channel_change_timer = QTimer(self)
         self._channel_change_timer.setSingleShot(True)
         self._channel_change_timer.setInterval(25)
@@ -127,16 +133,26 @@ class CurseForgeBrowserDialog(QDialog):
         channel_row.addWidget(self.include_alpha_checkbox)
         root.addLayout(channel_row)
 
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setChildrenCollapsible(False)
+
+        results_panel = QWidget()
+        results_layout = QVBoxLayout(results_panel)
+        results_layout.setContentsMargins(0, 0, 0, 0)
+        results_layout.setSpacing(8)
+
         self.results_table = QTableWidget(0, 5)
         self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.results_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.results_table.setAlternatingRowColors(True)
+        self.results_table.setIconSize(QSize(40, 40))
         self.results_table.verticalHeader().setVisible(False)
+        self.results_table.verticalHeader().setDefaultSectionSize(52)
         self.results_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.results_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         self.results_table.itemSelectionChanged.connect(self._project_selected)
-        root.addWidget(self.results_table, 1)
+        results_layout.addWidget(self.results_table, 1)
 
         page_row = QHBoxLayout()
         self.result_count_label = QLabel()
@@ -149,35 +165,34 @@ class CurseForgeBrowserDialog(QDialog):
         page_row.addStretch()
         page_row.addWidget(self.previous_button)
         page_row.addWidget(self.next_button)
-        root.addLayout(page_row)
+        results_layout.addLayout(page_row)
 
-        selection_row = QHBoxLayout()
+        self.detail_panel = ContentProjectDetailPanel(self._image_cache)
+        self.open_browser_button = self.detail_panel.open_web_button
+        self.details_label = self.detail_panel.status_label
+
         self.file_combo = QComboBox()
         self.file_combo.currentIndexChanged.connect(self._file_selected)
         self.instance_name_input = QLineEdit()
         self.instance_name_input.textEdited.connect(self._instance_name_edited)
         self.optional_checkbox = QCheckBox()
         self.optional_checkbox.setChecked(True)
-        self.open_browser_button = QPushButton()
-        self.open_browser_button.setEnabled(False)
-        self.open_browser_button.clicked.connect(self._open_selected_project)
         self.install_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.install_button.setObjectName("PrimaryButton")
         self.install_button.setEnabled(False)
         self.install_button.clicked.connect(self._request_install)
-        selection_row.addWidget(self.file_combo, 2)
+        self.detail_panel.add_action_widget(self.file_combo, 2)
         if self.project_type == "modpack":
-            selection_row.addWidget(self.instance_name_input, 2)
-            selection_row.addWidget(self.optional_checkbox)
-        selection_row.addWidget(self.open_browser_button)
-        selection_row.addWidget(self.install_button)
-        root.addLayout(selection_row)
+            self.detail_panel.add_action_widget(self.instance_name_input, 2)
+            self.detail_panel.add_action_widget(self.optional_checkbox)
+        self.detail_panel.add_action_widget(self.install_button)
 
-        self.details_label = QLabel()
-        self.details_label.setWordWrap(True)
-        self.details_label.setObjectName("MutedLabel")
-        self.details_label.setMinimumHeight(70)
-        root.addWidget(self.details_label)
+        splitter.addWidget(results_panel)
+        splitter.addWidget(self.detail_panel)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([650, 430])
+        root.addWidget(splitter, 1)
 
     @property
     def game_version(self) -> str:
@@ -261,6 +276,7 @@ class CurseForgeBrowserDialog(QDialog):
                     item = QTableWidgetItem(str(value))
                     item.setData(Qt.ItemDataRole.UserRole, project)
                     self.results_table.setItem(row, column, item)
+                self._request_row_icon(row, project)
             if self._projects:
                 self.results_table.selectRow(0)
         finally:
@@ -274,6 +290,27 @@ class CurseForgeBrowserDialog(QDialog):
             self._select_project(self._projects[0])
         else:
             self._clear_selection(tr("curseforge.results.empty"))
+
+    def set_project_details(self, project_type: str, project_id: int, loader: str, project: CurseForgeProject) -> None:
+        if project_type != self.project_type or str(loader).strip().casefold() != self.loader:
+            return
+        current = self._selected_project
+        if current is None or current.project_id != int(project_id) or project.project_id != current.project_id:
+            return
+        self._selected_project = replace(
+            project,
+            authors=project.authors or current.authors,
+            summary=project.summary or current.summary,
+            download_count=project.download_count or current.download_count,
+            logo_url=project.logo_url or current.logo_url,
+            project_url=project.project_url or current.project_url,
+            game_versions=project.game_versions or current.game_versions,
+            loaders=project.loaders or current.loaders,
+            date_modified=project.date_modified or current.date_modified,
+        )
+        self._render_project_details(self._selected_project)
+        if self._files:
+            self._file_selected()
 
     def set_files(self, project_id: int, files: list[CurseForgeFile], loader: str = "") -> None:
         if loader and str(loader).strip().casefold() != self.loader:
@@ -389,7 +426,9 @@ class CurseForgeBrowserDialog(QDialog):
             self._suggested_instance_name = InstanceManager.next_available_name(self._safe_instance_name(project.name))
             self.instance_name_input.setText(self._suggested_instance_name)
             self._instance_name_customized = False
-        self.details_label.setText(tr("curseforge.project.loading_files", name=project.name))
+        message = tr("curseforge.project.loading_files", name=project.name)
+        self.detail_panel.set_loading(str(project.project_id), "CurseForge", project.name, ", ".join(project.authors) or tr("common.unknown"), project.summary, project.logo_url, project.project_url, message)
+        self.project_details_requested.emit(self.project_type, project.project_id, self.loader)
         if self._refresh_files_after_search:
             self._refresh_files_after_search = False
             self.files_refresh_requested.emit(self.project_type, project.project_id, self.game_version, self.loader, self.allowed_release_types)
@@ -402,7 +441,7 @@ class CurseForgeBrowserDialog(QDialog):
         self.file_combo.clear()
         self.open_browser_button.setEnabled(False)
         self.install_button.setEnabled(False)
-        self.details_label.setText(message)
+        self.detail_panel.clear(message)
 
     def _file_selected(self) -> None:
         file = self.selected_file()
@@ -411,7 +450,63 @@ class CurseForgeBrowserDialog(QDialog):
             return
         distribution = tr("curseforge.file.manual_required") if not file.download_url or not file.is_available else tr("curseforge.file.automatic")
         loader_status = self._loader_status_text(file, detailed=True)
-        self.details_label.setText(tr("curseforge.project.details", name=project.name, authors=", ".join(project.authors) or tr("common.unknown"), version=file.display_name, release_type=file.release_type, downloads=f"{project.download_count:,}", description=f"{project.summary}\n{distribution}\n{loader_status}"))
+        dependencies = sum(1 for dependency in file.dependencies if dependency.required)
+        self.detail_panel.set_status(tr("content.details.file_status", version=file.display_name, channel=file.release_type.title(), size=self._format_bytes(file.file_length), dependencies=dependencies, distribution=distribution, loader_status=loader_status))
+
+    def _render_project_details(self, project: CurseForgeProject) -> None:
+        metadata = {
+            tr("content.metadata.downloads"): f"{project.download_count:,}",
+            tr("content.metadata.updated"): project.date_modified[:10],
+            tr("content.metadata.published"): project.date_created[:10],
+            tr("content.metadata.released"): project.date_released[:10],
+            tr("content.metadata.minecraft"): project.game_versions[:8],
+            tr("content.metadata.loaders"): project.loaders,
+            tr("content.metadata.categories"): project.categories[:8],
+            tr("content.metadata.featured"): tr("common.yes") if project.is_featured else "",
+        }
+        links = [
+            (tr("content.link.source"), safe_external_url(project.source_url)),
+            (tr("content.link.issues"), safe_external_url(project.issues_url)),
+            (tr("content.link.wiki"), safe_external_url(project.wiki_url)),
+        ]
+        links_html = " · ".join(f'<a href="{url}">{label}</a>' for label, url in links if url)
+        description = sanitize_html(project.description) if project.description else ""
+        if links_html:
+            description = f"{description}<p>{links_html}</p>"
+        self.detail_panel.set_project(
+            token=str(project.project_id),
+            provider="CurseForge",
+            title=project.name,
+            author=", ".join(project.authors) or tr("common.unknown"),
+            summary=project.summary,
+            description=description or project.summary,
+            icon_url=project.logo_url,
+            web_url=project.project_url,
+            metadata=metadata,
+            gallery_urls=project.screenshot_urls,
+            description_format="html" if description else "plain",
+            status=self.details_label.text(),
+        )
+
+    def _request_row_icon(self, row: int, project: CurseForgeProject) -> None:
+        self._image_cache.request(project.logo_url, lambda pixmap, row=row, project_id=project.project_id: self._apply_row_icon(row, project_id, pixmap))
+
+    def _apply_row_icon(self, row: int, project_id: int, pixmap: QPixmap) -> None:
+        if pixmap.isNull():
+            return
+        item = self.results_table.item(row, 0)
+        project = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        if isinstance(project, CurseForgeProject) and project.project_id == project_id:
+            item.setIcon(QIcon(self._image_cache.scaled(pixmap, QSize(40, 40))))
+
+    @staticmethod
+    def _format_bytes(value: int) -> str:
+        size = max(0, int(value))
+        for unit in ("B", "KiB", "MiB", "GiB"):
+            if size < 1024 or unit == "GiB":
+                return f"{size:.1f} {unit}" if unit != "B" else f"{size} {unit}"
+            size /= 1024
+        return f"{size:.1f} GiB"
 
     def _has_selected_project_url(self) -> bool:
         return bool(self._selected_project is not None and self._selected_project.project_url)
@@ -539,13 +634,15 @@ class CurseForgeBrowserDialog(QDialog):
         self.clear_cache_button.setText(tr("curseforge.cache.clear"))
         self.previous_button.setText(tr("common.previous"))
         self.next_button.setText(tr("common.next"))
-        self.open_browser_button.setText(tr("curseforge.open_in_browser"))
+        self.detail_panel.set_open_web_text(tr("content.open_web"))
         self.install_button.setText(tr("curseforge.mod.install" if is_mod else "curseforge.modpack.install"))
         self.instance_name_input.setPlaceholderText(tr("curseforge.modpack.instance_name"))
         self.optional_checkbox.setText(tr("curseforge.modpack.optional_files"))
         self.loader_label.setText(tr("curseforge.loader.label"))
         self.loader_combo.setItemText(0, tr("curseforge.loader.fabric"))
-        self.loader_combo.setItemText(1, tr("curseforge.loader.forge"))
+        self.loader_combo.setItemText(1, tr("curseforge.loader.quilt"))
+        self.loader_combo.setItemText(2, tr("curseforge.loader.forge"))
+        self.loader_combo.setItemText(3, tr("curseforge.loader.neoforge"))
         self.loader_combo.setToolTip(tr("curseforge.loader.help"))
         self.sort_combo.setItemText(0, tr("curseforge.sort.popularity"))
         self.sort_combo.setItemText(1, tr("curseforge.sort.downloads"))

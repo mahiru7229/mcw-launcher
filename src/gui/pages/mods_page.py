@@ -1,17 +1,21 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 
-from PySide6.QtCore import QTimer, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem
+from PySide6.QtCore import QSize, QTimer, Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices, QIcon, QPixmap
+from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
+from src.gui.media.remote_image_cache import RemoteImageCache
+from src.gui.media.safe_rich_text import safe_external_url, sanitize_html
 from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
+from src.gui.widget.content_project_detail import ContentProjectDetailPanel
 from src.models.curseforge.cache import CurseForgeCacheInfo
 from src.models.curseforge.file import CurseForgeFile
 from src.models.curseforge.project import CurseForgeProject, CurseForgeSearchResult
@@ -22,10 +26,12 @@ from src.models.modrinth.version import ModrinthVersion
 class ModsPage(BasePage):
     search_requested = Signal(str, str, int, str)
     versions_requested = Signal(str, str)
+    project_details_requested = Signal(str, str)
     install_requested = Signal(object, str, object)
     curseforge_search_requested = Signal(str, str, int, str)
     curseforge_refresh_requested = Signal(str, str, int, str)
     curseforge_files_requested = Signal(int, str, object)
+    curseforge_project_details_requested = Signal(int, str)
     curseforge_files_refresh_requested = Signal(int, str, object)
     curseforge_clear_cache_requested = Signal()
     curseforge_install_requested = Signal(object, str, object)
@@ -46,6 +52,7 @@ class ModsPage(BasePage):
         self._refresh_files_after_search = False
         self._pending_channel_preferences = (False, False)
         self._cache_info = CurseForgeClient.cache_status()
+        self._image_cache = RemoteImageCache(self)
 
         self._channel_change_timer = QTimer(self)
         self._channel_change_timer.setSingleShot(True)
@@ -141,20 +148,30 @@ class ModsPage(BasePage):
         channel_row.addWidget(self.include_alpha_checkbox)
         browser_card.layout.addLayout(channel_row)
 
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setChildrenCollapsible(False)
+
+        results_panel = QWidget()
+        results_layout = QVBoxLayout(results_panel)
+        results_layout.setContentsMargins(0, 0, 0, 0)
+        results_layout.setSpacing(8)
+
         self.results_table = QTableWidget(0, 5)
         self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.results_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.results_table.setAlternatingRowColors(True)
+        self.results_table.setIconSize(QSize(40, 40))
         self.results_table.verticalHeader().setVisible(False)
+        self.results_table.verticalHeader().setDefaultSectionSize(52)
         self.results_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self.results_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.results_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self.results_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         self.results_table.itemSelectionChanged.connect(self._project_selected)
-        self.results_table.setMinimumHeight(260)
-        browser_card.layout.addWidget(self.results_table, 1)
+        self.results_table.setMinimumHeight(320)
+        results_layout.addWidget(self.results_table, 1)
 
         page_row = QHBoxLayout()
         self.result_count_label = QLabel()
@@ -169,29 +186,26 @@ class ModsPage(BasePage):
         page_row.addStretch()
         page_row.addWidget(self.previous_button)
         page_row.addWidget(self.next_button)
-        browser_card.layout.addLayout(page_row)
+        results_layout.addLayout(page_row)
 
-        install_row = QHBoxLayout()
+        self.detail_panel = ContentProjectDetailPanel(self._image_cache)
+        self.details_label = self.detail_panel.status_label
+        self.open_browser_button = self.detail_panel.open_web_button
         self.version_combo = QComboBox()
         self.version_combo.currentIndexChanged.connect(self._version_selected)
-        self.open_browser_button = QPushButton()
-        self.open_browser_button.setVisible(False)
-        self.open_browser_button.setEnabled(False)
-        self.open_browser_button.clicked.connect(self._open_selected_project)
         self.install_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.install_button.setObjectName("PrimaryButton")
         self.install_button.setEnabled(False)
         self.install_button.clicked.connect(self._request_install)
-        install_row.addWidget(self.version_combo, 1)
-        install_row.addWidget(self.open_browser_button)
-        install_row.addWidget(self.install_button)
-        browser_card.layout.addLayout(install_row)
+        self.detail_panel.add_action_widget(self.version_combo, 1)
+        self.detail_panel.add_action_widget(self.install_button)
 
-        self.details_label = QLabel()
-        self.details_label.setObjectName("MutedLabel")
-        self.details_label.setWordWrap(True)
-        self.details_label.setMinimumHeight(70)
-        browser_card.layout.addWidget(self.details_label)
+        splitter.addWidget(results_panel)
+        splitter.addWidget(self.detail_panel)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([720, 480])
+        browser_card.layout.addWidget(splitter, 1)
 
         self.root_layout.addWidget(selector_card)
         self.root_layout.addWidget(browser_card)
@@ -296,6 +310,48 @@ class ModsPage(BasePage):
         self.next_button.setEnabled(not self._busy and result.index + result.page_size < result.total_count)
         self._select_first_project_or_show_empty(tr("curseforge.results.empty"))
 
+    def set_modrinth_project_details(self, project_id: str, loader: str, project: ModrinthProject) -> None:
+        if self.selected_provider != "modrinth" or (loader and str(loader).strip().casefold() != self.selected_loader):
+            return
+        current = self._selected_project
+        if not isinstance(current, ModrinthProject) or current.project_id != str(project_id) or project.project_id != current.project_id:
+            return
+        self._selected_project = replace(
+            project,
+            author=project.author or current.author,
+            downloads=project.downloads or current.downloads,
+            description=project.description or current.description,
+            icon_url=project.icon_url or current.icon_url,
+            date_modified=project.date_modified or current.date_modified,
+            categories=project.categories or current.categories,
+            versions=project.versions or current.versions,
+            loaders=project.loaders or current.loaders,
+        )
+        self._render_modrinth_details(self._selected_project)
+        if self._versions:
+            self._version_selected()
+
+    def set_curseforge_project_details(self, project_id: int, loader: str, project: CurseForgeProject) -> None:
+        if self.selected_provider != "curseforge" or (loader and str(loader).strip().casefold() != self.selected_loader):
+            return
+        current = self._selected_project
+        if not isinstance(current, CurseForgeProject) or current.project_id != int(project_id) or project.project_id != current.project_id:
+            return
+        self._selected_project = replace(
+            project,
+            authors=project.authors or current.authors,
+            summary=project.summary or current.summary,
+            download_count=project.download_count or current.download_count,
+            logo_url=project.logo_url or current.logo_url,
+            project_url=project.project_url or current.project_url,
+            game_versions=project.game_versions or current.game_versions,
+            loaders=project.loaders or current.loaders,
+            date_modified=project.date_modified or current.date_modified,
+        )
+        self._render_curseforge_details(self._selected_project)
+        if self._curseforge_files:
+            self._version_selected()
+
     def set_versions(self, project_id: str, versions: list[ModrinthVersion], loader: str = "") -> None:
         if self.selected_provider != "modrinth" or (loader and str(loader).strip().lower() != self.selected_loader):
             return
@@ -356,7 +412,7 @@ class ModsPage(BasePage):
         self.include_beta_checkbox.setEnabled(not self._busy)
         self.include_alpha_checkbox.setEnabled(not self._busy)
         self.clear_cache_button.setEnabled(not self._busy)
-        self.open_browser_button.setEnabled(not self._busy and self._has_selected_curseforge_url())
+        self.open_browser_button.setEnabled(not self._busy and self._has_selected_project_url())
         self.install_button.setEnabled(not self._busy and self._has_installable_items())
         self._update_pagination_buttons()
         self._render_cache_status()
@@ -408,17 +464,21 @@ class ModsPage(BasePage):
         self._versions = []
         self._curseforge_files = []
         self.version_combo.clear()
-        self.open_browser_button.setEnabled(not self._busy and isinstance(project, CurseForgeProject) and bool(project.project_url))
+        self.open_browser_button.setEnabled(not self._busy and bool(self._project_web_url(project)))
         self.install_button.setEnabled(False)
         if isinstance(project, CurseForgeProject):
-            self.details_label.setText(tr("curseforge.project.loading_files", name=project.name))
+            message = tr("curseforge.project.loading_files", name=project.name)
+            self.detail_panel.set_loading(str(project.project_id), "CurseForge", project.name, ", ".join(project.authors) or tr("common.unknown"), project.summary, project.logo_url, project.project_url, message)
+            self.curseforge_project_details_requested.emit(project.project_id, self.selected_loader)
             if self._refresh_files_after_search:
                 self._refresh_files_after_search = False
                 self.curseforge_files_refresh_requested.emit(project.project_id, self.selected_loader, self.allowed_version_types)
             else:
                 self.curseforge_files_requested.emit(project.project_id, self.selected_loader, self.allowed_version_types)
             return
-        self.details_label.setText(tr("modrinth.project.loading_versions", title=project.title))
+        message = tr("modrinth.project.loading_versions", title=project.title)
+        self.detail_panel.set_loading(project.project_id, "Modrinth", project.title, project.author or tr("common.unknown"), project.description, project.icon_url, project.project_url or self._project_web_url(project), message)
+        self.project_details_requested.emit(project.project_id, self.selected_loader)
         self.versions_requested.emit(project.project_id, self.selected_loader)
 
     def _clear_project_selection(self, message: str) -> None:
@@ -429,7 +489,7 @@ class ModsPage(BasePage):
         self.version_combo.clear()
         self.open_browser_button.setEnabled(False)
         self.install_button.setEnabled(False)
-        self.details_label.setText(message)
+        self.detail_panel.clear(message)
 
     def _apply_modrinth_version_filter(self) -> None:
         self._update_channel_summary()
@@ -472,24 +532,131 @@ class ModsPage(BasePage):
                 return
             distribution = tr("curseforge.file.manual_required") if not file.download_url or not file.is_available else tr("curseforge.file.automatic")
             loader_status = self._curseforge_loader_status_text(file, detailed=True)
-            self.details_label.setText(tr("curseforge.project.details", name=project.name, authors=", ".join(project.authors) or tr("common.unknown"), version=file.display_name, release_type=file.release_type, downloads=f"{project.download_count:,}", description=f"{project.summary}\n{distribution}\n{loader_status}"))
+            dependencies = sum(1 for dependency in file.dependencies if dependency.required)
+            self.detail_panel.set_status(tr("content.details.file_status", version=file.display_name, channel=file.release_type.title(), size=self._format_bytes(file.file_length), dependencies=dependencies, distribution=distribution, loader_status=loader_status))
             return
         version = self.selected_version()
         project = self._selected_project
         if version is None or not isinstance(project, ModrinthProject):
             return
-        game_versions = ", ".join(version.game_versions[:8])
-        if len(version.game_versions) > 8:
-            game_versions += ", …"
-        self.details_label.setText(tr("mods.catalog.details", title=project.title, author=project.author or tr("common.unknown"), version=version.version_number, release_type=version.version_type, minecraft=game_versions, loader=self.selected_loader.title(), description=project.description))
+        primary = next((file for file in version.files if file.primary), version.files[0] if version.files else None)
+        size_text = self._format_bytes(primary.size) if primary is not None else tr("common.unknown")
+        dependencies = sum(1 for dependency in version.dependencies if dependency.dependency_type == "required")
+        self.detail_panel.set_status(tr("content.details.version_status", version=version.version_number, channel=version.version_type.title(), size=size_text, dependencies=dependencies))
 
-    def _has_selected_curseforge_url(self) -> bool:
-        return isinstance(self._selected_project, CurseForgeProject) and bool(self._selected_project.project_url)
+    def _has_selected_project_url(self) -> bool:
+        return bool(self._project_web_url(self._selected_project))
 
     def _open_selected_project(self) -> None:
-        project = self._selected_project
-        if isinstance(project, CurseForgeProject) and project.project_url:
-            QDesktopServices.openUrl(QUrl(project.project_url))
+        url = self._project_web_url(self._selected_project)
+        if url:
+            QDesktopServices.openUrl(QUrl(url))
+
+    def _render_modrinth_details(self, project: ModrinthProject) -> None:
+        metadata = {
+            tr("content.metadata.downloads"): f"{project.downloads:,}",
+            tr("content.metadata.followers"): f"{project.followers:,}" if project.followers else "",
+            tr("content.metadata.updated"): project.date_modified[:10],
+            tr("content.metadata.published"): project.date_published[:10],
+            tr("content.metadata.license"): project.license_name or project.license_id,
+            tr("content.metadata.minecraft"): project.versions[:8],
+            tr("content.metadata.loaders"): project.loaders or tuple(item for item in project.categories if item.casefold() in ModLoaderManager.MODDED_LOADERS),
+            tr("content.metadata.categories"): project.categories[:8],
+            tr("content.metadata.client"): project.client_side.title(),
+            tr("content.metadata.server"): project.server_side.title(),
+        }
+        links = [
+            (tr("content.link.source"), safe_external_url(project.source_url)),
+            (tr("content.link.issues"), safe_external_url(project.issues_url)),
+            (tr("content.link.wiki"), safe_external_url(project.wiki_url)),
+            (tr("content.link.discord"), safe_external_url(project.discord_url)),
+        ]
+        link_text = " · ".join(f'<a href="{url}">{label}</a>' for label, url in links if url)
+        description = project.body or project.description
+        if link_text:
+            description = f"{description}\n\n{link_text}"
+        self.detail_panel.set_project(
+            token=project.project_id,
+            provider="Modrinth",
+            title=project.title,
+            author=project.author or tr("common.unknown"),
+            summary=project.description,
+            description=description,
+            icon_url=project.icon_url,
+            web_url=project.project_url or self._project_web_url(project),
+            metadata=metadata,
+            gallery_urls=project.gallery_urls,
+            description_format="markdown",
+            status=self.details_label.text(),
+        )
+
+    def _render_curseforge_details(self, project: CurseForgeProject) -> None:
+        metadata = {
+            tr("content.metadata.downloads"): f"{project.download_count:,}",
+            tr("content.metadata.updated"): project.date_modified[:10],
+            tr("content.metadata.published"): project.date_created[:10],
+            tr("content.metadata.released"): project.date_released[:10],
+            tr("content.metadata.minecraft"): project.game_versions[:8],
+            tr("content.metadata.loaders"): project.loaders,
+            tr("content.metadata.categories"): project.categories[:8],
+            tr("content.metadata.featured"): tr("common.yes") if project.is_featured else "",
+        }
+        links = [
+            (tr("content.link.source"), safe_external_url(project.source_url)),
+            (tr("content.link.issues"), safe_external_url(project.issues_url)),
+            (tr("content.link.wiki"), safe_external_url(project.wiki_url)),
+        ]
+        links_html = " · ".join(f'<a href="{url}">{label}</a>' for label, url in links if url)
+        description = sanitize_html(project.description) if project.description else ""
+        if links_html:
+            description = f"{description}<p>{links_html}</p>"
+        self.detail_panel.set_project(
+            token=str(project.project_id),
+            provider="CurseForge",
+            title=project.name,
+            author=", ".join(project.authors) or tr("common.unknown"),
+            summary=project.summary,
+            description=description or project.summary,
+            icon_url=project.logo_url,
+            web_url=project.project_url,
+            metadata=metadata,
+            gallery_urls=project.screenshot_urls,
+            description_format="html" if description else "plain",
+            status=self.details_label.text(),
+        )
+
+    def _request_row_icon(self, row: int, project: ModrinthProject | CurseForgeProject) -> None:
+        url = project.logo_url if isinstance(project, CurseForgeProject) else project.icon_url
+        project_id = project.project_id
+        self._image_cache.request(url, lambda pixmap, row=row, project_id=project_id: self._apply_row_icon(row, project_id, pixmap))
+
+    def _apply_row_icon(self, row: int, project_id: object, pixmap: QPixmap) -> None:
+        if pixmap.isNull():
+            return
+        item = self.results_table.item(row, 0)
+        project = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        if isinstance(project, (ModrinthProject, CurseForgeProject)) and project.project_id == project_id:
+            item.setIcon(QIcon(self._image_cache.scaled(pixmap, QSize(40, 40))))
+
+    @staticmethod
+    def _project_web_url(project: ModrinthProject | CurseForgeProject | None) -> str:
+        if isinstance(project, CurseForgeProject):
+            return project.project_url
+        if isinstance(project, ModrinthProject):
+            if project.project_url:
+                return project.project_url
+            kind = project.project_type if project.project_type in {"mod", "modpack"} else "mod"
+            return f"https://modrinth.com/{kind}/{project.slug}" if project.slug else ""
+        return ""
+
+    @staticmethod
+    def _format_bytes(value: int) -> str:
+        size = max(0, int(value))
+        for unit in ("B", "KiB", "MiB", "GiB"):
+            if size < 1024 or unit == "GiB":
+                return f"{size:.1f} {unit}" if unit != "B" else f"{size} {unit}"
+            size /= 1024
+        return f"{size:.1f} GiB"
 
     def _curseforge_loader_status_text(self, file: CurseForgeFile, detailed: bool = False) -> str:
         status = CurseForgeClient.loader_compatibility(file, self.selected_loader)
@@ -578,6 +745,7 @@ class ModsPage(BasePage):
                     item = QTableWidgetItem(str(value))
                     item.setData(Qt.ItemDataRole.UserRole, project)
                     self.results_table.setItem(row, column, item)
+                self._request_row_icon(row, project)
             if self._projects:
                 self.results_table.selectRow(0)
         finally:
@@ -641,8 +809,8 @@ class ModsPage(BasePage):
         self.cache_status_label.setVisible(is_curseforge)
         self.refresh_button.setVisible(is_curseforge)
         self.clear_cache_button.setVisible(is_curseforge)
-        self.open_browser_button.setVisible(is_curseforge)
-        self.open_browser_button.setEnabled(not self._busy and is_curseforge and self._has_selected_curseforge_url())
+        self.open_browser_button.setVisible(True)
+        self.open_browser_button.setEnabled(not self._busy and self._has_selected_project_url())
         self._configure_sort_combo()
         self._update_channel_summary()
         self.results_table.setHorizontalHeaderLabels(
@@ -725,7 +893,7 @@ class ModsPage(BasePage):
         self.clear_cache_button.setText(tr("curseforge.cache.clear"))
         self.previous_button.setText(tr("common.previous"))
         self.next_button.setText(tr("common.next"))
-        self.open_browser_button.setText(tr("curseforge.open_in_browser"))
+        self.detail_panel.set_open_web_text(tr("content.open_web"))
         self.install_button.setText(tr("mods.catalog.choose_instance"))
         self.include_beta_checkbox.setText(tr("modrinth.channel.beta"))
         self.include_alpha_checkbox.setText(tr("modrinth.channel.alpha"))

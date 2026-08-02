@@ -371,3 +371,38 @@ def test_quilt_version_query_preserves_exact_loader_priority(monkeypatch):
 
     assert json.loads(captured["loaders"]) == ["quilt", "fabric"]
     assert [version.version_id for version in versions] == ["quilt-version", "fabric-version"]
+
+
+def test_project_parser_keeps_rich_detail_metadata() -> None:
+    project = ModrinthClient._parse_project({
+        "id": "sodium",
+        "slug": "sodium",
+        "title": "Sodium",
+        "description": "Renderer",
+        "body": "# Sodium\nFast rendering.",
+        "project_type": "mod",
+        "author": "CaffeineMC",
+        "downloads": 1234,
+        "followers": 321,
+        "icon_url": "https://cdn.modrinth.com/icon.png",
+        "categories": ["optimization", "fabric"],
+        "loaders": ["fabric", "quilt"],
+        "versions": ["1.21.1"],
+        "client_side": "required",
+        "server_side": "unsupported",
+        "published": "2024-01-01T00:00:00Z",
+        "updated": "2026-08-01T00:00:00Z",
+        "source_url": "https://github.com/example/sodium",
+        "issues_url": "https://github.com/example/sodium/issues",
+        "wiki_url": "https://example.invalid/wiki",
+        "discord_url": "https://example.invalid/discord",
+        "license": {"id": "LGPL-3.0", "name": "LGPL", "url": "https://example.invalid/license"},
+        "gallery": [{"url": "https://cdn.modrinth.com/gallery.png"}],
+    })
+
+    assert project.body.startswith("# Sodium")
+    assert project.project_url == "https://modrinth.com/mod/sodium"
+    assert project.license_id == "LGPL-3.0"
+    assert project.gallery_urls == ("https://cdn.modrinth.com/gallery.png",)
+    assert project.loaders == ("fabric", "quilt")
+    assert project.followers == 321

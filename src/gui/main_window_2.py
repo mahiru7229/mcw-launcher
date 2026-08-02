@@ -296,10 +296,12 @@ class MainWindow(QMainWindow):
 
         self.mods_page.search_requested.connect(self.mod_catalog_controller.search)
         self.mods_page.versions_requested.connect(self.mod_catalog_controller.load_versions)
+        self.mods_page.project_details_requested.connect(lambda project_id, loader: self.modrinth_controller.load_project_details("mod", project_id, loader))
         self.mods_page.install_requested.connect(self._choose_instance_for_mod_install)
         self.mods_page.curseforge_search_requested.connect(self._search_curseforge_catalog)
         self.mods_page.curseforge_refresh_requested.connect(self._refresh_curseforge_catalog)
         self.mods_page.curseforge_files_requested.connect(self._load_curseforge_catalog_files)
+        self.mods_page.curseforge_project_details_requested.connect(lambda project_id, loader: self.curseforge_controller.load_project_details("mod", project_id, loader))
         self.mods_page.curseforge_files_refresh_requested.connect(self._refresh_curseforge_catalog_files)
         self.mods_page.curseforge_clear_cache_requested.connect(lambda: self.curseforge_controller.clear_cache(context=CurseForgeController.CATALOG_CONTEXT))
         self.mods_page.curseforge_install_requested.connect(self._choose_instance_for_curseforge_install)
@@ -400,6 +402,8 @@ class MainWindow(QMainWindow):
         self.modrinth_modpack_dialog.search_requested.connect(self._search_modrinth_modpacks)
         self.modrinth_mod_dialog.versions_requested.connect(self.modrinth_controller.load_versions)
         self.modrinth_modpack_dialog.versions_requested.connect(self.modrinth_controller.load_versions)
+        self.modrinth_mod_dialog.project_details_requested.connect(self.modrinth_controller.load_project_details)
+        self.modrinth_modpack_dialog.project_details_requested.connect(self.modrinth_controller.load_project_details)
         self.modrinth_mod_dialog.install_mod_requested.connect(self._install_modrinth_mod)
         self.modrinth_modpack_dialog.install_modpack_requested.connect(self.modrinth_controller.install_modpack)
         self.modrinth_mod_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
@@ -407,6 +411,7 @@ class MainWindow(QMainWindow):
         self.modrinth_controller.search_results_changed.connect(self._set_modrinth_results)
         self.modrinth_controller.search_failed.connect(self._set_modrinth_search_error)
         self.modrinth_controller.versions_changed.connect(self._set_modrinth_versions)
+        self.modrinth_controller.project_details_changed.connect(self._set_modrinth_project_details)
         self.modrinth_controller.mod_installed.connect(self._modrinth_mod_installed)
         self.modrinth_controller.manual_files_installed.connect(self._modrinth_manual_files_installed)
         self.modrinth_controller.modpack_installed.connect(self._modrinth_modpack_installed)
@@ -419,6 +424,8 @@ class MainWindow(QMainWindow):
         self.curseforge_modpack_dialog.refresh_requested.connect(self._refresh_curseforge_modpacks)
         self.curseforge_mod_dialog.files_requested.connect(self.curseforge_controller.load_files)
         self.curseforge_modpack_dialog.files_requested.connect(self.curseforge_controller.load_files)
+        self.curseforge_mod_dialog.project_details_requested.connect(self.curseforge_controller.load_project_details)
+        self.curseforge_modpack_dialog.project_details_requested.connect(self.curseforge_controller.load_project_details)
         self.curseforge_mod_dialog.files_refresh_requested.connect(lambda project_type, project_id, game_version, loader, channels: self.curseforge_controller.load_files(project_type, project_id, game_version, loader, tuple(channels), force_refresh=True, manual_refresh=False))
         self.curseforge_modpack_dialog.files_refresh_requested.connect(lambda project_type, project_id, game_version, loader, channels: self.curseforge_controller.load_files(project_type, project_id, game_version, loader, tuple(channels), force_refresh=True, manual_refresh=False))
         self.curseforge_mod_dialog.clear_cache_requested.connect(self.curseforge_controller.clear_cache)
@@ -429,6 +436,7 @@ class MainWindow(QMainWindow):
         self.curseforge_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.curseforge_controller.search_results_changed.connect(self._set_curseforge_results)
         self.curseforge_controller.files_changed.connect(self._set_curseforge_files)
+        self.curseforge_controller.project_details_changed.connect(self._set_curseforge_project_details)
         self.curseforge_controller.cache_info_changed.connect(self._set_curseforge_cache_info)
         self.curseforge_controller.catalog_search_results_changed.connect(self.mods_page.set_curseforge_search_result)
         self.curseforge_controller.catalog_files_changed.connect(self.mods_page.set_curseforge_files)
@@ -798,6 +806,12 @@ class MainWindow(QMainWindow):
         dialog = self.modrinth_mod_dialog if project_type == "mod" else self.modrinth_modpack_dialog
         dialog.set_versions(project_id, versions, loader)
 
+    def _set_modrinth_project_details(self, project_type: str, project_id: str, loader: str, project: object) -> None:
+        dialog = self.modrinth_mod_dialog if project_type == "mod" else self.modrinth_modpack_dialog
+        dialog.set_project_details(project_type, project_id, loader, project)
+        if project_type == "mod":
+            self.mods_page.set_modrinth_project_details(project_id, loader, project)
+
     def _modrinth_mod_installed(self, result: object) -> None:
         self.mod_controller.refresh()
         if self.mod_manager_dialog.isVisible():
@@ -1108,6 +1122,12 @@ class MainWindow(QMainWindow):
     def _set_curseforge_files(self, project_type: str, project_id: int, loader: str, files: list) -> None:
         dialog = self.curseforge_mod_dialog if project_type == "mod" else self.curseforge_modpack_dialog
         dialog.set_files(project_id, files, loader)
+
+    def _set_curseforge_project_details(self, project_type: str, project_id: int, loader: str, project: object) -> None:
+        dialog = self.curseforge_mod_dialog if project_type == "mod" else self.curseforge_modpack_dialog
+        dialog.set_project_details(project_type, project_id, loader, project)
+        if project_type == "mod":
+            self.mods_page.set_curseforge_project_details(project_id, loader, project)
 
     def _set_curseforge_cache_info(self, project_type: str, info: object) -> None:
         dialog = self.curseforge_mod_dialog if project_type == "mod" else self.curseforge_modpack_dialog

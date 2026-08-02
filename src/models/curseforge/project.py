@@ -19,6 +19,16 @@ class CurseForgeProject:
     project_url: str = ""
     game_versions: tuple[str, ...] = ()
     loaders: tuple[str, ...] = ()
+    description: str = ""
+    source_url: str = ""
+    issues_url: str = ""
+    wiki_url: str = ""
+    categories: tuple[str, ...] = ()
+    screenshot_urls: tuple[str, ...] = ()
+    date_created: str = ""
+    date_released: str = ""
+    status: str = ""
+    is_featured: bool = False
 
 
 @dataclass(frozen=True, slots=True)

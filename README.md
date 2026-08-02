@@ -7,10 +7,10 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Stable-v0.11.0-brightgreen" alt="Current stable version">
+    <img src="https://img.shields.io/badge/Stable-v0.12.0-brightgreen" alt="Current stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Tester-opt--in-orange" alt="Experimental builds require tester opt-in">
+    <img src="https://img.shields.io/badge/Beta-v1.0.0--beta.1-orange" alt="Current beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -25,12 +25,12 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v0.11.0.md">v0.11.0 release notes</a> ·
+  <a href="docs/RELEASE-v1.0.0-beta.1.md">v1.0 beta notes</a> ·
   <a href="docs/UPDATE_PACKAGES.md">Updater packages</a>
 </p>
 
 > [!NOTE]
-> `v0.11.0` là bản Stable hiện tại. Stable là kênh mặc định; bản thử nghiệm chỉ được nhận khi người dùng chủ động tham gia tester program.
+> `v0.12.0` là bản Stable hiện tại. `v1.0.0-beta.1` mở đầu dòng trải nghiệm nội dung mới và chỉ được nhận khi người dùng chủ động tham gia tester program.
 
 ---
 
@@ -41,6 +41,13 @@
 MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độc lập**, tiến trình tải rõ ràng, khả năng sửa chữa an toàn và kiến trúc tách biệt giữa GUI với launcher core.
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
+
+### Điểm nổi bật của `v1.0.0-beta.1`
+
+- Thêm icon cho kết quả mod/modpack Modrinth và CurseForge với cache ảnh HTTPS có giới hạn.
+- Click project sẽ mở bảng chi tiết thay vì cài ngay, gồm mô tả, tác giả, lượt tải, metadata tương thích, gallery và link web khi provider cung cấp.
+- Giữ bước chọn Minecraft version, loader và project version trước khi cài đặt.
+- Dùng chung detail panel trong Manage Mods và browser mod/modpack, tạo nền cho FTB, resource pack, shader pack và datapack ở các beta sau.
 
 ### Điểm nổi bật của `v0.12.0-beta.6`
 
@@ -107,7 +114,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.11.0` là bản Stable hiện tại dành cho người dùng thông thường.
+- `v0.12.0` là bản Stable hiện tại; `v1.0.0-beta.1` dành cho tester muốn thử content browser mới.
 - Stable là kênh mặc định. Để nhận bản thử nghiệm, người dùng phải chủ động bật:
 
 ```text
@@ -185,6 +192,13 @@ Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
 MCW Launcher is an open-source Minecraft launcher centered around **isolated instances**, visible download progress, safe repair workflows, and a GUI that remains separate from launcher logic.
 
 Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
+
+### `v1.0.0-beta.1` highlights
+
+- Add project icons to Modrinth and CurseForge mod/modpack results through a bounded HTTPS image cache.
+- Open a rich details panel on selection instead of installing immediately, including descriptions, authors, downloads, compatibility metadata, gallery media, and provider links when available.
+- Keep Minecraft version, loader, and project version selection as an explicit step before installation.
+- Share the same details panel across Manage Mods and provider browsers, establishing the foundation for FTB, resource packs, shader packs, and datapacks in later betas.
 
 ### `v0.11.0` highlights
 
@@ -427,6 +441,8 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
+| [`docs/RELEASE-v1.0.0-beta.1.md`](docs/RELEASE-v1.0.0-beta.1.md) | Rich Modrinth/CurseForge project browsing foundation |
+| [`docs/RELEASE-v0.12.0.md`](docs/RELEASE-v0.12.0.md) | Complete v0.12.0 Stable release notes |
 | [`docs/RELEASE-v0.12.0-beta.6.md`](docs/RELEASE-v0.12.0-beta.6.md) | Instance icons and runtime-state badges |
 | [`docs/RELEASE-v0.12.0-beta.5.md`](docs/RELEASE-v0.12.0-beta.5.md) | Instance-centered GUI workflow |
 | [`docs/RELEASE-v0.11.0.md`](docs/RELEASE-v0.11.0.md) | Complete v0.11.0 Stable release notes |
@@ -450,14 +466,14 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v0.12.0-beta.6 |
+| Component | Status in v1.0.0-beta.1 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |
 | Quilt Loader and compatible Fabric mods | Available — beta |
 | Forge Loader and mods | Available |
 | NeoForge Loader and mods | Available — beta |
-| Modrinth mods and `.mrpack` modpacks | Available — preview, update, repair, backup and rollback supported |
+| Modrinth mods and `.mrpack` modpacks | Available — icon cards, rich project details, version selection, preview, update, repair, backup and rollback supported |
 | Download resume and recovery | Available — verified `.part` files and persistent journal |
 | Repair Center | Available — Quick Check, Full Verification and recovery points |
 | Diagnostic ZIP export | Available — bounded and privacy-filtered |
@@ -465,7 +481,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 | Offline accounts | Available |
 | English / Vietnamese | Available |
 | Theme schema 1–6 | Available — animation, custom fonts, authoring tools, palette and custom accent support |
-| CurseForge Gateway mods | Available — Fabric/Quilt/Forge/NeoForge install, required dependencies, transactional apply, public gateway, cache and manual fallback |
+| CurseForge Gateway mods | Available — icon cards, rich project details, Fabric/Quilt/Forge/NeoForge install, required dependencies, transactional apply, public gateway, cache and manual fallback |
 | CurseForge modpacks | Available — Fabric/Quilt/Forge/NeoForge manifest-driven install with universal dependency support |
 
 ## Contributing and bug reports
