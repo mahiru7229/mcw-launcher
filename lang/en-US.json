@@ -1319,7 +1319,14 @@
     "workspace.state.loading": "Loading Minecraft",
     "workspace.state.running": "Minecraft is running",
     "workspace.state.crashed": "Last launch crashed",
-    "workspace.state.finished": "Last session finished"
+    "workspace.state.finished": "Last session finished",
+    "account.selection.instant": "Changing the selection switches accounts immediately.",
+    "account.selection.none": "No account selected.",
+    "account.selection.active": "Active for the next launch: {username}",
+    "account.selection.switched": "Switched to account {username}",
+    "account.skin.loading": "Loading Minecraft profile and skin...",
+    "account.skin.ready": "Minecraft skin ready for {username}",
+    "startup.recovering_instances": "Recovering interrupted instance operations..."
   },
   "aliases": {
     "MCW Launcher": "app.name",

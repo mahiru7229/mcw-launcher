@@ -201,6 +201,12 @@ class Paths:
     def account_database_path():
         return Paths.ACCOUNTS_ROOT / "accounts.db"
 
+    @staticmethod
+    def account_skins_root() -> Path:
+        directory = Paths.ACCOUNTS_ROOT / "skins"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
 
     @staticmethod
     def accounts_path() -> Path:
@@ -239,6 +245,24 @@ class Paths:
         instance_dir = Paths.INSTANCES_ROOT
         instance_dir.mkdir(parents=True, exist_ok=True)
         return instance_dir
+
+    @staticmethod
+    def instance_runtime_root() -> Path:
+        directory = Paths.instances_root() / ".runtime"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def instance_operations_root() -> Path:
+        directory = Paths.instance_runtime_root() / "operations"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def instance_staging_root() -> Path:
+        directory = Paths.instance_runtime_root() / "staging"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
     
     @staticmethod
     def load_instance_dir(name: str) -> Path:

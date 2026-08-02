@@ -7,6 +7,7 @@ from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.fs.paths import Paths
 from src.core.instance.settings_manager import SettingsManager
 from src.core.instance.instance_deletion_manager import InstanceDeletionManager
+from src.core.instance.instance_operation_journal import InstanceOperationJournal
 from src.core.package.package_manager import PackageManager
 from src.config import VERSION_TAG
 
@@ -174,56 +175,47 @@ class InstanceManager:
         return instances
 
     @staticmethod
-    def clone(
-        source_name: str,
-        new_name: str,
-        include_saves: bool = False
-    ) -> Instance:
+    def clone(source_name: str, new_name: str, include_saves: bool = False) -> Instance:
         new_name = InstanceManager.validate_name(new_name)
         if not InstanceManager.is_instance_exist(source_name):
-            raise RuntimeError(
-                f"Instance '{source_name}' does not exist."
-            )
-
+            raise RuntimeError(f"Instance '{source_name}' does not exist.")
         if InstanceManager.is_instance_exist(new_name):
-            raise RuntimeError(
-                f"Instance '{new_name}' already exists."
-            )
+            raise RuntimeError(f"Instance '{new_name}' already exists.")
 
         source_dir = Paths.load_instance_dir(source_name)
         target_dir = Paths.load_instance_dir(new_name)
+        staging_dir = Paths.instance_staging_root() / f"clone-{uuid.uuid4().hex}"
+        journal = InstanceOperationJournal.begin("clone", new_name, source_path=source_dir, target_path=target_dir, staging_path=staging_dir)
+        committed = False
+        ignore = None if include_saves else shutil.ignore_patterns("saves", "logs", "crash-reports")
 
-        ignore = None
+        try:
+            shutil.copytree(source_dir, staging_dir, ignore=ignore)
+            InstanceManager._reset_cloned_runtime_data(staging_dir)
+            instance = InstanceManager._load_instance_metadata(staging_dir / "instance.json")
+            instance.instance_id = str(uuid.uuid4())
+            instance.name = new_name
+            instance.instance_dir = staging_dir
+            InstanceManager._save_instance_metadata(instance)
 
-        if not include_saves:
-            ignore = shutil.ignore_patterns(
-                "saves",
-                "logs",
-                "crash-reports"
-            )
-
-        shutil.copytree(
-            source_dir,
-            target_dir,
-            ignore=ignore
-        )
-
-        InstanceManager._reset_cloned_runtime_data(target_dir)
-        instance = InstanceManager.load(new_name)
-
-        instance.instance_id = str(uuid.uuid4())
-        instance.name = new_name
-        instance.instance_dir = target_dir
-
-        InstanceManager._save_instance_metadata(instance)
-
-        instances_data = InstanceManager._add_instances_data(
-            InstanceManager._load_instances_data(),
-            instance
-        )
-        InstanceManager._save_instances(instances_data)
-
-        return instance
+            journal.update("committing")
+            staging_dir.rename(target_dir)
+            committed = True
+            instance.instance_dir = target_dir
+            InstanceManager._save_instance_metadata(instance)
+            InstanceManager.reconcile_registry()
+            journal.complete()
+            return InstanceManager.load(new_name)
+        except Exception:
+            rollback_target = target_dir if committed else staging_dir
+            try:
+                if rollback_target.exists():
+                    shutil.rmtree(rollback_target)
+                InstanceManager.reconcile_registry()
+                journal.abandon()
+            except OSError:
+                pass
+            raise
 
 
     @staticmethod
@@ -350,43 +342,27 @@ class InstanceManager:
         on_progress: ProgressCallback | None = None,
         settings_override: dict | InstanceSettings | None = None,
     ) -> Instance:
-        temp_dir = Paths.instances_root() / "_import_temp"
-
-        if temp_dir.exists():
-            shutil.rmtree(temp_dir)
-
-        temp_dir.mkdir(
-            parents=True,
-            exist_ok=True
-        )
+        staging_dir = Paths.instance_staging_root() / f"import-{uuid.uuid4().hex}"
+        staging_dir.mkdir(parents=True, exist_ok=False)
+        journal: InstanceOperationJournal | None = None
+        target_dir: Path | None = None
+        committed = False
 
         try:
-            PackageManager.extract(package_path, temp_dir, on_progress)
-
-            metadata_files = list(
-                temp_dir.rglob("instance.json")
-            )
-
+            PackageManager.extract(package_path, staging_dir, on_progress)
+            metadata_files = list(staging_dir.rglob("instance.json"))
             if len(metadata_files) != 1:
-                raise RuntimeError(
-                    "Invalid package: missing or duplicated instance.json."
-                )
+                raise RuntimeError("Invalid package: missing or duplicated instance.json.")
 
             metadata_path = metadata_files[0]
             imported_dir = metadata_path.parent
-
-            instance = InstanceManager._load_instance_metadata(
-                metadata_path
-            )
+            instance = InstanceManager._load_instance_metadata(metadata_path)
             instance.name = InstanceManager.validate_name(instance.name)
-
             if InstanceManager.is_instance_exist(instance.name):
-                raise RuntimeError(
-                    f"Instance '{instance.name}' already exists."
-                )
+                raise RuntimeError(f"Instance '{instance.name}' already exists.")
 
             target_dir = Paths.load_instance_dir(instance.name)
-
+            journal = InstanceOperationJournal.begin("import", instance.name, target_path=target_dir, staging_path=staging_dir)
             if settings_override is not None:
                 SettingsManager.save_dict(instance, settings_override)
             elif (imported_dir / "settings.json").is_file():
@@ -394,64 +370,83 @@ class InstanceManager:
             else:
                 SettingsManager.save_dict(instance, InstanceManager.default_instance_settings())
 
-            shutil.move(
-                str(imported_dir),
-                str(target_dir)
-            )
+            if imported_dir != staging_dir:
+                normalized_staging = staging_dir.with_name(f"{staging_dir.name}-instance")
+                if normalized_staging.exists():
+                    shutil.rmtree(normalized_staging)
+                imported_dir.rename(normalized_staging)
+                shutil.rmtree(staging_dir)
+                staging_dir = normalized_staging
+                journal.update("prepared", staging_path=str(staging_dir))
 
+            instance.instance_dir = staging_dir
+            InstanceManager._save_instance_metadata(instance)
+            journal.update("committing")
+            staging_dir.rename(target_dir)
+            committed = True
             instance.instance_dir = target_dir
             InstanceManager._save_instance_metadata(instance)
+            InstanceManager.reconcile_registry()
+            journal.complete()
+            return InstanceManager.load(instance.name)
+        except Exception:
+            rollback_target = target_dir if committed and target_dir is not None else staging_dir
+            try:
+                if rollback_target.exists():
+                    shutil.rmtree(rollback_target)
+                InstanceManager.reconcile_registry()
+                if journal is not None:
+                    journal.abandon()
+            except OSError:
+                pass
+            raise
 
-            instances_data = InstanceManager._add_instances_data(
-                InstanceManager._load_instances_data(),
-                instance
-            )
-            InstanceManager._save_instances(instances_data)
-
-            return instance
-
-        finally:
-            if temp_dir.exists():
-                shutil.rmtree(temp_dir)
 
     @staticmethod
     def rename(instance_name: str, new_name: str) -> Path:
         new_name = InstanceManager.validate_name(new_name)
         if not InstanceManager.is_instance_exist(instance_name):
-            raise RuntimeError(
-                f"Instance '{instance_name}' does not exist!"
-            )
-
+            raise RuntimeError(f"Instance '{instance_name}' does not exist!")
         if InstanceManager.is_instance_exist(new_name):
-            raise RuntimeError(
-                f"Instance '{new_name}' already exists!"
-            )
-
+            raise RuntimeError(f"Instance '{new_name}' already exists!")
         if instance_name == new_name:
             return Paths.load_instance_dir(instance_name)
 
         old_dir = Paths.load_instance_dir(instance_name)
         new_dir = Paths.load_instance_dir(new_name)
+        journal = InstanceOperationJournal.begin("rename", new_name, source_path=old_dir, target_path=new_dir)
+        moved = False
 
-        old_dir.rename(new_dir)
+        try:
+            journal.update("committing")
+            old_dir.rename(new_dir)
+            moved = True
+            instance = InstanceManager._load_instance_metadata(new_dir / "instance.json")
+            instance.name = new_name
+            instance.instance_dir = new_dir
+            InstanceManager._save_instance_metadata(instance)
+            InstanceManager.reconcile_registry()
+            journal.complete()
+            return new_dir
+        except Exception:
+            rollback_succeeded = False
+            if moved and new_dir.exists() and not old_dir.exists():
+                try:
+                    new_dir.rename(old_dir)
+                    instance = InstanceManager._load_instance_metadata(old_dir / "instance.json")
+                    instance.name = instance_name
+                    instance.instance_dir = old_dir
+                    InstanceManager._save_instance_metadata(instance)
+                    InstanceManager.reconcile_registry()
+                    rollback_succeeded = True
+                except Exception:
+                    rollback_succeeded = False
+            elif not moved:
+                rollback_succeeded = True
+            if rollback_succeeded:
+                journal.abandon()
+            raise
 
-        instance = InstanceManager.load(new_name)
-        instance.name = new_name
-        instance.instance_dir = new_dir
-
-        InstanceManager._save_instance_metadata(instance)
-
-        instances_data = InstanceManager._load_instances_data()
-
-        for item in instances_data.get("instances", []):
-            if item.get("name") == instance_name:
-                item["name"] = new_name
-                item["instance_dir"] = str(new_dir)
-                break
-
-        InstanceManager._save_instances(instances_data)
-
-        return new_dir
 
     @staticmethod
     def load(name: str) -> Instance:
@@ -503,30 +498,39 @@ class InstanceManager:
     ) -> Instance:
         name = InstanceManager.validate_name(name)
         if InstanceManager.is_instance_exist(name):
-            raise RuntimeError(
-                f"Instance '{name}' already exists."
-            )
+            raise RuntimeError(f"Instance '{name}' already exists.")
 
-        Paths.instances_root()
-        Paths.instance_data_path_create()
-        Paths.create_instance_dir(name)
+        target_dir = Paths.load_instance_dir(name)
+        staging_dir = Paths.instance_staging_root() / f"create-{uuid.uuid4().hex}"
+        journal = InstanceOperationJournal.begin("create", name, target_path=target_dir, staging_path=staging_dir)
+        committed = False
 
-        instance = InstanceManager._add_instance(
-            name,
-            version,
-            mod_loader
-        )
+        try:
+            staging_dir.mkdir(parents=True, exist_ok=False)
+            instance = InstanceManager._add_instance(name, version, mod_loader)
+            instance.instance_dir = staging_dir
+            InstanceManager._save_instance_metadata(instance)
+            SettingsManager.save_dict(instance, settings if settings is not None else InstanceManager.default_instance_settings())
 
-        instances_data = InstanceManager._add_instances_data(
-            InstanceManager._load_instances_data(),
-            instance
-        )
-        InstanceManager._save_instances(instances_data)
+            journal.update("committing")
+            staging_dir.rename(target_dir)
+            committed = True
+            instance.instance_dir = target_dir
+            InstanceManager._save_instance_metadata(instance)
+            InstanceManager.reconcile_registry()
+            journal.complete()
+            return InstanceManager.load(name)
+        except Exception:
+            rollback_target = target_dir if committed else staging_dir
+            try:
+                if rollback_target.exists():
+                    shutil.rmtree(rollback_target)
+                InstanceManager.reconcile_registry()
+                journal.abandon()
+            except OSError:
+                pass
+            raise
 
-        InstanceManager._save_instance_metadata(instance)
-        SettingsManager.save_dict(instance, settings if settings is not None else InstanceManager.default_instance_settings())
-
-        return instance
 
     @staticmethod
     def default_instance_settings() -> dict:
@@ -591,6 +595,31 @@ class InstanceManager:
         ]
         InstanceManager._save_instances(instances_data)
         return True
+
+    @staticmethod
+    def reconcile_registry() -> dict:
+        entries: list[dict] = []
+        root = Paths.instances_root()
+        for instance_dir in sorted(root.iterdir(), key=lambda item: item.name.casefold()):
+            if not instance_dir.is_dir() or instance_dir.name.startswith("."):
+                continue
+            metadata_path = instance_dir / "instance.json"
+            if not metadata_path.is_file():
+                continue
+            try:
+                instance = InstanceManager.load(instance_dir.name)
+            except RuntimeError:
+                continue
+            entries.append({
+                "id": instance.instance_id,
+                "name": instance.name,
+                "version_id": instance.version_id,
+                "mod_loader": instance.mod_loader,
+                "instance_dir": str(instance.instance_dir),
+            })
+        data = {"instances": entries}
+        InstanceManager._save_instances(data)
+        return data
 
     @staticmethod
     def next_available_name(preferred_name: str) -> str:

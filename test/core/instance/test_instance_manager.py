@@ -299,3 +299,27 @@ def test_import_rejects_instance_name_that_escapes_instances_root(temporary_path
         InstanceManager.import_instance(package_path)
 
     assert not (temporary_paths.parent / "escape").exists()
+
+
+def test_create_rolls_back_staging_when_settings_write_fails(temporary_paths: Path, fake_version, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_settings(*_args, **_kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("src.core.instance.instance_manager.SettingsManager.save_dict", fail_settings)
+
+    with pytest.raises(OSError, match="disk full"):
+        InstanceManager.create("Interrupted Create", fake_version)
+
+    assert not (temporary_paths / "Interrupted Create").exists()
+    assert list((temporary_paths / ".runtime" / "staging").iterdir()) == []
+    assert list((temporary_paths / ".runtime" / "operations").glob("*.json")) == []
+
+
+def test_clone_commits_without_leaving_staging_or_journal(temporary_paths: Path, fake_version) -> None:
+    InstanceManager.create("Clone Source", fake_version)
+
+    InstanceManager.clone("Clone Source", "Clone Target")
+
+    assert (temporary_paths / "Clone Target" / "instance.json").is_file()
+    assert list((temporary_paths / ".runtime" / "staging").iterdir()) == []
+    assert list((temporary_paths / ".runtime" / "operations").glob("*.json")) == []

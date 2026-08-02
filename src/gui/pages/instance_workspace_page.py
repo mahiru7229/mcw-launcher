@@ -25,11 +25,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from mcw_core.api.account.account_skin_manager import AccountSkinManager
 from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.theme.theme_manager import theme_manager
 from src.gui.dialogs.create_instance_dialog import CreateInstanceDialog
 from src.gui.dialogs.instance_management_dialog import AdvancedInstanceManagerDialog, InstanceManagementDialog
+from src.gui.media.minecraft_skin import minecraft_skin_face_icon
 from src.gui.pages.base_page import BasePage
 from src.gui.pages.instances_page import InstancesPage
 from src.gui.theme.accent_runtime import theme_accent_runtime
@@ -111,6 +113,7 @@ class InstanceWorkspacePage(BasePage):
         self.browse_curseforge_modpacks_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.refresh_button = set_theme_icon(QPushButton(), "icon.action.refresh")
         self.account_button = set_theme_icon(QPushButton(), "icon.action.account")
+        self.account_button.setIconSize(QSize(32, 32))
         self.account_button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
 
         self.add_button.clicked.connect(self._open_create_dialog)
@@ -326,10 +329,29 @@ class InstanceWorkspacePage(BasePage):
 
     def set_account(self, account: object | None) -> None:
         self._account = account
+        self.account_button.setProperty("themeIcon", "")
+        self.account_button.setIcon(QIcon())
+
         if account is None:
+            set_theme_icon(self.account_button, "icon.action.account")
             self.account_button.setText(tr("workspace.account.none"))
+            self.account_button.setToolTip(tr("account.selection.none"))
             return
-        self.account_button.setText(tr("workspace.account.active", username=str(getattr(account, "username", "?"))))
+
+        username = str(getattr(account, "username", "?") or "?")
+        account_type = str(getattr(getattr(account, "account_type", None), "value", getattr(account, "account_type", "")) or "")
+        texture_path = AccountSkinManager.cached_texture(account)
+        if texture_path is not None:
+            icon = minecraft_skin_face_icon(texture_path, 32)
+            if not icon.isNull():
+                self.account_button.setIcon(icon)
+            else:
+                set_theme_icon(self.account_button, "icon.action.account")
+        else:
+            set_theme_icon(self.account_button, "icon.action.account")
+
+        self.account_button.setText(tr("workspace.account.active", username=username))
+        self.account_button.setToolTip(f"{username} — {account_type}" if account_type else username)
 
     def set_running_instances(self, running_instances: list[object]) -> None:
         self._running_instances = list(running_instances)

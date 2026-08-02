@@ -137,6 +137,28 @@ class InstanceRunLock:
         return cls._remove_if_unchanged(lock_path, snapshot)
 
     @classmethod
+    def reconcile(cls) -> tuple[str, ...]:
+        Paths.INSTANCE_LOCKS_ROOT.mkdir(parents=True, exist_ok=True)
+        removed: list[str] = []
+        try:
+            lock_paths = list(Paths.INSTANCE_LOCKS_ROOT.glob("*.lock"))
+        except OSError:
+            return ()
+
+        for lock_path in lock_paths:
+            snapshot = cls._read_snapshot(lock_path)
+            if snapshot is None:
+                continue
+            if cls._snapshot_is_active(snapshot):
+                continue
+            if cls._remove_if_unchanged(lock_path, snapshot):
+                name = ""
+                if snapshot.payload is not None:
+                    name = str(snapshot.payload.get("instance_name") or "")
+                removed.append(name or lock_path.stem)
+        return tuple(sorted(removed, key=str.casefold))
+
+    @classmethod
     def list_active(cls) -> list[RunningInstanceInfo]:
         Paths.INSTANCE_LOCKS_ROOT.mkdir(parents=True, exist_ok=True)
         running_instances: list[RunningInstanceInfo] = []

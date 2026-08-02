@@ -1319,7 +1319,14 @@
     "workspace.state.loading": "Đang tải Minecraft",
     "workspace.state.running": "Minecraft đang chạy",
     "workspace.state.crashed": "Lần chạy gần nhất đã crash",
-    "workspace.state.finished": "Phiên chơi gần nhất đã kết thúc"
+    "workspace.state.finished": "Phiên chơi gần nhất đã kết thúc",
+    "account.selection.instant": "Thay đổi lựa chọn sẽ chuyển tài khoản ngay lập tức.",
+    "account.selection.none": "Chưa chọn tài khoản.",
+    "account.selection.active": "Sẽ dùng cho lần khởi chạy tiếp theo: {username}",
+    "account.selection.switched": "Đã chuyển sang tài khoản {username}",
+    "account.skin.loading": "Đang tải hồ sơ và skin Minecraft...",
+    "account.skin.ready": "Skin Minecraft của {username} đã sẵn sàng.",
+    "startup.recovering_instances": "Đang phục hồi các thao tác instance bị gián đoạn..."
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

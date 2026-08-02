@@ -187,3 +187,13 @@ def test_running_lock_cannot_authorize_mod_changes(monkeypatch: pytest.MonkeyPat
 
     process.exit_requested.set()
     wait_until_missing(run_lock.lock_path)
+
+
+def test_reconcile_removes_stale_lock_and_reports_instance(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    instance = make_instance(tmp_path, "Stale Instance")
+    lock_path = InstanceRunLock.lock_path_for(instance)
+    lock_path.write_text(json.dumps({"instance_name": instance.name, "state": "running", "launcher_pid": 111, "minecraft_pid": 222}), encoding="utf-8")
+    monkeypatch.setattr(InstanceRunLock, "_is_process_alive", staticmethod(lambda _pid: False))
+
+    assert InstanceRunLock.reconcile() == ("Stale Instance",)
+    assert not lock_path.exists()

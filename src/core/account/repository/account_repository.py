@@ -43,9 +43,9 @@ class AccountRepository:
                 """
                 INSERT INTO accounts (
                     account_id, account_type, username, uuid, access_token, refresh_token,
-                    token_expires_at, token_cipher_version, record_integrity, updated_at
+                    token_expires_at, skin_url, skin_variant, token_cipher_version, record_integrity, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(account_id) DO UPDATE SET
                     account_type = excluded.account_type,
                     username = excluded.username,
@@ -53,6 +53,8 @@ class AccountRepository:
                     access_token = excluded.access_token,
                     refresh_token = excluded.refresh_token,
                     token_expires_at = excluded.token_expires_at,
+                    skin_url = excluded.skin_url,
+                    skin_variant = excluded.skin_variant,
                     token_cipher_version = excluded.token_cipher_version,
                     record_integrity = excluded.record_integrity,
                     updated_at = excluded.updated_at
@@ -65,6 +67,8 @@ class AccountRepository:
                     access_token,
                     refresh_token,
                     account.token_expires_at,
+                    account.skin_url,
+                    account.skin_variant,
                     cipher_version,
                     signature,
                     updated_at,
@@ -138,7 +142,7 @@ class AccountRepository:
 
     _SELECT_COLUMNS = """
         SELECT account_id, account_type, username, uuid, access_token, refresh_token,
-               token_expires_at, token_cipher_version, record_integrity, updated_at
+               token_expires_at, skin_url, skin_variant, token_cipher_version, record_integrity, updated_at
         FROM accounts
     """
 
@@ -161,6 +165,8 @@ class AccountRepository:
             access_token=access_token,
             refresh_token=refresh_token,
             token_expires_at=row["token_expires_at"],
+            skin_url=row["skin_url"],
+            skin_variant=row["skin_variant"],
         )
 
     @staticmethod

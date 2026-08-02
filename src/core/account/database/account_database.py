@@ -10,7 +10,7 @@ from src.core.fs.paths import Paths
 
 
 class AccountDatabase:
-    SCHEMA_VERSION = 2
+    SCHEMA_VERSION = 3
     CONNECTION_TIMEOUT_SECONDS = 10.0
 
     _schema_lock = Lock()
@@ -24,6 +24,8 @@ class AccountDatabase:
             access_token TEXT,
             refresh_token TEXT,
             token_expires_at INTEGER,
+            skin_url TEXT,
+            skin_variant TEXT,
             token_cipher_version INTEGER NOT NULL DEFAULT 1,
             record_integrity TEXT,
             updated_at INTEGER
@@ -42,6 +44,8 @@ class AccountDatabase:
         "access_token": "TEXT",
         "refresh_token": "TEXT",
         "token_expires_at": "INTEGER",
+        "skin_url": "TEXT",
+        "skin_variant": "TEXT",
         "token_cipher_version": "INTEGER NOT NULL DEFAULT 1",
         "record_integrity": "TEXT",
         "updated_at": "INTEGER",
