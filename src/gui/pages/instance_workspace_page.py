@@ -87,6 +87,7 @@ class InstanceWorkspacePage(BasePage):
         self._synchronizing = False
         self._account: object | None = None
         self._running_instances: list[object] = []
+        self._health_reports: dict[str, object] = {}
         self._busy = False
 
         self.advanced_page = InstancesPage()
@@ -181,6 +182,10 @@ class InstanceWorkspacePage(BasePage):
         self.running_label = QLabel()
         self.running_label.setObjectName("TinyLabel")
         self.running_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.health_label = QLabel()
+        self.health_label.setObjectName("TinyLabel")
+        self.health_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.health_label.setWordWrap(True)
 
         self.launch_button = set_theme_icon(QPushButton(), "icon.action.launch")
         self.launch_button.setObjectName("PrimaryButton")
@@ -210,6 +215,7 @@ class InstanceWorkspacePage(BasePage):
         self.action_panel.layout.addWidget(self.instance_name_label)
         self.action_panel.layout.addWidget(self.instance_detail_label)
         self.action_panel.layout.addWidget(self.running_label)
+        self.action_panel.layout.addWidget(self.health_label)
         self.action_panel.layout.addSpacing(4)
         self.action_panel.layout.addWidget(self.launch_button)
         self.action_panel.layout.addWidget(self.edit_button)
@@ -357,6 +363,18 @@ class InstanceWorkspacePage(BasePage):
         self._running_instances = list(running_instances)
         self._rebuild_library(self.current_instance_name())
 
+    def set_health_reports(self, reports: list[object]) -> None:
+        mapped: dict[str, object] = {}
+        for report in reports:
+            instance_id = str(getattr(report, "instance_id", "") or "")
+            name = str(getattr(report, "name", "") or "")
+            if instance_id:
+                mapped[f"id:{instance_id}"] = report
+            if name:
+                mapped[f"name:{name}"] = report
+        self._health_reports = mapped
+        self._rebuild_library(self.current_instance_name())
+
     def set_busy(self, busy: bool) -> None:
         self._busy = bool(busy)
         self.set_interaction_locked(busy)
@@ -419,17 +437,19 @@ class InstanceWorkspacePage(BasePage):
         loader_name, loader_version = self._instance_loader(instance)
         loader = loader_name.title() if loader_version in {"", "-1"} else f"{loader_name.title()} {loader_version}"
         state = self._instance_state(instance)
-        return f"{getattr(instance, 'name', '?')}\n{getattr(instance, 'version_id', '?')} • {loader}\n{self._state_text(state)}"
+        health = self._instance_health_state(instance)
+        health_line = "" if health == "healthy" else f"\n{self._health_text(health)}"
+        return f"{getattr(instance, 'name', '?')}\n{getattr(instance, 'version_id', '?')} • {loader}\n{self._state_text(state)}{health_line}"
 
-    @classmethod
-    def _search_blob(cls, instance: object) -> str:
-        loader_name, loader_version = cls._instance_loader(instance)
+    def _search_blob(self, instance: object) -> str:
+        loader_name, loader_version = self._instance_loader(instance)
         return " ".join(
             (
                 str(getattr(instance, "name", "")),
                 str(getattr(instance, "version_id", "")),
                 loader_name,
                 loader_version,
+                self._instance_health_state(instance),
             )
         ).casefold()
 
@@ -439,6 +459,28 @@ class InstanceWorkspacePage(BasePage):
         loader_name = str(loader[0] if loader else "vanilla").strip().lower() or "vanilla"
         loader_version = str(loader[1] if len(loader) > 1 else "-1").strip()
         return loader_name, "-1" if loader_name == "vanilla" else loader_version
+
+    def _instance_health_report(self, instance: object) -> object | None:
+        instance_id = str(getattr(instance, "instance_id", "") or "")
+        name = str(getattr(instance, "name", "") or "")
+        return self._health_reports.get(f"id:{instance_id}") or self._health_reports.get(f"name:{name}")
+
+    def _instance_health_state(self, instance: object) -> str:
+        report = self._instance_health_report(instance)
+        state = getattr(report, "state", "healthy") if report is not None else "healthy"
+        return str(getattr(state, "value", state) or "healthy")
+
+    @staticmethod
+    def _health_text(state: str) -> str:
+        return {
+            "healthy": tr("workspace.health.healthy"),
+            "needs_attention": tr("workspace.health.needs_attention"),
+            "migration_required": tr("workspace.health.migration_required"),
+            "missing_java": tr("workspace.health.missing_java"),
+            "missing_files": tr("workspace.health.missing_files"),
+            "incomplete": tr("workspace.health.incomplete"),
+            "corrupted": tr("workspace.health.corrupted"),
+        }.get(state, tr("workspace.health.healthy"))
 
     def _instance_state(self, instance: object) -> str:
         instance_id = str(getattr(instance, "instance_id", "") or "")
@@ -547,6 +589,7 @@ class InstanceWorkspacePage(BasePage):
             self.instance_name_label.setText(tr("workspace.no_selection"))
             self.instance_detail_label.setText(tr("workspace.no_selection_detail"))
             self.running_label.setText("")
+            self.health_label.setText("")
             self.manage_mods_button.setEnabled(False)
             self.management_dialog.set_instance(None)
             return
@@ -568,6 +611,16 @@ class InstanceWorkspacePage(BasePage):
         self.running_label.setProperty("state", {"crashed": "error", "loading": "busy", "running": "success", "finished": "success"}.get(state, "ready"))
         self.running_label.style().unpolish(self.running_label)
         self.running_label.style().polish(self.running_label)
+        health_state = self._instance_health_state(instance)
+        report = self._instance_health_report(instance)
+        issue_count = len(tuple(getattr(report, "issues", ()) or ())) if report is not None else 0
+        health_text = self._health_text(health_state)
+        if issue_count:
+            health_text = tr("workspace.health.with_issues", state=health_text, count=issue_count)
+        self.health_label.setText(health_text)
+        self.health_label.setProperty("state", "success" if health_state == "healthy" else "error" if health_state in {"corrupted", "incomplete", "missing_java", "missing_files"} else "busy")
+        self.health_label.style().unpolish(self.health_label)
+        self.health_label.style().polish(self.health_label)
         self.manage_mods_button.setEnabled(enabled and loader_name in {"fabric", "quilt", "forge", "neoforge"})
         self.management_dialog.set_instance(instance)
 

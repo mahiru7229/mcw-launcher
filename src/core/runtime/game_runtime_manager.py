@@ -10,6 +10,7 @@ from typing import Callable
 
 from src.core.fs.paths import Paths
 from src.core.java.java_runtime import JavaRuntime
+from src.core.runtime.process_supervisor import ProcessSupervisor
 from src.models.instance.instance import Instance
 from src.models.runtime.game_exit_result import GameExitResult
 
@@ -25,18 +26,18 @@ class GameRuntimeManager:
     _active_processes_lock = threading.RLock()
 
     @classmethod
-    def watch(cls, process: object, instance: Instance, minecraft_version: str, started_at: datetime, on_exit: GameExitCallback | None = None) -> bool:
+    def watch(cls, process: object, instance: Instance, minecraft_version: str, started_at: datetime, on_exit: GameExitCallback | None = None, session_id: str | None = None) -> bool:
         poll = getattr(process, "poll", None)
         if not callable(poll):
             return False
 
         cls._register_process(instance, process)
-        watcher = threading.Thread(target=cls._watch_process, args=(process, instance, minecraft_version, started_at, on_exit), name=f"game-runtime-{instance.name}", daemon=True)
+        watcher = threading.Thread(target=cls._watch_process, args=(process, instance, minecraft_version, started_at, on_exit, session_id), name=f"game-runtime-{instance.name}", daemon=True)
         watcher.start()
         return True
 
     @classmethod
-    def _watch_process(cls, process: object, instance: Instance, minecraft_version: str, started_at: datetime, on_exit: GameExitCallback | None) -> None:
+    def _watch_process(cls, process: object, instance: Instance, minecraft_version: str, started_at: datetime, on_exit: GameExitCallback | None, session_id: str | None = None) -> None:
         try:
             exit_code = cls._wait_for_exit(process)
             ended_at = datetime.now(timezone.utc)
@@ -61,6 +62,11 @@ class GameRuntimeManager:
             try:
                 cls._record_result(instance, result)
             finally:
+                if session_id:
+                    try:
+                        ProcessSupervisor.finish(session_id, exit_code, crashed)
+                    except Exception:
+                        pass
                 if on_exit is not None:
                     try:
                         on_exit(result)
@@ -73,7 +79,7 @@ class GameRuntimeManager:
     def stop(cls, instance: Instance, graceful_timeout: float = 2.5) -> bool:
         process = cls._active_process(instance)
         if process is None:
-            return False
+            return ProcessSupervisor.stop_instance(instance, graceful_timeout=graceful_timeout)
         poll = getattr(process, "poll", None)
         if callable(poll):
             try:

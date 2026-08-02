@@ -8,7 +8,7 @@ import tomllib
 
 import pytest
 
-from mcw_core import CorePaths, InstanceState, InstanceStatus, LaunchRequest, MCWCore
+from mcw_core import CorePaths, InstanceHealthReport, InstanceHealthState, InstanceState, InstanceStatus, LaunchRequest, MCWCore, ProcessSession, ProcessSessionState
 from src.core.fs.paths import Paths
 from src.models.instance.instance import Instance
 
@@ -99,6 +99,25 @@ def test_instance_state_types_are_public() -> None:
     assert InstanceState.RUNNING.value == "running"
     status = InstanceStatus(instance_id="id", name="Example", state=InstanceState.READY)
     assert status.state is InstanceState.READY
+
+
+def test_stability_types_are_public(tmp_path: Path) -> None:
+    report = InstanceHealthReport(instance_id="id", name="Example", state=InstanceHealthState.HEALTHY, issues=(), checked_at="now")
+    session = ProcessSession(
+        session_id="session",
+        instance_id="id",
+        instance_name="Example",
+        instance_dir=tmp_path,
+        state=ProcessSessionState.RUNNING,
+        launcher_pid=1,
+        root_pid=2,
+        child_pids=(),
+        started_at="now",
+        updated_at="now",
+    )
+
+    assert report.healthy is True
+    assert session.active is True
 
 def _imports(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

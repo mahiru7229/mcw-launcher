@@ -53,3 +53,6 @@ def test_instance_workspace_supports_icons_and_runtime_badges() -> None:
     assert '"crashed": "icon.state.error"' in source
     assert '"finished": "icon.state.success"' in source
     assert "def _instance_state" in source
+    assert "def set_health_reports" in source
+    assert "def _instance_health_state" in source
+    assert "self.health_label" in source

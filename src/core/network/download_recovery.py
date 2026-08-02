@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import time
 
 from src.core.fs.paths import Paths
 from src.core.network.download_journal import DownloadJournal, download_journal
@@ -13,6 +14,9 @@ from src.models.network.download_recovery import (
 
 class DownloadRecoveryManager:
     """Reconcile interrupted-download metadata without discarding valid partial files."""
+
+    ORPHAN_PART_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
+    ORPHAN_PART_BASE_SUFFIXES = {".jar", ".zip", ".json", ".png", ".jpg", ".jpeg", ".webp", ".mrpack", ".mcwpack"}
 
     def __init__(self, journal: DownloadJournal | None = None) -> None:
         self.journal = journal or download_journal
@@ -52,6 +56,42 @@ class DownloadRecoveryManager:
             deleted_partial_files=deleted_files,
             deleted_partial_bytes=deleted_bytes,
         )
+
+    def remove_orphan_parts(self, max_age_seconds: float | None = None) -> tuple[str, ...]:
+        max_age = self.ORPHAN_PART_MAX_AGE_SECONDS if max_age_seconds is None else max(0.0, float(max_age_seconds))
+        now = time.time()
+        referenced = {Path(str(entry.get("temporary_path") or "")).resolve(strict=False) for entry in self.journal.snapshot() if entry.get("temporary_path")}
+        removed: list[str] = []
+        roots = (Paths.CACHE_ROOT, Paths.INSTANCES_ROOT)
+        for root in roots:
+            try:
+                candidates = tuple(root.rglob("*.part"))
+            except OSError:
+                continue
+            for path in candidates:
+                try:
+                    if not path.is_file() or path.is_symlink():
+                        continue
+                    resolved = path.resolve(strict=False)
+                    if resolved in referenced:
+                        continue
+                    base = path.with_suffix("")
+                    if base.suffix.casefold() not in self.ORPHAN_PART_BASE_SUFFIXES:
+                        continue
+                    if now - path.stat().st_mtime < max_age:
+                        continue
+                    path.unlink()
+                    removed.append(self._safe_relative(path))
+                except (OSError, ValueError):
+                    continue
+        return tuple(sorted(removed, key=str.casefold))
+
+    @staticmethod
+    def _safe_relative(path: Path) -> str:
+        try:
+            return path.resolve(strict=False).relative_to(Paths.root().resolve(strict=False)).as_posix()
+        except (OSError, ValueError):
+            return path.name
 
     @classmethod
     def _inspect_entry(cls, entry: dict) -> DownloadRecoveryItem:

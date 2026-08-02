@@ -97,3 +97,38 @@ def test_unexpected_partial_path_is_never_deleted(monkeypatch, tmp_path: Path) -
     assert report.count(DownloadRecoveryState.INVALID) == 1
     assert report.deleted_partial_files == 0
     assert protected.read_bytes() == b"keep"
+
+
+def test_remove_orphan_parts_keeps_fresh_and_journal_referenced_files(monkeypatch, tmp_path: Path) -> None:
+    import os
+    import time
+
+    cache = tmp_path / "cache"
+    instances = tmp_path / "instances"
+    cache.mkdir()
+    instances.mkdir()
+    monkeypatch.setattr(Paths, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(Paths, "CACHE_ROOT", cache)
+    monkeypatch.setattr(Paths, "INSTANCES_ROOT", instances)
+    journal = DownloadJournal(tmp_path / "journal.json")
+    manager = DownloadRecoveryManager(journal)
+
+    old_orphan = cache / "old.jar.part"
+    fresh_orphan = cache / "fresh.jar.part"
+    unknown = cache / "notes.txt.part"
+    referenced_request = _request(cache, "referenced")
+    for path in (old_orphan, fresh_orphan, unknown, referenced_request.temporary_path):
+        path.write_bytes(b"partial")
+    old_time = time.time() - 1000
+    os.utime(old_orphan, (old_time, old_time))
+    os.utime(unknown, (old_time, old_time))
+    os.utime(referenced_request.temporary_path, (old_time, old_time))
+    journal.update(referenced_request, DownloadState.PAUSED, downloaded_bytes=7)
+
+    removed = manager.remove_orphan_parts(max_age_seconds=100)
+
+    assert removed == ("cache/old.jar.part",)
+    assert not old_orphan.exists()
+    assert fresh_orphan.exists()
+    assert unknown.exists()
+    assert referenced_request.temporary_path.exists()

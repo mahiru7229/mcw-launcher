@@ -263,6 +263,18 @@ class Paths:
         directory = Paths.instance_runtime_root() / "staging"
         directory.mkdir(parents=True, exist_ok=True)
         return directory
+
+    @staticmethod
+    def process_sessions_root() -> Path:
+        directory = Paths.instance_runtime_root() / "process-sessions"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def process_session_history_root() -> Path:
+        directory = Paths.process_sessions_root() / "history"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
     
     @staticmethod
     def load_instance_dir(name: str) -> Path:

@@ -368,6 +368,7 @@ class MainWindow(QMainWindow):
         self.modpack_lifecycle_controller.repair_finished.connect(self._on_modpack_repaired)
 
         self.instance_controller.instances_changed.connect(self.instances_page.set_instances)
+        self.instance_controller.health_reports_changed.connect(self.instances_page.set_health_reports)
         self.instance_controller.instances_changed.connect(self.instance_settings_page.set_instances)
         self.instance_controller.running_instances_changed.connect(self.right_panel.set_running_instances)
         self.instance_controller.running_instances_changed.connect(self.instances_page.set_running_instances)

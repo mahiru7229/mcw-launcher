@@ -5,6 +5,8 @@ from src.models.account.account import Account
 from src.models.auth.authentication import Authentication
 from src.models.instance.instance import Instance
 from src.models.instance.instance_state import InstanceState, InstanceStatus
+from src.models.instance.instance_health import InstanceHealthIssue, InstanceHealthReport, InstanceHealthSeverity, InstanceHealthState
+from src.models.runtime.process_session import ProcessSession, ProcessSessionState
 from src.models.progress.progress_event import ProgressEvent
 from src.models.progress.progress_stage import ProgressStage
 from src.models.progress.progress_state import ProgressState
@@ -27,6 +29,10 @@ __all__ = [
     "Instance",
     "InstanceState",
     "InstanceStatus",
+    "InstanceHealthIssue",
+    "InstanceHealthReport",
+    "InstanceHealthSeverity",
+    "InstanceHealthState",
     "InstanceCreateRequest",
     "InstanceDeletionError",
     "InstanceService",
@@ -41,6 +47,8 @@ __all__ = [
     "ProgressStage",
     "ProgressState",
     "ProgressUnit",
+    "ProcessSession",
+    "ProcessSessionState",
     "configure_default_core",
     "get_default_core",
     "is_download_cancelled",

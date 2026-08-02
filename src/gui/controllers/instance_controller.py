@@ -16,6 +16,7 @@ from src.config import VERSION_ID
 class InstanceController(BaseController):
     instances_changed = Signal(list, str)
     running_instances_changed = Signal(list)
+    health_reports_changed = Signal(list)
     selected_instance_changed = Signal(object)
     export_finished = Signal(object)
     repair_progress = Signal(object)
@@ -65,6 +66,12 @@ class InstanceController(BaseController):
             preferred = names[0] if names else ""
         self._selected_name = preferred
         self.instances_changed.emit(instances, preferred)
+        try:
+            health_reports = self._core.instances.list_health()
+        except Exception as error:
+            health_reports = []
+            self.log_created.emit(f"Instance health scan failed: {type(error).__name__}: {error}")
+        self.health_reports_changed.emit(health_reports)
         self.select(preferred)
         self.log_created.emit(f"Instances refreshed: {len(instances)} found")
 

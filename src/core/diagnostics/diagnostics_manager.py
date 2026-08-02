@@ -12,8 +12,10 @@ import zipfile
 
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
+from src.core.instance.instance_health_manager import InstanceHealthManager
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.network.download_recovery import download_recovery_manager
+from src.core.runtime.process_supervisor import ProcessSupervisor
 from src.core.security.sensitive_data_redactor import SensitiveDataRedactor
 
 
@@ -34,6 +36,15 @@ class DiagnosticsManager:
             instance_error = SensitiveDataRedactor.redact_text(error)
         else:
             instance_error = ""
+
+        try:
+            health_reports = InstanceHealthManager.list(instances)
+        except Exception:
+            health_reports = []
+        try:
+            process_sessions = ProcessSupervisor.list_active()
+        except Exception:
+            process_sessions = ()
 
         safe_settings = cls._safe_settings(settings or {})
         language_files = cls._language_files()
@@ -63,11 +74,17 @@ class DiagnosticsManager:
             "-------------",
             f"instance_count: {len(instances)}",
             f"running_instance_count: {len(active_instances)}",
+            f"supervised_session_count: {len(process_sessions)}",
+            f"healthy_instance_count: {sum(1 for report in health_reports if report.healthy)}",
+            f"attention_instance_count: {sum(1 for report in health_reports if not report.healthy)}",
         ]
         if instance_error:
             lines.append(f"instance_scan_error: {instance_error}")
         for item in active_instances:
             lines.append(f"running_instance: {item.name} [{item.state}] pid={item.minecraft_pid or item.launcher_pid or 'unknown'}")
+        for report in health_reports:
+            if not report.healthy:
+                lines.append(f"instance_health: {report.name} [{report.state.value}] issues={len(report.issues)}")
 
         lines.extend([
             "",
@@ -114,6 +131,9 @@ class DiagnosticsManager:
                 activity_log=activity_log,
             ).encode("utf-8"),
             "download-recovery.json": cls._download_recovery_json(),
+            "instance-health.json": cls._instance_health_json(),
+            "process-sessions.json": cls._process_sessions_json(),
+            "operation-journals.json": cls._operation_journals_json(),
         }
         entries.update(cls._safe_log_entries())
         manifest_entries = [
@@ -182,6 +202,73 @@ class DiagnosticsManager:
                 "error": SensitiveDataRedactor.redact_text(error),
                 "items": [],
             }
+        return (json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+    @classmethod
+    def _instance_health_json(cls) -> bytes:
+        try:
+            reports = InstanceHealthManager.list(InstanceManager.list_instances())
+            instances: list[dict[str, Any]] = []
+            for report in reports:
+                data = report.to_dict()
+                for issue in data.get("issues", []):
+                    path = issue.get("path")
+                    if path:
+                        issue["path"] = cls._safe_path(Path(str(path)))
+                instances.append(SensitiveDataRedactor.redact_value(data))
+            payload: dict[str, Any] = {
+                "schema_version": 1,
+                "instances": instances,
+            }
+        except Exception as error:
+            payload = {"schema_version": 1, "error": SensitiveDataRedactor.redact_text(error), "instances": []}
+        return (json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+    @classmethod
+    def _process_sessions_json(cls) -> bytes:
+        try:
+            sessions = ProcessSupervisor.list_active()
+            rows = []
+            for session in sessions:
+                data = session.to_dict()
+                data["instance_dir"] = cls._safe_path(session.instance_dir)
+                rows.append(SensitiveDataRedactor.redact_value(data))
+            payload: dict[str, Any] = {"schema_version": 1, "sessions": rows}
+        except Exception as error:
+            payload = {"schema_version": 1, "error": SensitiveDataRedactor.redact_text(error), "sessions": []}
+        return (json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+    @classmethod
+    def _operation_journals_json(cls) -> bytes:
+        rows: list[dict[str, Any]] = []
+        try:
+            paths = tuple(Paths.instance_operations_root().glob("*.json"))
+        except OSError:
+            paths = ()
+        for path in paths:
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError, TypeError, ValueError):
+                rows.append({"journal": path.name, "state": "invalid"})
+                continue
+            if not isinstance(payload, dict):
+                rows.append({"journal": path.name, "state": "invalid"})
+                continue
+            safe = {
+                "journal": path.name,
+                "operation_id": str(payload.get("operation_id") or ""),
+                "operation": str(payload.get("operation") or ""),
+                "instance_name": str(payload.get("instance_name") or ""),
+                "phase": str(payload.get("phase") or ""),
+                "created_at": str(payload.get("created_at") or ""),
+                "updated_at": str(payload.get("updated_at") or ""),
+            }
+            for key in ("source_path", "target_path", "staging_path"):
+                value = payload.get(key)
+                if value:
+                    safe[key] = cls._safe_path(Path(str(value)))
+            rows.append(SensitiveDataRedactor.redact_value(safe))
+        payload = {"schema_version": 1, "journals": rows}
         return (json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
     @classmethod

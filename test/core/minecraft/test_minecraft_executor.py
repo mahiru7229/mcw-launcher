@@ -21,6 +21,7 @@ from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManager
 from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
+from src.core.runtime.process_supervisor import ProcessSupervisor
 from src.core.minecraft.version_manager import VersionManager
 from src.core.minecraft.version_manifest_manager import (
     VersionManifestManager,
@@ -45,6 +46,10 @@ class FakeRunLock:
 @pytest.fixture(autouse=True)
 def patch_instance_run_lock(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(InstanceRunLock, "acquire", lambda instance: FakeRunLock())
+    monkeypatch.setattr(ProcessSupervisor, "begin", lambda instance: SimpleNamespace(session_id="test-session"))
+    monkeypatch.setattr(ProcessSupervisor, "attach", lambda session_id, process: None)
+    monkeypatch.setattr(ProcessSupervisor, "abort", lambda session_id, detail="": None)
+    monkeypatch.setattr(ProcessSupervisor, "stop_process", lambda process, graceful_timeout=2.5: True)
     monkeypatch.setattr(
         LauncherSettingsManager,
         "load",
@@ -1003,3 +1008,41 @@ def test_run_allows_forge_compatibility_errors_when_instance_policy_allows(monke
 
     assert result["minecraftVersion"] == pipeline["version"].id
     assert "warnings" not in result
+
+
+def test_run_stops_started_process_when_supervision_registration_fails(monkeypatch: pytest.MonkeyPatch):
+    patch_pipeline(monkeypatch)
+    lock = FakeRunLock()
+    aborted: list[tuple[str, str]] = []
+
+    class Process:
+        pid = 4242
+
+        def __init__(self) -> None:
+            self.return_code = None
+            self.terminated = False
+
+        def poll(self):
+            return self.return_code
+
+        def terminate(self) -> None:
+            self.terminated = True
+            self.return_code = 0
+
+        def kill(self) -> None:
+            self.return_code = -9
+
+    process = Process()
+    monkeypatch.setattr(InstanceRunLock, "acquire", lambda _instance: lock)
+    monkeypatch.setattr(JavaRuntime, "run", lambda *args: process)
+    monkeypatch.setattr(ProcessSupervisor, "begin", lambda _instance: SimpleNamespace(session_id="session-id"))
+    monkeypatch.setattr(ProcessSupervisor, "attach", lambda _session_id, _process: (_ for _ in ()).throw(OSError("session disk full")))
+    monkeypatch.setattr(ProcessSupervisor, "stop_process", lambda target, graceful_timeout=2.5: target.terminate() or True)
+    monkeypatch.setattr(ProcessSupervisor, "abort", lambda session_id, detail="": aborted.append((session_id, detail)))
+
+    with pytest.raises(OSError, match="session disk full"):
+        MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object())
+
+    assert process.terminated is True
+    assert lock.released is True
+    assert aborted and aborted[0][0] == "session-id"

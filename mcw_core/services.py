@@ -7,6 +7,7 @@ from src.config import VERSION_ID
 from src.core.diagnostics.forge_diagnostics_manager import ForgeDiagnosticsManager
 from src.core.diagnostics.quilt_diagnostics_manager import QuiltDiagnosticsManager
 from src.core.instance.instance_manager import InstanceManager
+from src.core.instance.instance_health_manager import InstanceHealthManager
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.instance.instance_status_manager import InstanceStatusManager
 from src.core.java.adoptium_client import AdoptiumClient
@@ -21,6 +22,7 @@ from src.core.repair.repair_service import RepairService
 from src.core.runtime.instance_repair_manager import InstanceRepairManager
 from src.models.instance.instance import Instance
 from src.models.instance.instance_state import InstanceStatus
+from src.models.instance.instance_health import InstanceHealthReport
 from src.models.progress.progress_callback import ProgressCallback
 
 from mcw_core.models import InstanceCreateRequest
@@ -80,6 +82,15 @@ class InstanceService:
     @staticmethod
     def list_statuses() -> list[InstanceStatus]:
         return InstanceStatusManager.list(InstanceManager.list_instances())
+
+    @staticmethod
+    def health(instance: Instance | str) -> InstanceHealthReport:
+        loaded = instance if isinstance(instance, Instance) else InstanceManager.load(str(instance))
+        return InstanceHealthManager.scan(loaded)
+
+    @staticmethod
+    def list_health() -> list[InstanceHealthReport]:
+        return InstanceHealthManager.list(InstanceManager.list_instances())
 
     @staticmethod
     def set_icon(name: str, source_path: Path) -> Instance:

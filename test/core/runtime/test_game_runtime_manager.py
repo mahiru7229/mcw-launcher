@@ -8,6 +8,7 @@ import pytest
 from src.core.fs.paths import Paths
 from src.core.java.java_runtime import JavaRuntime
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
+from src.core.runtime.process_supervisor import ProcessSupervisor
 
 
 class FinishedProcess:
@@ -139,3 +140,16 @@ def test_stop_terminates_registered_instance_process(instance) -> None:
     assert process.terminated is True
     assert process.killed is False
     assert GameRuntimeManager._active_process(instance) is None
+
+
+def test_process_session_finishes_even_when_runtime_history_write_fails(monkeypatch: pytest.MonkeyPatch, instance) -> None:
+    finished: list[tuple[str, int, bool]] = []
+    monkeypatch.setattr(JavaRuntime, "log_path", classmethod(lambda cls, process: None))
+    monkeypatch.setattr(JavaRuntime, "close_process_log", classmethod(lambda cls, process: None))
+    monkeypatch.setattr(GameRuntimeManager, "_record_result", classmethod(lambda cls, received_instance, result: (_ for _ in ()).throw(OSError("disk full"))))
+    monkeypatch.setattr(ProcessSupervisor, "finish", classmethod(lambda cls, session_id, exit_code, crashed, detail="": finished.append((session_id, exit_code, crashed))))
+
+    with pytest.raises(OSError, match="disk full"):
+        GameRuntimeManager._watch_process(FinishedProcess(1), instance, "1.21.1", datetime.now(timezone.utc), None, "session-id")
+
+    assert finished == [("session-id", 1, True)]

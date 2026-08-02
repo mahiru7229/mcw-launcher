@@ -1326,7 +1326,15 @@
     "account.selection.switched": "Đã chuyển sang tài khoản {username}",
     "account.skin.loading": "Đang tải hồ sơ và skin Minecraft...",
     "account.skin.ready": "Skin Minecraft của {username} đã sẵn sàng.",
-    "startup.recovering_instances": "Đang phục hồi các thao tác instance bị gián đoạn..."
+    "startup.recovering_instances": "Đang phục hồi các thao tác instance bị gián đoạn...",
+    "workspace.health.healthy": "Tình trạng instance: Tốt",
+    "workspace.health.needs_attention": "Tình trạng instance: Cần chú ý",
+    "workspace.health.migration_required": "Tình trạng instance: Cần nâng schema",
+    "workspace.health.missing_java": "Tình trạng instance: Thiếu Java",
+    "workspace.health.missing_files": "Tình trạng instance: Thiếu file",
+    "workspace.health.incomplete": "Tình trạng instance: Chưa hoàn chỉnh",
+    "workspace.health.corrupted": "Tình trạng instance: Bị hỏng",
+    "workspace.health.with_issues": "{state} ({count} vấn đề)"
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",
