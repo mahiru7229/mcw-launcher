@@ -399,7 +399,7 @@ class InstanceManager:
             instance.instance_dir = staging_dir
             InstanceManager._save_instance_metadata(instance)
             journal.update("committing")
-            InstanceManager._commit_staging_directory(staging_dir, target_dir)
+            InstanceManager._commit_staging_directory(staging_dir, target_dir, allow_copy_fallback=True)
             committed = True
             instance.instance_dir = target_dir
             InstanceManager._save_instance_metadata(instance)
@@ -435,7 +435,7 @@ class InstanceManager:
         return alternate, Paths.load_instance_dir(alternate)
 
     @staticmethod
-    def _commit_staging_directory(staging_dir: Path, target_dir: Path) -> None:
+    def _commit_staging_directory(staging_dir: Path, target_dir: Path, *, allow_copy_fallback: bool = False) -> None:
         if target_dir.exists():
             raise RuntimeError(f"Cannot commit instance because the target directory already exists: {target_dir}")
 
@@ -460,10 +460,116 @@ class InstanceManager:
             if attempt + 1 < InstanceManager.DIRECTORY_COMMIT_ATTEMPTS:
                 time.sleep(InstanceManager.DIRECTORY_COMMIT_RETRY_SECONDS * (attempt + 1))
 
+        if allow_copy_fallback:
+            InstanceManager._commit_staging_directory_by_copy(staging_dir, target_dir)
+            return
+
         raise RuntimeError(
             f"Windows could not finalize the instance operation after {InstanceManager.DIRECTORY_COMMIT_ATTEMPTS} attempts. "
             f"Staging: {staging_dir}; target: {target_dir}. Close programs scanning these folders and retry."
         ) from last_error
+
+    @staticmethod
+    def _commit_staging_directory_by_copy(staging_dir: Path, target_dir: Path) -> None:
+        """Publish an imported instance without renaming a directory containing scanned JARs.
+
+        Windows security/indexing tools may temporarily open a nested JAR without
+        FILE_SHARE_DELETE. That blocks renaming the *parent* staging directory even
+        though every file remains readable. Copying into a fresh target avoids that
+        Windows-only restriction. ``instance.json`` is copied last, so the instance
+        cannot become visible to the launcher until every other file is present.
+        """
+        metadata_source = staging_dir / "instance.json"
+        if not staging_dir.is_dir() or not metadata_source.is_file():
+            raise RuntimeError(f"Cannot copy-commit an incomplete instance staging directory: {staging_dir}")
+        if target_dir.exists():
+            raise RuntimeError(f"Cannot commit instance because the target directory already exists: {target_dir}")
+
+        marker = target_dir / ".mcw-import-incomplete"
+        published = False
+        try:
+            target_dir.mkdir(parents=False, exist_ok=False)
+            marker.write_text("MCW instance import is still being committed.\n", encoding="utf-8")
+
+            for root, directory_names, file_names in os.walk(staging_dir, topdown=True, followlinks=False):
+                source_root = Path(root)
+                relative_root = source_root.relative_to(staging_dir)
+                destination_root = target_dir / relative_root
+                destination_root.mkdir(parents=True, exist_ok=True)
+
+                for directory_name in list(directory_names):
+                    source_directory = source_root / directory_name
+                    if source_directory.is_symlink():
+                        raise RuntimeError(f"Cannot safely copy-commit a symbolic-link directory: {source_directory}")
+                    (destination_root / directory_name).mkdir(parents=True, exist_ok=True)
+
+                for file_name in file_names:
+                    source_file = source_root / file_name
+                    relative_file = source_file.relative_to(staging_dir)
+                    if relative_file == Path("instance.json"):
+                        continue
+                    if source_file.is_symlink():
+                        raise RuntimeError(f"Cannot safely copy-commit a symbolic-link file: {source_file}")
+                    InstanceManager._copy_commit_file(source_file, target_dir / relative_file)
+
+            metadata_temporary = target_dir / f".instance.json.{uuid.uuid4().hex}.tmp"
+            InstanceManager._copy_commit_file(metadata_source, metadata_temporary)
+            metadata_temporary.replace(target_dir / "instance.json")
+            published = True
+            marker.unlink(missing_ok=True)
+        except Exception:
+            if not published:
+                try:
+                    (target_dir / "instance.json").unlink(missing_ok=True)
+                except OSError:
+                    pass
+                shutil.rmtree(target_dir, ignore_errors=True)
+            raise
+        finally:
+            if published:
+                InstanceManager._remove_committed_staging_best_effort(staging_dir)
+
+    @staticmethod
+    def _copy_commit_file(source: Path, destination: Path) -> None:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        last_error: OSError | None = None
+
+        for attempt in range(InstanceManager.DIRECTORY_COMMIT_ATTEMPTS):
+            temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.part")
+            try:
+                with source.open("rb") as input_file, temporary.open("xb") as output_file:
+                    shutil.copyfileobj(input_file, output_file, length=1024 * 1024)
+                    output_file.flush()
+                    os.fsync(output_file.fileno())
+                temporary.replace(destination)
+                return
+            except PermissionError as error:
+                last_error = error
+            except OSError as error:
+                if getattr(error, "winerror", None) not in {5, 32, 33}:
+                    temporary.unlink(missing_ok=True)
+                    raise
+                last_error = error
+            finally:
+                temporary.unlink(missing_ok=True)
+
+            if attempt + 1 < InstanceManager.DIRECTORY_COMMIT_ATTEMPTS:
+                time.sleep(InstanceManager.DIRECTORY_COMMIT_RETRY_SECONDS * (attempt + 1))
+
+        raise RuntimeError(f"Windows could not copy an imported instance file after repeated attempts: {source}") from last_error
+
+    @staticmethod
+    def _remove_committed_staging_best_effort(staging_dir: Path) -> None:
+        for attempt in range(InstanceManager.DIRECTORY_COMMIT_ATTEMPTS):
+            try:
+                shutil.rmtree(staging_dir)
+                return
+            except FileNotFoundError:
+                return
+            except OSError:
+                if attempt + 1 < InstanceManager.DIRECTORY_COMMIT_ATTEMPTS:
+                    time.sleep(InstanceManager.DIRECTORY_COMMIT_RETRY_SECONDS * (attempt + 1))
+        # StartupRecoveryManager removes orphan staging directories on the next run.
 
 
     @staticmethod

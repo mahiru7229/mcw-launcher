@@ -52,3 +52,16 @@ UPDATE_CHANNEL = beta
 ```text
 fix: correct package import commits and runtime status lifecycle
 ```
+
+## Windows copy-commit hotfix
+
+A second diagnostics capture showed that extraction completed successfully, but Windows kept one or more nested mod JARs open long enough to block renaming the staging directory after all rename retries. The import transaction now has an application-level copy-commit fallback:
+
+- directory rename remains the preferred fast path;
+- after persistent Windows sharing/access errors, files are copied into a fresh target directory;
+- `instance.json` is published last, so the launcher cannot discover a half-copied instance;
+- each file copy uses a temporary `.part` path, bounded retry, flush, and atomic replacement;
+- the source staging directory is removed best-effort and is otherwise cleaned by startup recovery;
+- a failed fallback removes the unpublished target and never updates the instance registry.
+
+This specifically avoids the Windows rule where an antivirus, indexer, or JAR scanner can allow file reads while denying deletion/rename sharing on the parent directory.

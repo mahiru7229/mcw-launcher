@@ -384,3 +384,89 @@ def test_directory_commit_retries_transient_windows_permission_error(tmp_path: P
     assert attempts == 2
     assert not source.exists()
     assert (target / "instance.json").is_file()
+
+
+def test_import_falls_back_to_copy_commit_when_windows_blocks_directory_rename(
+    temporary_paths: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import json
+    import zipfile
+
+    package_path = tmp_path / "scanner-locked-pack.mcwpack"
+    package_metadata = {
+        "format": "mcwpack",
+        "format_version": 1,
+        "package_type": "instance",
+        "launcher_name": "mcw-launcher",
+        "launcher_version": "v0.12.0-beta.9",
+        "created_at": "2026-08-02T00:00:00+00:00",
+        "include_saves": False,
+    }
+    instance_metadata = {
+        "id": "scanner-locked-pack-id",
+        "name": "Scanner Locked Pack",
+        "version_id": "1.20.1",
+        "mod_loader": ["forge", "47.2.0"],
+    }
+    with zipfile.ZipFile(package_path, "w") as archive:
+        archive.writestr("package.json", json.dumps(package_metadata))
+        archive.writestr("instance.json", json.dumps(instance_metadata))
+        archive.writestr("settings.json", json.dumps({"java": {"min_memory": 1024, "max_memory": 4096}}))
+        archive.writestr("mods/example.jar", b"jar-bytes")
+        archive.writestr("config/example.toml", b"enabled = true\n")
+
+    original_rename = Path.rename
+    blocked_attempts = 0
+
+    def block_staging_directory_rename(self: Path, destination: Path):
+        nonlocal blocked_attempts
+        if self.parent == temporary_paths / ".runtime" / "staging" and self.name.startswith("import-"):
+            blocked_attempts += 1
+            raise PermissionError(5, "Access is denied", str(self))
+        return original_rename(self, destination)
+
+    monkeypatch.setattr(Path, "rename", block_staging_directory_rename)
+    monkeypatch.setattr(InstanceManager, "DIRECTORY_COMMIT_RETRY_SECONDS", 0)
+
+    imported = InstanceManager.import_instance(package_path)
+
+    target = temporary_paths / "Scanner Locked Pack"
+    assert blocked_attempts == InstanceManager.DIRECTORY_COMMIT_ATTEMPTS
+    assert imported.instance_dir == target
+    assert (target / "instance.json").is_file()
+    assert (target / "settings.json").is_file()
+    assert (target / "mods" / "example.jar").read_bytes() == b"jar-bytes"
+    assert (target / "config" / "example.toml").read_text(encoding="utf-8") == "enabled = true\n"
+    assert not (target / ".mcw-import-incomplete").exists()
+    assert list((temporary_paths / ".runtime" / "staging").iterdir()) == []
+    assert list((temporary_paths / ".runtime" / "operations").glob("*.json")) == []
+
+
+def test_copy_commit_does_not_publish_instance_json_before_other_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "staging"
+    target = tmp_path / "target"
+    source.mkdir()
+    (source / "instance.json").write_text('{"name": "Copy Commit"}', encoding="utf-8")
+    (source / "mods").mkdir()
+    (source / "mods" / "example.jar").write_bytes(b"example")
+
+    original_copy = InstanceManager._copy_commit_file
+    observations: list[tuple[str, bool]] = []
+
+    def observe_copy(source_path: Path, destination_path: Path) -> None:
+        observations.append((source_path.name, (target / "instance.json").exists()))
+        original_copy(source_path, destination_path)
+
+    monkeypatch.setattr(InstanceManager, "_copy_commit_file", observe_copy)
+
+    InstanceManager._commit_staging_directory_by_copy(source, target)
+
+    assert observations
+    assert all(not published for _name, published in observations)
+    assert (target / "instance.json").is_file()
+    assert (target / "mods" / "example.jar").is_file()
