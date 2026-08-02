@@ -5,6 +5,7 @@ from threading import Lock
 from time import time
 from urllib.parse import quote
 import json
+import re
 
 import httpx
 
@@ -17,7 +18,7 @@ from src.models.modloader.quilt_loader_version import QuiltLoaderVersion
 
 class QuiltMetaClient:
     BASE_URL = "https://meta.quiltmc.org/v3"
-    CATALOG_CACHE_SCHEMA = 1
+    CATALOG_CACHE_SCHEMA = 2
     INSTALL_CACHE_SCHEMA = 1
     PROFILE_CACHE_SCHEMA = 1
     CATALOG_TTL_SECONDS = 6 * 60 * 60
@@ -31,7 +32,7 @@ class QuiltMetaClient:
         if not isinstance(data, list):
             raise RuntimeError("Quilt Meta returned an invalid loader list.")
 
-        versions: list[QuiltLoaderVersion] = []
+        versions_by_id: dict[str, QuiltLoaderVersion] = {}
         for item in data:
             if not isinstance(item, dict):
                 continue
@@ -42,16 +43,38 @@ class QuiltMetaClient:
             version = str(loader.get("version", "")).strip()
             if not version:
                 continue
-            versions.append(
-                QuiltLoaderVersion(
-                    version=version,
-                    stable=bool(loader.get("stable", item.get("stable", False))),
-                    mappings_version=str(mappings.get("version", "")).strip() if isinstance(mappings, dict) else "",
-                    loader_maven=str(loader.get("maven", "")).strip(),
-                    mappings_maven=str(mappings.get("maven", "")).strip() if isinstance(mappings, dict) else "",
-                )
+            parsed = QuiltLoaderVersion(
+                version=version,
+                stable=QuiltMetaClient._stable_flag(loader, item, version),
+                mappings_version=str(mappings.get("version", "")).strip() if isinstance(mappings, dict) else "",
+                loader_maven=str(loader.get("maven", "")).strip(),
+                mappings_maven=str(mappings.get("maven", "")).strip() if isinstance(mappings, dict) else "",
             )
-        return versions
+            current = versions_by_id.get(version)
+            if current is None or (parsed.stable and not current.stable):
+                versions_by_id[version] = parsed
+        return sorted(versions_by_id.values(), key=lambda entry: QuiltMetaClient.version_sort_key(entry.version), reverse=True)
+
+
+    @staticmethod
+    def _stable_flag(loader: dict, item: dict, version: str) -> bool:
+        for source in (loader, item):
+            value = source.get("stable")
+            if isinstance(value, bool):
+                return value
+        without_build = str(version).strip().split("+", 1)[0]
+        return "-" not in without_build
+
+    @staticmethod
+    def version_sort_key(version: str) -> tuple:
+        normalized = str(version).strip().lstrip("vV").casefold()
+        without_build = normalized.split("+", 1)[0]
+        numeric, separator, prerelease = without_build.partition("-")
+        numbers = [int(part) for part in numeric.split(".") if part.isdigit()]
+        while len(numbers) < 4:
+            numbers.append(0)
+        tokens = tuple((1, int(token)) if token.isdigit() else (0, token) for token in re.findall(r"[a-z]+|\d+", prerelease))
+        return *numbers[:4], 1 if not separator else 0, tokens
 
     @staticmethod
     def get_install_metadata(game_version: str, loader_version: str, force_refresh: bool = False) -> QuiltInstallMetadata:

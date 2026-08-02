@@ -177,3 +177,31 @@ def test_loads_profile_and_reuses_cache(monkeypatch):
     assert QuiltMetaClient.get_profile("1.20.1", "0.27.1") == profile
     assert QuiltMetaClient.get_profile("1.20.1", "0.27.1") == profile
     assert client.urls == [url]
+
+
+def test_sorts_loader_versions_newest_first_and_infers_stable_when_flag_is_missing(monkeypatch):
+    url = QuiltMetaClient.BASE_URL + "/versions/loader/26.2"
+    payload = [
+        {"loader": {"version": "0.20.0-beta.9", "maven": "org.quiltmc:quilt-loader:0.20.0-beta.9"}},
+        {"loader": {"version": "0.24.0", "maven": "org.quiltmc:quilt-loader:0.24.0"}},
+        {"loader": {"version": "0.30.1", "maven": "org.quiltmc:quilt-loader:0.30.1"}},
+        {"loader": {"version": "0.30.0-beta.2", "maven": "org.quiltmc:quilt-loader:0.30.0-beta.2"}},
+    ]
+    client = FakeClient({url: payload})
+    monkeypatch.setattr(HttpDownloader, "get_client", lambda: client)
+
+    versions = QuiltMetaClient.list_loader_versions("26.2")
+
+    assert [version.version for version in versions] == ["0.30.1", "0.30.0-beta.2", "0.24.0", "0.20.0-beta.9"]
+    assert [version.stable for version in versions] == [True, False, True, False]
+
+
+def test_explicit_stability_flag_wins_over_version_name(monkeypatch):
+    url = QuiltMetaClient.BASE_URL + "/versions/loader/26.2"
+    payload = [{"loader": {"version": "0.30.1", "stable": False, "maven": "org.quiltmc:quilt-loader:0.30.1"}}]
+    client = FakeClient({url: payload})
+    monkeypatch.setattr(HttpDownloader, "get_client", lambda: client)
+
+    versions = QuiltMetaClient.list_loader_versions("26.2")
+
+    assert versions[0].stable is False

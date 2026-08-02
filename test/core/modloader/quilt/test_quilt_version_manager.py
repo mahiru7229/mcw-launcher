@@ -227,14 +227,15 @@ def test_quilt_library_replaces_same_maven_module_from_base_profile():
     assert QuiltVersionManager._merge_libraries([base_library], [quilt_library]) == [quilt_library]
 
 
-def test_recommended_loader_prefers_first_stable_version(monkeypatch):
+def test_recommended_loader_prefers_newest_stable_version_regardless_of_api_order(monkeypatch):
     versions = [
-        type("Loader", (), {"version": "0.28.0-beta", "stable": False})(),
-        type("Loader", (), {"version": "0.27.1", "stable": True})(),
-        type("Loader", (), {"version": "0.26.4", "stable": True})(),
+        type("Loader", (), {"version": "0.24.0", "stable": True})(),
+        type("Loader", (), {"version": "0.30.0-beta.2", "stable": False})(),
+        type("Loader", (), {"version": "0.30.1", "stable": True})(),
+        type("Loader", (), {"version": "0.20.0-beta.9", "stable": False})(),
     ]
     monkeypatch.setattr(QuiltMetaClient, "list_loader_versions", lambda game_version: versions)
-    assert QuiltVersionManager.recommended_loader_version("1.20.1") == "0.27.1"
+    assert QuiltVersionManager.recommended_loader_version("26.2") == "0.30.1"
 
 
 def test_recommended_loader_rejects_automatic_unstable_version(monkeypatch):
@@ -243,3 +244,47 @@ def test_recommended_loader_rejects_automatic_unstable_version(monkeypatch):
 
     with pytest.raises(RuntimeError, match="No stable Quilt Loader"):
         QuiltVersionManager.recommended_loader_version("1.20.1")
+
+
+def test_rejects_quilt_profile_with_asm_too_old_for_java_25(tmp_path):
+    base = make_base_version(tmp_path, {"id": "26.2", "javaVersion": {"majorVersion": 25}})
+    base.id = "26.2"
+    metadata = QuiltInstallMetadata(
+        game=QuiltComponent(uid="net.minecraft", version="26.2"),
+        mappings=None,
+        loader=QuiltComponent(uid="org.quiltmc.quilt-loader", version="0.20.0-beta.9", maven="org.quiltmc:quilt-loader:0.20.0-beta.9"),
+        main_class="org.quiltmc.loader.impl.launch.knot.KnotClient",
+        libraries=({"name": "org.ow2.asm:asm:9.5"},),
+    )
+
+    with pytest.raises(RuntimeError, match=r"ASM 9\.5.*Java 25.*ASM 9\.8"):
+        QuiltVersionManager._validate_bytecode_support(base, "0.20.0-beta.9", metadata, {})
+
+
+def test_accepts_quilt_profile_with_java_25_capable_asm(tmp_path):
+    base = make_base_version(tmp_path, {"id": "26.2", "javaVersion": {"majorVersion": 25}})
+    base.id = "26.2"
+    metadata = QuiltInstallMetadata(
+        game=QuiltComponent(uid="net.minecraft", version="26.2"),
+        mappings=None,
+        loader=QuiltComponent(uid="org.quiltmc.quilt-loader", version="0.30.1", maven="org.quiltmc:quilt-loader:0.30.1"),
+        main_class="org.quiltmc.loader.impl.launch.knot.KnotClient",
+        libraries=({"name": "org.ow2.asm:asm:9.8"},),
+    )
+
+    QuiltVersionManager._validate_bytecode_support(base, "0.30.1", metadata, {})
+
+
+def test_requires_asm_9_9_for_java_26(tmp_path):
+    base = make_base_version(tmp_path, {"id": "future", "javaVersion": {"majorVersion": 26}})
+    base.id = "future"
+    metadata = QuiltInstallMetadata(
+        game=QuiltComponent(uid="net.minecraft", version="future"),
+        mappings=None,
+        loader=QuiltComponent(uid="org.quiltmc.quilt-loader", version="0.30.0", maven="org.quiltmc:quilt-loader:0.30.0"),
+        main_class="org.quiltmc.loader.impl.launch.knot.KnotClient",
+        libraries=({"name": "org.ow2.asm:asm:9.8"},),
+    )
+
+    with pytest.raises(RuntimeError, match=r"Java 26.*ASM 9\.9"):
+        QuiltVersionManager._validate_bytecode_support(base, "0.30.0", metadata, {})

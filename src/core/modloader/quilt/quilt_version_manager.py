@@ -34,12 +34,13 @@ class QuiltVersionManager:
         versions = QuiltMetaClient.list_loader_versions(game_version)
         if not versions:
             raise RuntimeError(f"Quilt Loader is not available for Minecraft {game_version}.")
-        recommended = next((version for version in versions if version.stable), None)
-        if recommended is None:
+        stable_versions = [version for version in versions if version.stable]
+        if not stable_versions:
             raise RuntimeError(
                 f"No stable Quilt Loader is available for Minecraft {game_version}. "
                 "Choose an experimental Loader version manually from Manage selected instance."
             )
+        recommended = max(stable_versions, key=lambda version: QuiltMetaClient.version_sort_key(version.version))
         return recommended.version
 
     @staticmethod
@@ -64,6 +65,7 @@ class QuiltVersionManager:
 
             metadata = QuiltMetaClient.get_install_metadata(base_version.id, loader_version, force_refresh=force_refresh)
             profile = QuiltMetaClient.get_profile(base_version.id, loader_version, force_refresh=force_refresh)
+            QuiltVersionManager._validate_bytecode_support(base_version, loader_version, metadata, profile)
             normalized_profile = QuiltVersionManager._normalize_profile_libraries(profile, reporter=reporter, force_artifact_refresh=repair_libraries)
             merged = QuiltVersionManager._merge_profiles(base_version.raw_json, normalized_profile, metadata)
             QuiltVersionManager._write_json(cache_path, merged)
@@ -118,6 +120,63 @@ class QuiltVersionManager:
         if not data.get("mainClass") or not data.get("libraries"):
             return None
         return data
+
+    @staticmethod
+    def _validate_bytecode_support(base_version: Version, loader_version: str, metadata: QuiltInstallMetadata, profile: dict) -> None:
+        try:
+            java_major = int((base_version.java_version or {}).get("majorVersion") or 8)
+        except (TypeError, ValueError):
+            java_major = 8
+        required_asm = QuiltVersionManager._required_asm_version(java_major)
+        if required_asm is None:
+            return
+
+        asm_versions: list[tuple[int, ...]] = []
+        asm_labels: list[str] = []
+        libraries = [*metadata.libraries, *(profile.get("libraries", []) if isinstance(profile, dict) else [])]
+        for library in libraries:
+            if not isinstance(library, dict):
+                continue
+            coordinate = str(library.get("name", "")).strip().split("@", 1)[0]
+            parts = coordinate.split(":")
+            if len(parts) < 3 or parts[0] != "org.ow2.asm" or parts[1] != "asm":
+                continue
+            parsed = QuiltVersionManager._numeric_version(parts[2])
+            if parsed is not None:
+                asm_versions.append(parsed)
+                asm_labels.append(parts[2])
+
+        if not asm_versions:
+            return
+        newest_asm = max(asm_versions)
+        if newest_asm >= required_asm:
+            return
+        detected = max(asm_labels, key=QuiltVersionManager._numeric_version)
+        required_label = ".".join(str(part) for part in required_asm)
+        raise RuntimeError(
+            f"Quilt Loader {loader_version} is too old for Minecraft {base_version.id}. "
+            f"It uses ASM {detected}, but Java {java_major} bytecode requires ASM {required_label} or newer. "
+            "Choose a newer stable Quilt Loader version."
+        )
+
+    @staticmethod
+    def _required_asm_version(java_major: int) -> tuple[int, ...] | None:
+        if java_major >= 26:
+            return 9, 9
+        if java_major >= 25:
+            return 9, 8
+        return None
+
+    @staticmethod
+    def _numeric_version(value: str) -> tuple[int, ...] | None:
+        parts = str(value).strip().split(".")
+        numbers: list[int] = []
+        for part in parts:
+            digits = "".join(character for character in part if character.isdigit())
+            if not digits:
+                break
+            numbers.append(int(digits))
+        return tuple(numbers) if numbers else None
 
     @staticmethod
     def _normalize_profile_libraries(profile: dict, reporter: ProgressReporter | None = None, force_artifact_refresh: bool = False) -> dict:
