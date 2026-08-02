@@ -7,7 +7,7 @@ from typing import Any
 
 from PySide6.QtCore import Signal, Slot
 
-from mcw_core import InstanceCreateRequest, LoaderService, get_default_core
+from mcw_core import InstanceCreateRequest, InstanceDeletionError, LoaderService, get_default_core
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 from src.config import VERSION_ID
@@ -352,6 +352,11 @@ class InstanceController(BaseController):
 
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
+        if task_id == "instance.delete" and isinstance(error, InstanceDeletionError):
+            if error.scheduled:
+                self.status_changed.emit(f"Deletion queued for '{error.instance_name}'")
+            self._emit_error("Delete instance", error)
+            return
         if task_id in {self.REPAIR_SCAN_TASK_ID, self.REPAIR_EXECUTE_TASK_ID}:
             self.repair_center_failed.emit(error)
             self.status_changed.emit("Repair Center task failed")

@@ -8,6 +8,7 @@ import pytest
 
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
+from src.core.instance.instance_artwork_manager import InstanceArtworkManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_client import ModrinthClient
@@ -55,7 +56,7 @@ def test_rejects_unsafe_pack_paths():
 def test_installs_fabric_modpack_as_new_instance(tmp_path, monkeypatch):
     configure_paths(tmp_path, monkeypatch)
     pack_source = make_pack(tmp_path / "pack.mrpack")
-    project = ModrinthProject(project_id="pack-project", slug="pack", title="Test Pack", description="", project_type="modpack")
+    project = ModrinthProject(project_id="pack-project", slug="pack", title="Test Pack", description="", project_type="modpack", icon_url="https://cdn.example/modrinth.png")
     version = ModrinthVersion(version_id="pack-version", project_id="pack-project", name="1.0", version_number="1.0", version_type="release", game_versions=("1.20.4",), loaders=("fabric",), files=(ModrinthFile(url="https://cdn.modrinth.com/pack.mrpack", filename="pack.mrpack", sha1="a", sha512="b", size=1, primary=True),))
     monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: project)
     monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: version)
@@ -64,6 +65,8 @@ def test_installs_fabric_modpack_as_new_instance(tmp_path, monkeypatch):
     monkeypatch.setattr(VersionManager, "load", lambda version_id: SimpleNamespace(id=version_id))
     monkeypatch.setattr(ModLoaderManager, "resolve", lambda game_version, loader_name, loader_version="auto": ("fabric", loader_version))
     monkeypatch.setattr(ModLoaderManager, "prepare", lambda version, loader_name, loader_version, reporter=None: version)
+    artwork_calls = []
+    monkeypatch.setattr(InstanceArtworkManager, "apply_provider_artwork", classmethod(lambda cls, instance, provider, project_id, artwork_url, reporter=None: artwork_calls.append((provider, project_id, artwork_url)) or False))
 
     result = ModrinthPackInstaller.install("pack-project", "pack-version", "Test Instance", True)
 
@@ -80,6 +83,7 @@ def test_installs_fabric_modpack_as_new_instance(tmp_path, monkeypatch):
     assert {item["path"] for item in metadata["managedFiles"]} == {"mods/example.jar", "config/example.json", "options.txt"}
     queued = next(item for item in metadata["managedFiles"] if item["path"] == "mods/example.jar")
     assert queued["downloads"] == ["https://cdn.modrinth.com/data/project/example.jar"]
+    assert artwork_calls == [("modrinth", "pack-project", "https://cdn.example/modrinth.png")]
 
 
 def test_cleanup_removes_instance_when_finalization_fails(tmp_path, monkeypatch):

@@ -463,6 +463,18 @@ class Paths:
         return Paths.curseforge_file_cache(project_id, file_id, filename)
 
     @staticmethod
+    def instance_artwork_cache(provider: str, project_id: str, artwork_url: str) -> Path:
+        import hashlib
+        from urllib.parse import quote
+
+        provider_name = quote(str(provider).strip().casefold(), safe="") or "provider"
+        project_name = quote(str(project_id).strip(), safe="") or "unknown"
+        digest = hashlib.sha256(str(artwork_url).strip().encode("utf-8")).hexdigest()
+        directory = Paths.CACHE_ROOT / "content" / "artwork" / provider_name / project_name
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory / digest
+
+    @staticmethod
     def curseforge_instance_registry(instance: Instance) -> Path:
         return Path(instance.instance_dir) / ".mcw" / "curseforge.json"
 

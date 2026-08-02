@@ -21,6 +21,8 @@ class GameRuntimeManager:
     HISTORY_SCHEMA_VERSION = 1
     HISTORY_LIMIT = 50
     POLL_INTERVAL_SECONDS = 0.5
+    _active_processes: dict[str, object] = {}
+    _active_processes_lock = threading.RLock()
 
     @classmethod
     def watch(cls, process: object, instance: Instance, minecraft_version: str, started_at: datetime, on_exit: GameExitCallback | None = None) -> bool:
@@ -28,40 +30,118 @@ class GameRuntimeManager:
         if not callable(poll):
             return False
 
+        cls._register_process(instance, process)
         watcher = threading.Thread(target=cls._watch_process, args=(process, instance, minecraft_version, started_at, on_exit), name=f"game-runtime-{instance.name}", daemon=True)
         watcher.start()
         return True
 
     @classmethod
     def _watch_process(cls, process: object, instance: Instance, minecraft_version: str, started_at: datetime, on_exit: GameExitCallback | None) -> None:
-        exit_code = cls._wait_for_exit(process)
-        ended_at = datetime.now(timezone.utc)
-        log_path = JavaRuntime.log_path(process) or cls.latest_game_log(instance)
-        JavaRuntime.close_process_log(process)
-        crash_report_path = cls.latest_crash_report(instance, since=started_at)
-        crashed = exit_code != 0 or crash_report_path is not None
-        duration_seconds = max(0, round((ended_at - started_at).total_seconds()))
-        pid = getattr(process, "pid", None)
-        result = GameExitResult(
-            instance_name=instance.name,
-            minecraft_version=minecraft_version,
-            pid=pid if isinstance(pid, int) and pid > 0 else None,
-            exit_code=exit_code,
-            started_at=started_at.isoformat(),
-            ended_at=ended_at.isoformat(),
-            duration_seconds=duration_seconds,
-            crashed=crashed,
-            log_path=log_path,
-            crash_report_path=crash_report_path,
-        )
         try:
-            cls._record_result(instance, result)
+            exit_code = cls._wait_for_exit(process)
+            ended_at = datetime.now(timezone.utc)
+            log_path = JavaRuntime.log_path(process) or cls.latest_game_log(instance)
+            JavaRuntime.close_process_log(process)
+            crash_report_path = cls.latest_crash_report(instance, since=started_at)
+            crashed = exit_code != 0 or crash_report_path is not None
+            duration_seconds = max(0, round((ended_at - started_at).total_seconds()))
+            pid = getattr(process, "pid", None)
+            result = GameExitResult(
+                instance_name=instance.name,
+                minecraft_version=minecraft_version,
+                pid=pid if isinstance(pid, int) and pid > 0 else None,
+                exit_code=exit_code,
+                started_at=started_at.isoformat(),
+                ended_at=ended_at.isoformat(),
+                duration_seconds=duration_seconds,
+                crashed=crashed,
+                log_path=log_path,
+                crash_report_path=crash_report_path,
+            )
+            try:
+                cls._record_result(instance, result)
+            finally:
+                if on_exit is not None:
+                    try:
+                        on_exit(result)
+                    except Exception:
+                        pass
         finally:
-            if on_exit is not None:
-                try:
-                    on_exit(result)
-                except Exception:
-                    pass
+            cls._unregister_process(instance, process)
+
+    @classmethod
+    def stop(cls, instance: Instance, graceful_timeout: float = 2.5) -> bool:
+        process = cls._active_process(instance)
+        if process is None:
+            return False
+        poll = getattr(process, "poll", None)
+        if callable(poll):
+            try:
+                if poll() is not None:
+                    cls._unregister_process(instance, process)
+                    return False
+            except Exception:
+                pass
+        terminate = getattr(process, "terminate", None)
+        if callable(terminate):
+            try:
+                terminate()
+            except Exception:
+                pass
+        if cls._wait_process(process, graceful_timeout):
+            cls._unregister_process(instance, process)
+            return True
+        kill = getattr(process, "kill", None)
+        if callable(kill):
+            try:
+                kill()
+            except Exception:
+                pass
+        if cls._wait_process(process, 2.0):
+            cls._unregister_process(instance, process)
+        return True
+
+    @classmethod
+    def _register_process(cls, instance: Instance, process: object) -> None:
+        with cls._active_processes_lock:
+            cls._active_processes[cls._instance_key(instance)] = process
+
+    @classmethod
+    def _unregister_process(cls, instance: Instance, process: object) -> None:
+        key = cls._instance_key(instance)
+        with cls._active_processes_lock:
+            if cls._active_processes.get(key) is process:
+                cls._active_processes.pop(key, None)
+
+    @classmethod
+    def _active_process(cls, instance: Instance) -> object | None:
+        with cls._active_processes_lock:
+            return cls._active_processes.get(cls._instance_key(instance))
+
+    @staticmethod
+    def _instance_key(instance: Instance) -> str:
+        instance_id = str(getattr(instance, "instance_id", "")).strip()
+        if instance_id:
+            return f"id:{instance_id}"
+        return f"path:{os.path.normcase(str(Path(instance.instance_dir).resolve(strict=False)))}"
+
+    @staticmethod
+    def _wait_process(process: object, timeout: float) -> bool:
+        poll = getattr(process, "poll", None)
+        if not callable(poll):
+            return False
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        while time.monotonic() < deadline:
+            try:
+                if poll() is not None:
+                    return True
+            except Exception:
+                return False
+            time.sleep(0.05)
+        try:
+            return poll() is not None
+        except Exception:
+            return False
 
     @classmethod
     def _wait_for_exit(cls, process: object) -> int:

@@ -8,6 +8,7 @@ import pytest
 from src.core.curseforge.curseforge_client import CurseForgeClient
 from src.core.curseforge.curseforge_pack_installer import CurseForgePackInstaller
 from src.core.instance.instance_manager import InstanceManager
+from src.core.instance.instance_artwork_manager import InstanceArtworkManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.models.curseforge.file import CurseForgeFile
@@ -92,7 +93,7 @@ def test_installs_fabric_modpack_as_fabric_instance(tmp_path: Path, monkeypatch)
 
     calls: list[tuple[str, ...]] = []
     base_version = SimpleNamespace(id="1.20.1")
-    project = SimpleNamespace(name="Fabric Pack")
+    project = SimpleNamespace(name="Fabric Pack", logo_url="https://cdn.example/curseforge.png")
     file = SimpleNamespace(display_name="Fabric Pack 1.0")
 
     def create_instance(name: str, version: object, mod_loader: tuple[str, str]) -> Instance:
@@ -128,6 +129,8 @@ def test_installs_fabric_modpack_as_fabric_instance(tmp_path: Path, monkeypatch)
         ),
     )
     monkeypatch.setattr(InstanceManager, "create", staticmethod(create_instance))
+    artwork_calls = []
+    monkeypatch.setattr(InstanceArtworkManager, "apply_provider_artwork", classmethod(lambda cls, instance, provider, project_id, artwork_url, reporter=None: artwork_calls.append((provider, project_id, artwork_url)) or False))
 
     result = CurseForgePackInstaller._install_from_archive(
         11,
@@ -150,6 +153,7 @@ def test_installs_fabric_modpack_as_fabric_instance(tmp_path: Path, monkeypatch)
     )
     assert registry["loader"] == "fabric"
     assert registry["loaderVersion"] == "0.16.0"
+    assert artwork_calls == [("curseforge", 11, "https://cdn.example/curseforge.png")]
 
 
 def test_installs_neoforge_modpack_as_neoforge_instance(tmp_path: Path, monkeypatch) -> None:

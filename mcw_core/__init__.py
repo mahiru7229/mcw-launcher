@@ -9,6 +9,7 @@ from src.models.progress.progress_event import ProgressEvent
 from src.models.progress.progress_stage import ProgressStage
 from src.models.progress.progress_state import ProgressState
 from src.models.progress.progress_unit import ProgressUnit
+from src.core.instance.errors import InstanceDeletionError
 from src.core.network.download_pause import DownloadCancelledError, DownloadInterruptedError, is_download_cancelled, is_download_paused
 
 from mcw_core.facade import MCWCore, configure_default_core, get_default_core
@@ -27,6 +28,7 @@ __all__ = [
     "InstanceState",
     "InstanceStatus",
     "InstanceCreateRequest",
+    "InstanceDeletionError",
     "InstanceService",
     "JavaService",
     "LaunchRequest",

@@ -109,3 +109,33 @@ def test_callback_still_runs_when_runtime_history_cannot_be_written(monkeypatch:
 
     assert len(results) == 1
     assert results[0].exit_code == 0
+
+
+class StoppableProcess:
+    def __init__(self) -> None:
+        self.pid = 54321
+        self.returncode = None
+        self.terminated = False
+        self.killed = False
+
+    def poll(self):
+        return self.returncode
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.returncode = 0
+
+    def kill(self) -> None:
+        self.killed = True
+        self.returncode = -9
+
+
+def test_stop_terminates_registered_instance_process(instance) -> None:
+    process = StoppableProcess()
+    GameRuntimeManager._active_processes.clear()
+    GameRuntimeManager._register_process(instance, process)
+
+    assert GameRuntimeManager.stop(instance, graceful_timeout=0.1) is True
+    assert process.terminated is True
+    assert process.killed is False
+    assert GameRuntimeManager._active_process(instance) is None

@@ -15,6 +15,7 @@ from src.core.curseforge.curseforge_errors import CurseForgeModpackManualDownloa
 from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
+from src.core.instance.instance_artwork_manager import InstanceArtworkManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.progress.progress_reporter import ProgressReporter
@@ -117,6 +118,8 @@ class CurseForgePackInstaller:
                     "managedFiles": entries,
                     "lastDownloadFailures": [],
                 })
+                if InstanceArtworkManager.apply_provider_artwork(instance, "curseforge", project_id, getattr(project, "logo_url", ""), reporter):
+                    instance = InstanceManager.load(instance.name)
             except Exception:
                 InstanceManager.delete_instance(name)
                 raise

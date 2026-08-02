@@ -6,6 +6,7 @@ from src.models.package.instance_package_preview import InstancePackagePreview
 from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.fs.paths import Paths
 from src.core.instance.settings_manager import SettingsManager
+from src.core.instance.instance_deletion_manager import InstanceDeletionManager
 from src.core.package.package_manager import PackageManager
 from src.config import VERSION_TAG
 
@@ -84,6 +85,24 @@ class InstanceManager:
         temporary.replace(path)
 
     @staticmethod
+    def _update_instance_metadata_fields(instance: Instance, updates: dict) -> None:
+        path = Path(instance.instance_dir) / "instance.json"
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, ValueError) as error:
+            raise RuntimeError(f"Invalid instance metadata: {path}") from error
+        if not isinstance(data, dict):
+            raise RuntimeError(f"Invalid instance metadata: {path}")
+        data.update(dict(updates))
+        data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        temporary = path.with_name(f"{path.name}.tmp")
+        with temporary.open("w", encoding="utf-8", newline="\n") as file:
+            file.write(json.dumps(data, indent=4, ensure_ascii=False) + "\n")
+            file.flush()
+            os.fsync(file.fileno())
+        temporary.replace(path)
+
+    @staticmethod
     def _load_instance_metadata(path: Path) -> Instance:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -125,6 +144,15 @@ class InstanceManager:
     @staticmethod
     def list_instances() -> list[Instance]:
         instances: list[Instance] = []
+        deleted_names = InstanceDeletionManager.process_pending()
+        if deleted_names:
+            deleted = {name.casefold() for name in deleted_names}
+            instances_data = InstanceManager._load_instances_data()
+            instances_data["instances"] = [
+                item for item in instances_data.get("instances", [])
+                if str(item.get("name") or "").casefold() not in deleted
+            ]
+            InstanceManager._save_instances(instances_data)
 
         root = Paths.instances_root()
 
@@ -234,7 +262,7 @@ class InstanceManager:
         return PackageManager.export_instance(instance, output_path, include_saves, on_progress)
 
     @staticmethod
-    def set_icon(instance_name: str, source_path: Path) -> Instance:
+    def set_icon(instance_name: str, source_path: Path, origin: dict | None = None) -> Instance:
         instance = InstanceManager.load(instance_name)
         source = Path(source_path).expanduser()
         if not source.is_file():
@@ -272,6 +300,9 @@ class InstanceManager:
 
         instance.icon = target.relative_to(instance.instance_dir).as_posix()
         InstanceManager._save_instance_metadata(instance)
+        normalized_origin = dict(origin) if isinstance(origin, dict) else {"provider": "custom"}
+        normalized_origin["provider"] = str(normalized_origin.get("provider") or "custom").strip().casefold() or "custom"
+        InstanceManager._update_instance_metadata_fields(instance, {"icon_origin": normalized_origin})
         return InstanceManager.load(instance.name)
 
     @staticmethod
@@ -282,6 +313,7 @@ class InstanceManager:
             old_icon.unlink(missing_ok=True)
         instance.icon = InstanceManager.DEFAULT_ICON
         InstanceManager._save_instance_metadata(instance)
+        InstanceManager._update_instance_metadata_fields(instance, {"icon_origin": {"provider": "default"}})
         return InstanceManager.load(instance.name)
 
     @staticmethod
@@ -547,23 +579,17 @@ class InstanceManager:
         if not InstanceManager.is_instance_exist(name):
             return False
 
-        instance_dir = Paths.load_instance_dir(name)
-
-        if instance_dir.exists():
-            shutil.rmtree(instance_dir)
+        instance = InstanceManager.load(name)
+        InstanceDeletionManager.delete(instance)
 
         Paths.instances_root()
         Paths.instance_data_path_create()
-
         instances_data = InstanceManager._load_instances_data()
-
         instances_data["instances"] = [
-            inst for inst in instances_data.get("instances", [])
-            if inst.get("name") != name
+            item for item in instances_data.get("instances", [])
+            if item.get("name") != name
         ]
-
         InstanceManager._save_instances(instances_data)
-
         return True
 
     @staticmethod

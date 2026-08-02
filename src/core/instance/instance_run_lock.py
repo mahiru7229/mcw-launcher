@@ -116,6 +116,27 @@ class InstanceRunLock:
         )
 
     @classmethod
+    def active_for(cls, instance: Instance) -> RunningInstanceInfo | None:
+        lock_path = cls.lock_path_for(instance)
+        snapshot = cls._read_snapshot(lock_path)
+        if snapshot is None:
+            return None
+        if not cls._snapshot_is_active(snapshot):
+            cls._remove_if_unchanged(lock_path, snapshot)
+            return None
+        return cls._running_instance_from_payload(snapshot.payload)
+
+    @classmethod
+    def remove_for(cls, instance: Instance, force: bool = False) -> bool:
+        lock_path = cls.lock_path_for(instance)
+        snapshot = cls._read_snapshot(lock_path)
+        if snapshot is None:
+            return True
+        if cls._snapshot_is_active(snapshot) and not force:
+            return False
+        return cls._remove_if_unchanged(lock_path, snapshot)
+
+    @classmethod
     def list_active(cls) -> list[RunningInstanceInfo]:
         Paths.INSTANCE_LOCKS_ROOT.mkdir(parents=True, exist_ok=True)
         running_instances: list[RunningInstanceInfo] = []
