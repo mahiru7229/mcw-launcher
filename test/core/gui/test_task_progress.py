@@ -9,6 +9,7 @@ def test_profiles_cover_requested_long_running_tasks() -> None:
         "modpack.update.check": ProgressStage.CHECKING_MODPACK,
         "backup.create": ProgressStage.EXPORTING_INSTANCE,
         "instance.import": ProgressStage.IMPORTING_INSTANCE,
+        "modpack.import": ProgressStage.IMPORTING_INSTANCE,
         "lan.hosting.prepare": ProgressStage.PREPARING,
         "update.prepare": ProgressStage.DOWNLOADING_UPDATE,
         "modrinth.install.modpack": ProgressStage.DOWNLOADING_MODPACK,

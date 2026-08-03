@@ -1585,7 +1585,10 @@
     "navigation.forward": "Forward",
     "navigation.back.description": "Return to the previously viewed launcher page.",
     "navigation.forward.description": "Go forward to the next launcher page in history.",
-    "modpack_package.import.universal_filter": "MCW / Modpack Package (*.mcwpack *.mrpack *.zip)"
+    "modpack_package.import.universal_filter": "MCW / Modpack Package (*.mcwpack *.mrpack *.zip)",
+    "modpack_package.import.completed": "Modpack import completed",
+    "modpack_package.import.completed_detail": "The provider package was validated and imported. Managed files will be downloaded on the first Launch.",
+    "modpack_package.import.failed": "Modpack import failed"
   },
   "aliases": {
     "MCW Launcher": "app.name",

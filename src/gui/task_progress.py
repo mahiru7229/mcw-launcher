@@ -28,6 +28,7 @@ def task_progress_profile(task_id: str) -> TaskProgressProfile | None:
         "backup.create": TaskProgressProfile(ProgressStage.EXPORTING_INSTANCE, "backup.create.completed", "backup.create.completed_detail", "backup.create.failed"),
         "backup.restore": TaskProgressProfile(ProgressStage.REPAIRING_INSTANCE, "backup.restore.completed", "backup.restore.completed_detail", "backup.restore.failed"),
         "instance.import": TaskProgressProfile(ProgressStage.IMPORTING_INSTANCE, "instance.import.completed", "instance.import.completed_detail", "instance.import.failed"),
+        "modpack.import": TaskProgressProfile(ProgressStage.IMPORTING_INSTANCE, "modpack_package.import.completed", "modpack_package.import.completed_detail", "modpack_package.import.failed"),
         "instance.export": TaskProgressProfile(ProgressStage.EXPORTING_INSTANCE, "instance.export.completed", "instance.export.completed_detail", "instance.export.failed"),
         "instance.repair.full": TaskProgressProfile(ProgressStage.REPAIRING_INSTANCE, "instance.repair.completed", "instance.repair.completed_detail", "instance.repair.failed"),
         "instance.repair.scan": TaskProgressProfile(ProgressStage.SCANNING_REPAIR, "repair.center.scan_task_completed", "repair.center.scan_task_detail", "repair.center.scan_task_failed"),

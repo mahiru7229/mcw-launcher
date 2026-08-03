@@ -1585,7 +1585,10 @@
     "navigation.forward": "Tiến tới",
     "navigation.back.description": "Trở về trang launcher đã xem trước đó.",
     "navigation.forward.description": "Tiến tới trang launcher tiếp theo trong lịch sử.",
-    "modpack_package.import.universal_filter": "Gói MCW / modpack (*.mcwpack *.mrpack *.zip)"
+    "modpack_package.import.universal_filter": "Gói MCW / modpack (*.mcwpack *.mrpack *.zip)",
+    "modpack_package.import.completed": "Đã nhập modpack",
+    "modpack_package.import.completed_detail": "Gói từ provider đã được xác minh và nhập thành công. Các file được quản lý sẽ được tải ở lần Launch đầu tiên.",
+    "modpack_package.import.failed": "Nhập modpack thất bại"
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",
