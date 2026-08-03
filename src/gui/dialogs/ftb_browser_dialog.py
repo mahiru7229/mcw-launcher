@@ -56,8 +56,7 @@ class FTBBrowserDialog(QDialog):
         self.set_cache_info(self._cache_info)
 
     def _build_ui(self) -> None:
-        _, dialog_height = resize_dialog_to_screen(self, 1360, 680, 1040, 540)
-        self.setMaximumHeight(dialog_height)
+        resize_dialog_to_screen(self, 1240, 620, 1000, 500)
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 18, 18, 18)
         root.setSpacing(12)

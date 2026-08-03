@@ -8,7 +8,7 @@ def read(path: str) -> str:
 def test_ftb_browser_is_wide_and_reuses_rich_detail_panel() -> None:
     source = read("src/gui/dialogs/ftb_browser_dialog.py")
 
-    assert "resize_dialog_to_screen(self, 1360, 680" in source
+    assert "resize_dialog_to_screen(self, 1240, 620" in source
     assert "ContentProjectDetailPanel" in source
     assert "set_show_project_descriptions" in source
     assert "QTimer.singleShot(0" in source

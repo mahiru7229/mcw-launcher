@@ -50,8 +50,7 @@ class ContentPackBrowserDialog(QDialog):
         self.retranslate_dynamic()
 
     def _build_ui(self) -> None:
-        _, dialog_height = resize_dialog_to_screen(self, 1380, 680, 1060, 540)
-        self.setMaximumHeight(dialog_height)
+        resize_dialog_to_screen(self, 1240, 620, 1000, 500)
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 18, 18, 18)
         root.setSpacing(10)

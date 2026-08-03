@@ -30,9 +30,38 @@ def test_content_browsers_are_wide_and_hide_long_descriptions_by_default(gui_app
 
         assert dialog.content_type == kind
         assert dialog.width() > dialog.height()
+        assert dialog.width() <= 1240
+        assert dialog.height() <= 620
+        assert dialog.maximumWidth() == dialog.width()
+        assert dialog.maximumHeight() == dialog.height()
         assert dialog.detail_panel.description_visible is False
         assert dialog.version_combo.sizePolicy().horizontalPolicy() is QSizePolicy.Policy.Expanding
         assert dialog.provider_combo.itemData(0) == "modrinth"
+
+
+def test_project_details_compact_long_contributors_and_metadata(gui_app):
+    dialog = ContentPackBrowserDialog("resourcepack")
+    contributors = ", ".join(f"Contributor {index}" for index in range(12))
+    versions = tuple(f"1.{index}" for index in range(30))
+
+    dialog.detail_panel.set_project(
+        token="long-project",
+        provider="Modrinth",
+        title="Long metadata project",
+        author=contributors,
+        summary="Summary",
+        description="Description",
+        icon_url="",
+        web_url="https://modrinth.com/resourcepack/example",
+        metadata={"Minecraft": versions, "Contributors": tuple(f"Person {index}" for index in range(20))},
+    )
+
+    assert "(+7)" in dialog.detail_panel.provider_label.text()
+    assert contributors not in dialog.detail_panel.provider_label.text()
+    assert contributors in dialog.detail_panel.provider_label.toolTip()
+    assert "(+22)" in dialog.detail_panel.metadata_label.text()
+    assert "1.29" not in dialog.detail_panel.metadata_label.text()
+    assert dialog.detail_panel.metadata_label.maximumHeight() == 132
 
 
 def test_content_manager_tracks_resource_and_shader_tabs(gui_app, instance: Instance):

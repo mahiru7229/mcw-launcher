@@ -107,7 +107,9 @@ def test_dialog_is_wide_and_description_is_opt_in(gui_app) -> None:
     dialog = CurseForgeBrowserDialog("modpack")
 
     assert dialog.width() >= dialog.height()
-    assert dialog.height() <= 680
+    assert dialog.width() <= 1240
+    assert dialog.height() <= 620
+    assert dialog.maximumWidth() == dialog.width()
     assert dialog.maximumHeight() == dialog.height()
     assert dialog.detail_panel.description_visible is False
 
