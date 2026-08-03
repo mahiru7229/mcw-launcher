@@ -20,6 +20,7 @@ from src.core.curseforge.curseforge_registry import CurseForgeRegistry
 from src.core.fs.paths import Paths
 from src.core.ftb.ftb_pack_installer import FTBPackInstaller
 from src.core.ftb.ftb_pack_registry import FTBPackRegistry
+from src.core.instance.instance_artwork_manager import InstanceArtworkManager
 from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.settings_manager import SettingsManager
 from src.core.minecraft.version_manager import VersionManager
@@ -46,6 +47,7 @@ class ModpackPackageManager:
     PROFILE_MANIFEST = "mcw-profile.json"
     PORTABLE_MANIFEST = "mcwpack.json"
     SETTINGS_MEMBER = "mcw/instance-settings.json"
+    INSTANCE_ICON_PREFIX = "mcw/instance-icon"
     NATIVE_PREFIX = "provider/"
     OVERRIDES_PREFIX = "overrides/"
     EMBEDDED_PREFIX = "embedded/"
@@ -217,6 +219,7 @@ class ModpackPackageManager:
                 mod_loader=native_preview.mod_loader,
                 file_count=native_preview.file_count,
                 summary=native_preview.summary,
+                icon=ModpackPackageManager._icon_value(profile.get("instanceIcon")),
                 settings=SettingsManager.normalize_dict(settings),
                 has_package_settings=bool(settings),
                 provider_reference=dict(profile.get("providerReference") or {}),
@@ -243,6 +246,7 @@ class ModpackPackageManager:
             mod_loader=(loader, loader_version),
             file_count=max(0, int(profile.get("fileCount", 0) or 0)),
             summary=str(profile.get("summary") or ""),
+            icon=ModpackPackageManager._icon_value(profile.get("instanceIcon")),
             settings=SettingsManager.normalize_dict(settings),
             has_package_settings=bool(settings),
             provider_reference=dict(reference),
@@ -278,51 +282,62 @@ class ModpackPackageManager:
             mod_loader=(loader, loader_version),
             file_count=len(files),
             summary=str(manifest.get("summary") or ""),
+            icon=ModpackPackageManager._icon_value(instance.get("icon")),
             settings=SettingsManager.normalize_dict(settings),
             has_package_settings=bool(settings),
         )
 
     @staticmethod
     def _import_profile(path: Path, preview: ProviderModpackPreview, settings_override: dict | None, install_optional_files: bool, reporter: ProgressReporter) -> Instance:
-        with ZipFile(path, "r") as archive:
-            profile = ModpackPackageManager._read_json(archive, ModpackPackageManager.PROFILE_MANIFEST)
-            if preview.native_package_member:
-                info = ModpackPackageManager._member(archive, preview.native_package_member)
-                if info is None:
-                    raise RuntimeError("The provider profile is missing its native package.")
-                suffix = ".mrpack" if preview.provider == "modrinth" else ".zip"
-                temporary = Paths.instance_staging_root() / f"provider-package-{uuid4().hex}{suffix}"
-                temporary.parent.mkdir(parents=True, exist_ok=True)
-                try:
-                    with archive.open(info, "r") as source, temporary.open("wb") as destination:
-                        shutil.copyfileobj(source, destination, length=ModpackPackageManager.COPY_CHUNK_SIZE)
-                    if preview.provider == "modrinth":
-                        result = ModrinthPackInstaller.install_local_archive(temporary, preview.name, install_optional_files, reporter, settings_override)
-                    else:
-                        result = CurseForgePackInstaller.install_local_archive(temporary, preview.name, install_optional_files, reporter, settings_override)
-                    return result.instance
-                finally:
-                    temporary.unlink(missing_ok=True)
-        reference = preview.provider_reference
-        if preview.provider == "modrinth":
-            project_id = str(reference.get("projectId") or "").strip()
-            version_id = str(reference.get("versionId") or "").strip()
-            if not project_id or not version_id:
-                raise RuntimeError("The Modrinth provider profile is missing project/version IDs.")
-            return ModrinthPackInstaller.install(project_id, version_id, preview.name, install_optional_files, reporter=reporter, settings_override=settings_override).instance
-        if preview.provider == "curseforge":
-            project_id = int(reference.get("projectId") or 0)
-            file_id = int(reference.get("fileId") or 0)
-            if project_id <= 0 or file_id <= 0:
-                raise RuntimeError("The CurseForge provider profile is missing project/file IDs.")
-            return CurseForgePackInstaller.install(project_id, file_id, preview.name, install_optional_files, reporter=reporter, settings_override=settings_override).instance
-        if preview.provider == "ftb":
-            project_id = int(reference.get("projectId") or 0)
-            version_id = int(reference.get("versionId") or 0)
-            if project_id <= 0 or version_id <= 0:
-                raise RuntimeError("The FTB provider profile is missing project/version IDs.")
-            return FTBPackInstaller.install(project_id, version_id, preview.name, install_optional_files, reporter=reporter, settings_override=settings_override).instance
-        raise RuntimeError("Unsupported provider profile.")
+        icon_temporary: Path | None = None
+        try:
+            with ZipFile(path, "r") as archive:
+                ModpackPackageManager._validate_archive(archive)
+                profile = ModpackPackageManager._read_json(archive, ModpackPackageManager.PROFILE_MANIFEST)
+                icon_temporary = ModpackPackageManager._extract_instance_icon(archive, profile.get("instanceIcon"))
+                if preview.native_package_member:
+                    info = ModpackPackageManager._member(archive, preview.native_package_member)
+                    if info is None:
+                        raise RuntimeError("The provider profile is missing its native package.")
+                    suffix = ".mrpack" if preview.provider == "modrinth" else ".zip"
+                    temporary = Paths.instance_staging_root() / f"provider-package-{uuid4().hex}{suffix}"
+                    temporary.parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        with archive.open(info, "r") as source, temporary.open("wb") as destination:
+                            shutil.copyfileobj(source, destination, length=ModpackPackageManager.COPY_CHUNK_SIZE)
+                        if preview.provider == "modrinth":
+                            result = ModrinthPackInstaller.install_local_archive(temporary, preview.name, install_optional_files, reporter, settings_override)
+                        else:
+                            result = CurseForgePackInstaller.install_local_archive(temporary, preview.name, install_optional_files, reporter, settings_override)
+                        return ModpackPackageManager._restore_instance_icon(result.instance, icon_temporary, preview.provider)
+                    finally:
+                        temporary.unlink(missing_ok=True)
+
+            reference = preview.provider_reference
+            if preview.provider == "modrinth":
+                project_id = str(reference.get("projectId") or "").strip()
+                version_id = str(reference.get("versionId") or "").strip()
+                if not project_id or not version_id:
+                    raise RuntimeError("The Modrinth provider profile is missing project/version IDs.")
+                result = ModrinthPackInstaller.install(project_id, version_id, preview.name, install_optional_files, reporter=reporter, settings_override=settings_override)
+            elif preview.provider == "curseforge":
+                project_id = int(reference.get("projectId") or 0)
+                file_id = int(reference.get("fileId") or 0)
+                if project_id <= 0 or file_id <= 0:
+                    raise RuntimeError("The CurseForge provider profile is missing project/file IDs.")
+                result = CurseForgePackInstaller.install(project_id, file_id, preview.name, install_optional_files, reporter=reporter, settings_override=settings_override)
+            elif preview.provider == "ftb":
+                project_id = int(reference.get("projectId") or 0)
+                version_id = int(reference.get("versionId") or 0)
+                if project_id <= 0 or version_id <= 0:
+                    raise RuntimeError("The FTB provider profile is missing project/version IDs.")
+                result = FTBPackInstaller.install(project_id, version_id, preview.name, install_optional_files, reporter=reporter, settings_override=settings_override)
+            else:
+                raise RuntimeError("Unsupported provider profile.")
+            return ModpackPackageManager._restore_instance_icon(result.instance, icon_temporary, preview.provider)
+        finally:
+            if icon_temporary is not None:
+                icon_temporary.unlink(missing_ok=True)
 
     @staticmethod
     def _export_provider_profile(instance: Instance, output_path: Path, options: ModpackExportOptions, on_progress: ProgressCallback | None) -> ModpackExportResult:
@@ -346,6 +361,7 @@ class ModpackPackageManager:
         if native is None and not reference_ready:
             raise RuntimeError("The original provider package is unavailable and the provider reference is incomplete.")
         settings = ModpackPackageManager._portable_settings(instance)
+        icon_metadata, icon_source = ModpackPackageManager._instance_icon_export(instance)
         profile = {
             "format": ModpackPackageManager.PROFILE_FORMAT,
             "formatVersion": ModpackPackageManager.PROFILE_VERSION,
@@ -364,6 +380,7 @@ class ModpackPackageManager:
                 if str(origin.get(key) or "").strip()
             },
             "fileCount": len(ModProvenanceRegistry.entries_by_file(instance)),
+            "instanceIcon": icon_metadata,
             "nativePackage": "",
             "nativePackageSha256": "",
             "distributionNotice": ModpackPackageManager.DISTRIBUTION_NOTICE,
@@ -377,6 +394,8 @@ class ModpackPackageManager:
                     profile["nativePackage"] = member
                     profile["nativePackageSha256"] = ProviderPackageStore.sha256(native)
                     archive.write(native, member)
+                if icon_source is not None:
+                    archive.write(icon_source, str(icon_metadata["member"]))
                 archive.writestr(ModpackPackageManager.PROFILE_MANIFEST, ModpackPackageManager._json_bytes(profile))
                 archive.writestr(ModpackPackageManager.SETTINGS_MEMBER, ModpackPackageManager._json_bytes(settings))
                 archive.writestr("DISTRIBUTION-NOTICE.txt", ModpackPackageManager.DISTRIBUTION_NOTICE + "\n")
@@ -455,6 +474,7 @@ class ModpackPackageManager:
             entries.append(entry)
 
         override_files = ModpackPackageManager._portable_override_files(instance, options.include_saves)
+        icon_metadata, icon_source = ModpackPackageManager._instance_icon_export(instance)
         manifest = {
             "format": ModpackPackageManager.PORTABLE_FORMAT,
             "formatVersion": ModpackPackageManager.PORTABLE_VERSION,
@@ -465,13 +485,13 @@ class ModpackPackageManager:
                 "name": instance.name,
                 "minecraftVersion": instance.version_id,
                 "modLoader": list(instance.mod_loader),
-                "icon": str(instance.icon or "grass_block"),
+                "icon": icon_metadata,
             },
             "files": entries,
             "overridesPrefix": ModpackPackageManager.OVERRIDES_PREFIX,
             "distributionNotice": ModpackPackageManager.DISTRIBUTION_NOTICE,
         }
-        total = len(entries) + len(override_files) + len(embedded) + 3
+        total = len(entries) + len(override_files) + len(embedded) + 3 + (1 if icon_source is not None else 0)
         current = 0
         reporter.files(ProgressStage.EXPORTING_INSTANCE, "Exporting portable modpack...", current, total)
         try:
@@ -485,6 +505,10 @@ class ModpackPackageManager:
                 reporter.files(ProgressStage.EXPORTING_INSTANCE, "Exporting portable modpack...", current, total)
                 archive.writestr("DISTRIBUTION-NOTICE.txt", ModpackPackageManager.DISTRIBUTION_NOTICE + "\n")
                 current += 1
+                if icon_source is not None:
+                    archive.write(icon_source, str(icon_metadata["member"]))
+                    current += 1
+                    reporter.files(ProgressStage.EXPORTING_INSTANCE, "Exporting portable modpack...", current, total)
                 for source, relative in override_files:
                     archive.write(source, f"{ModpackPackageManager.OVERRIDES_PREFIX}{relative}")
                     current += 1
@@ -507,10 +531,13 @@ class ModpackPackageManager:
         staging = Paths.instance_staging_root() / f"portable-import-{uuid4().hex}"
         staging.mkdir(parents=True, exist_ok=False)
         created: Instance | None = None
+        icon_temporary: Path | None = None
         try:
             with ZipFile(path, "r") as archive:
                 ModpackPackageManager._validate_archive(archive)
                 manifest = ModpackPackageManager._read_json(archive, ModpackPackageManager.PORTABLE_MANIFEST)
+                instance_manifest = manifest.get("instance") if isinstance(manifest.get("instance"), dict) else {}
+                icon_temporary = ModpackPackageManager._extract_instance_icon(archive, instance_manifest.get("icon"))
                 version = VersionManager.load(preview.minecraft_version)
                 loader = ModLoaderManager.resolve(preview.minecraft_version, preview.mod_loader[0], preview.mod_loader[1])
                 created = InstanceManager.create(preview.name, version, loader)
@@ -527,12 +554,18 @@ class ModpackPackageManager:
                     "source": "local_import",
                 }
                 ProviderPackageStore.save_origin(created, origin)
+                if icon_temporary is not None:
+                    created = ModpackPackageManager._restore_instance_icon(created, icon_temporary, "mcw")
+                else:
+                    created = ModpackPackageManager._restore_legacy_portable_icon(created, instance_manifest.get("icon"))
                 return InstanceManager.load(created.name)
         except Exception:
             if created is not None:
                 InstanceManager.delete_instance(created.name)
             raise
         finally:
+            if icon_temporary is not None:
+                icon_temporary.unlink(missing_ok=True)
             shutil.rmtree(staging, ignore_errors=True)
 
     @staticmethod
@@ -757,6 +790,92 @@ class ModpackPackageManager:
         return None
 
     @staticmethod
+    def _icon_value(value: object) -> str:
+        if isinstance(value, dict):
+            return str(value.get("value") or InstanceManager.DEFAULT_ICON).strip() or InstanceManager.DEFAULT_ICON
+        return str(value or InstanceManager.DEFAULT_ICON).strip() or InstanceManager.DEFAULT_ICON
+
+    @staticmethod
+    def _instance_icon_export(instance: Instance) -> tuple[dict, Path | None]:
+        source = InstanceManager.resolve_icon_path(instance)
+        if source is None:
+            return {"value": InstanceManager.DEFAULT_ICON, "member": "", "sha256": "", "size": 0}, None
+        try:
+            size = source.stat().st_size
+        except OSError:
+            return {"value": InstanceManager.DEFAULT_ICON, "member": "", "sha256": "", "size": 0}, None
+        suffix = source.suffix.casefold()
+        if suffix not in InstanceManager.ICON_EXTENSIONS or size <= 0 or size > InstanceManager.MAX_ICON_BYTES:
+            return {"value": InstanceManager.DEFAULT_ICON, "member": "", "sha256": "", "size": 0}, None
+        member = f"{ModpackPackageManager.INSTANCE_ICON_PREFIX}{suffix}"
+        return {
+            "value": str(instance.icon or InstanceManager.DEFAULT_ICON),
+            "member": member,
+            "sha256": ProviderPackageStore.sha256(source),
+            "size": size,
+        }, source
+
+    @staticmethod
+    def _extract_instance_icon(archive: ZipFile, value: object) -> Path | None:
+        if not isinstance(value, dict):
+            return None
+        member_name = str(value.get("member") or "").replace("\\", "/").strip("/")
+        if not member_name:
+            return None
+        relative = ModpackPackageManager._safe_relative(member_name)
+        if relative is None or not relative.as_posix().casefold().startswith(ModpackPackageManager.INSTANCE_ICON_PREFIX.casefold()):
+            raise RuntimeError("The modpack package declares an unsafe instance icon path.")
+        info = ModpackPackageManager._member(archive, relative.as_posix())
+        if info is None:
+            raise RuntimeError("The modpack package is missing its instance icon.")
+        expected_size = max(0, int(value.get("size", 0) or 0))
+        actual_size = max(0, int(info.file_size or 0))
+        if actual_size <= 0 or actual_size > InstanceManager.MAX_ICON_BYTES or (expected_size > 0 and actual_size != expected_size):
+            raise RuntimeError("The modpack package instance icon has an invalid size.")
+        suffix = Path(relative.name).suffix.casefold()
+        if suffix not in InstanceManager.ICON_EXTENSIONS:
+            raise RuntimeError("The modpack package instance icon uses an unsupported format.")
+        temporary = ModpackPackageManager._copy_member_to_temporary(archive, info, suffix)
+        try:
+            expected_sha256 = str(value.get("sha256") or "").strip().casefold()
+            if expected_sha256 and ProviderPackageStore.sha256(temporary).casefold() != expected_sha256:
+                raise RuntimeError("The modpack package instance icon checksum does not match.")
+            detected = InstanceArtworkManager._detect_extension(temporary)
+            suffix_matches = detected == suffix or {detected, suffix} <= {".jpg", ".jpeg"}
+            if not suffix_matches:
+                raise RuntimeError("The modpack package instance icon content does not match its file extension.")
+            return temporary
+        except Exception:
+            temporary.unlink(missing_ok=True)
+            raise
+
+    @staticmethod
+    def _restore_instance_icon(instance: Instance, icon_temporary: Path | None, package_provider: str) -> Instance:
+        if icon_temporary is None:
+            return InstanceManager.load(instance.name)
+        return InstanceManager.set_icon(
+            instance.name,
+            icon_temporary,
+            origin={"provider": "mcw-package", "package_provider": str(package_provider or "mcw").strip().casefold()},
+        )
+
+    @staticmethod
+    def _restore_legacy_portable_icon(instance: Instance, value: object) -> Instance:
+        if not isinstance(value, str):
+            return InstanceManager.load(instance.name)
+        relative = ModpackPackageManager._safe_relative(value)
+        if relative is None:
+            return InstanceManager.load(instance.name)
+        candidate = Path(instance.instance_dir).joinpath(*relative.parts)
+        if not candidate.is_file() or candidate.suffix.casefold() not in InstanceManager.ICON_EXTENSIONS:
+            return InstanceManager.load(instance.name)
+        return InstanceManager.set_icon(
+            instance.name,
+            candidate,
+            origin={"provider": "mcw-package", "package_provider": "legacy-portable"},
+        )
+
+    @staticmethod
     def _portable_settings(instance: Instance) -> dict:
         settings = SettingsManager.to_dict(SettingsManager.load(instance))
         settings["java"]["path"] = ""
@@ -860,7 +979,7 @@ class ModpackPackageManager:
                 continue
             if first == "saves" and not include_saves:
                 continue
-            if first == ".mcw" and len(parts) > 1 and (parts[1].casefold() in ignored_mcw or parts[1].casefold() == "provider"):
+            if first == ".mcw" and len(parts) > 1 and (parts[1].casefold() in ignored_mcw or parts[1].casefold() == "provider" or parts[1].casefold().startswith(f"{InstanceManager.ICON_BASENAME}.")):
                 continue
             output.append((path, relative))
         output.sort(key=lambda item: item[1].casefold())

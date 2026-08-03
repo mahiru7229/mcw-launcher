@@ -12,7 +12,11 @@ from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
 from src.core.package.modpack_package_manager import ModpackPackageManager
 from src.core.package.provider_package_store import ProviderPackageStore
 from src.models.package.modpack_export import ModpackExportOptions
+from src.models.package.provider_modpack_preview import ProviderModpackPreview
+from src.core.progress.progress_reporter import ProgressReporter
 
+
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"portable-icon"
 
 def write_mrpack(path: Path) -> None:
     index = {
@@ -129,6 +133,94 @@ def test_provider_profile_preserves_native_package_and_settings(tmp_path: Path, 
         assert profile["nativePackageSha256"] == hashlib.sha256(native.read_bytes()).hexdigest()
         assert archive.read(profile["nativePackage"]) == native.read_bytes()
         assert json.loads(archive.read("mcw/instance-settings.json"))["java"]["path"] == ""
+
+
+def test_provider_profile_exports_custom_instance_icon(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    instance = fake_instance(tmp_path / "instance")
+    icon = instance.instance_dir / ".mcw" / "instance-icon.png"
+    icon.parent.mkdir(parents=True)
+    icon.write_bytes(PNG_BYTES)
+    instance.icon = ".mcw/instance-icon.png"
+    native = tmp_path / "original.mrpack"
+    write_mrpack(native)
+    monkeypatch.setattr(ModpackPackageManager, "_provider_origin", lambda _instance: {
+        "provider": "modrinth",
+        "projectId": "project",
+        "versionId": "version",
+    })
+    monkeypatch.setattr(ProviderPackageStore, "native_package", lambda _instance: native)
+    monkeypatch.setattr(ModpackPackageManager, "_portable_settings", lambda _instance: {"java": {"path": ""}})
+    monkeypatch.setattr(ModProvenanceRegistry, "entries_by_file", lambda _instance: {})
+
+    output = ModpackPackageManager.export(instance, tmp_path / "profile-icon.zip", ModpackExportOptions(mode="provider_profile")).output_path
+
+    with ZipFile(output) as archive:
+        profile = json.loads(archive.read("mcw-profile.json"))
+        icon_metadata = profile["instanceIcon"]
+        assert icon_metadata["value"] == ".mcw/instance-icon.png"
+        assert icon_metadata["sha256"] == hashlib.sha256(PNG_BYTES).hexdigest()
+        assert archive.read(icon_metadata["member"]) == PNG_BYTES
+
+
+def test_portable_export_and_import_restore_custom_instance_icon(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    instance = fake_instance(tmp_path / "source-instance")
+    icon = instance.instance_dir / ".mcw" / "instance-icon.png"
+    icon.parent.mkdir(parents=True)
+    icon.write_bytes(PNG_BYTES)
+    instance.icon = ".mcw/instance-icon.png"
+    monkeypatch.setattr(ModProvenanceRegistry, "entries_by_file", lambda _instance: {})
+    monkeypatch.setattr(ModpackPackageManager, "_portable_settings", lambda _instance: {"java": {"path": ""}})
+    monkeypatch.setattr(ModpackPackageManager, "_portable_override_files", lambda _instance, _include_saves: [])
+
+    output = ModpackPackageManager.export(instance, tmp_path / "icon.mcwpack", ModpackExportOptions(mode="portable", portable_mode="smart")).output_path
+    with ZipFile(output) as archive:
+        manifest = json.loads(archive.read("mcwpack.json"))
+        icon_metadata = manifest["instance"]["icon"]
+        assert archive.read(icon_metadata["member"]) == PNG_BYTES
+        assert not any(name.startswith("overrides/.mcw/instance-icon") for name in archive.namelist())
+
+    imported_dir = tmp_path / "imported-instance"
+    imported_dir.mkdir()
+    imported = SimpleNamespace(name="Imported Icon", instance_dir=imported_dir, icon="grass_block")
+    preview = ProviderModpackPreview(
+        package_path=output,
+        provider="mcw",
+        package_format="portable_mcwpack",
+        name=imported.name,
+        version_id="1.21.1",
+        version_label="Portable",
+        version_id_source="mcwpack.json",
+        version_id_is_provider_native=False,
+        minecraft_version="1.21.1",
+        mod_loader=("fabric", "0.16.10"),
+        file_count=0,
+        settings={"java": {"path": ""}},
+    )
+    monkeypatch.setattr("src.core.package.modpack_package_manager.Paths.instance_staging_root", lambda: tmp_path / "staging")
+    monkeypatch.setattr("src.core.package.modpack_package_manager.VersionManager.load", lambda _version: object())
+    monkeypatch.setattr("src.core.package.modpack_package_manager.ModLoaderManager.resolve", lambda *_args: object())
+    monkeypatch.setattr("src.core.package.modpack_package_manager.InstanceManager.create", lambda *_args: imported)
+    monkeypatch.setattr("src.core.package.modpack_package_manager.SettingsManager.save_dict", lambda *_args: None)
+    monkeypatch.setattr(ModpackPackageManager, "_extract_prefixed", lambda *_args: None)
+    monkeypatch.setattr(ModpackPackageManager, "_extract_embedded", lambda *_args: None)
+    monkeypatch.setattr(ModpackPackageManager, "_write_portable_registries", lambda *_args: None)
+    monkeypatch.setattr("src.core.package.modpack_package_manager.ModProvenanceRegistry.synchronize", lambda *_args: None)
+    monkeypatch.setattr("src.core.package.modpack_package_manager.ProviderPackageStore.save_origin", lambda *_args: None)
+    monkeypatch.setattr("src.core.package.modpack_package_manager.InstanceManager.load", lambda _name: imported)
+    monkeypatch.setattr("src.core.package.modpack_package_manager.InstanceManager.delete_instance", lambda _name: None)
+
+    def set_icon(_name: str, source: Path, origin: dict | None = None):
+        assert source.read_bytes() == PNG_BYTES
+        assert origin == {"provider": "mcw-package", "package_provider": "mcw"}
+        imported.icon = ".mcw/instance-icon.png"
+        return imported
+
+    monkeypatch.setattr("src.core.package.modpack_package_manager.InstanceManager.set_icon", set_icon)
+
+    result = ModpackPackageManager._import_portable(output, preview, preview.settings, ProgressReporter())
+
+    assert result.icon == ".mcw/instance-icon.png"
+
 
 
 def test_portable_export_smart_references_and_full_embeds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
