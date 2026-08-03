@@ -1362,7 +1362,13 @@
     "modrinth.loader.neoforge": "NeoForge",
     "curseforge.loader.quilt": "Quilt",
     "curseforge.loader.neoforge": "NeoForge",
-    "content.icon.placeholder": "?"
+    "content.icon.placeholder": "?",
+    "content.settings.title": "Content browser",
+    "content.settings.detail": "Keep project cards compact by default. Full project descriptions can be shown when you need the extra information. Release versions remain enabled; Beta and Alpha are optional.",
+    "content.settings.show_descriptions": "Show full project descriptions in mod and modpack browsers",
+    "content.channels.applying": "Applying release channel selection…",
+    "content.cache.clearing": "Clearing content cache…",
+    "content.install.preparing": "Preparing installation…"
   },
   "aliases": {
     "MCW Launcher": "app.name",

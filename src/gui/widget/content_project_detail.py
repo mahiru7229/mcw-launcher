@@ -36,6 +36,7 @@ class ContentProjectDetailPanel(QFrame):
         self._image_cache = image_cache
         self._project_token = ""
         self._web_url = ""
+        self._show_description = False
         self._legacy_action_row: QHBoxLayout | None = None
         self._build_ui()
         self.clear(tr("content.details.select_project"))
@@ -108,6 +109,7 @@ class ContentProjectDetailPanel(QFrame):
         self.description_browser.setOpenExternalLinks(True)
         self.description_browser.setMinimumHeight(130)
         self.description_browser.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.description_browser.setVisible(self._show_description)
         root.addWidget(self.description_browser, 1)
 
         self.status_label = QLabel()
@@ -142,6 +144,15 @@ class ContentProjectDetailPanel(QFrame):
             self._legacy_action_row.setSpacing(8)
             self.actions_layout.addLayout(self._legacy_action_row)
         self._legacy_action_row.addStretch()
+
+    @property
+    def description_visible(self) -> bool:
+        return self._show_description
+
+    def set_description_visible(self, visible: bool) -> None:
+        self._show_description = bool(visible)
+        self.description_browser.setVisible(self._show_description)
+        self.updateGeometry()
 
     def set_open_web_text(self, text: str) -> None:
         self.open_web_button.setText(text)

@@ -44,16 +44,18 @@ class ModrinthBrowserDialog(QDialog):
         self._suggested_instance_name = ""
         self._instance_name_customized = False
         self._pending_channel_preferences = (False, False)
+        self._busy = False
         self._image_cache = RemoteImageCache(self)
         self._channel_change_timer = QTimer(self)
         self._channel_change_timer.setSingleShot(True)
-        self._channel_change_timer.setInterval(25)
+        self._channel_change_timer.setInterval(60)
         self._channel_change_timer.timeout.connect(self._apply_queued_channel_change)
         self._build_ui()
         self.retranslate_dynamic()
 
     def _build_ui(self) -> None:
-        resize_dialog_to_screen(self, 1180, 760, 960, 620)
+        _, dialog_height = resize_dialog_to_screen(self, 1360, 680, 1040, 540)
+        self.setMaximumHeight(dialog_height)
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 18, 18, 18)
         root.setSpacing(12)
@@ -173,9 +175,9 @@ class ModrinthBrowserDialog(QDialog):
         results_panel.setMinimumWidth(420)
         splitter.addWidget(results_panel)
         splitter.addWidget(self.detail_panel)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 1)
-        splitter.setSizes([500, 580])
+        splitter.setStretchFactor(0, 5)
+        splitter.setStretchFactor(1, 7)
+        splitter.setSizes([540, 760])
         root.addWidget(splitter, 1)
 
     @property
@@ -204,6 +206,12 @@ class ModrinthBrowserDialog(QDialog):
         self.include_beta_checkbox.blockSignals(False)
         self.include_alpha_checkbox.blockSignals(False)
         self._apply_version_filter()
+        if not self._busy:
+            self.include_beta_checkbox.setEnabled(True)
+            self.include_alpha_checkbox.setEnabled(True)
+
+    def set_show_project_descriptions(self, visible: bool) -> None:
+        self.detail_panel.set_description_visible(visible)
 
     def set_searching(self, loader: str = "") -> None:
         if loader and str(loader).strip().lower() != self.selected_loader:
@@ -326,15 +334,16 @@ class ModrinthBrowserDialog(QDialog):
             self._version_selected()
 
     def set_busy(self, busy: bool) -> None:
-        self.search_button.setEnabled(not busy)
-        self.results_table.setEnabled(not busy)
-        self.version_combo.setEnabled(not busy)
-        self.loader_combo.setEnabled(not busy)
-        self.include_beta_checkbox.setEnabled(not busy)
-        self.include_alpha_checkbox.setEnabled(not busy)
-        self.install_button.setEnabled(not busy and bool(self._versions))
-        self.previous_button.setEnabled(not busy and self._result is not None and self._result.offset > 0)
-        self.next_button.setEnabled(not busy and self._result is not None and self._result.offset + self._result.limit < self._result.total_hits)
+        self._busy = bool(busy)
+        self.search_button.setEnabled(not self._busy)
+        self.results_table.setEnabled(not self._busy)
+        self.version_combo.setEnabled(not self._busy)
+        self.loader_combo.setEnabled(not self._busy)
+        self.include_beta_checkbox.setEnabled(not self._busy)
+        self.include_alpha_checkbox.setEnabled(not self._busy)
+        self.install_button.setEnabled(not self._busy and bool(self._versions))
+        self.previous_button.setEnabled(not self._busy and self._result is not None and self._result.offset > 0)
+        self.next_button.setEnabled(not self._busy and self._result is not None and self._result.offset + self._result.limit < self._result.total_hits)
 
     def show_error(self, title: str, message: str) -> None:
         QMessageBox.critical(self, title, message)
@@ -352,7 +361,7 @@ class ModrinthBrowserDialog(QDialog):
             label = f"{version.version_number} • {version.version_type} • Minecraft {game_text}"
             self.version_combo.addItem(label, version.version_id)
         self.version_combo.blockSignals(False)
-        self.install_button.setEnabled(bool(self._versions))
+        self.install_button.setEnabled(not self._busy and bool(self._versions))
         if self._versions:
             self._version_selected()
         elif self._selected_project is not None:
@@ -374,12 +383,19 @@ class ModrinthBrowserDialog(QDialog):
             self.include_beta_checkbox.isChecked(),
             self.include_alpha_checkbox.isChecked(),
         )
+        self.release_channel_label.setText(tr("content.channels.applying"))
+        self.include_beta_checkbox.setEnabled(False)
+        self.include_alpha_checkbox.setEnabled(False)
+        self._commit_feedback(self.include_beta_checkbox, self.include_alpha_checkbox, self.release_channel_label)
         self._channel_change_timer.start()
 
     def _apply_queued_channel_change(self) -> None:
         include_beta, include_alpha = self._pending_channel_preferences
         self._apply_version_filter()
         self.channel_preferences_changed.emit(include_beta, include_alpha)
+        if not self._busy:
+            self.include_beta_checkbox.setEnabled(True)
+            self.include_alpha_checkbox.setEnabled(True)
 
     def _loader_changed(self, _index: int) -> None:
         self._offset = 0
@@ -397,7 +413,10 @@ class ModrinthBrowserDialog(QDialog):
             return
         self._offset = 0
         self.set_searching(self.selected_loader)
-        self.search_requested.emit(self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset, self.selected_loader)
+        self.search_button.setEnabled(False)
+        self._commit_feedback(self.search_button, self.result_count_label, self.details_label)
+        request = (self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset, self.selected_loader)
+        QTimer.singleShot(0, lambda values=request: self.search_requested.emit(*values))
 
     def _project_selected(self) -> None:
         rows = self.results_table.selectionModel().selectedRows()
@@ -522,10 +541,18 @@ class ModrinthBrowserDialog(QDialog):
                 if instance_loader != self.selected_loader:
                     QMessageBox.information(self, tr("modrinth.title"), tr("modrinth.loader.instance_mismatch", instance_loader=instance_loader.title(), selected_loader=self.selected_loader.title()))
                     return
-            self.install_mod_requested.emit(version.version_id, self.selected_loader)
+            self.install_button.setEnabled(False)
+            self.details_label.setText(tr("content.install.preparing"))
+            self._commit_feedback(self.install_button, self.details_label)
+            request = (version.version_id, self.selected_loader)
+            QTimer.singleShot(0, lambda values=request: self.install_mod_requested.emit(*values))
             return
         name = self.instance_name_input.text().strip()
-        self.install_modpack_requested.emit(project.project_id, version.version_id, name, self.optional_checkbox.isChecked(), self.allowed_version_types, self.selected_loader)
+        self.install_button.setEnabled(False)
+        self.details_label.setText(tr("content.install.preparing"))
+        self._commit_feedback(self.install_button, self.details_label)
+        request = (project.project_id, version.version_id, name, self.optional_checkbox.isChecked(), self.allowed_version_types, self.selected_loader)
+        QTimer.singleShot(0, lambda values=request: self.install_modpack_requested.emit(*values))
 
     def _selected_version(self) -> ModrinthVersion | None:
         index = self.version_combo.currentIndex()
@@ -537,17 +564,27 @@ class ModrinthBrowserDialog(QDialog):
     def _previous_page(self) -> None:
         self._offset = max(0, self._offset - self.PAGE_SIZE)
         self.set_searching(self.selected_loader)
-        self.search_requested.emit(self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset, self.selected_loader)
+        self._commit_feedback(self.result_count_label, self.details_label)
+        request = (self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset, self.selected_loader)
+        QTimer.singleShot(0, lambda values=request: self.search_requested.emit(*values))
 
     def _next_page(self) -> None:
         self._offset += self.PAGE_SIZE
         self.set_searching(self.selected_loader)
-        self.search_requested.emit(self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset, self.selected_loader)
+        self._commit_feedback(self.result_count_label, self.details_label)
+        request = (self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset, self.selected_loader)
+        QTimer.singleShot(0, lambda values=request: self.search_requested.emit(*values))
 
     @staticmethod
     def _safe_instance_name(value: str) -> str:
         cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1F]', "_", str(value)).strip().rstrip(". ")
         return cleaned[:80] or "Modrinth Modpack"
+
+    @staticmethod
+    def _commit_feedback(*widgets: QWidget) -> None:
+        for widget in widgets:
+            widget.update()
+            widget.repaint()
 
     def retranslate_dynamic(self) -> None:
         is_mod = self.project_type == "mod"

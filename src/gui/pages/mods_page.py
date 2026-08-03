@@ -56,7 +56,7 @@ class ModsPage(BasePage):
 
         self._channel_change_timer = QTimer(self)
         self._channel_change_timer.setSingleShot(True)
-        self._channel_change_timer.setInterval(25)
+        self._channel_change_timer.setInterval(60)
         self._channel_change_timer.timeout.connect(self._apply_queued_channel_change)
 
         self._cooldown_timer = QTimer(self)
@@ -129,7 +129,7 @@ class ModsPage(BasePage):
         self.refresh_button = set_theme_icon(QPushButton(), "icon.action.refresh")
         self.refresh_button.clicked.connect(self._request_refresh)
         self.clear_cache_button = QPushButton()
-        self.clear_cache_button.clicked.connect(self.curseforge_clear_cache_requested.emit)
+        self.clear_cache_button.clicked.connect(self._request_clear_cache)
         cache_row.addWidget(self.cache_status_label, 1)
         cache_row.addWidget(self.refresh_button)
         cache_row.addWidget(self.clear_cache_button)
@@ -243,6 +243,12 @@ class ModsPage(BasePage):
         self.include_alpha_checkbox.blockSignals(False)
         if self.selected_provider == "modrinth":
             self._apply_modrinth_version_filter()
+        if not self._busy:
+            self.include_beta_checkbox.setEnabled(True)
+            self.include_alpha_checkbox.setEnabled(True)
+
+    def set_show_project_descriptions(self, visible: bool) -> None:
+        self.detail_panel.set_description_visible(visible)
 
     def set_searching(self, loader: str = "", provider: str = "modrinth") -> None:
         if str(provider).strip().lower() != self.selected_provider:
@@ -430,10 +436,16 @@ class ModsPage(BasePage):
                 return
             self._refresh_files_after_search = False
             self.set_searching(self.selected_loader, "curseforge")
-            self.curseforge_search_requested.emit(self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._offset, self.selected_loader)
+            self.search_button.setEnabled(False)
+            self._commit_feedback(self.search_button, self.result_count_label, self.details_label)
+            request = (self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._offset, self.selected_loader)
+            QTimer.singleShot(0, lambda values=request: self.curseforge_search_requested.emit(*values))
             return
         self.set_searching(self.selected_loader, "modrinth")
-        self.search_requested.emit(self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset, self.selected_loader)
+        self.search_button.setEnabled(False)
+        self._commit_feedback(self.search_button, self.result_count_label, self.details_label)
+        request = (self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset, self.selected_loader)
+        QTimer.singleShot(0, lambda values=request: self.search_requested.emit(*values))
 
     def _request_refresh(self) -> None:
         if self.selected_provider != "curseforge":
@@ -447,7 +459,16 @@ class ModsPage(BasePage):
             return
         self._refresh_files_after_search = True
         self.set_searching(self.selected_loader, "curseforge")
-        self.curseforge_refresh_requested.emit(self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._offset, self.selected_loader)
+        self.refresh_button.setEnabled(False)
+        self._commit_feedback(self.refresh_button, self.result_count_label, self.details_label)
+        request = (self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._offset, self.selected_loader)
+        QTimer.singleShot(0, lambda values=request: self.curseforge_refresh_requested.emit(*values))
+
+    def _request_clear_cache(self) -> None:
+        self.clear_cache_button.setEnabled(False)
+        self.cache_status_label.setText(tr("content.cache.clearing"))
+        self._commit_feedback(self.clear_cache_button, self.cache_status_label)
+        QTimer.singleShot(0, self.curseforge_clear_cache_requested.emit)
 
     def _project_selected(self) -> None:
         rows = self.results_table.selectionModel().selectedRows()
@@ -670,14 +691,19 @@ class ModsPage(BasePage):
         return tr(key, loader=self.selected_loader.title())
 
     def _request_install(self) -> None:
+        self.install_button.setEnabled(False)
+        self.details_label.setText(tr("content.install.preparing"))
+        self._commit_feedback(self.install_button, self.details_label)
         if self.selected_provider == "curseforge":
             file = self.selected_curseforge_file()
             if file is not None:
-                self.curseforge_install_requested.emit(file, self.selected_loader, self.allowed_version_types)
+                request = (file, self.selected_loader, self.allowed_version_types)
+                QTimer.singleShot(0, lambda values=request: self.curseforge_install_requested.emit(*values))
             return
         version = self.selected_version()
         if version is not None:
-            self.install_requested.emit(version, self.selected_loader, self.allowed_version_types)
+            request = (version, self.selected_loader, self.allowed_version_types)
+            QTimer.singleShot(0, lambda values=request: self.install_requested.emit(*values))
 
     def selected_version(self) -> ModrinthVersion | None:
         if self.selected_provider != "modrinth":
@@ -705,10 +731,14 @@ class ModsPage(BasePage):
     def _request_current_page(self) -> None:
         if self.selected_provider == "curseforge":
             self.set_searching(self.selected_loader, "curseforge")
-            self.curseforge_search_requested.emit(self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._offset, self.selected_loader)
+            self._commit_feedback(self.result_count_label, self.details_label)
+            request = (self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._offset, self.selected_loader)
+            QTimer.singleShot(0, lambda values=request: self.curseforge_search_requested.emit(*values))
             return
         self.set_searching(self.selected_loader, "modrinth")
-        self.search_requested.emit(self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset, self.selected_loader)
+        self._commit_feedback(self.result_count_label, self.details_label)
+        request = (self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset, self.selected_loader)
+        QTimer.singleShot(0, lambda values=request: self.search_requested.emit(*values))
 
     def _provider_changed(self, _index: int) -> None:
         self._reset_catalog()
@@ -720,15 +750,23 @@ class ModsPage(BasePage):
 
     def _channels_changed(self, _checked: bool) -> None:
         self._pending_channel_preferences = (self.include_beta_checkbox.isChecked(), self.include_alpha_checkbox.isChecked())
+        self.release_channel_label.setText(tr("content.channels.applying"))
+        self.include_beta_checkbox.setEnabled(False)
+        self.include_alpha_checkbox.setEnabled(False)
+        self._commit_feedback(self.include_beta_checkbox, self.include_alpha_checkbox, self.release_channel_label)
         self._channel_change_timer.start()
 
     def _apply_queued_channel_change(self) -> None:
         include_beta, include_alpha = self._pending_channel_preferences
         self.channel_preferences_changed.emit(include_beta, include_alpha)
         if self.selected_provider == "curseforge" and isinstance(self._selected_project, CurseForgeProject):
+            self._update_channel_summary()
             self.curseforge_files_requested.emit(self._selected_project.project_id, self.selected_loader, self.allowed_version_types)
         else:
             self._apply_modrinth_version_filter()
+        if not self._busy:
+            self.include_beta_checkbox.setEnabled(True)
+            self.include_alpha_checkbox.setEnabled(True)
 
     def _render_project_rows(self) -> None:
         self.results_table.blockSignals(True)
@@ -881,6 +919,12 @@ class ModsPage(BasePage):
         if hours < 24:
             return tr("curseforge.cache.hours_ago", value=hours)
         return tr("curseforge.cache.days_ago", value=hours // 24)
+
+    @staticmethod
+    def _commit_feedback(*widgets: QWidget) -> None:
+        for widget in widgets:
+            widget.update()
+            widget.repaint()
 
     def retranslate_dynamic(self) -> None:
         self.provider_label.setText(tr("mods.catalog.provider.label"))

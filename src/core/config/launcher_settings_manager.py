@@ -16,7 +16,7 @@ from src.core.theme.theme_palette import normalize_hex_color
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 13
+    SCHEMA_VERSION = 14
     UPDATE_CHANNEL_POLICY_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
@@ -25,6 +25,7 @@ class LauncherSettingsManager:
             "show_snapshots": False,
             "remember_window_size": True,
             "language": "en-US",
+            "show_content_descriptions": False,
         },
         "launch": {
             "debug_mode": False,
@@ -173,6 +174,7 @@ class LauncherSettingsManager:
         gui["show_snapshots"] = self._as_bool(gui.get("show_snapshots"), False)
         gui["remember_window_size"] = self._as_bool(gui.get("remember_window_size"), True)
         gui["language"] = str(gui.get("language") or "en-US")
+        gui["show_content_descriptions"] = self._as_bool(gui.get("show_content_descriptions"), False)
 
         launch = normalized.setdefault("launch", {})
         launch["debug_mode"] = self._as_bool(launch.get("debug_mode"), False)

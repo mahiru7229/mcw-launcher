@@ -56,7 +56,7 @@ class CurseForgeBrowserDialog(QDialog):
         self._image_cache = RemoteImageCache(self)
         self._channel_change_timer = QTimer(self)
         self._channel_change_timer.setSingleShot(True)
-        self._channel_change_timer.setInterval(25)
+        self._channel_change_timer.setInterval(60)
         self._channel_change_timer.timeout.connect(self._apply_queued_channel_change)
         self._cooldown_timer = QTimer(self)
         self._cooldown_timer.setInterval(1000)
@@ -67,7 +67,8 @@ class CurseForgeBrowserDialog(QDialog):
         self.set_cache_info(self._cache_info)
 
     def _build_ui(self) -> None:
-        resize_dialog_to_screen(self, 1180, 760, 960, 620)
+        _, dialog_height = resize_dialog_to_screen(self, 1360, 680, 1040, 540)
+        self.setMaximumHeight(dialog_height)
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 18, 18, 18)
         root.setSpacing(12)
@@ -114,7 +115,7 @@ class CurseForgeBrowserDialog(QDialog):
         self.refresh_button = set_theme_icon(QPushButton(), "icon.action.refresh")
         self.refresh_button.clicked.connect(self._request_refresh)
         self.clear_cache_button = QPushButton()
-        self.clear_cache_button.clicked.connect(self.clear_cache_requested.emit)
+        self.clear_cache_button.clicked.connect(self._request_clear_cache)
         provider_row.addWidget(self.cache_status_label, 1)
         provider_row.addWidget(self.refresh_button)
         provider_row.addWidget(self.clear_cache_button)
@@ -201,9 +202,9 @@ class CurseForgeBrowserDialog(QDialog):
         results_panel.setMinimumWidth(420)
         splitter.addWidget(results_panel)
         splitter.addWidget(self.detail_panel)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 1)
-        splitter.setSizes([500, 580])
+        splitter.setStretchFactor(0, 5)
+        splitter.setStretchFactor(1, 7)
+        splitter.setSizes([540, 760])
         root.addWidget(splitter, 1)
 
     @property
@@ -239,6 +240,25 @@ class CurseForgeBrowserDialog(QDialog):
         self.include_alpha_checkbox.setChecked(bool(include_alpha))
         self.include_beta_checkbox.blockSignals(False)
         self.include_alpha_checkbox.blockSignals(False)
+        if not self._busy:
+            self.include_beta_checkbox.setEnabled(True)
+            self.include_alpha_checkbox.setEnabled(True)
+
+    def set_show_project_descriptions(self, visible: bool) -> None:
+        self.detail_panel.set_description_visible(visible)
+
+    def set_searching(self, loader: str = "") -> None:
+        if loader and str(loader).strip().casefold() != self.loader:
+            return
+        self._result = None
+        self._projects = []
+        self.results_table.clearSelection()
+        self.results_table.clearContents()
+        self.results_table.setRowCount(0)
+        self.result_count_label.setText(tr("mods.catalog.curseforge.searching"))
+        self.previous_button.setEnabled(False)
+        self.next_button.setEnabled(False)
+        self._clear_selection(tr("mods.catalog.curseforge.contacting"))
 
     def set_instance(self, instance: Instance | None) -> None:
         self._instance = instance
@@ -375,13 +395,21 @@ class CurseForgeBrowserDialog(QDialog):
             self.include_beta_checkbox.isChecked(),
             self.include_alpha_checkbox.isChecked(),
         )
+        self.release_channel_label.setText(tr("content.channels.applying"))
+        self.include_beta_checkbox.setEnabled(False)
+        self.include_alpha_checkbox.setEnabled(False)
+        self._commit_feedback(self.include_beta_checkbox, self.include_alpha_checkbox, self.release_channel_label)
         self._channel_change_timer.start()
 
     def _apply_queued_channel_change(self) -> None:
         include_beta, include_alpha = self._pending_channel_preferences
         self.channel_preferences_changed.emit(include_beta, include_alpha)
+        self.release_channel_label.setText(tr("curseforge.channel.release_always"))
         if self._selected_project is not None:
             self.files_requested.emit(self.project_type, self._selected_project.project_id, self.game_version, self.loader, self.allowed_release_types)
+        if not self._busy:
+            self.include_beta_checkbox.setEnabled(True)
+            self.include_alpha_checkbox.setEnabled(True)
 
     def _loader_changed(self, _index: int) -> None:
         if self.project_type != "modpack":
@@ -407,7 +435,11 @@ class CurseForgeBrowserDialog(QDialog):
             QMessageBox.information(self, tr("curseforge.title"), tr("curseforge.search.required"))
             return
         self._index = 0
-        self.search_requested.emit(self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._index)
+        self.set_searching(self.loader)
+        self.search_button.setEnabled(False)
+        self._commit_feedback(self.search_button, self.result_count_label, self.details_label)
+        request = (self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._index)
+        QTimer.singleShot(0, lambda values=request: self.search_requested.emit(*values))
 
     def _request_refresh(self) -> None:
         if not self.search_input.text().strip():
@@ -417,7 +449,17 @@ class CurseForgeBrowserDialog(QDialog):
             self._render_cache_status()
             return
         self._refresh_files_after_search = True
-        self.refresh_requested.emit(self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._index)
+        self.set_searching(self.loader)
+        self.refresh_button.setEnabled(False)
+        self._commit_feedback(self.refresh_button, self.result_count_label, self.details_label)
+        request = (self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._index)
+        QTimer.singleShot(0, lambda values=request: self.refresh_requested.emit(*values))
+
+    def _request_clear_cache(self) -> None:
+        self.clear_cache_button.setEnabled(False)
+        self.cache_status_label.setText(tr("content.cache.clearing"))
+        self._commit_feedback(self.clear_cache_button, self.cache_status_label)
+        QTimer.singleShot(0, self.clear_cache_requested.emit)
 
     def _project_selected(self) -> None:
         rows = self.results_table.selectionModel().selectedRows()
@@ -547,17 +589,15 @@ class CurseForgeBrowserDialog(QDialog):
         project = self._selected_project
         if file is None or project is None:
             return
+        self.install_button.setEnabled(False)
+        self.details_label.setText(tr("content.install.preparing"))
+        self._commit_feedback(self.install_button, self.details_label)
         if self.project_type == "mod":
-            self.install_mod_requested.emit(project.project_id, file.file_id, self.allowed_release_types)
+            request = (project.project_id, file.file_id, self.allowed_release_types)
+            QTimer.singleShot(0, lambda values=request: self.install_mod_requested.emit(*values))
             return
-        self.install_modpack_requested.emit(
-            project.project_id,
-            file.file_id,
-            self.instance_name_input.text().strip(),
-            self.optional_checkbox.isChecked(),
-            self.allowed_release_types,
-            self.loader,
-        )
+        request = (project.project_id, file.file_id, self.instance_name_input.text().strip(), self.optional_checkbox.isChecked(), self.allowed_release_types, self.loader)
+        QTimer.singleShot(0, lambda values=request: self.install_modpack_requested.emit(*values))
 
     def selected_file(self) -> CurseForgeFile | None:
         file_id = int(self.file_combo.currentData() or 0)
@@ -565,11 +605,17 @@ class CurseForgeBrowserDialog(QDialog):
 
     def _previous_page(self) -> None:
         self._index = max(0, self._index - self.PAGE_SIZE)
-        self.search_requested.emit(self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._index)
+        self.set_searching(self.loader)
+        self._commit_feedback(self.result_count_label, self.details_label)
+        request = (self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._index)
+        QTimer.singleShot(0, lambda values=request: self.search_requested.emit(*values))
 
     def _next_page(self) -> None:
         self._index += self.PAGE_SIZE
-        self.search_requested.emit(self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._index)
+        self.set_searching(self.loader)
+        self._commit_feedback(self.result_count_label, self.details_label)
+        request = (self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "popularity"), self._index)
+        QTimer.singleShot(0, lambda values=request: self.search_requested.emit(*values))
 
     def _render_cache_status(self) -> None:
         info = self._cache_info
@@ -616,6 +662,12 @@ class CurseForgeBrowserDialog(QDialog):
     def _safe_instance_name(value: str) -> str:
         cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1F]', "_", str(value)).strip().rstrip(". ")
         return cleaned[:80] or "CurseForge Modpack"
+
+    @staticmethod
+    def _commit_feedback(*widgets: QWidget) -> None:
+        for widget in widgets:
+            widget.update()
+            widget.repaint()
 
     def retranslate_dynamic(self) -> None:
         is_mod = self.project_type == "mod"

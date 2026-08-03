@@ -49,3 +49,17 @@ def test_disabling_tester_mode_returns_to_stable(tmp_path: Path) -> None:
     assert controller.current["tester_mode"] is False
     assert controller.current["update_channel"] == "stable"
     assert LauncherSettingsManager(settings_path).load()["updates"]["channel"] == "stable"
+
+
+def test_content_description_visibility_round_trips_through_gui_settings(tmp_path: Path) -> None:
+    settings_path = tmp_path / "launcher_settings.json"
+    controller = _controller(settings_path)
+    data = controller.load()
+
+    assert data["show_content_descriptions"] is False
+
+    data["show_content_descriptions"] = True
+    controller.save(data)
+
+    assert controller.current["show_content_descriptions"] is True
+    assert LauncherSettingsManager(settings_path).load()["gui"]["show_content_descriptions"] is True

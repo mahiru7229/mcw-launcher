@@ -127,12 +127,14 @@ class LauncherSettingsPage(BasePage):
         language_card.layout.addWidget(reload_languages_button)
         general_section.add_card(language_card)
 
-        modrinth_card = CardWidget("Modrinth release channels", "Release versions are always shown. Enable Beta or Alpha only when you accept less stable project versions.")
+        self.content_browser_card = CardWidget(tr("content.settings.title"), tr("content.settings.detail"))
+        self.show_content_descriptions = QCheckBox(tr("content.settings.show_descriptions"))
         self.modrinth_include_beta = QCheckBox("Include Beta mod and modpack versions")
         self.modrinth_include_alpha = QCheckBox("Include Alpha mod and modpack versions")
-        modrinth_card.layout.addWidget(self.modrinth_include_beta)
-        modrinth_card.layout.addWidget(self.modrinth_include_alpha)
-        downloads_section.add_card(modrinth_card)
+        self.content_browser_card.layout.addWidget(self.show_content_descriptions)
+        self.content_browser_card.layout.addWidget(self.modrinth_include_beta)
+        self.content_browser_card.layout.addWidget(self.modrinth_include_alpha)
+        downloads_section.add_card(self.content_browser_card)
 
         managed_checks_card = CardWidget(
             tr("managed_content.launcher.title"),
@@ -413,6 +415,7 @@ class LauncherSettingsPage(BasePage):
         self.download_limit_mbps.valueChanged.connect(self._refresh_dirty_state)
         self.download_concurrency.currentIndexChanged.connect(self._refresh_dirty_state)
         self.language_combo.currentIndexChanged.connect(self._refresh_dirty_state)
+        self.show_content_descriptions.toggled.connect(self._refresh_dirty_state)
         self.modrinth_include_beta.toggled.connect(self._refresh_dirty_state)
         self.modrinth_include_alpha.toggled.connect(self._refresh_dirty_state)
         self.block_modrinth_failure.toggled.connect(self._refresh_dirty_state)
@@ -670,6 +673,7 @@ class LauncherSettingsPage(BasePage):
             "debug_mode": self.debug_mode.isChecked(),
             "remember_window_size": self.remember_window_size.isChecked(),
             "language": self.language_combo.currentData() or "en-US",
+            "show_content_descriptions": self.show_content_descriptions.isChecked(),
             "auto_check_updates": self.auto_check_updates.isChecked(),
             "tester_mode": self.join_tester_program.isChecked(),
             "theme": self.theme_combo.currentData() or "mcw-default",
@@ -736,6 +740,11 @@ class LauncherSettingsPage(BasePage):
             label.setText(tr("curseforge.gateway.slot", index=index))
         self.reveal_curseforge_gateways.setText(tr("curseforge.gateway.reveal.toggle"))
         self.curseforge_gateway_security.setText(tr("curseforge.gateway.security.note"))
+        if self.content_browser_card.title_label is not None:
+            self.content_browser_card.title_label.setText(tr("content.settings.title"))
+        if self.content_browser_card.subtitle_label is not None:
+            self.content_browser_card.subtitle_label.setText(tr("content.settings.detail"))
+        self.show_content_descriptions.setText(tr("content.settings.show_descriptions"))
         self.block_modrinth_failure.setText(tr("managed_content.modrinth.block"))
         self.block_curseforge_failure.setText(tr("managed_content.curseforge.block"))
         self.allow_forge_preflight_failure.setText(tr("forge_preflight.launcher.allow"))
@@ -786,6 +795,7 @@ class LauncherSettingsPage(BasePage):
             self.debug_mode,
             self.remember_window_size,
             self.auto_check_updates,
+            self.show_content_descriptions,
             self.modrinth_include_beta,
             self.modrinth_include_alpha,
             self.block_modrinth_failure,
@@ -810,6 +820,7 @@ class LauncherSettingsPage(BasePage):
         self.debug_mode.setChecked(bool(settings.get("debug_mode", False)))
         self.remember_window_size.setChecked(bool(settings.get("remember_window_size", True)))
         self.auto_check_updates.setChecked(bool(settings.get("auto_check_updates", True)))
+        self.show_content_descriptions.setChecked(bool(settings.get("show_content_descriptions", False)))
         self.modrinth_include_beta.setChecked(bool(settings.get("modrinth_include_beta", False)))
         self.modrinth_include_alpha.setChecked(bool(settings.get("modrinth_include_alpha", False)))
         self.block_modrinth_failure.setChecked(bool(settings.get("block_launch_on_modrinth_failure", True)))

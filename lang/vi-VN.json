@@ -1362,7 +1362,13 @@
     "modrinth.loader.neoforge": "NeoForge",
     "curseforge.loader.quilt": "Quilt",
     "curseforge.loader.neoforge": "NeoForge",
-    "content.icon.placeholder": "?"
+    "content.icon.placeholder": "?",
+    "content.settings.title": "Trình duyệt nội dung",
+    "content.settings.detail": "Mặc định giữ thẻ dự án gọn nhẹ. Chỉ hiện mô tả đầy đủ khi cần thêm thông tin. Bản Release luôn được bật; Beta và Alpha là tùy chọn.",
+    "content.settings.show_descriptions": "Hiện mô tả đầy đủ trong trình duyệt mod và modpack",
+    "content.channels.applying": "Đang áp dụng lựa chọn kênh phát hành…",
+    "content.cache.clearing": "Đang xóa cache nội dung…",
+    "content.install.preparing": "Đang chuẩn bị cài đặt…"
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

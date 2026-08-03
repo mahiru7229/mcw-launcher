@@ -101,6 +101,9 @@ def test_mod_browser_defaults_to_instance_loader_and_emits_forge_filter(app, tmp
     dialog._request_search()
 
     assert dialog.selected_loader == "forge"
+    assert dialog.search_button.isEnabled() is False
+    assert requested == []
+    app.processEvents()
     assert requested == [("mod", "forge")]
     assert "Forge" in dialog.context_label.text()
 
@@ -144,3 +147,15 @@ def test_modpack_dialog_keeps_version_and_instance_fields_on_separate_rows(app):
     assert dialog.version_combo.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
     assert dialog.instance_name_input.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
     assert dialog.install_button.minimumWidth() >= 210
+
+
+def test_dialog_is_wide_and_description_is_opt_in(app):
+    dialog = ModrinthBrowserDialog("modpack")
+
+    assert dialog.width() >= dialog.height()
+    assert dialog.height() <= 680
+    assert dialog.maximumHeight() == dialog.height()
+    assert dialog.detail_panel.description_visible is False
+
+    dialog.set_show_project_descriptions(True)
+    assert dialog.detail_panel.description_visible is True

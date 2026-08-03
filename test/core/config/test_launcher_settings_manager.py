@@ -13,6 +13,7 @@ def test_initialize_creates_launcher_settings_file(tmp_path: Path) -> None:
     assert manager.initialize() == path
     assert path.exists()
     assert manager.load()["gui"]["language"] == "en-US"
+    assert manager.load()["gui"]["show_content_descriptions"] is False
 
 
 def test_save_updates_sections_and_preserves_unknown_options(tmp_path: Path) -> None:
@@ -43,6 +44,16 @@ def test_invalid_file_is_backed_up_and_recreated(tmp_path: Path) -> None:
     assert data["schema_version"] == manager.SCHEMA_VERSION
     assert json.loads(path.read_text(encoding="utf-8"))["gui"]["start_page"] == "instances"
     assert (tmp_path / "launcher_settings.json.broken").read_text(encoding="utf-8") == "not json"
+
+
+def test_content_descriptions_are_opt_in_and_persisted(tmp_path: Path) -> None:
+    manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
+
+    assert manager.load()["gui"]["show_content_descriptions"] is False
+
+    manager.update_section("gui", {"show_content_descriptions": True})
+
+    assert manager.load()["gui"]["show_content_descriptions"] is True
 
 
 def test_window_geometry_round_trip(tmp_path: Path) -> None:
