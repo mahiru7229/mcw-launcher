@@ -96,7 +96,7 @@ def test_missing_pack_file_downloads_once_then_only_verifies(tmp_path, monkeypat
     assert ModrinthContentManager.ensure(instance, reporter) == ()
     assert len(calls) == 1
     assert any(event.stage is ProgressStage.CHECKING_MODPACK for event in events)
-    assert any(event.stage is ProgressStage.DOWNLOADING_MODPACK for event in events)
+    assert any(event.stage is ProgressStage.DOWNLOADING_MODS for event in events)
 
 
 def test_all_modrinth_files_are_checked_before_any_download(tmp_path, monkeypatch):
@@ -161,7 +161,7 @@ def test_failed_mod_is_rechecked_and_retried_in_next_round(tmp_path, monkeypatch
     checking_messages = [event.message for event in events if event.stage is ProgressStage.CHECKING_MODS]
     downloading_messages = [event.message for event in events if event.stage is ProgressStage.DOWNLOADING_MODS]
     assert any("after download round 1/3" in message for message in checking_messages)
-    assert any("round 2/3" in message for message in downloading_messages)
+    assert downloading_messages and all(message == "Downloading modpack mods..." for message in downloading_messages)
 
 
 def test_failed_pack_file_raises_after_three_complete_rounds(tmp_path, monkeypatch):

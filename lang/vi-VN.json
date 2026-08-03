@@ -354,7 +354,7 @@
     "modrinth.modpack.instance_name": "Tên instance mới",
     "modrinth.modpack.optional_files": "Cài các tệp tùy chọn",
     "modrinth.modpack.name_required": "Hãy nhập tên cho instance mới.",
-    "modrinth.modpack.installed": "Đã cài modpack thành instance '{name}'.",
+    "modrinth.modpack.installed": "Đã tạo instance Modrinth '{name}'. Các file được quản lý sẽ được tải khi nhấn Launch.",
     "launcher_settings.update.title": "Cập nhật launcher",
     "launcher_settings.update.subtitle": "Bản cập nhật ổn định được sử dụng mặc định. Chỉ tham gia chương trình tester khi muốn nhận các bản thử nghiệm.",
     "launcher_settings.update.current_version": "Phiên bản hiện tại: v0.5.0 Beta 3",
@@ -1375,7 +1375,7 @@
     "ftb.modpack.context": "Duyệt modpack FTB chính thức, xem metadata, chọn phiên bản rồi cài thành một instance mới.",
     "ftb.modpack.browse": "Duyệt modpack FTB",
     "ftb.modpack.install": "Cài modpack FTB",
-    "ftb.modpack.installed": "Đã cài thành công instance FTB '{name}'.",
+    "ftb.modpack.installed": "Đã tạo instance FTB '{name}'. Các file được quản lý sẽ được tải khi nhấn Launch.",
     "ftb.modpack.instance_name": "Tên instance mới",
     "ftb.modpack.optional_files": "Bao gồm file tùy chọn",
     "ftb.search.placeholder": "Tìm modpack FTB (để trống để xem pack phổ biến)",
@@ -1408,7 +1408,10 @@
     "ftb.column.author": "Tác giả",
     "ftb.column.installs": "Lượt cài",
     "ftb.column.updated": "Cập nhật",
-    "ftb.column.description": "Mô tả"
+    "ftb.column.description": "Mô tả",
+    "modpack.settings.title": "Kiểm tra cài đặt cho {name}",
+    "modpack.settings.description_recommended": "Modpack đề xuất tối đa {memory} MB bộ nhớ. Hãy kiểm tra hoặc chỉnh sửa trước khi tạo instance.",
+    "modpack.settings.description_defaults": "Hãy kiểm tra hoặc chỉnh sửa cài đặt mặc định của launcher trước khi tạo instance modpack này."
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

@@ -13,7 +13,7 @@ class FTBPackRegistry:
 
     @staticmethod
     def load(instance: Instance | Path) -> dict:
-        path = Paths.ftb_pack_registry(instance) if isinstance(instance, Instance) else Path(instance) / ".mcw" / "ftb-pack.json"
+        path = Paths.ftb_pack_registry(instance) if isinstance(instance, Instance) or getattr(instance, "instance_dir", None) is not None else Path(instance) / ".mcw" / "ftb-pack.json"
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (FileNotFoundError, OSError, json.JSONDecodeError):
@@ -22,7 +22,7 @@ class FTBPackRegistry:
 
     @staticmethod
     def save(instance: Instance | Path, data: dict) -> None:
-        path = Paths.ftb_pack_registry(instance) if isinstance(instance, Instance) else Path(instance) / ".mcw" / "ftb-pack.json"
+        path = Paths.ftb_pack_registry(instance) if isinstance(instance, Instance) or getattr(instance, "instance_dir", None) is not None else Path(instance) / ".mcw" / "ftb-pack.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         normalized = FTBPackRegistry._normalize(data)
         normalized["updatedAt"] = datetime.now(timezone.utc).isoformat()
@@ -62,6 +62,8 @@ class FTBPackRegistry:
                 "optional": bool(raw.get("optional", False)),
                 "clientOnly": bool(raw.get("clientOnly", False)),
                 "fileType": str(raw.get("fileType") or "").strip(),
+                "pendingDownload": bool(raw.get("pendingDownload", False)),
+                "lastDownloadError": str(raw.get("lastDownloadError") or "").strip(),
             })
         output = dict(data)
         output["schemaVersion"] = FTBPackRegistry.SCHEMA_VERSION

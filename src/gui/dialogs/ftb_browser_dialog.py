@@ -176,6 +176,14 @@ class FTBBrowserDialog(QDialog):
         root.addWidget(splitter, 1)
 
     @property
+    def selected_project(self) -> FTBProject | None:
+        return self._selected_project
+
+    @property
+    def selected_version(self) -> FTBVersion | None:
+        return self._selected_version
+
+    @property
     def allowed_release_types(self) -> tuple[str, ...]:
         values = ["release"]
         if self.include_beta_checkbox.isChecked():

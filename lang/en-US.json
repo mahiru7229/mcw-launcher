@@ -354,7 +354,7 @@
     "modrinth.modpack.instance_name": "New instance name",
     "modrinth.modpack.optional_files": "Install optional files",
     "modrinth.modpack.name_required": "Enter a name for the new instance.",
-    "modrinth.modpack.installed": "Modpack installed successfully as instance '{name}'.",
+    "modrinth.modpack.installed": "Created Modrinth instance '{name}'. Managed files will download when you Launch it.",
     "launcher_settings.update.title": "Launcher updates",
     "launcher_settings.update.subtitle": "Stable updates are used by default. Join the tester program only when you want to receive experimental builds.",
     "launcher_settings.update.current_version": "Current version: v0.5.0 Beta 3",
@@ -1375,7 +1375,7 @@
     "ftb.modpack.context": "Browse official FTB modpacks, review their metadata, select a version, and install it as a new instance.",
     "ftb.modpack.browse": "Browse FTB modpacks",
     "ftb.modpack.install": "Install FTB modpack",
-    "ftb.modpack.installed": "FTB modpack instance '{name}' was installed successfully.",
+    "ftb.modpack.installed": "Created FTB instance '{name}'. Managed files will download when you Launch it.",
     "ftb.modpack.instance_name": "New instance name",
     "ftb.modpack.optional_files": "Include optional files",
     "ftb.search.placeholder": "Search FTB modpacks (leave empty for popular packs)",
@@ -1408,7 +1408,10 @@
     "ftb.column.author": "Author",
     "ftb.column.installs": "Installs",
     "ftb.column.updated": "Updated",
-    "ftb.column.description": "Description"
+    "ftb.column.description": "Description",
+    "modpack.settings.title": "Review settings for {name}",
+    "modpack.settings.description_recommended": "The modpack recommends up to {memory} MB of memory. Review or edit these settings before creating the instance.",
+    "modpack.settings.description_defaults": "Review or edit the launcher defaults before creating this modpack instance."
   },
   "aliases": {
     "MCW Launcher": "app.name",

@@ -56,7 +56,7 @@ class FTBController(BaseController):
             blocking=False,
         )
 
-    def install_modpack(self, project_id: int, version_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: tuple[str, ...]) -> bool:
+    def install_modpack(self, project_id: int, version_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: tuple[str, ...], settings_override: dict | None = None) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
         return self._task_runner.run(
             "ftb.install.modpack",
@@ -67,6 +67,7 @@ class FTBController(BaseController):
                 install_optional_files=install_optional_files,
                 allowed_release_types=allowed_release_types,
                 reporter=reporter,
+                settings_override=settings_override,
             ),
             f"Installing FTB modpack '{instance_name}'...",
         )

@@ -11,6 +11,7 @@ import zipfile
 
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
+from src.core.instance.settings_manager import SettingsManager
 from src.core.instance.instance_artwork_manager import InstanceArtworkManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
@@ -40,7 +41,7 @@ class ModrinthPackInstaller:
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
 
     @staticmethod
-    def install(project_id: str, version_id: str, instance_name: str, install_optional_files: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None, expected_loader: str = "") -> ModrinthModpackInstallResult:
+    def install(project_id: str, version_id: str, instance_name: str, install_optional_files: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None, expected_loader: str = "", settings_override: dict | None = None) -> ModrinthModpackInstallResult:
         project = ModrinthClient.get_project(project_id)
         requested_name = str(instance_name or "").strip()
         base_name = ModrinthPackInstaller._validated_instance_name(requested_name or project.title)
@@ -91,8 +92,8 @@ class ModrinthPackInstaller:
                 retryable=error.failure.retryable,
                 managed_kind="modpack_archive",
             )
-            raise ModrinthModpackManualDownloadRequired(requirement, project.project_id, version.version_id, normalized_name, install_optional_files, allowed_types, expected_loader) from error
-        return ModrinthPackInstaller._install_archive(project, version, pack_path, normalized_name, install_optional_files, reporter, expected_loader)
+            raise ModrinthModpackManualDownloadRequired(requirement, project.project_id, version.version_id, normalized_name, install_optional_files, allowed_types, expected_loader, settings_override) from error
+        return ModrinthPackInstaller._install_archive(project, version, pack_path, normalized_name, install_optional_files, reporter, expected_loader, settings_override)
 
     @staticmethod
     def install_manual_archive(request: ModrinthModpackManualDownloadRequired, source: Path, reporter: ProgressReporter | None = None) -> ModrinthModpackInstallResult:
@@ -114,10 +115,10 @@ class ModrinthPackInstaller:
             version_id=requirement.version_id,
         )
         artifact_download_service.accept_manual_file(artifact_request, Path(source))
-        return ModrinthPackInstaller._install_archive(project, version, pack_path, request.instance_name, request.install_optional_files, reporter, request.expected_loader)
+        return ModrinthPackInstaller._install_archive(project, version, pack_path, request.instance_name, request.install_optional_files, reporter, request.expected_loader, request.settings_override)
 
     @staticmethod
-    def _install_archive(project, version, pack_path: Path, normalized_name: str, install_optional_files: bool, reporter: ProgressReporter | None, expected_loader: str) -> ModrinthModpackInstallResult:
+    def _install_archive(project, version, pack_path: Path, normalized_name: str, install_optional_files: bool, reporter: ProgressReporter | None, expected_loader: str, settings_override: dict | None = None) -> ModrinthModpackInstallResult:
         staging = Paths.modrinth_staging_root() / uuid4().hex
         staging.mkdir(parents=True, exist_ok=False)
         created_instance = None
@@ -138,9 +139,10 @@ class ModrinthPackInstaller:
                 raise RuntimeError(f"This modpack uses {loader_name.title()}, but the browser filter is set to {selected_loader.title()}.")
             base_version = VersionManager.load(minecraft_version)
             resolved_loader = ModLoaderManager.resolve(minecraft_version, loader_name, loader_version)
-            ModLoaderManager.prepare(base_version, *resolved_loader, reporter=reporter)
             download_pause_controller.raise_if_requested()
             created_instance = InstanceManager.create(name=normalized_name, version=base_version, mod_loader=resolved_loader)
+            if settings_override is not None:
+                SettingsManager.save_dict(created_instance, settings_override)
             shutil.copytree(staging, created_instance.instance_dir, dirs_exist_ok=True)
             ModrinthPackInstaller._write_metadata(created_instance.instance_dir, project.project_id, version.version_id, project.title, version.version_number, minecraft_version, loader_name, loader_version, list(managed_files.values()), install_optional_files)
             if InstanceArtworkManager.apply_provider_artwork(created_instance, "modrinth", project.project_id, getattr(project, "icon_url", ""), reporter):

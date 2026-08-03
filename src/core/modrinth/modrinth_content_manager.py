@@ -200,8 +200,8 @@ class ModrinthContentManager:
     @staticmethod
     def _download_pack_round(missing: list[dict], reporter: ProgressReporter | None, round_number: int) -> dict[str, str]:
         total = len(missing)
-        message = f"Downloading missing Modrinth modpack files (round {round_number}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS})..."
-        batch_progress = FileBatchProgress(reporter=reporter, stage=ProgressStage.DOWNLOADING_MODPACK, message=message, total=total, min_emit_interval_seconds=ModrinthContentManager.PROGRESS_EMIT_INTERVAL_SECONDS)
+        message = "Downloading modpack mods..."
+        batch_progress = FileBatchProgress(reporter=reporter, stage=ProgressStage.DOWNLOADING_MODS, message=message, total=total, min_emit_interval_seconds=ModrinthContentManager.PROGRESS_EMIT_INTERVAL_SECONDS)
         batch_progress.start()
         errors: dict[str, str] = {}
         for item in missing:
@@ -224,8 +224,8 @@ class ModrinthContentManager:
                     restrict_hosts=True,
                     max_retry=1,
                     reporter=child_reporter,
-                    progress_stage=ProgressStage.DOWNLOADING_MODPACK,
-                    progress_message=f"Downloading modpack file {target.name} (round {round_number}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS})...",
+                    progress_stage=ProgressStage.DOWNLOADING_MODS,
+                    progress_message=message,
                     purpose="modpack-artifact",
                 )
                 entry.pop("downloadFailure", None)
@@ -242,7 +242,7 @@ class ModrinthContentManager:
     @staticmethod
     def _download_mod_round(instance: Instance, missing: list[dict], reporter: ProgressReporter | None, round_number: int, launch_lock_token: str | None = None) -> dict[str, str]:
         total = len(missing)
-        message = f"Downloading missing Modrinth mods (round {round_number}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS})..."
+        message = "Downloading modpack mods..."
         batch_progress = FileBatchProgress(reporter=reporter, stage=ProgressStage.DOWNLOADING_MODS, message=message, total=total, min_emit_interval_seconds=ModrinthContentManager.PROGRESS_EMIT_INTERVAL_SECONDS)
         batch_progress.start()
         errors: dict[str, str] = {}
@@ -280,7 +280,7 @@ class ModrinthContentManager:
                     max_retry=1,
                     reporter=child_reporter,
                     progress_stage=ProgressStage.DOWNLOADING_MODS,
-                    progress_message=f"Downloading {title} (round {round_number}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS})...",
+                    progress_message=message,
                     purpose="mod",
                     page_url=version_url,
                     project_url=project_url,

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QCloseEvent, QDesktopServices, QGuiApplication, QScreen
-from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget
 
 from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
 from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
@@ -13,6 +13,7 @@ from mcw_core.api.curseforge.curseforge_errors import CurseForgeManagedFilesRequ
 from mcw_core.api.diagnostics.diagnostics_manager import DiagnosticsManager
 from mcw_core.api.fs.paths import Paths
 from mcw_core.api.instance.instance_manager import InstanceManager
+from mcw_core.api.instance.settings_manager import SettingsManager
 from mcw_core.api.instance.instance_run_lock import InstanceRunLock
 from mcw_core.api.language.language_manager import language_manager, tr
 from mcw_core.api.lan.lan_agent_manager import LanAgentManager
@@ -47,6 +48,7 @@ from src.gui.dialogs.curseforge_manual_download_dialog import CurseForgeManualDo
 from src.gui.dialogs.ftb_browser_dialog import FTBBrowserDialog
 from src.gui.dialogs.lan_agent_log_dialog import LanAgentLogDialog
 from src.gui.dialogs.instance_import_settings_dialog import InstanceImportSettingsDialog
+from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
 from src.gui.dialogs.repair_center_dialog import RepairCenterDialog
@@ -411,7 +413,7 @@ class MainWindow(QMainWindow):
         self.modrinth_mod_dialog.project_details_requested.connect(self.modrinth_controller.load_project_details)
         self.modrinth_modpack_dialog.project_details_requested.connect(self.modrinth_controller.load_project_details)
         self.modrinth_mod_dialog.install_mod_requested.connect(self._install_modrinth_mod)
-        self.modrinth_modpack_dialog.install_modpack_requested.connect(self.modrinth_controller.install_modpack)
+        self.modrinth_modpack_dialog.install_modpack_requested.connect(self._install_modrinth_modpack)
         self.modrinth_mod_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.modrinth_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.modrinth_controller.search_results_changed.connect(self._set_modrinth_results)
@@ -461,7 +463,7 @@ class MainWindow(QMainWindow):
         self.ftb_modpack_dialog.versions_requested.connect(self.ftb_controller.load_versions)
         self.ftb_modpack_dialog.version_details_requested.connect(self.ftb_controller.load_version_details)
         self.ftb_modpack_dialog.clear_cache_requested.connect(self.ftb_controller.clear_cache)
-        self.ftb_modpack_dialog.install_modpack_requested.connect(self.ftb_controller.install_modpack)
+        self.ftb_modpack_dialog.install_modpack_requested.connect(self._install_ftb_modpack)
         self.ftb_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.ftb_controller.search_results_changed.connect(self.ftb_modpack_dialog.set_search_result)
         self.ftb_controller.project_details_changed.connect(self.ftb_modpack_dialog.set_project_details)
@@ -1134,8 +1136,63 @@ class MainWindow(QMainWindow):
         )
         return True if answer == QMessageBox.StandardButton.Yes else None
 
+    def _prompt_modpack_settings(self, instance_name: str, recommended_min_memory_mb: int = 0, recommended_max_memory_mb: int = 0) -> dict | None:
+        settings = SettingsManager.normalize_dict(self.gui_settings_controller.current.get("instance_defaults", {}))
+        java = settings.setdefault("java", {})
+        recommended_minimum = max(0, int(recommended_min_memory_mb or 0))
+        recommended_maximum = max(0, int(recommended_max_memory_mb or 0))
+        if recommended_maximum > 0:
+            java["max_memory"] = recommended_maximum
+        if recommended_minimum > 0:
+            java["min_memory"] = recommended_minimum
+        settings = SettingsManager.normalize_dict(settings)
+        dialog = InstanceSettingsEditorDialog(settings, self, title=tr("modpack.settings.title", name=instance_name))
+        if recommended_maximum > 0:
+            dialog.description_label.setText(tr("modpack.settings.description_recommended", memory=recommended_maximum))
+        else:
+            dialog.description_label.setText(tr("modpack.settings.description_defaults"))
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return dialog.settings_data
+
+    def _install_modrinth_modpack(self, project_id: str, version_id: str, instance_name: str, install_optional_files: bool, allowed_version_types: object, loader: str) -> None:
+        settings = self._prompt_modpack_settings(str(instance_name))
+        if settings is None:
+            self.modrinth_modpack_dialog.set_busy(False)
+            return
+        self.modrinth_controller.install_modpack(
+            str(project_id),
+            str(version_id),
+            str(instance_name),
+            bool(install_optional_files),
+            tuple(allowed_version_types) if isinstance(allowed_version_types, (list, tuple, set)) else ("release",),
+            str(loader),
+            settings,
+        )
+
+    def _install_ftb_modpack(self, project_id: int, version_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: object) -> None:
+        version = self.ftb_modpack_dialog.selected_version
+        recommended_minimum = int(getattr(version, "minimum_memory_mb", 0) or 0)
+        recommended_maximum = int(getattr(version, "recommended_memory_mb", 0) or 0)
+        settings = self._prompt_modpack_settings(str(instance_name), recommended_minimum, recommended_maximum)
+        if settings is None:
+            self.ftb_modpack_dialog.set_busy(False)
+            return
+        self.ftb_controller.install_modpack(
+            int(project_id),
+            int(version_id),
+            str(instance_name),
+            bool(install_optional_files),
+            tuple(allowed_release_types) if isinstance(allowed_release_types, (list, tuple, set)) else ("release",),
+            settings,
+        )
+
     def _install_curseforge_modpack(self, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: object, expected_loader: str) -> None:
         self._curseforge_pending_modpack_install = None
+        settings = self._prompt_modpack_settings(str(instance_name))
+        if settings is None:
+            self.curseforge_modpack_dialog.set_busy(False)
+            return
         self.curseforge_controller.install_modpack(
             int(project_id),
             int(file_id),
@@ -1143,6 +1200,7 @@ class MainWindow(QMainWindow):
             bool(install_optional_files),
             tuple(allowed_release_types) if isinstance(allowed_release_types, (list, tuple, set)) else ("release",),
             str(expected_loader),
+            settings,
         )
 
     def _set_curseforge_results(self, project_type: str, loader: str, result: object) -> None:

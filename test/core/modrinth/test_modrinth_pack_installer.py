@@ -145,7 +145,7 @@ def test_installs_forge_modpack_with_declared_forge_version(tmp_path, monkeypatc
 
     assert result.instance.mod_loader == ("forge", "47.4.21")
     assert ("resolve", "1.20.1", "forge", "47.4.21") in calls
-    assert ("prepare", "forge", "47.4.21") in calls
+    assert ("prepare", "forge", "47.4.21") not in calls
     metadata = json.loads((tmp_path / "instances" / "Forge Instance" / ".mcw" / "modrinth-pack.json").read_text(encoding="utf-8"))
     assert metadata["loader"] == "forge"
     assert metadata["loaderVersion"] == "47.4.21"
@@ -169,7 +169,7 @@ def test_installs_neoforge_modpack_with_declared_neoforge_version(tmp_path, monk
 
     assert result.instance.mod_loader == ("neoforge", "21.1.200")
     assert ("resolve", "1.20.1", "neoforge", "21.1.200") in calls
-    assert ("prepare", "neoforge", "21.1.200") in calls
+    assert ("prepare", "neoforge", "21.1.200") not in calls
     metadata = json.loads((tmp_path / "instances" / "NeoForge Instance" / ".mcw" / "modrinth-pack.json").read_text(encoding="utf-8"))
     assert metadata["loader"] == "neoforge"
     assert metadata["loaderVersion"] == "21.1.200"

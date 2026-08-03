@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 
 from mcw_core.api.language.language_manager import tr
 from src.gui.presenters.progress_presenter import ProgressPresenter
@@ -93,18 +93,19 @@ class LaunchControlWidget(QFrame):
         progress_layout.addWidget(self.detail_label)
         progress_layout.addWidget(self.progress_bar)
 
-        controls_layout = QVBoxLayout()
+        self.controls_widget = QWidget()
+        self.controls_widget.setMinimumWidth(260 if self._compact else 340)
+        self.controls_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        controls_layout = QHBoxLayout(self.controls_widget)
         controls_layout.setContentsMargins(0, 0, 0, 0)
-        controls_layout.setSpacing(4)
+        controls_layout.setSpacing(8)
 
         self.launch_button = set_theme_icon(QPushButton(tr(self.LAUNCH_TEXT)), "icon.action.launch", 26 if self._compact else 32)
         set_theme_static_text(self.launch_button, "control.launch", tr(self.LAUNCH_TEXT))
         self.launch_button.setObjectName("PrimaryButton")
         self.launch_button.setProperty("themeRole", "launch")
-        if self._compact:
-            self.launch_button.setFixedSize(190, 34)
-        else:
-            self.launch_button.setFixedSize(230, 42)
+        self.launch_button.setMinimumHeight(36 if self._compact else 48)
+        self.launch_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.launch_button.clicked.connect(self.launch_clicked.emit)
 
         self.cancel_button = set_theme_icon(QPushButton(tr(self.CANCEL_TEXT)), "icon.action.cancel", 18 if self._compact else 20)
@@ -113,18 +114,16 @@ class LaunchControlWidget(QFrame):
         self.cancel_button.setProperty("themeRole", "cancel")
         self.cancel_button.setProperty("motionVisibilityOnly", True)
         self.cancel_button.setProperty("motionVisibleTarget", False)
-        if self._compact:
-            self.cancel_button.setFixedSize(190, 22)
-        else:
-            self.cancel_button.setFixedSize(230, 26)
+        self.cancel_button.setMinimumHeight(36 if self._compact else 48)
+        self.cancel_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.cancel_button.clicked.connect(self.cancel_clicked.emit)
         self.cancel_button.setVisible(False)
 
-        controls_layout.addWidget(self.launch_button)
-        controls_layout.addWidget(self.cancel_button)
+        controls_layout.addWidget(self.launch_button, 1)
+        controls_layout.addWidget(self.cancel_button, 1)
 
         layout.addLayout(progress_layout, 1)
-        layout.addLayout(controls_layout)
+        layout.addWidget(self.controls_widget)
 
     def set_motion_runtime(self, runtime: "MotionRuntime | None") -> None:
         self._motion_runtime = runtime

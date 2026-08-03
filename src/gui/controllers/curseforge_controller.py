@@ -147,7 +147,7 @@ class CurseForgeController(BaseController):
             f"Adding {len(normalized_sources)} downloaded mod file(s) to '{instance_name}'...",
         )
 
-    def install_modpack(self, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: tuple[str, ...], expected_loader: str = "") -> bool:
+    def install_modpack(self, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: tuple[str, ...], expected_loader: str = "", settings_override: dict | None = None) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
         return self._task_runner.run(
             "curseforge.install.modpack",
@@ -159,6 +159,7 @@ class CurseForgeController(BaseController):
                 allowed_release_types=allowed_release_types,
                 reporter=reporter,
                 expected_loader=expected_loader,
+                settings_override=settings_override,
             ),
             f"Installing CurseForge modpack '{instance_name}'...",
         )

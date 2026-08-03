@@ -22,6 +22,7 @@ from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManager
 from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
+from src.core.ftb.ftb_content_manager import FTBContentManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
 from src.core.network.download_pause import download_pause_controller
@@ -79,6 +80,7 @@ class MinecraftExecutor:
             launch_lock_token = getattr(run_lock, "token", None)
             modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
             curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
+            ftb_warnings = FTBContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
 
             download_pause_controller.raise_if_requested()
             VersionManifestManager.get()
@@ -162,7 +164,7 @@ class MinecraftExecutor:
                 "minecraftVersion": version.id,
             }
             forge_warnings = tuple(issue.message for issue in forge_preflight.warnings)
-            warnings = tuple(modrinth_warnings) + tuple(curseforge_warnings) + forge_warnings
+            warnings = tuple(modrinth_warnings) + tuple(curseforge_warnings) + tuple(ftb_warnings) + forge_warnings
             if warnings:
                 result["warnings"] = warnings
             return result

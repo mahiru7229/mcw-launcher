@@ -15,6 +15,7 @@ from src.core.curseforge.curseforge_errors import CurseForgeModpackManualDownloa
 from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
+from src.core.instance.settings_manager import SettingsManager
 from src.core.instance.instance_artwork_manager import InstanceArtworkManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
@@ -36,7 +37,7 @@ class CurseForgePackInstaller:
     SUPPORTED_LOADERS = (ModLoaderManager.FABRIC, ModLoaderManager.QUILT, ModLoaderManager.FORGE, ModLoaderManager.NEOFORGE)
 
     @staticmethod
-    def install(project_id: int, file_id: int, instance_name: str, install_optional_files: bool = True, allowed_release_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None, expected_loader: str = "") -> CurseForgeModpackInstallResult:
+    def install(project_id: int, file_id: int, instance_name: str, install_optional_files: bool = True, allowed_release_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None, expected_loader: str = "", settings_override: dict | None = None) -> CurseForgeModpackInstallResult:
         name, allowed, project, file = CurseForgePackInstaller._prepare_install(project_id, file_id, instance_name, allowed_release_types)
         pack_path = Paths.curseforge_pack_cache(project_id, file_id, file.file_name)
         try:
@@ -48,8 +49,8 @@ class CurseForgePackInstaller:
                 project_url=CurseForgePackInstaller._file_page_url(project.project_url, project_id, file_id),
                 managed_kind="modpack_archive",
             )
-            raise CurseForgeModpackManualDownloadRequired(requirement, project_id, file_id, name, install_optional_files, allowed, expected_loader) from error
-        return CurseForgePackInstaller._install_from_archive(project_id, file_id, name, install_optional_files, project, file, pack_path, reporter, expected_loader)
+            raise CurseForgeModpackManualDownloadRequired(requirement, project_id, file_id, name, install_optional_files, allowed, expected_loader, settings_override) from error
+        return CurseForgePackInstaller._install_from_archive(project_id, file_id, name, install_optional_files, project, file, pack_path, reporter, expected_loader, settings_override)
 
     @staticmethod
     def install_manual_archive(request: CurseForgeModpackManualDownloadRequired, source: Path, reporter: ProgressReporter | None = None) -> CurseForgeModpackInstallResult:
@@ -75,6 +76,7 @@ class CurseForgePackInstaller:
             pack_path,
             reporter,
             getattr(request, "expected_loader", ""),
+            getattr(request, "settings_override", None),
         )
 
     @staticmethod
@@ -90,7 +92,7 @@ class CurseForgePackInstaller:
         return name, allowed, project, file
 
     @staticmethod
-    def _install_from_archive(project_id: int, file_id: int, name: str, install_optional_files: bool, project: object, file: object, pack_path: Path, reporter: ProgressReporter | None, expected_loader: str = "") -> CurseForgeModpackInstallResult:
+    def _install_from_archive(project_id: int, file_id: int, name: str, install_optional_files: bool, project: object, file: object, pack_path: Path, reporter: ProgressReporter | None, expected_loader: str = "", settings_override: dict | None = None) -> CurseForgeModpackInstallResult:
         try:
             archive = zipfile.ZipFile(pack_path, "r")
         except (OSError, zipfile.BadZipFile) as error:
@@ -102,9 +104,10 @@ class CurseForgePackInstaller:
             entries, skipped = CurseForgePackInstaller._resolve_files(manifest, minecraft_version, install_optional_files, reporter)
             version = VersionManager.load(minecraft_version)
             resolved_loader = ModLoaderManager.resolve(minecraft_version, loader_name, loader_version)
-            ModLoaderManager.prepare(version, *resolved_loader, reporter=reporter)
             instance = InstanceManager.create(name=name, version=version, mod_loader=resolved_loader)
             try:
+                if settings_override is not None:
+                    SettingsManager.save_dict(instance, settings_override)
                 CurseForgePackInstaller._extract_overrides(archive, str(manifest.get("overrides") or "overrides"), Path(instance.instance_dir), reporter)
                 CurseForgePackRegistry.save(instance, {
                     "projectId": int(project_id),

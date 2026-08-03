@@ -146,7 +146,7 @@ def test_installs_fabric_modpack_as_fabric_instance(tmp_path: Path, monkeypatch)
 
     assert result.instance.mod_loader == ("fabric", "0.16.0")
     assert ("resolve", "1.20.1", "fabric", "0.16.0") in calls
-    assert ("prepare", "fabric", "0.16.0") in calls
+    assert ("prepare", "fabric", "0.16.0") not in calls
     assert (result.instance.instance_dir / "config" / "example.json").is_file()
     registry = json.loads(
         (result.instance.instance_dir / ".mcw" / "curseforge-pack.json").read_text(encoding="utf-8")
@@ -190,7 +190,7 @@ def test_installs_neoforge_modpack_as_neoforge_instance(tmp_path: Path, monkeypa
 
     assert result.instance.mod_loader == ("neoforge", "21.1.200")
     assert ("resolve", "1.21.1", "neoforge", "21.1.200") in calls
-    assert ("prepare", "neoforge", "21.1.200") in calls
+    assert ("prepare", "neoforge", "21.1.200") not in calls
     assert (result.instance.instance_dir / "config" / "neoforge.toml").is_file()
     registry = json.loads((result.instance.instance_dir / ".mcw" / "curseforge-pack.json").read_text(encoding="utf-8"))
     assert registry["loader"] == "neoforge"

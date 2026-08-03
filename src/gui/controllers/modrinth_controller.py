@@ -57,10 +57,10 @@ class ModrinthController(BaseController):
 
         return self._task_runner.run("modrinth.install.mod", task, f"Installing Modrinth mod into '{instance_name}'...")
 
-    def install_modpack(self, project_id: str, version_id: str, instance_name: str, install_optional_files: bool, allowed_version_types: tuple[str, ...] = ("release",), loader: str = ModLoaderManager.FABRIC) -> None:
+    def install_modpack(self, project_id: str, version_id: str, instance_name: str, install_optional_files: bool, allowed_version_types: tuple[str, ...] = ("release",), loader: str = ModLoaderManager.FABRIC, settings_override: dict | None = None) -> None:
         reporter = ProgressReporter(self.progress_received.emit)
         normalized_loader = self._normalize_loader(loader)
-        self._task_runner.run("modrinth.install.modpack", lambda: ModrinthPackInstaller.install(project_id, version_id, instance_name, install_optional_files, allowed_version_types, reporter, expected_loader=normalized_loader), f"Installing Modrinth {normalized_loader.title()} modpack '{instance_name}'...")
+        self._task_runner.run("modrinth.install.modpack", lambda: ModrinthPackInstaller.install(project_id, version_id, instance_name, install_optional_files, allowed_version_types, reporter, expected_loader=normalized_loader, settings_override=settings_override), f"Installing Modrinth {normalized_loader.title()} modpack '{instance_name}'...")
 
     def install_manual_files(self, instance_name: str, requirements: tuple[object, ...] | list[object], sources: tuple[Path, ...] | list[Path]) -> bool:
         normalized_sources = [Path(source) for source in sources]

@@ -13,6 +13,7 @@ from src.core.mod.mod_manager import ModManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.network.artifact_download_service import artifact_download_service
 from src.core.network.download_pause import download_pause_controller, is_download_paused
+from src.core.progress.file_batch_progress import FileBatchProgress
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.curseforge.file import CurseForgeFile
 from src.models.curseforge.manual_download import CurseForgeManualDownload
@@ -156,7 +157,7 @@ class CurseForgeContentManager:
             else:
                 item["entry"]["lastDownloadError"] = str(item["entry"].get("lastDownloadError") or "File is missing or invalid")
                 missing.append(item)
-            if reporter is not None:
+            if reporter is not None and (index == total or index % 50 == 0):
                 reporter.files(stage=ProgressStage.CHECKING_MODS, message=message, current=index, total=total)
         return missing
 
@@ -165,12 +166,14 @@ class CurseForgeContentManager:
         errors: dict[str, dict[str, object]] = {}
         downloaded = 0
         accepted_unverified = 0
-        message = f"Downloading missing CurseForge files (round {round_number}/3)..."
-        if reporter is not None:
-            reporter.files(stage=ProgressStage.DOWNLOADING_MODS, message=message, current=0, total=len(missing))
+        message = "Downloading modpack mods..."
+        batch_progress = FileBatchProgress(reporter=reporter, stage=ProgressStage.DOWNLOADING_MODS, message=message, total=len(missing), min_emit_interval_seconds=0.08)
+        batch_progress.start()
 
-        for completed, item in enumerate(missing, start=1):
+        for item in missing:
             download_pause_controller.raise_if_requested()
+            token = object()
+            child_reporter = batch_progress.reporter_for(token)
             entry = item["entry"]
             try:
                 file = CurseForgeContentManager._file_from_entry(entry)
@@ -180,8 +183,8 @@ class CurseForgeContentManager:
                 CurseForgeDownloader.download_file(
                     file,
                     cache,
-                    reporter=reporter,
-                    project_name=str(entry.get("displayName") or file.display_name),
+                    reporter=child_reporter,
+                    project_name="Modpack mod",
                     purpose="modpack-artifact" if item["kind"] == "pack" else "mod",
                     managed_kind=str(item["kind"]),
                     managed_path=str(item["path"]),
@@ -248,8 +251,8 @@ class CurseForgeContentManager:
                         retryable=requirement.retryable,
                     )
                 errors[item["key"]] = error_payload
-            if reporter is not None:
-                reporter.files(stage=ProgressStage.DOWNLOADING_MODS, message=message, current=completed, total=len(missing))
+            finally:
+                batch_progress.complete(token)
         return {"errors": errors, "downloaded": downloaded, "acceptedUnverified": accepted_unverified}
 
     @staticmethod
