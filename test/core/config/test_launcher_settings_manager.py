@@ -242,3 +242,30 @@ def test_accent_settings_are_normalized_and_migrated(tmp_path: Path) -> None:
     appearance = manager.load()["appearance"]
     assert appearance["accent_mode"] == "theme"
     assert appearance["accent_color"] == "#8ed35b"
+
+
+def test_first_run_and_dedicated_gpu_settings_are_opt_in_and_persisted(tmp_path: Path) -> None:
+    manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
+
+    defaults = manager.load()
+    assert defaults["onboarding"] == {"completed": False, "version": 1}
+    assert defaults["launch"]["prefer_dedicated_gpu"] is False
+
+    manager.save({
+        "onboarding": {"completed": True},
+        "launch": {"prefer_dedicated_gpu": True},
+    })
+    updated = manager.load()
+
+    assert updated["onboarding"] == {"completed": True, "version": 1}
+    assert updated["launch"]["prefer_dedicated_gpu"] is True
+
+
+def test_reset_preserves_completed_first_run_state(tmp_path: Path) -> None:
+    manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
+    manager.save({"onboarding": {"completed": True, "version": 1}, "launch": {"debug_mode": True}})
+
+    data = manager.reset()
+
+    assert data["onboarding"] == {"completed": True, "version": 1}
+    assert data["launch"]["debug_mode"] is False

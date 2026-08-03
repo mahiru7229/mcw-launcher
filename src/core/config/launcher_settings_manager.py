@@ -16,7 +16,7 @@ from src.core.theme.theme_palette import normalize_hex_color
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 14
+    SCHEMA_VERSION = 15
     UPDATE_CHANNEL_POLICY_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
@@ -29,6 +29,11 @@ class LauncherSettingsManager:
         },
         "launch": {
             "debug_mode": False,
+            "prefer_dedicated_gpu": False,
+        },
+        "onboarding": {
+            "completed": False,
+            "version": 1,
         },
         "window": {
             "geometry": None,
@@ -103,7 +108,14 @@ class LauncherSettingsManager:
 
     def reset(self) -> dict[str, Any]:
         with self._lock:
+            current = self._read_or_recover() if self.path.exists() else {}
             defaults = copy.deepcopy(self.DEFAULT_SETTINGS)
+            onboarding = current.get("onboarding") if isinstance(current.get("onboarding"), dict) else {}
+            if self._as_bool(onboarding.get("completed"), False):
+                defaults["onboarding"] = {
+                    "completed": True,
+                    "version": max(1, self._as_non_negative_int(onboarding.get("version"), 1)),
+                }
             self._write(defaults)
             return defaults
 
@@ -178,6 +190,11 @@ class LauncherSettingsManager:
 
         launch = normalized.setdefault("launch", {})
         launch["debug_mode"] = self._as_bool(launch.get("debug_mode"), False)
+        launch["prefer_dedicated_gpu"] = self._as_bool(launch.get("prefer_dedicated_gpu"), False)
+
+        onboarding = normalized.setdefault("onboarding", {})
+        onboarding["completed"] = self._as_bool(onboarding.get("completed"), False)
+        onboarding["version"] = max(1, self._as_non_negative_int(onboarding.get("version"), 1))
 
         window = normalized.setdefault("window", {})
         geometry = window.get("geometry")

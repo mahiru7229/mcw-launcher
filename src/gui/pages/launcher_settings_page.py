@@ -7,6 +7,7 @@ from PySide6.QtCore import QSignalBlocker, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtWidgets import QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy
 
+from mcw_core.api.hardware.gpu_preference_manager import GraphicsDetectionResult
 from mcw_core.api.instance.settings_manager import SettingsManager, default_instance_settings
 from mcw_core.api.java.java_major_policy import JavaMajorPolicy
 from mcw_core.api.language.language_manager import language_manager, tr
@@ -46,6 +47,7 @@ class LauncherSettingsPage(BasePage):
         self._java_installations: list[object] = []
         self._latest_java_major: int | None = None
         self._latest_java_lookup_error = ""
+        self._gpu_detection = GraphicsDetectionResult(supported=False)
         self._theme_authoring = ThemeAuthoringService(theme_manager)
         self._theme_live_reload = ThemeLiveReload(self)
         self._theme_live_reload.reload_requested.connect(self._handle_live_theme_reload)
@@ -208,6 +210,17 @@ class LauncherSettingsPage(BasePage):
         self.java_card.layout.addWidget(self.java_install_status)
         runtime_section.add_card(self.java_card)
         self._update_java_install_action()
+
+        self.gpu_card = CardWidget(tr("gpu.preference.title"), tr("gpu.preference.detail"))
+        self.prefer_dedicated_gpu = QCheckBox(tr("gpu.preference.toggle"))
+        self.prefer_dedicated_gpu.setChecked(False)
+        self.prefer_dedicated_gpu.setEnabled(False)
+        self.gpu_status_label = QLabel(tr("gpu.preference.detecting"))
+        self.gpu_status_label.setObjectName("MutedLabel")
+        self.gpu_status_label.setWordWrap(True)
+        self.gpu_card.layout.addWidget(self.prefer_dedicated_gpu)
+        self.gpu_card.layout.addWidget(self.gpu_status_label)
+        runtime_section.add_card(self.gpu_card)
 
         self.instance_defaults_card = CardWidget(
             tr("instance_defaults.launcher.title"),
@@ -411,6 +424,7 @@ class LauncherSettingsPage(BasePage):
         self.show_snapshots.toggled.connect(self._refresh_dirty_state)
         self.remember_window_size.toggled.connect(self._refresh_dirty_state)
         self.debug_mode.toggled.connect(self._refresh_dirty_state)
+        self.prefer_dedicated_gpu.toggled.connect(self._refresh_dirty_state)
         self.limit_download_speed.toggled.connect(self._refresh_dirty_state)
         self.download_limit_mbps.valueChanged.connect(self._refresh_dirty_state)
         self.download_concurrency.currentIndexChanged.connect(self._refresh_dirty_state)
@@ -431,6 +445,32 @@ class LauncherSettingsPage(BasePage):
         self.accent_mode_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.show_static_text.toggled.connect(self._refresh_dirty_state)
         self.live_theme_reload.toggled.connect(self._refresh_dirty_state)
+
+    def set_gpu_detection(self, detection: GraphicsDetectionResult) -> None:
+        self._gpu_detection = detection
+        available = bool(detection.supported and detection.has_dedicated_gpu)
+        self.prefer_dedicated_gpu.setEnabled(available)
+        if not available:
+            with QSignalBlocker(self.prefer_dedicated_gpu):
+                self.prefer_dedicated_gpu.setChecked(False)
+        self._update_gpu_status()
+        if not self._tracking_suspended:
+            self._refresh_dirty_state()
+
+    def _update_gpu_status(self) -> None:
+        detection = self._gpu_detection
+        if not detection.supported:
+            self.gpu_status_label.setText(tr("gpu.preference.unsupported"))
+            return
+        if detection.error:
+            self.gpu_status_label.setText(tr("gpu.preference.detect_failed", error=detection.error))
+            return
+        dedicated = detection.dedicated_adapters
+        if dedicated:
+            names = ", ".join(adapter.name for adapter in dedicated)
+            self.gpu_status_label.setText(tr("gpu.preference.detected", adapters=names))
+        else:
+            self.gpu_status_label.setText(tr("gpu.preference.not_detected"))
 
     def set_java_installations(self, installations: list) -> None:
         self._java_installations = list(installations)
@@ -671,6 +711,7 @@ class LauncherSettingsPage(BasePage):
             "start_page": self.start_page_combo.currentData(),
             "show_snapshots": self.show_snapshots.isChecked(),
             "debug_mode": self.debug_mode.isChecked(),
+            "prefer_dedicated_gpu": self.prefer_dedicated_gpu.isEnabled() and self.prefer_dedicated_gpu.isChecked(),
             "remember_window_size": self.remember_window_size.isChecked(),
             "language": self.language_combo.currentData() or "en-US",
             "show_content_descriptions": self.show_content_descriptions.isChecked(),
@@ -736,6 +777,12 @@ class LauncherSettingsPage(BasePage):
         current_major = int(self.java_install_combo.currentData() or 17)
         self._populate_java_install_combo(current_major)
         self._update_java_details()
+        if self.gpu_card.title_label is not None:
+            self.gpu_card.title_label.setText(tr("gpu.preference.title"))
+        if self.gpu_card.subtitle_label is not None:
+            self.gpu_card.subtitle_label.setText(tr("gpu.preference.detail"))
+        self.prefer_dedicated_gpu.setText(tr("gpu.preference.toggle"))
+        self._update_gpu_status()
         for index, label in enumerate(self.curseforge_gateway_labels, start=1):
             label.setText(tr("curseforge.gateway.slot", index=index))
         self.reveal_curseforge_gateways.setText(tr("curseforge.gateway.reveal.toggle"))
@@ -793,6 +840,7 @@ class LauncherSettingsPage(BasePage):
             self.start_page_combo,
             self.show_snapshots,
             self.debug_mode,
+            self.prefer_dedicated_gpu,
             self.remember_window_size,
             self.auto_check_updates,
             self.show_content_descriptions,
@@ -818,6 +866,7 @@ class LauncherSettingsPage(BasePage):
         self.start_page_combo.setCurrentIndex(max(0, index))
         self.show_snapshots.setChecked(bool(settings.get("show_snapshots", False)))
         self.debug_mode.setChecked(bool(settings.get("debug_mode", False)))
+        self.prefer_dedicated_gpu.setChecked(bool(settings.get("prefer_dedicated_gpu", False)) and self._gpu_detection.has_dedicated_gpu)
         self.remember_window_size.setChecked(bool(settings.get("remember_window_size", True)))
         self.auto_check_updates.setChecked(bool(settings.get("auto_check_updates", True)))
         self.show_content_descriptions.setChecked(bool(settings.get("show_content_descriptions", False)))

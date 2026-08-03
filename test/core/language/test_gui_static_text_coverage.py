@@ -14,6 +14,9 @@ _WIDGET_CALL_ARGUMENTS = {
     "QLabel": (0,),
     "QPushButton": (0,),
     "QCheckBox": (0,),
+    "QRadioButton": (0,),
+    "QTableWidgetItem": (0,),
+    "ThemedAnimatedLabel": (0,),
     "QGroupBox": (0,),
     "CardWidget": (0, 1),
     "SettingsSection": (0, 1),
@@ -23,15 +26,14 @@ _WIDGET_CALL_ARGUMENTS = {
 _METHOD_CALL_ARGUMENTS = {
     "setText": (0,),
     "setToolTip": (0,),
+    "setStatusTip": (0,),
     "setWindowTitle": (0,),
     "setPlaceholderText": (0,),
     "addTab": (1,),
     "setTabText": (1,),
     "addItem": (0,),
 }
-_ALLOWED_UNTRANSLATED = {
-    "MCW LAUNCHER",
-}
+_ALLOWED_UNTRANSLATED: set[str] = set()
 
 
 def _literal_argument(call: ast.Call, index: int) -> str | None:
@@ -64,6 +66,9 @@ def test_static_gui_text_has_translation_key_or_english_alias() -> None:
             elif isinstance(function, ast.Attribute) and function.attr in _METHOD_CALL_ARGUMENTS:
                 label = function.attr
                 argument_indices = _METHOD_CALL_ARGUMENTS[function.attr]
+            elif isinstance(function, ast.Attribute) and function.attr in {"information", "warning", "critical", "question"}:
+                label = f"QMessageBox.{function.attr}"
+                argument_indices = (1, 2)
 
             for index in argument_indices:
                 text = _literal_argument(node, index)

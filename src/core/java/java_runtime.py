@@ -7,7 +7,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import TextIO
 
+from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.fs.paths import Paths
+from src.core.hardware.gpu_preference_manager import GpuPreferenceManager
 from src.core.java.java_command_compactor import JavaCommandCompactor
 from src.models.instance.instance import Instance
 
@@ -32,6 +34,9 @@ class JavaRuntime:
             raise
 
         try:
+            settings = LauncherSettingsManager().load()
+            prefer_dedicated_gpu = bool(settings.get("launch", {}).get("prefer_dedicated_gpu", False))
+            GpuPreferenceManager.apply_to_java(java, prefer_dedicated_gpu)
             process = cls._popen(java, launch_command, instance_dir, log_file, creation_flags)
         except OSError as error:
             if not cls._is_windows_length_error(error):

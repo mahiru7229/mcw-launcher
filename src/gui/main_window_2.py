@@ -14,6 +14,7 @@ from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
 from mcw_core.api.curseforge.curseforge_errors import CurseForgeManagedFilesRequired, CurseForgeModpackManualDownloadRequired
 from mcw_core.api.diagnostics.diagnostics_manager import DiagnosticsManager
 from mcw_core.api.fs.paths import Paths
+from mcw_core.api.hardware.gpu_preference_manager import GraphicsDetectionResult
 from mcw_core.api.instance.instance_manager import InstanceManager
 from mcw_core.api.instance.settings_manager import SettingsManager
 from mcw_core.api.instance.instance_run_lock import InstanceRunLock
@@ -89,10 +90,11 @@ from src.models.update.update_info import PreparedUpdate, UpdateInfo
 
 
 class MainWindow(QMainWindow):
-    def __init__(self) -> None:
+    def __init__(self, gpu_detection: GraphicsDetectionResult | None = None) -> None:
         super().__init__()
 
         self.setWindowTitle(LAUNCHER_NAME)
+        self._gpu_detection = gpu_detection or GraphicsDetectionResult(supported=False)
         self._display_profile = self._detect_display_profile()
         self.resize(self._display_profile.window_width, self._display_profile.window_height)
         self.setMinimumSize(self._display_profile.minimum_width, self._display_profile.minimum_height)
@@ -241,6 +243,7 @@ class MainWindow(QMainWindow):
         self.mods_page = ModsPage()
         self.instance_settings_page = InstanceSettingsPage()
         self.launcher_settings_page = LauncherSettingsPage()
+        self.launcher_settings_page.set_gpu_detection(self._gpu_detection)
         self.logs_page = LogsPage()
         self.about_page = AboutPage()
         self.mod_manager_dialog = ModManagerDialog(self)

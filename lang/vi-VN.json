@@ -1588,7 +1588,37 @@
     "modpack_package.import.universal_filter": "Gói MCW / modpack (*.mcwpack *.mrpack *.zip)",
     "modpack_package.import.completed": "Đã nhập modpack",
     "modpack_package.import.completed_detail": "Gói từ provider đã được xác minh và nhập thành công. Các file được quản lý sẽ được tải ở lần Launch đầu tiên.",
-    "modpack_package.import.failed": "Nhập modpack thất bại"
+    "modpack_package.import.failed": "Nhập modpack thất bại",
+    "brand.mcw_launcher": "MCW LAUNCHER",
+    "state.ready": "Sẵn sàng",
+    "state.success": "Thành công",
+    "state.warning": "Cảnh báo",
+    "state.error": "Lỗi",
+    "gpu.preference.title": "Ưu tiên GPU rời",
+    "gpu.preference.detail": "Yêu cầu Windows ưu tiên GPU hiệu năng cao cho Java runtime dùng để khởi chạy Minecraft.",
+    "gpu.preference.toggle": "Ưu tiên GPU rời khi khởi chạy Minecraft",
+    "gpu.preference.detecting": "Đang phát hiện bộ điều hợp đồ họa...",
+    "gpu.preference.unsupported": "Tùy chọn ưu tiên GPU rời chỉ khả dụng trên Windows.",
+    "gpu.preference.detect_failed": "Không thể phát hiện bộ điều hợp đồ họa: {error}",
+    "gpu.preference.detected": "Đã phát hiện GPU rời: {adapters}",
+    "gpu.preference.not_detected": "Không phát hiện GPU rời được hỗ trợ. Tùy chọn này sẽ được khóa.",
+    "gpu.preference.notice": "Đây là tùy chọn ưu tiên của Windows, không phải bảo đảm tuyệt đối. Windows và driver đồ họa vẫn quyết định GPU cuối cùng.",
+    "first_run.title": "Thiết lập lần chạy đầu",
+    "first_run.page": "Bước {current}/{total}",
+    "first_run.next": "Tiếp tục",
+    "first_run.back": "Quay lại",
+    "first_run.skip": "Dùng mặc định",
+    "first_run.finish": "Hoàn tất thiết lập",
+    "first_run.welcome.title": "Chào mừng đến với MCW Launcher",
+    "first_run.welcome.detail": "Chọn các thiết lập cơ bản trước khi tạo hoặc chạy instance đầu tiên. Bạn có thể thay đổi mọi tùy chọn sau này trong Cài đặt Launcher.",
+    "first_run.language.label": "Ngôn ngữ launcher",
+    "first_run.updates.toggle": "Tự động kiểm tra cập nhật launcher",
+    "first_run.graphics.title": "Tùy chọn đồ họa",
+    "first_run.graphics.detail": "Trên máy dùng đồ họa lai, MCW Launcher có thể yêu cầu Windows dùng GPU hiệu năng cao cho Minecraft Java.",
+    "first_run.finish.title": "Thiết lập đã sẵn sàng",
+    "first_run.finish.detail": "Kiểm tra các lựa chọn rồi hoàn tất. RAM, Java và hiển thị vẫn có thể chỉnh riêng cho từng instance.",
+    "first_run.summary": "Ngôn ngữ: {language}\nƯu tiên GPU rời: {gpu}\nTự động kiểm tra cập nhật: {updates}",
+    "startup.detecting_graphics": "Đang phát hiện phần cứng đồ họa..."
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",
@@ -1660,6 +1690,7 @@
     "Rebuild Fabric, Quilt, Forge, or NeoForge metadata and verify loader libraries without changing mods or saves.": "instances.repair_loader.tooltip",
     "Loading compatible Quilt Loader versions...": "instances.quilt.loading_versions",
     "Choose a Fabric, Quilt, Forge, or NeoForge instance to manage its mods.": "mods.choose_supported_instance",
-    "This instance is Vanilla. Apply Fabric, Quilt, Forge, or NeoForge from the Instances page before adding mods.": "mods.vanilla_apply_loader"
+    "This instance is Vanilla. Apply Fabric, Quilt, Forge, or NeoForge from the Instances page before adding mods.": "mods.vanilla_apply_loader",
+    "MCW LAUNCHER": "brand.mcw_launcher"
   }
 }

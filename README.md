@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/Stable-v0.12.0-brightgreen" alt="Current stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Beta-v1.0.0--beta.6-orange" alt="Current beta version">
+    <img src="https://img.shields.io/badge/RC-v1.0.0--rc.1-blue" alt="Current release candidate">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -25,12 +25,12 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v1.0.0-beta.6.md">v1.0 beta notes</a> ·
+  <a href="docs/RELEASE-v1.0.0-rc.1.md">v1.0 RC notes</a> ·
   <a href="docs/UPDATE_PACKAGES.md">Updater packages</a>
 </p>
 
 > [!NOTE]
-> `v0.12.0` là bản Stable hiện tại. `v1.0.0-beta.6` bổ sung import/export modpack giữ nguyên nguồn provider, Portable MCWPack và nút ẩn/hiện sidebar rõ nghĩa; bản này chỉ được nhận khi người dùng chủ động tham gia tester program.
+> `v0.12.0` là bản Stable hiện tại. `v1.0.0-rc.1` bổ sung First Run Setup, tùy chọn ưu tiên GPU rời trên máy được hỗ trợ và hoàn thiện độ phủ bản dịch; đây vẫn là bản thử nghiệm trước Stable.
 
 ---
 
@@ -41,6 +41,15 @@
 MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độc lập**, tiến trình tải rõ ràng, khả năng sửa chữa an toàn và kiến trúc tách biệt giữa GUI với launcher core.
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
+
+### Điểm nổi bật của `v1.0.0-rc.1`
+
+- Thêm **First Run Setup** ba bước để chọn ngôn ngữ, kiểm tra cập nhật tự động và xem trạng thái phần cứng đồ họa trước khi dùng launcher.
+- Thêm setting **Ưu tiên GPU rời khi khởi chạy Minecraft**, mặc định tắt và chỉ cho bật khi phát hiện GPU hiệu năng cao được hỗ trợ.
+- Áp dụng tùy chọn đồ họa hiệu năng cao cho Java runtime trước khi khởi chạy; lỗi phát hiện hoặc áp dụng không chặn game.
+- Reset settings không làm onboarding xuất hiện lại sau khi đã hoàn tất.
+- Quét lại toàn bộ static GUI text, tooltip, status tip, tab, item và QMessageBox; bổ sung key/alias còn thiếu cho en-US và vi-VN.
+- Mở rộng translation regression test để chuỗi GUI mới không thể được thêm mà thiếu key.
 
 ### Điểm nổi bật của `v1.0.0-beta.6`
 
@@ -203,6 +212,15 @@ Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
 MCW Launcher is an open-source Minecraft launcher centered around **isolated instances**, visible download progress, safe repair workflows, and a GUI that remains separate from launcher logic.
 
 Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
+
+### `v1.0.0-rc.1` highlights
+
+- Add a three-step **First Run Setup** for language, automatic update checks, and graphics-hardware review.
+- Add **Prefer the dedicated GPU when launching Minecraft**, disabled by default and enabled only when a supported high-performance adapter is detected.
+- Apply the high-performance graphics preference to the selected Java runtime before launch without blocking Minecraft on detection or preference failures.
+- Preserve completed onboarding when launcher settings are reset.
+- Re-audit static GUI text, tooltips, status tips, tabs, items, and QMessageBox literals; fill missing en-US and vi-VN keys/aliases.
+- Expand translation regression coverage so new GUI literals require a translation key.
 
 ### `v1.0.0-beta.6` highlights
 

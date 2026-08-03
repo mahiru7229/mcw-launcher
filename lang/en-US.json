@@ -1588,7 +1588,37 @@
     "modpack_package.import.universal_filter": "MCW / Modpack Package (*.mcwpack *.mrpack *.zip)",
     "modpack_package.import.completed": "Modpack import completed",
     "modpack_package.import.completed_detail": "The provider package was validated and imported. Managed files will be downloaded on the first Launch.",
-    "modpack_package.import.failed": "Modpack import failed"
+    "modpack_package.import.failed": "Modpack import failed",
+    "brand.mcw_launcher": "MCW LAUNCHER",
+    "state.ready": "Ready",
+    "state.success": "Success",
+    "state.warning": "Warning",
+    "state.error": "Error",
+    "gpu.preference.title": "Dedicated GPU preference",
+    "gpu.preference.detail": "Ask Windows to prefer the high-performance GPU for the Java runtime used to launch Minecraft.",
+    "gpu.preference.toggle": "Prefer the dedicated GPU when launching Minecraft",
+    "gpu.preference.detecting": "Detecting graphics adapters...",
+    "gpu.preference.unsupported": "Dedicated GPU preference is available only on Windows.",
+    "gpu.preference.detect_failed": "Graphics adapter detection failed: {error}",
+    "gpu.preference.detected": "Detected dedicated GPU: {adapters}",
+    "gpu.preference.not_detected": "No supported dedicated GPU was detected. This option remains disabled.",
+    "gpu.preference.notice": "This is a Windows preference rather than a guarantee. The graphics driver and Windows still make the final adapter choice.",
+    "first_run.title": "First Run Setup",
+    "first_run.page": "Step {current} of {total}",
+    "first_run.next": "Next",
+    "first_run.back": "Back",
+    "first_run.skip": "Use defaults",
+    "first_run.finish": "Finish setup",
+    "first_run.welcome.title": "Welcome to MCW Launcher",
+    "first_run.welcome.detail": "Choose the basic launcher preferences before creating or launching your first instance. You can change every option later in Launcher Settings.",
+    "first_run.language.label": "Launcher language",
+    "first_run.updates.toggle": "Automatically check for launcher updates",
+    "first_run.graphics.title": "Graphics preference",
+    "first_run.graphics.detail": "On hybrid-graphics systems, MCW Launcher can ask Windows to use the high-performance GPU for Minecraft Java.",
+    "first_run.finish.title": "Setup is ready",
+    "first_run.finish.detail": "Review the selected defaults, then finish setup. Instance-specific RAM, Java, and display settings remain editable per instance.",
+    "first_run.summary": "Language: {language}\nDedicated GPU preference: {gpu}\nAutomatic update checks: {updates}",
+    "startup.detecting_graphics": "Detecting graphics hardware..."
   },
   "aliases": {
     "MCW Launcher": "app.name",
@@ -2128,6 +2158,7 @@
     "Rebuild Fabric, Quilt, Forge, or NeoForge metadata and verify loader libraries without changing mods or saves.": "instances.repair_loader.tooltip",
     "Loading compatible Quilt Loader versions...": "instances.quilt.loading_versions",
     "Choose a Fabric, Quilt, Forge, or NeoForge instance to manage its mods.": "mods.choose_supported_instance",
-    "This instance is Vanilla. Apply Fabric, Quilt, Forge, or NeoForge from the Instances page before adding mods.": "mods.vanilla_apply_loader"
+    "This instance is Vanilla. Apply Fabric, Quilt, Forge, or NeoForge from the Instances page before adding mods.": "mods.vanilla_apply_loader",
+    "MCW LAUNCHER": "brand.mcw_launcher"
   }
 }
