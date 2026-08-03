@@ -15,6 +15,7 @@ from src.core.instance.settings_manager import SettingsManager
 from src.core.instance.instance_artwork_manager import InstanceArtworkManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
 from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_downloader import ModrinthDownloader
 from src.core.modrinth.modrinth_errors import ModrinthModpackManualDownloadRequired
@@ -145,6 +146,7 @@ class ModrinthPackInstaller:
                 SettingsManager.save_dict(created_instance, settings_override)
             shutil.copytree(staging, created_instance.instance_dir, dirs_exist_ok=True)
             ModrinthPackInstaller._write_metadata(created_instance.instance_dir, project.project_id, version.version_id, project.title, version.version_number, minecraft_version, loader_name, loader_version, list(managed_files.values()), install_optional_files)
+            ModProvenanceRegistry.synchronize(created_instance)
             if InstanceArtworkManager.apply_provider_artwork(created_instance, "modrinth", project.project_id, getattr(project, "icon_url", ""), reporter):
                 created_instance = InstanceManager.load(created_instance.name)
             return ModrinthModpackInstallResult(instance=created_instance, pack_name=project.title, pack_version=version.version_number, installed_files=len(selected_files), skipped_optional_files=skipped_optional, skipped_server_files=skipped_server)
@@ -269,7 +271,7 @@ class ModrinthPackInstaller:
             relative = ModrinthPackInstaller._safe_relative_path(str(item.get("path") or ""))
             hashes = item.get("hashes", {}) if isinstance(item.get("hashes"), dict) else {}
             client_state = str((item.get("env") or {}).get("client") or "required").strip().lower() if isinstance(item.get("env"), dict) else "required"
-            managed.append({"path": relative.as_posix(), "sha1": str(hashes.get("sha1") or "").lower(), "sha512": str(hashes.get("sha512") or "").lower(), "size": int(item.get("fileSize", 0) or 0), "source": "download", "downloads": [str(url).strip() for url in item.get("downloads", []) if str(url).strip()], "required": client_state == "required"})
+            managed.append({"path": relative.as_posix(), "fileName": relative.name, "sha1": str(hashes.get("sha1") or "").lower(), "sha512": str(hashes.get("sha512") or "").lower(), "size": int(item.get("fileSize", 0) or 0), "source": "download", "provider": "modrinth", "downloads": [str(url).strip() for url in item.get("downloads", []) if str(url).strip()], "required": client_state == "required"})
         return managed
 
     @staticmethod
@@ -301,7 +303,7 @@ class ModrinthPackInstaller:
                     sha1.update(chunk)
                     sha512.update(chunk)
                     written += len(chunk)
-            managed.append({"path": relative.as_posix(), "sha1": sha1.hexdigest(), "sha512": sha512.hexdigest(), "size": written, "source": prefix})
+            managed.append({"path": relative.as_posix(), "fileName": relative.name, "sha1": sha1.hexdigest(), "sha512": sha512.hexdigest(), "size": written, "source": prefix, "provider": "pack"})
         return managed
 
     @staticmethod

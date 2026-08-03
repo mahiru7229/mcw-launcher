@@ -1474,7 +1474,19 @@
     "content.task.install.completed_detail": "The content pack is ready in the selected instance.",
     "content.task.install.failed": "Content pack installation failed",
     "content.manager.open_web": "Open on Web",
-    "content.manager.version_with_pack_format": "{version} · Pack format {pack_format}"
+    "content.manager.version_with_pack_format": "{version} · Pack format {pack_format}",
+    "mod_manager.source.ftb": "FTB",
+    "mod_manager.source.manual": "Manual",
+    "mod_manager.source.unknown": "Unknown",
+    "mod_manager.source.managed_pack": "{provider} • Modpack",
+    "mod_manager.source.scope.modpack": "Managed by modpack",
+    "mod_manager.source.scope.direct": "Installed directly",
+    "mod_manager.details.source": "Source: {source}",
+    "mod_manager.details.source_scope": "Source scope: {scope}",
+    "mod_manager.details.source_identity": "Provider identity:",
+    "mod_manager.details.project_id": "Project ID: {value}",
+    "mod_manager.details.version_id": "Version ID: {value}",
+    "mod_manager.details.file_id": "File ID: {value}"
   },
   "aliases": {
     "MCW Launcher": "app.name",

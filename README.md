@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/Stable-v0.12.0-brightgreen" alt="Current stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Beta-v1.0.0--beta.3-orange" alt="Current beta version">
+    <img src="https://img.shields.io/badge/Beta-v1.0.0--beta.4-orange" alt="Current beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -25,12 +25,12 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v1.0.0-beta.3.md">v1.0 beta notes</a> ·
+  <a href="docs/RELEASE-v1.0.0-beta.4.md">v1.0 beta notes</a> ·
   <a href="docs/UPDATE_PACKAGES.md">Updater packages</a>
 </p>
 
 > [!NOTE]
-> `v0.12.0` là bản Stable hiện tại. `v1.0.0-beta.3` mở rộng trải nghiệm nội dung với FTB modpack, resource pack, shader pack và Launch Control mới; bản beta chỉ được nhận khi người dùng chủ động tham gia tester program.
+> `v0.12.0` là bản Stable hiện tại. `v1.0.0-beta.4` mở rộng quản lý nội dung, dependency và nguồn mod; bản này chỉ được nhận khi người dùng chủ động tham gia tester program.
 
 ---
 
@@ -42,15 +42,13 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
-### Điểm nổi bật của `v1.0.0-beta.3`
+### Điểm nổi bật của `v1.0.0-beta.4`
 
-- Thêm trình quản lý **Resource Packs** và **Shader Packs** theo từng instance, hỗ trợ duyệt Modrinth/CurseForge và nhập ZIP cục bộ.
-- Dùng lại Content Browser có icon, metadata, gallery, mô tả tùy chọn, chọn phiên bản và nút mở trang dự án trước khi cài.
-- Xác minh ZIP, `pack.mcmeta`, `pack_format`, thư mục shader, hash, kích thước và đường dẫn an toàn trước khi thay đổi instance.
-- Lưu provider/project/version/file IDs, hash, URL nguồn và trạng thái bật/tắt vào `.mcw/content-packs.json` để phục vụ update, repair và manifest export sau này.
-- Cho phép bật/tắt, gỡ, mở thư mục và xem project của content pack đã cài mà không làm mất file ngoài ý muốn.
-- Mở rộng nút Launch/Pause/Cancel theo cả chiều ngang lẫn chiều cao; Launch chiếm toàn vùng điều khiển khi rảnh và Pause/Cancel chia đều khi tác vụ chạy.
-- Giữ FTB modpack và deferred download của beta.2: instance chỉ lưu manifest lúc tạo, còn file quản lý được tải ở lần Launch đầu.
+- Lưu nguồn chính xác cho từng mod được quản lý bởi modpack: Modrinth, CurseForge hoặc FTB thay vì hiển thị dấu `-`.
+- Thêm `.mcw/mod-provenance.json` làm registry thống nhất cho provider/project/version/file ID, hash, URL và modpack sở hữu file.
+- Tự đồng bộ provenance từ manifest ngay khi tạo instance, trước cả lần Launch đầu tiên tải mod.
+- Manage Mods hiển thị rõ nguồn trực tiếp hay nguồn do modpack quản lý, phục vụ update, repair và manifest export ở beta.6.
+- Hoàn thiện Launch Control để Launch hoặc Pause/Cancel mở rộng theo cả chiều ngang lẫn chiều cao.
 
 ### Điểm nổi bật của `v0.12.0-beta.6`
 
@@ -117,7 +115,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.12.0` là bản Stable hiện tại; `v1.0.0-beta.3` dành cho tester muốn thử FTB, resource pack, shader pack và Launch Control mới.
+- `v0.12.0` là bản Stable hiện tại; `v1.0.0-beta.4` dành cho tester muốn thử provenance, update/dependency và content workflow mới.
 - Stable là kênh mặc định. Để nhận bản thử nghiệm, người dùng phải chủ động bật:
 
 ```text
@@ -196,15 +194,13 @@ MCW Launcher is an open-source Minecraft launcher centered around **isolated ins
 
 Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
 
-### `v1.0.0-beta.3` highlights
+### `v1.0.0-beta.4` highlights
 
-- Add per-instance **Resource Pack** and **Shader Pack** management with Modrinth/CurseForge browsing and local ZIP import.
-- Reuse the rich Content Browser with icons, metadata, gallery media, optional long descriptions, explicit version selection, and project web links.
-- Validate ZIP structure, `pack.mcmeta`, `pack_format`, shader directories, hashes, sizes, and safe paths before changing an instance.
-- Persist provider/project/version/file IDs, hashes, source URLs, and enable state in `.mcw/content-packs.json` for later update, repair, and manifest export workflows.
-- Enable, disable, remove, open folders, and view installed content projects without silently overwriting unrelated files.
-- Expand Launch/Pause/Cancel in both dimensions; Launch fills the idle control area while Pause and Cancel split it evenly during active work.
-- Preserve beta.2 FTB and deferred modpack behavior: instance creation stores manifests, while managed files download on first Launch.
+- Preserve exact Modrinth, CurseForge, or FTB provenance for every mod managed by a modpack instead of showing an unknown `-` source.
+- Add `.mcw/mod-provenance.json` as a unified per-instance registry for provider/project/version/file IDs, hashes, URLs, and owning modpack identity.
+- Synchronize provenance as soon as a manifest creates an instance, before first-launch mod downloads begin.
+- Show whether a mod was installed directly or is managed by a modpack in Manage Mods, preparing update, repair, and beta.6 manifest-export workflows.
+- Expand Launch and Pause/Cancel controls across the available action area in both dimensions.
 
 ### `v0.11.0` highlights
 
@@ -447,8 +443,6 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
-| [`docs/RELEASE-v1.0.0-beta.3.md`](docs/RELEASE-v1.0.0-beta.3.md) | Resource packs, shader packs and expanded Launch Control |
-| [`docs/RELEASE-v1.0.0-beta.2.md`](docs/RELEASE-v1.0.0-beta.2.md) | FTB modpacks and deferred managed-file installation |
 | [`docs/RELEASE-v1.0.0-beta.1.md`](docs/RELEASE-v1.0.0-beta.1.md) | Rich Modrinth/CurseForge project browsing foundation |
 | [`docs/RELEASE-v0.12.0.md`](docs/RELEASE-v0.12.0.md) | Complete v0.12.0 Stable release notes |
 | [`docs/RELEASE-v0.12.0-beta.6.md`](docs/RELEASE-v0.12.0-beta.6.md) | Instance icons and runtime-state badges |
@@ -474,7 +468,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v1.0.0-beta.3 |
+| Component | Status in v1.0.0-beta.1 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |
@@ -491,9 +485,6 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 | Theme schema 1–6 | Available — animation, custom fonts, authoring tools, palette and custom accent support |
 | CurseForge Gateway mods | Available — icon cards, rich project details, Fabric/Quilt/Forge/NeoForge install, required dependencies, transactional apply, public gateway, cache and manual fallback |
 | CurseForge modpacks | Available — Fabric/Quilt/Forge/NeoForge manifest-driven install with universal dependency support |
-| FTB modpacks | Available — rich browser, manifest-first instance creation, primary/mirror download and first-launch materialization |
-| Resource packs | Available — Modrinth/CurseForge browser, local ZIP import, pack metadata validation, enable/disable and removal |
-| Shader packs | Available — Modrinth/CurseForge browser, local ZIP import, shader-directory validation, enable/disable and environment warning |
 
 ## Contributing and bug reports
 

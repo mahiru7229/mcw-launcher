@@ -252,19 +252,16 @@ class ModManagerDialog(QDialog):
         selected_files = {mod.file_name.casefold() for mod in self._selected_mods()}
         updates = self._updates_by_file()
         issues = self._issues_by_mod_id()
-        curseforge_files = self._curseforge_files()
         self.table.setSortingEnabled(False)
         self.table.setRowCount(len(self._mods))
 
         for row, mod in enumerate(self._mods):
             update = updates.get(mod.file_name.casefold())
             mod_issues = issues.get(mod.mod_id.casefold(), ())
-            if update is not None:
-                source = tr("mod_manager.source.modrinth")
-            elif mod.file_name.casefold() in curseforge_files:
-                source = tr("mod_manager.source.curseforge")
-            else:
-                source = tr("mod_manager.source.local")
+            provider = str(mod.source or "local").strip().casefold()
+            source = tr(f"mod_manager.source.{provider}", default=provider.title() if provider else tr("mod_manager.source.local"))
+            if mod.managed_by_modpack:
+                source = tr("mod_manager.source.managed_pack", provider=source)
             update_text = "—"
             lock_text = "—"
             if update is not None:
@@ -457,6 +454,8 @@ class ModManagerDialog(QDialog):
             tr("Authors: {authors}", authors=authors),
             tr("License: {licenses}", licenses=licenses),
             tr("Status: {status}", status=tr(mod.status)),
+            tr("mod_manager.details.source", source=tr(f"mod_manager.source.{mod.source}", default=(mod.source or "local").title())),
+            tr("mod_manager.details.source_scope", scope=tr("mod_manager.source.scope.modpack") if mod.managed_by_modpack else tr("mod_manager.source.scope.direct")),
             "",
             mod.description or tr("No description."),
             "",
@@ -466,6 +465,15 @@ class ModManagerDialog(QDialog):
             tr("mod_manager.details.optional_dependencies"),
             recommends,
         ]
+        source_ids = []
+        if mod.source_project_id:
+            source_ids.append(tr("mod_manager.details.project_id", value=mod.source_project_id))
+        if mod.source_version_id:
+            source_ids.append(tr("mod_manager.details.version_id", value=mod.source_version_id))
+        if mod.source_file_id:
+            source_ids.append(tr("mod_manager.details.file_id", value=mod.source_file_id))
+        if source_ids:
+            text.extend(["", tr("mod_manager.details.source_identity"), *[f"  {value}" for value in source_ids]])
         if update is not None:
             text.extend(["", "Modrinth:", f"  Project: {update.title} ({update.project_id})", f"  Installed: {update.current_version_number}", f"  Latest allowed: {update.latest_version_number} ({update.latest_version_type})", f"  Version lock: {'On' if update.locked else 'Off'}", f"  Update state: {update.status}"])
             if update.warning:

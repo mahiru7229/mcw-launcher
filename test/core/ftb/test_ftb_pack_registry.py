@@ -28,9 +28,10 @@ def test_registry_round_trip_normalizes_paths_and_files(tmp_path: Path) -> None:
 
     data = FTBPackRegistry.load(tmp_path)
 
-    assert data["schemaVersion"] == 1
+    assert data["schemaVersion"] == 2
     assert data["source"] == "ftb"
     assert [entry["fileName"] for entry in data["managedFiles"]] == ["a.jar", "b.jar"]
     assert data["managedFiles"][0]["path"] == "a.jar"
     assert data["managedFiles"][1]["urls"] == ["https://one.example/b.jar"]
     assert data["managedFiles"][1]["sha1"] == "a" * 40
+    assert data["managedFiles"][1]["provider"] == "ftb"

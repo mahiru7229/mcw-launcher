@@ -9,7 +9,7 @@ from src.models.instance.instance import Instance
 
 
 class CurseForgePackRegistry:
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     @staticmethod
     def load(instance: Instance | Path) -> dict:
@@ -84,6 +84,7 @@ class CurseForgePackRegistry:
                 "acceptedUnverified": bool(raw.get("acceptedUnverified", False)),
                 "compatibilityWarning": str(raw.get("compatibilityWarning") or "").strip(),
                 "manualImport": bool(raw.get("manualImport", False)),
+                "provider": "curseforge",
             })
         output = dict(data)
         output["schemaVersion"] = CurseForgePackRegistry.SCHEMA_VERSION

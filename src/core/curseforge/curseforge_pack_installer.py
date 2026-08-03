@@ -19,6 +19,7 @@ from src.core.instance.settings_manager import SettingsManager
 from src.core.instance.instance_artwork_manager import InstanceArtworkManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.curseforge.install_result import CurseForgeModpackInstallResult
 from src.models.curseforge.manual_download import CurseForgeManualDownload
@@ -108,7 +109,7 @@ class CurseForgePackInstaller:
             try:
                 if settings_override is not None:
                     SettingsManager.save_dict(instance, settings_override)
-                CurseForgePackInstaller._extract_overrides(archive, str(manifest.get("overrides") or "overrides"), Path(instance.instance_dir), reporter)
+                override_mods = CurseForgePackInstaller._extract_overrides(archive, str(manifest.get("overrides") or "overrides"), Path(instance.instance_dir), reporter)
                 CurseForgePackRegistry.save(instance, {
                     "projectId": int(project_id),
                     "fileId": int(file_id),
@@ -121,6 +122,8 @@ class CurseForgePackInstaller:
                     "managedFiles": entries,
                     "lastDownloadFailures": [],
                 })
+                ModProvenanceRegistry.synchronize(instance)
+                ModProvenanceRegistry.record_many(instance, [{**entry, "provider": "curseforge", "managedByModpack": True, "packProvider": "curseforge", "packProjectId": str(project_id), "packVersionId": str(file_id)} for entry in override_mods])
                 if InstanceArtworkManager.apply_provider_artwork(instance, "curseforge", project_id, getattr(project, "logo_url", ""), reporter):
                     instance = InstanceManager.load(instance.name)
             except Exception:
@@ -285,19 +288,21 @@ class CurseForgePackInstaller:
                 "declaredLoaders": list(file.loaders),
                 "gameVersions": list(file.game_versions),
                 "required": required,
+                "provider": "curseforge",
             })
             if reporter is not None:
                 reporter.files(stage=ProgressStage.CHECKING_MODPACK, message="Reading CurseForge modpack file metadata...", current=completed, total=len(normalized))
         return sorted(results, key=lambda item: (item["projectId"], item["fileId"])), skipped
 
     @staticmethod
-    def _extract_overrides(archive: zipfile.ZipFile, prefix: str, destination: Path, reporter: ProgressReporter | None) -> None:
+    def _extract_overrides(archive: zipfile.ZipFile, prefix: str, destination: Path, reporter: ProgressReporter | None) -> list[dict]:
         normalized_prefix = str(prefix).replace("\\", "/").strip("/") + "/"
         entries = [info for info in archive.infolist() if info.filename.replace("\\", "/").startswith(normalized_prefix) and not info.is_dir()]
         total_bytes = sum(max(0, int(info.file_size or 0)) for info in entries)
         if total_bytes > CurseForgePackInstaller.MAX_OVERRIDE_BYTES:
             raise RuntimeError("The CurseForge override layer is larger than the configured safety limit.")
         written = 0
+        override_mods: list[dict] = []
         if reporter is not None:
             reporter.bytes(stage=ProgressStage.INSTALLING_MOD_LOADER, message="Extracting CurseForge overrides...", current=0, total=total_bytes)
         for info in entries:
@@ -307,12 +312,19 @@ class CurseForgePackInstaller:
             relative = CurseForgePackInstaller._safe_relative_path(name)
             target = destination.joinpath(*relative.parts)
             target.parent.mkdir(parents=True, exist_ok=True)
+            digest = hashlib.sha1(usedforsecurity=False)
+            file_written = 0
             with archive.open(info, "r") as source, target.open("wb") as output:
                 while chunk := source.read(1024 * 1024):
                     output.write(chunk)
+                    digest.update(chunk)
+                    file_written += len(chunk)
                     written += len(chunk)
                     if reporter is not None:
                         reporter.bytes(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Extracting {relative.as_posix()}...", current=written, total=total_bytes)
+            if len(relative.parts) >= 2 and relative.parts[0].casefold() == "mods" and relative.name.casefold().endswith(".jar"):
+                override_mods.append({"fileName": relative.name, "path": relative.as_posix(), "sha1": digest.hexdigest(), "size": file_written})
+        return override_mods
 
     @staticmethod
     def _safe_relative_path(value: str) -> PurePosixPath:

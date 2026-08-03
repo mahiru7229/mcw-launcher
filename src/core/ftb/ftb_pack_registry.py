@@ -9,7 +9,7 @@ from src.models.instance.instance import Instance
 
 
 class FTBPackRegistry:
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     @staticmethod
     def load(instance: Instance | Path) -> dict:
@@ -64,6 +64,7 @@ class FTBPackRegistry:
                 "fileType": str(raw.get("fileType") or "").strip(),
                 "pendingDownload": bool(raw.get("pendingDownload", False)),
                 "lastDownloadError": str(raw.get("lastDownloadError") or "").strip(),
+                "provider": "ftb",
             })
         output = dict(data)
         output["schemaVersion"] = FTBPackRegistry.SCHEMA_VERSION

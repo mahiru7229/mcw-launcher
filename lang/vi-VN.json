@@ -1474,7 +1474,19 @@
     "content.task.install.completed_detail": "Gói nội dung đã sẵn sàng trong instance được chọn.",
     "content.task.install.failed": "Cài gói nội dung thất bại",
     "content.manager.open_web": "Mở trên web",
-    "content.manager.version_with_pack_format": "{version} · Pack format {pack_format}"
+    "content.manager.version_with_pack_format": "{version} · Pack format {pack_format}",
+    "mod_manager.source.ftb": "FTB",
+    "mod_manager.source.manual": "Thủ công",
+    "mod_manager.source.unknown": "Không xác định",
+    "mod_manager.source.managed_pack": "{provider} • Modpack",
+    "mod_manager.source.scope.modpack": "Được modpack quản lý",
+    "mod_manager.source.scope.direct": "Cài trực tiếp",
+    "mod_manager.details.source": "Nguồn: {source}",
+    "mod_manager.details.source_scope": "Phạm vi nguồn: {scope}",
+    "mod_manager.details.source_identity": "Định danh từ provider:",
+    "mod_manager.details.project_id": "Project ID: {value}",
+    "mod_manager.details.version_id": "Version ID: {value}",
+    "mod_manager.details.file_id": "File ID: {value}"
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

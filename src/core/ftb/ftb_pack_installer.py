@@ -10,6 +10,7 @@ from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.settings_manager import SettingsManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
 from src.core.network.download_pause import download_pause_controller
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.ftb.install_result import FTBModpackInstallResult
@@ -59,6 +60,7 @@ class FTBPackInstaller:
                 "recommendedMemoryMb": version.recommended_memory_mb,
                 "managedFiles": [FTBPackInstaller._registry_entry(file) for file in selected],
             })
+            ModProvenanceRegistry.synchronize(instance)
             if InstanceArtworkManager.apply_provider_artwork(instance, "ftb", project.project_id, project.icon_url, reporter):
                 instance = InstanceManager.load(instance.name)
         except Exception:
@@ -150,6 +152,7 @@ class FTBPackInstaller:
             "fileType": file.file_type,
             "pendingDownload": True,
             "lastDownloadError": "",
+            "provider": "ftb",
         }
 
     @staticmethod

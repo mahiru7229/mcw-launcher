@@ -582,6 +582,10 @@ class Paths:
         return directory
 
     @staticmethod
+    def mod_provenance_registry(instance: Instance) -> Path:
+        return Path(instance.instance_dir) / ".mcw" / "mod-provenance.json"
+
+    @staticmethod
     def modrinth_root() -> Path:
         directory = Paths.CACHE_ROOT / "content" / "modrinth"
         directory.mkdir(parents=True, exist_ok=True)

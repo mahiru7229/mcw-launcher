@@ -23,3 +23,9 @@ class ModInfo:
     breaks: dict[str, object] = field(default_factory=dict)
     status: str = "Ready"
     error: str = ""
+    source: str = "local"
+    source_project_id: str = ""
+    source_version_id: str = ""
+    source_file_id: str = ""
+    managed_by_modpack: bool = False
+    source_pack_provider: str = ""

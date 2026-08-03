@@ -144,8 +144,10 @@ def test_idle_launch_fills_controls_and_active_state_splits_pause_cancel(app):
     assert widget.launch_button.sizePolicy().verticalPolicy() is QSizePolicy.Policy.Expanding
     assert widget.cancel_button.sizePolicy().horizontalPolicy() is QSizePolicy.Policy.Expanding
     assert widget.cancel_button.sizePolicy().verticalPolicy() is QSizePolicy.Policy.Expanding
-    assert widget.launch_button.minimumHeight() >= 58
-    assert widget.cancel_button.minimumHeight() >= 58
+    assert widget.controls_widget.sizePolicy().horizontalPolicy() is QSizePolicy.Policy.Expanding
+    assert widget.controls_widget.sizePolicy().verticalPolicy() is QSizePolicy.Policy.Expanding
+    assert widget.launch_button.minimumHeight() >= 74
+    assert widget.cancel_button.minimumHeight() >= 74
     assert widget.cancel_button.isVisible() is False
     idle_width = widget.launch_button.width()
     idle_height = widget.launch_button.height()
