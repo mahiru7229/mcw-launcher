@@ -42,6 +42,30 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
+### Điểm nổi bật của `v0.12.0-beta.6`
+
+- Nâng `instance.json` lên metadata schema 3 với icon, kết quả phiên gần nhất và dữ liệu runtime đã chuẩn hóa.
+- Hiển thị badge **đang tải / đang chạy / đã kết thúc / crash** trực tiếp trên icon từng instance.
+- Cho phép đổi icon bằng PNG, JPEG, WebP, BMP hoặc ICO; icon được chép vào `.mcw/instance-icon.<ext>` để instance tự chứa dữ liệu.
+- `.mcwpack` mang theo icon và thêm `instance_name` / `instance_icon` vào `package.json` để phục vụ preview.
+- Public API bổ sung `InstanceState`, `InstanceStatus`, `status()`, `list_statuses()`, `set_icon()` và `reset_icon()`.
+
+### Điểm nổi bật của `v0.12.0-beta.5`
+
+- Chuyển màn hình mặc định thành **thư viện instance** dạng icon, có tìm kiếm và panel thao tác nhanh.
+- Thêm workflow Add Instance / Import / Modrinth Packs / CurseForge Packs trên cùng một toolbar.
+- Thêm cửa sổ **Edit Instance** theo hướng instance-centered với Overview, Mods, Settings, Maintenance và Diagnostics.
+- Hỗ trợ double-click để launch, menu chuột phải, clone, export, repair và mở thư mục ngay từ thư viện.
+- Rút gọn sidebar và giữ Launch Control cố định; toàn bộ GUI vẫn chỉ gọi public API của `mcw_core`.
+
+### Điểm nổi bật của `v0.12.0-beta.4`
+
+- Thêm package headless **`mcw_core`**, import và sử dụng được mà không cần PySide6.
+- Thêm facade `MCWCore`, `CorePaths`, request/result models và pause/resume/cancel API công khai.
+- Cho phép chương trình Python hoặc CLI bên ngoài load instance, cài Java/mod loader và launch Minecraft bằng cùng core của launcher.
+- Chuyển GUI và entrypoint sang boundary `mcw_core` / `mcw_core.api`, đồng thời khóa chiều phụ thuộc bằng architectural tests.
+- Build được wheel không chứa `src/gui`, nhưng vẫn đóng gói MCW LAN Agent cho Fabric, Quilt, Forge và NeoForge.
+
 ### Điểm nổi bật của `v0.11.0`
 
 - Thêm **Theme Animation Engine** dùng chung cho spritesheet, progress xác định/không xác định và animated state assets.
@@ -58,7 +82,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 ### Tính năng mới trong `v0.10.0`
 
 - Thêm **cài đặt mặc định cho instance** trong Launcher Settings: Java, RAM, kích thước cửa sổ/toàn màn hình, LAN, chính sách file được quản lý, Forge preflight, JVM arguments và game arguments.
-- Mọi instance Vanilla/Fabric/Forge mới và mọi modpack Modrinth/CurseForge mới đều sao chép bộ mặc định này; instance hiện có vẫn giữ `settings.json` riêng.
+- Mọi instance Vanilla/Fabric/Quilt/Forge/NeoForge mới và mọi modpack Modrinth/CurseForge mới đều sao chép bộ mặc định này; instance hiện có vẫn giữ `settings.json` riêng.
 - Khi import `.mcwpack`, hiển thị thông tin gói và cho chọn ghi đè bằng setting tổng, giữ setting trong gói hoặc mở toàn bộ setting của gói để chỉnh trước khi nhập.
 - Cài mod **Fabric trực tiếp từ CurseForge** trong catalog Mods hiện có; vẫn hỗ trợ Forge bằng cùng một luồng.
 - Cài **modpack Fabric từ CurseForge**: chọn Fabric/Forge trong trình duyệt, đọc loader và phiên bản chính xác từ `manifest.json`, rồi tạo instance tương ứng.
@@ -70,7 +94,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 
 ### Nền tảng hiện có
 
-- Tạo và chạy instance **Vanilla, Fabric hoặc Forge**; cài đặt, thay đổi và repair Fabric Loader/Minecraft Forge.
+- Tạo và chạy instance **Vanilla, Fabric, Quilt, Forge hoặc NeoForge**; cài đặt, thay đổi và repair mod loader tương ứng.
 - Tài khoản Offline và Microsoft OAuth PKCE, hỗ trợ nhiều tài khoản Microsoft và bảo vệ refresh token bằng Windows DPAPI.
 - Tìm, cài và cập nhật mod từ **Modrinth**; nhãn Minecraft chỉ để ưu tiên, còn manifest `.mrpack` quyết định phiên bản của modpack.
 - Tìm và cài mod/modpack **CurseForge** qua gateway công khai, có cache, failover và luồng tải thủ công được xác minh khi tác giả hạn chế phân phối.
@@ -175,10 +199,34 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 - Preserve compatibility with theme schemas 1–6 and updater paths from v0.10.0.
 - Include the verified RC2 startup splash and circular-import hotfixes.
 
+### Highlights of `v0.12.0-beta.6`
+
+- Upgrade `instance.json` to metadata schema 3 with normalized icon and completed-session runtime fields.
+- Show **loading / running / finished / crashed** badges directly on every instance icon.
+- Allow PNG, JPEG, WebP, BMP, and ICO files; selected icons are copied to `.mcw/instance-icon.<ext>` so instances remain self-contained.
+- Include icons in `.mcwpack` exports and add `instance_name` / `instance_icon` to `package.json` for previews.
+- Extend the public API with `InstanceState`, `InstanceStatus`, `status()`, `list_statuses()`, `set_icon()`, and `reset_icon()`.
+
+### Highlights of `v0.12.0-beta.5`
+
+- Make the icon-based **instance library** the default screen, with search and a selected-instance action panel.
+- Put Add Instance, Import, Modrinth Packs, CurseForge Packs, and Refresh on one toolbar.
+- Add an instance-centered **Edit Instance** window with Overview, Mods, Settings, Maintenance, and Diagnostics.
+- Support double-click launch, context-menu actions, cloning, export, repair, and folder access directly from the library.
+- Reduce the sidebar while keeping Launch Control permanent; the GUI continues to call only the public `mcw_core` API.
+
+### Highlights of `v0.12.0-beta.4`
+
+- Add the headless **`mcw_core`** package, importable and usable without PySide6.
+- Add the public `MCWCore` facade, `CorePaths`, request/result models, and pause/resume/cancel controls.
+- Allow external Python programs and the CLI to load instances, install Java/mod loaders, and launch Minecraft through the same launcher core.
+- Move the GUI and launcher entrypoint behind the `mcw_core` / `mcw_core.api` boundary and enforce it with architectural tests.
+- Build a wheel that excludes `src/gui` while still bundling the MCW LAN Agent for Fabric, Quilt, Forge, and NeoForge.
+
 ### New in `v0.10.0`
 
 - Add **default instance settings** under Launcher Settings for Java, memory, window/fullscreen, LAN, managed-file policies, Forge preflight, JVM arguments, and game arguments.
-- Every new Vanilla/Fabric/Forge instance and every new Modrinth/CurseForge modpack copies these defaults, while existing instances retain their own `settings.json`.
+- Every new Vanilla/Fabric/Quilt/Forge/NeoForge instance and every new Modrinth/CurseForge modpack copies these defaults, while existing instances retain their own `settings.json`.
 - Before importing a `.mcwpack`, show its package details and let the user overwrite settings with launcher defaults, keep package settings, or review and edit the complete package settings first.
 - Install **Fabric mods directly from CurseForge** in the existing Mods catalog while retaining the same Forge workflow.
 - Install **Fabric CurseForge modpacks** by selecting Fabric/Forge in the browser, validating the exact loader and version from `manifest.json`, and creating the matching instance.
@@ -190,7 +238,7 @@ Each instance owns its game directory, Minecraft version, mod loader, mods, save
 
 ### Existing foundation
 
-- Create and launch **Vanilla, Fabric, and Forge** instances; install, change, and repair Fabric Loader/Minecraft Forge.
+- Create and launch **Vanilla, Fabric, Quilt, Forge, and NeoForge** instances; install, change, and repair their mod loaders.
 - Use Offline or Microsoft OAuth PKCE accounts, including multiple Microsoft accounts and Windows DPAPI protection for refresh tokens.
 - Search, install, and update **Modrinth** mods; Minecraft labels only affect ranking, while each `.mrpack` manifest determines its modpack version.
 - Search and install **CurseForge** mods/modpacks through the public gateway, with caching, failover, and verified manual downloads for restricted files.
@@ -379,6 +427,8 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
+| [`docs/RELEASE-v0.12.0-beta.6.md`](docs/RELEASE-v0.12.0-beta.6.md) | Instance icons and runtime-state badges |
+| [`docs/RELEASE-v0.12.0-beta.5.md`](docs/RELEASE-v0.12.0-beta.5.md) | Instance-centered GUI workflow |
 | [`docs/RELEASE-v0.11.0.md`](docs/RELEASE-v0.11.0.md) | Complete v0.11.0 Stable release notes |
 | [`docs/RELEASE-v0.11.0-rc.2.md`](docs/RELEASE-v0.11.0-rc.2.md) | Final v0.11.0 release candidate: theme palette and user accent color |
 | [`docs/RELEASE-v0.9.0.md`](docs/RELEASE-v0.9.0.md) | Complete v0.9.0 Stable release notes |
@@ -396,14 +446,17 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 | [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) | PNG theme assets and sizes |
 | [`docs/THEME_RUNTIME_CONTRACT.md`](docs/THEME_RUNTIME_CONTRACT.md) | Frozen schema 6, asset catalog, validation API and package contract |
 | [`docs/gui-api.en.md`](docs/gui-api.en.md) / [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API |
+| [`docs/MCW_CORE_LIBRARY.md`](docs/MCW_CORE_LIBRARY.md) | Headless MCW Core public API and CLI |
 
 ## Support status
 
-| Component | Status in v0.11.0 |
+| Component | Status in v0.12.0-beta.6 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |
+| Quilt Loader and compatible Fabric mods | Available — beta |
 | Forge Loader and mods | Available |
+| NeoForge Loader and mods | Available — beta |
 | Modrinth mods and `.mrpack` modpacks | Available — preview, update, repair, backup and rollback supported |
 | Download resume and recovery | Available — verified `.part` files and persistent journal |
 | Repair Center | Available — Quick Check, Full Verification and recovery points |
@@ -412,9 +465,8 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 | Offline accounts | Available |
 | English / Vietnamese | Available |
 | Theme schema 1–6 | Available — animation, custom fonts, authoring tools, palette and custom accent support |
-| NeoForge / Quilt | Not supported |
-| CurseForge Gateway mods | Available — Fabric/Forge install, required dependencies, transactional apply, public gateway, cache and manual fallback |
-| CurseForge modpacks | Available — Fabric/Forge manifest-driven install with universal dependency support |
+| CurseForge Gateway mods | Available — Fabric/Quilt/Forge/NeoForge install, required dependencies, transactional apply, public gateway, cache and manual fallback |
+| CurseForge modpacks | Available — Fabric/Quilt/Forge/NeoForge manifest-driven install with universal dependency support |
 
 ## Contributing and bug reports
 

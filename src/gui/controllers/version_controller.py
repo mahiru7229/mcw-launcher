@@ -4,8 +4,8 @@ from typing import Any
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.language.language_manager import tr
-from src.core.minecraft.version_manifest_manager import VersionManifestManager
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.minecraft.version_manifest_manager import VersionManifestManager
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 

@@ -309,6 +309,40 @@ def test_reads_forge_language_provider_from_manifest(tmp_path):
     assert "LANGPROVIDER" in mod.metadata_format
 
 
+def test_reads_fml_managed_library_as_neoforge_for_neoforge_instance(tmp_path):
+    instance = make_instance(tmp_path, loader=("neoforge", "47.1.106"))
+    source = tmp_path / "kotlinforforge-4.12.0-all.jar"
+    with zipfile.ZipFile(source, "w") as archive:
+        archive.writestr(
+            "META-INF/MANIFEST.MF",
+            "Manifest-Version: 1.0\nFMLModType: LIBRARY\n",
+        )
+
+    metadata = ModManager.read_mod(source, preferred_loader="neoforge", provider_version="4.12.0")
+    ModManager.validate_mod_for_instance(instance, metadata)
+    added = ModManager.add_mods(instance, [source])
+
+    assert metadata.loader == "neoforge"
+    assert metadata.version == "4.12.0"
+    assert metadata.description == "Neoforge managed library"
+    assert added[0].loader == "neoforge"
+    assert added[0].status == "Ready"
+
+
+def test_fml_managed_library_defaults_to_forge_without_family_preference(tmp_path):
+    source = tmp_path / "forge-library.jar"
+    with zipfile.ZipFile(source, "w") as archive:
+        archive.writestr(
+            "META-INF/MANIFEST.MF",
+            "Manifest-Version: 1.0\nFMLModType: LIBRARY\nImplementation-Version: 1.2.3\n",
+        )
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.loader == "forge"
+    assert mod.version == "1.2.3"
+
+
 def test_allow_unverified_installs_fabric_jar_into_forge_instance(tmp_path):
     instance = make_instance(tmp_path, loader=("forge", "47.3.0"))
     source = make_mod(tmp_path / "fabric-api-port.jar")
@@ -317,3 +351,213 @@ def test_allow_unverified_installs_fabric_jar_into_forge_instance(tmp_path):
 
     assert added[0].loader == "fabric"
     assert (ModManager.mods_dir(instance) / source.name).is_file()
+
+
+def make_forge_placeholder_mod(path: Path, version: str, manifest: str = "", extra_properties: str = "") -> Path:
+    metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[47,)"\n'
+        'license="MIT"\n'
+        f'{extra_properties}\n'
+        '[[mods]]\n'
+        'modId="placeholder_example"\n'
+        f'version="{version}"\n'
+        'displayName="Placeholder Example"\n'
+        'description="Version placeholder test."\n'
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("META-INF/mods.toml", metadata)
+        if manifest:
+            archive.writestr("META-INF/MANIFEST.MF", manifest)
+    return path
+
+
+def test_resolves_file_jar_version_from_manifest(tmp_path):
+    source = make_forge_placeholder_mod(
+        tmp_path / "flywheel.jar",
+        "${file.jarVersion}",
+        "Manifest-Version: 1.0\nImplementation-Version: 0.6.8\n",
+    )
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.version == "0.6.8"
+
+
+def test_resolves_jar_version_with_case_insensitive_continued_manifest_attribute(tmp_path):
+    source = make_forge_placeholder_mod(
+        tmp_path / "continued.jar",
+        "${file.jarVersion}",
+        "Manifest-Version: 1.0\niMpLeMeNtAtIoN-vErSiOn: 0.6.\n 8\n",
+    )
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.version == "0.6.8"
+
+
+def test_resolves_generic_file_property_from_mod_metadata(tmp_path):
+    source = make_forge_placeholder_mod(tmp_path / "property.jar", "${file.someKey}", extra_properties='someKey="2.4.1"')
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.version == "2.4.1"
+
+
+def test_uses_provider_version_when_placeholder_cannot_be_resolved(tmp_path):
+    source = make_forge_placeholder_mod(tmp_path / "provider.jar", "${file.jarVersion}")
+
+    mod = ModManager.read_mod(source, provider_version="3.1.4")
+
+    assert mod.version == "3.1.4"
+
+
+def test_infers_version_from_filename_after_placeholder_fallbacks(tmp_path):
+    source = make_forge_placeholder_mod(tmp_path / "flywheel-forge-0.6.8.jar", "${file.jarVersion}")
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.version == "0.6.8"
+
+
+def test_unresolved_version_placeholder_becomes_unknown(tmp_path):
+    source = make_forge_placeholder_mod(tmp_path / "flywheel.jar", "${file.jarVersion}")
+
+    mod = ModManager.read_mod(source)
+
+    assert mod.version == "Unknown"
+
+
+def test_reads_legacy_mods_toml_as_neoforge_for_neoforge_instance(tmp_path):
+    instance = make_instance(tmp_path, loader=("neoforge", "47.1.106"))
+    source = make_forge_mod(tmp_path / "legacy-neoforge.jar", mod_id="legacy_neoforge")
+
+    added = ModManager.add_mods(instance, [source])
+
+    assert added[0].loader == "neoforge"
+    assert added[0].metadata_format == "mods.toml"
+    assert added[0].mod_id == "legacy_neoforge"
+
+def test_reads_modern_neoforge_metadata_and_dependencies(tmp_path):
+    instance = make_instance(tmp_path, loader=("neoforge", "21.1.200"))
+    source = tmp_path / "modern-neoforge.jar"
+    metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[4,)"\n'
+        'license="MIT"\n\n'
+        '[[mods]]\n'
+        'modId="modern_neoforge"\n'
+        'version="1.2.3"\n'
+        'displayName="Modern NeoForge"\n\n'
+        '[[dependencies.modern_neoforge]]\n'
+        'modId="minecraft"\n'
+        'type="required"\n'
+        'versionRange="[1.21.1,1.22)"\n'
+        'ordering="NONE"\n'
+        'side="BOTH"\n'
+    )
+    with zipfile.ZipFile(source, "w") as archive:
+        archive.writestr("META-INF/neoforge.mods.toml", metadata)
+
+    added = ModManager.add_mods(instance, [source])
+
+    assert added[0].loader == "neoforge"
+    assert added[0].metadata_format == "neoforge.mods.toml"
+    assert added[0].mod_id == "modern_neoforge"
+    assert added[0].version == "1.2.3"
+    assert added[0].dependencies["neoforge"] == "[4,)"
+    assert added[0].dependencies["minecraft"] == "[1.21.1,1.22)"
+
+
+
+def make_quilt_mod(path: Path, mod_id="quilt_example", name="Quilt Example", version="1.0.0") -> Path:
+    metadata = {
+        "schema_version": 1,
+        "quilt_loader": {
+            "group": "dev.mcw",
+            "id": mod_id,
+            "version": version,
+            "metadata": {
+                "name": name,
+                "description": "A Quilt test mod.",
+                "contributors": {"Mahiru": "Owner"},
+                "license": "MIT",
+            },
+            "depends": [
+                {"id": "quilt_loader", "versions": ">=0.20.0"},
+                {"id": "minecraft", "versions": "1.20.1"},
+            ],
+            "recommends": {"qsl": "*"},
+        },
+        "minecraft": {"environment": "client"},
+    }
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("quilt.mod.json", json.dumps(metadata))
+    return path
+
+
+def test_adds_and_reads_quilt_mod(tmp_path):
+    instance = make_instance(tmp_path, loader=("quilt", "0.27.1"))
+    source = make_quilt_mod(tmp_path / "quilt-example.jar")
+
+    added = ModManager.add_mods(instance, [source])
+
+    assert added[0].mod_id == "quilt_example"
+    assert added[0].name == "Quilt Example"
+    assert added[0].loader == "quilt"
+    assert added[0].metadata_format == "quilt.mod.json"
+    assert added[0].dependencies["quilt_loader"] == ">=0.20.0"
+    assert added[0].dependencies["minecraft"] == "1.20.1"
+    assert added[0].recommends["qsl"] == "*"
+    assert added[0].authors == ("Mahiru",)
+
+
+def test_fabric_mod_is_read_as_quilt_compatible_in_quilt_instance(tmp_path):
+    instance = make_instance(tmp_path, loader=("quilt", "0.27.1"))
+    source = make_mod(tmp_path / "fabric-compatible.jar")
+
+    added = ModManager.add_mods(instance, [source])
+
+    assert added[0].loader == "quilt"
+    assert added[0].metadata_format == "fabric.mod.json (Quilt compatibility)"
+    assert added[0].dependencies["fabricloader"] == ">=0.15.0"
+
+
+def test_quilt_mod_is_rejected_by_fabric_instance(tmp_path):
+    instance = make_instance(tmp_path, loader=("fabric", "0.16.0"))
+    source = make_quilt_mod(tmp_path / "quilt-only.jar")
+
+    with pytest.raises(RuntimeError, match="Quilt mod"):
+        ModManager.add_mods(instance, [source])
+
+
+def test_dual_quilt_and_fabric_metadata_prefers_instance_loader(tmp_path):
+    path = tmp_path / "dual-quilt-fabric.jar"
+    fabric = {
+        "schemaVersion": 1,
+        "id": "dual_example",
+        "name": "Fabric View",
+        "version": "1.0.0",
+        "depends": {"fabricloader": "*"},
+    }
+    quilt = {
+        "schema_version": 1,
+        "quilt_loader": {
+            "group": "dev.mcw",
+            "id": "dual_example",
+            "version": "1.0.0",
+            "metadata": {"name": "Quilt View"},
+            "depends": [{"id": "quilt_loader", "versions": "*"}],
+        },
+    }
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("fabric.mod.json", json.dumps(fabric))
+        archive.writestr("quilt.mod.json", json.dumps(quilt))
+
+    quilt_mod = ModManager.read_mod(path, preferred_loader="quilt")
+    fabric_mod = ModManager.read_mod(path, preferred_loader="fabric")
+
+    assert quilt_mod.loader == "quilt"
+    assert quilt_mod.name == "Quilt View"
+    assert fabric_mod.loader == "fabric"
+    assert fabric_mod.name == "Fabric View"

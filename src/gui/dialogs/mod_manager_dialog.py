@@ -6,10 +6,10 @@ from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import QAbstractItemView, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
-from src.core.config.curseforge_config_manager import CurseForgeConfigManager
-from src.core.curseforge.curseforge_registry import CurseForgeRegistry
-from src.core.language.language_manager import tr
-from src.core.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
+from mcw_core.api.curseforge.curseforge_registry import CurseForgeRegistry
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.window_sizing import resize_dialog_to_screen
 from src.models.instance.instance import Instance
@@ -65,7 +65,7 @@ class ModManagerDialog(QDialog):
 
         self.title_label = QLabel("No instance selected")
         self.title_label.setObjectName("PageTitle")
-        self.summary_label = QLabel("Choose a Fabric or Forge instance to manage its mods.")
+        self.summary_label = QLabel("Choose a Fabric, Quilt, Forge, or NeoForge instance to manage its mods.")
         self.summary_label.setObjectName("MutedLabel")
         self.summary_label.setWordWrap(True)
         self.health_label = QLabel("")
@@ -177,20 +177,20 @@ class ModManagerDialog(QDialog):
 
         if instance is None:
             self.title_label.setText(tr("No instance selected"))
-            self.summary_label.setText(tr("Choose a Fabric or Forge instance to manage its mods."))
+            self.summary_label.setText(tr("Choose a Fabric, Quilt, Forge, or NeoForge instance to manage its mods."))
             self._set_actions_enabled(False)
             return
 
         loader_name, loader_version = ModLoaderManager.normalize(instance.mod_loader)
         self.title_label.setText(tr("Mods — {name}", name=instance.name))
-        if loader_name in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
-            loader_title = "Fabric Loader" if loader_name == ModLoaderManager.FABRIC else "Minecraft Forge"
+        if loader_name in ModLoaderManager.MODDED_LOADERS:
+            loader_title = {ModLoaderManager.FABRIC: "Fabric Loader", ModLoaderManager.QUILT: "Quilt Loader", ModLoaderManager.FORGE: "Minecraft Forge", ModLoaderManager.NEOFORGE: "NeoForge"}.get(loader_name, loader_name.title())
             self.summary_label.setText(tr("Minecraft {version} • {loader} {loader_version} • Drop .jar files into this window to add them.", version=instance.version_id, loader=loader_title, loader_version=loader_version))
             for widget in (self.check_updates_button, self.update_selected_button, self.update_all_button, self.lock_button, self.unlock_button):
-                widget.setVisible(loader_name in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE})
+                widget.setVisible(loader_name in ModLoaderManager.MODDED_LOADERS)
             self._set_actions_enabled(not self._busy)
         else:
-            self.summary_label.setText(tr("This instance is Vanilla. Apply Fabric or Forge from the Instances page before adding mods."))
+            self.summary_label.setText(tr("This instance is Vanilla. Apply Fabric, Quilt, Forge, or NeoForge from the Instances page before adding mods."))
             self._set_actions_enabled(False)
 
     def set_mods(self, mods: list[ModInfo]) -> None:
@@ -525,7 +525,7 @@ class ModManagerDialog(QDialog):
         if self._instance is None:
             return False
         loader_name, _ = ModLoaderManager.normalize(self._instance.mod_loader)
-        return loader_name == ModLoaderManager.FORGE
+        return loader_name in ModLoaderManager.FORGE_FAMILY
 
     def _is_modded_instance(self) -> bool:
         return self._is_fabric_instance() or self._is_forge_instance()

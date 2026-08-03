@@ -19,6 +19,7 @@ from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManag
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
+from src.core.runtime.process_supervisor import ProcessSupervisor
 
 
 class FakeRunLock:
@@ -37,6 +38,8 @@ def test_launcher_creates_agent_log_before_java_process_starts(monkeypatch, tmp_
     process = SimpleNamespace(pid=1234)
 
     monkeypatch.setattr(InstanceRunLock, "acquire", lambda _instance: FakeRunLock())
+    monkeypatch.setattr(ProcessSupervisor, "begin", lambda _instance: SimpleNamespace(session_id="test-session"))
+    monkeypatch.setattr(ProcessSupervisor, "attach", lambda _session_id, _process: None)
     monkeypatch.setattr(SettingsManager, "load", lambda _instance: settings)
     monkeypatch.setattr(LanHostingManager, "disable_legacy_auth_bridges", lambda _instance: ())
     monkeypatch.setattr(ModrinthContentManager, "ensure", lambda *args, **kwargs: ())

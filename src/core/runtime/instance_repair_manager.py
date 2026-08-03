@@ -8,6 +8,7 @@ from pathlib import Path
 
 from src.core.fs.paths import Paths
 from src.core.instance.instance_run_lock import InstanceRunLock
+from src.core.instance.settings_manager import SettingsManager
 from src.core.java.java_resolver import JavaResolver
 from src.core.minecraft.asset_manager import AssetManager
 from src.core.minecraft.download_manager import DownloadClientManager
@@ -36,7 +37,7 @@ class InstanceRepairManager:
 
         loader_name, loader_version = ModLoaderManager.normalize(instance.mod_loader)
         reporter.status(stage=ProgressStage.LOADING_VERSION, message=f"Refreshing Minecraft {instance.version_id} metadata...")
-        if loader_name in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+        if loader_name in ModLoaderManager.MODDED_LOADERS:
             version = ModLoaderManager.repair(instance, reporter)
         else:
             version = VersionManager.load(instance.version_id)
@@ -57,7 +58,9 @@ class InstanceRepairManager:
 
         reporter.status(stage=ProgressStage.SELECTING_JAVA, message="Checking Java runtime...")
         java_major = int(version.java_version.get("majorVersion") or 8)
-        java_path = JavaResolver.resolve(java_major, reporter)
+        settings = SettingsManager.load(instance)
+        preferred_java = str(getattr(settings, "java_path", "") or "").strip()
+        java_path = JavaResolver.resolve(java_major, reporter, preferred_java) if preferred_java else JavaResolver.resolve(java_major, reporter)
 
         completed_at = datetime.now(timezone.utc).isoformat()
         result = InstanceRepairResult(

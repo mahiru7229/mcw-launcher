@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.instance.instance_manager import InstanceManager
-from src.core.language.language_manager import tr
-from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
-from src.core.modrinth.modrinth_pack_repair_manager import ModrinthPackRepairManager
-from src.core.modrinth.modrinth_pack_update_manager import ModrinthPackUpdateManager
-from src.core.progress.progress_reporter import ProgressReporter
+from mcw_core.api.instance.instance_manager import InstanceManager
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.modrinth.modrinth_pack_registry import ModrinthPackRegistry
+from mcw_core.api.modrinth.modrinth_pack_repair_manager import ModrinthPackRepairManager
+from mcw_core.api.modrinth.modrinth_pack_update_manager import ModrinthPackUpdateManager
+from mcw_core.api.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 

@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
-from src.core.language.language_manager import tr
+from mcw_core.api.language.language_manager import tr
 from src.gui.widget.card_widget import CardWidget
 from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap
 
@@ -146,7 +146,7 @@ class RightPanelWidget(QFrame):
         loader_name = loader[0] if loader else "vanilla"
         loader_version = loader[1] if len(loader) > 1 else "-1"
         loader_text = loader_name if loader_version in {"", "-1"} else f"{loader_name} {loader_version}"
-        is_modded = str(loader_name).casefold() in {"fabric", "forge"}
+        is_modded = str(loader_name).casefold() in {"fabric", "quilt", "forge", "neoforge"}
         self.manage_mods_button.setEnabled(is_modded)
         self.manage_mods_button.setToolTip("" if is_modded else tr("right_panel.mods.apply_loader"))
         self.instance_name.setText(instance.name)

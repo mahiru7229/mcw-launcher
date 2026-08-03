@@ -117,40 +117,45 @@ def verify_agent(agent_jar: Path) -> None:
         run([javac, "--release", "8", "-d", str(root), str(server_source), str(main_source)])
 
         normal = subprocess.run([java, "-cp", str(root), "AgentSmokeTest"], check=True, capture_output=True, text=True)
-        agent_log = root / "mcw-lan-agent.log"
-        patched = subprocess.run(
-            [
-                java,
-                "-Dmcw.lan.offline=true",
-                "-Dmcw.lan.targets=net/minecraft/server/Wrong#missing;net/minecraft/server/MinecraftServer#setUsesAuthentication",
-                f"-Dmcw.lan.log={agent_log.as_posix()}",
-                f"-javaagent:{agent_jar}",
-                "-cp",
-                str(root),
-                "AgentSmokeTest",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
         if normal.stdout.strip() != "true":
             raise RuntimeError(f"Unexpected unpatched smoke-test output: {normal.stdout!r}")
-        if patched.stdout.strip() != "false":
-            raise RuntimeError(f"Agent smoke test failed: stdout={patched.stdout!r}, stderr={patched.stderr!r}")
-        if "patched net.minecraft.server.MinecraftServer#setUsesAuthentication(boolean)" not in patched.stderr:
-            raise RuntimeError(f"Agent did not report a successful patch: {patched.stderr!r}")
-        log_text = agent_log.read_text(encoding="utf-8")
-        expected_log_messages = (
-            "premain entered",
-            "enabled with 2 resolved target candidate(s)",
-            "candidate: net.minecraft.server.MinecraftServer#setUsesAuthentication(boolean)",
-            "target class loaded by",
-            "patched net.minecraft.server.MinecraftServer#setUsesAuthentication(boolean)",
-            "shutdown summary: LAN Offline Mode patch was applied successfully",
-        )
-        missing = [message for message in expected_log_messages if message not in log_text]
-        if missing:
-            raise RuntimeError(f"Dedicated agent log is incomplete; missing={missing!r}, log={log_text!r}")
+
+        for loader in ("neoforge", "quilt"):
+            agent_log = root / f"mcw-lan-agent-{loader}.log"
+            patched = subprocess.run(
+                [
+                    java,
+                    "-Dmcw.lan.offline=true",
+                    f"-Dmcw.lan.loader={loader}",
+                    "-Dmcw.lan.targets=net/minecraft/server/Wrong#missing;net/minecraft/server/MinecraftServer#setUsesAuthentication",
+                    f"-Dmcw.lan.log={agent_log.as_posix()}",
+                    f"-javaagent:{agent_jar}",
+                    "-cp",
+                    str(root),
+                    "AgentSmokeTest",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            if patched.stdout.strip() != "false":
+                raise RuntimeError(f"Agent smoke test failed for {loader}: stdout={patched.stdout!r}, stderr={patched.stderr!r}")
+            if "patched net.minecraft.server.MinecraftServer#setUsesAuthentication(boolean)" not in patched.stderr:
+                raise RuntimeError(f"Agent did not report a successful {loader} patch: {patched.stderr!r}")
+            log_text = agent_log.read_text(encoding="utf-8")
+            expected_log_messages = (
+                "premain entered",
+                f"loader={loader}",
+                "enabled with 2 resolved target candidate(s)",
+                "candidate: net.minecraft.server.MinecraftServer#setUsesAuthentication(boolean)",
+                "target class loaded by",
+                "patched net.minecraft.server.MinecraftServer#setUsesAuthentication(boolean)",
+                "shutdown summary: LAN Offline Mode patch was applied successfully",
+            )
+            missing = [message for message in expected_log_messages if message not in log_text]
+            if missing:
+                raise RuntimeError(f"Dedicated {loader} agent log is incomplete; missing={missing!r}, log={log_text!r}")
+
 
 
 if __name__ == "__main__":

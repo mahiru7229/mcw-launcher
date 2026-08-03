@@ -5,13 +5,14 @@ from pathlib import Path
 
 from PySide6.QtCore import QSignalBlocker, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices
-from PySide6.QtWidgets import QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton
+from PySide6.QtWidgets import QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy
 
-from src.core.instance.settings_manager import SettingsManager, default_instance_settings
-from src.core.language.language_manager import language_manager, tr
-from src.core.theme.theme_authoring import ThemeAuthoringError, ThemeAuthoringService
-from src.core.theme.theme_manager import theme_manager
-from src.core.theme.theme_palette import normalize_hex_color
+from mcw_core.api.instance.settings_manager import SettingsManager, default_instance_settings
+from mcw_core.api.java.java_major_policy import JavaMajorPolicy
+from mcw_core.api.language.language_manager import language_manager, tr
+from mcw_core.api.theme.theme_authoring import ThemeAuthoringError, ThemeAuthoringService
+from mcw_core.api.theme.theme_manager import theme_manager
+from mcw_core.api.theme.theme_palette import normalize_hex_color
 from src.gui.config import NAVIGATION_ITEMS, VERSION
 from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
 from src.gui.dialogs.protected_value_reveal_dialog import confirm_reveal_protected_values
@@ -36,12 +37,15 @@ class LauncherSettingsPage(BasePage):
     accent_changed = Signal(str, str)
     preview_toast_requested = Signal()
     scan_java_requested = Signal()
+    install_java_requested = Signal(int)
     open_java_requested = Signal(object)
     dirty_changed = Signal(bool)
 
     def __init__(self) -> None:
         super().__init__("Launcher Settings", "Preferences here belong to the GUI, not to an individual Minecraft instance.", "launcher_settings")
         self._java_installations: list[object] = []
+        self._latest_java_major: int | None = None
+        self._latest_java_lookup_error = ""
         self._theme_authoring = ThemeAuthoringService(theme_manager)
         self._theme_live_reload = ThemeLiveReload(self)
         self._theme_live_reload.reload_requested.connect(self._handle_live_theme_reload)
@@ -167,23 +171,41 @@ class LauncherSettingsPage(BasePage):
         curseforge_card.layout.addWidget(self.curseforge_gateway_security)
         downloads_section.add_card(curseforge_card, span=2)
 
-        java_card = CardWidget("Java installations", "Scan Java from JAVA_HOME, PATH, Program Files, the Windows Registry, and managed runtimes.")
-        java_card.setProperty("themeRole", "java")
+        self.java_card = CardWidget(tr("launcher_settings.java.title"), tr("launcher_settings.java.description"))
+        self.java_card.setProperty("themeRole", "java")
         self.java_combo = QComboBox()
         self.java_combo.currentIndexChanged.connect(self._update_java_details)
         self.java_details = QLabel("Java scan has not run yet.")
         self.java_details.setObjectName("MutedLabel")
         self.java_details.setWordWrap(True)
-        scan_java_button = set_theme_icon(QPushButton("Scan Java installations"), "icon.action.java")
-        scan_java_button.clicked.connect(self.scan_java_requested.emit)
+        self.scan_java_button = set_theme_icon(QPushButton("Scan Java installations"), "icon.action.java")
+        self.scan_java_button.clicked.connect(self.scan_java_requested.emit)
         self.open_java_button = set_theme_icon(QPushButton("Open selected Java folder"), "icon.action.folder")
         self.open_java_button.setEnabled(False)
         self.open_java_button.clicked.connect(lambda: self.open_java_requested.emit(self.current_java_installation()))
-        java_card.layout.addWidget(self.java_combo)
-        java_card.layout.addWidget(self.java_details)
-        java_card.layout.addWidget(scan_java_button)
-        java_card.layout.addWidget(self.open_java_button)
-        runtime_section.add_card(java_card)
+
+        self.java_install_label = QLabel(tr("launcher_settings.java.install_label"))
+        self.java_install_combo = QComboBox()
+        self._populate_java_install_combo(17)
+        default_index = self.java_install_combo.findData(17)
+        self.java_install_combo.setCurrentIndex(max(0, default_index))
+        self.java_install_button = set_theme_icon(QPushButton(), "icon.action.download")
+        self.java_install_button.clicked.connect(self._request_java_install)
+        self.java_install_combo.currentIndexChanged.connect(self._update_java_install_action)
+        self.java_install_status = QLabel(tr("launcher_settings.java.install_hint"))
+        self.java_install_status.setObjectName("MutedLabel")
+        self.java_install_status.setWordWrap(True)
+
+        self.java_card.layout.addWidget(self.java_combo)
+        self.java_card.layout.addWidget(self.java_details)
+        self.java_card.layout.addWidget(self.scan_java_button)
+        self.java_card.layout.addWidget(self.open_java_button)
+        self.java_card.layout.addWidget(self.java_install_label)
+        self.java_card.layout.addWidget(self.java_install_combo)
+        self.java_card.layout.addWidget(self.java_install_button)
+        self.java_card.layout.addWidget(self.java_install_status)
+        runtime_section.add_card(self.java_card)
+        self._update_java_install_action()
 
         self.instance_defaults_card = CardWidget(
             tr("instance_defaults.launcher.title"),
@@ -192,12 +214,14 @@ class LauncherSettingsPage(BasePage):
         self.instance_defaults_summary = QLabel()
         self.instance_defaults_summary.setObjectName("MutedLabel")
         self.instance_defaults_summary.setWordWrap(True)
+        self.instance_defaults_summary.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.edit_instance_defaults_button = set_theme_icon(
             QPushButton(tr("instance_defaults.launcher.edit")),
             "icon.action.settings",
         )
         self.edit_instance_defaults_button.clicked.connect(self._edit_instance_defaults)
         self.instance_defaults_card.layout.addWidget(self.instance_defaults_summary)
+        self.instance_defaults_card.layout.addStretch(1)
         self.instance_defaults_card.layout.addWidget(self.edit_instance_defaults_button)
         runtime_section.add_card(self.instance_defaults_card)
         self._update_instance_defaults_summary()
@@ -424,12 +448,86 @@ class LauncherSettingsPage(BasePage):
     def _update_java_details(self, _index: int = -1) -> None:
         item = self.current_java_installation()
         if item is None:
-            self.java_details.setText("No Java installation detected.")
+            self.java_details.setText(tr("launcher_settings.java.none"))
             self.open_java_button.setEnabled(False)
+            self._update_java_install_action()
             return
         source = getattr(getattr(item, "source", None), "value", "unknown")
         self.java_details.setText(tr("launcher_settings.java.details", major=getattr(item, "major_version", "?"), vendor=getattr(item, "vendor", "") or tr("common.unknown"), architecture=getattr(item, "architecture", "") or tr("common.unknown"), path=getattr(item, "executable", ""), source=source))
         self.open_java_button.setEnabled(True)
+        self._update_java_install_action()
+
+    def set_latest_java_release(self, major: int) -> None:
+        try:
+            latest_major = int(major)
+        except (TypeError, ValueError):
+            return
+        if latest_major < 8:
+            return
+        current_major = self.java_install_combo.currentData() if hasattr(self, "java_install_combo") else 17
+        self._latest_java_major = latest_major
+        self._latest_java_lookup_error = ""
+        self._populate_java_install_combo(int(current_major or 17))
+        self._update_java_install_action()
+
+    def set_latest_java_release_failed(self, error: str) -> None:
+        self._latest_java_lookup_error = str(error or "")
+        if self._latest_java_major is None and not self.java_install_status.text().endswith("..."):
+            self.java_install_status.setText(tr("launcher_settings.java.latest_unavailable"))
+
+    def _populate_java_install_combo(self, selected_major: int | None = None) -> None:
+        current_major = int(selected_major or self.java_install_combo.currentData() or 17)
+        with QSignalBlocker(self.java_install_combo):
+            self.java_install_combo.clear()
+            for major in JavaMajorPolicy.SUPPORTED_MAJORS:
+                label_key = "launcher_settings.java.latest_version" if major == self._latest_java_major else "launcher_settings.java.version"
+                self.java_install_combo.addItem(tr(label_key, major=major), major)
+            if self._latest_java_major is not None and self._latest_java_major not in JavaMajorPolicy.SUPPORTED_MAJORS:
+                self.java_install_combo.addItem(tr("launcher_settings.java.latest_version", major=self._latest_java_major), self._latest_java_major)
+            index = self.java_install_combo.findData(current_major)
+            if index < 0:
+                index = self.java_install_combo.findData(self._latest_java_major) if self._latest_java_major is not None else self.java_install_combo.findData(17)
+            self.java_install_combo.setCurrentIndex(max(0, index))
+
+    def _request_java_install(self) -> None:
+        major = int(self.java_install_combo.currentData() or 17)
+        self.java_install_status.setText(tr("launcher_settings.java.install_starting", major=major))
+        self.install_java_requested.emit(major)
+
+    def _update_java_install_action(self, _index: int = -1) -> None:
+        if not hasattr(self, "java_install_combo"):
+            return
+        major = int(self.java_install_combo.currentData() or 17)
+        managed = any(
+            int(getattr(item, "major_version", -1)) == major
+            and str(getattr(getattr(item, "source", None), "value", "")) == "MINECRAFT_RUNTIME"
+            for item in self._java_installations
+        )
+        is_latest = major == self._latest_java_major
+        if is_latest:
+            key = "launcher_settings.java.latest_reinstall" if managed else "launcher_settings.java.latest_install"
+        else:
+            key = "launcher_settings.java.reinstall" if managed else "launcher_settings.java.install"
+        self.java_install_button.setText(tr(key, major=major))
+        if managed:
+            status_key = "launcher_settings.java.latest_managed_ready" if is_latest else "launcher_settings.java.managed_ready"
+            self.java_install_status.setText(tr(status_key, major=major))
+        elif not self.java_install_status.text() or "..." not in self.java_install_status.text():
+            if is_latest:
+                self.java_install_status.setText(tr("launcher_settings.java.latest_hint", major=major))
+            elif self._latest_java_major is None and self._latest_java_lookup_error:
+                self.java_install_status.setText(tr("launcher_settings.java.latest_unavailable"))
+            else:
+                self.java_install_status.setText(tr("launcher_settings.java.install_hint"))
+
+    def set_java_installation_result(self, major: int, executable: object) -> None:
+        self.java_install_status.setText(tr("launcher_settings.java.install_success", major=major, path=executable))
+
+    def set_java_installation_cancelled(self, major: int) -> None:
+        self.java_install_status.setText(tr("launcher_settings.java.install_cancelled", major=major))
+
+    def set_java_installation_failed(self, major: int, error: str) -> None:
+        self.java_install_status.setText(tr("launcher_settings.java.install_failed", major=major, error=error))
 
     def reload_languages(self) -> None:
         current_locale = self.language_combo.currentData() if hasattr(self, "language_combo") else None
@@ -624,6 +722,16 @@ class LauncherSettingsPage(BasePage):
 
     def retranslate_dynamic(self) -> None:
         self.unsaved_label.setText(tr("settings.unsaved.banner"))
+        if self.java_card.title_label is not None:
+            self.java_card.title_label.setText(tr("launcher_settings.java.title"))
+        if self.java_card.subtitle_label is not None:
+            self.java_card.subtitle_label.setText(tr("launcher_settings.java.description"))
+        self.scan_java_button.setText(tr("launcher_settings.java.scan"))
+        self.open_java_button.setText(tr("launcher_settings.java.open_folder"))
+        self.java_install_label.setText(tr("launcher_settings.java.install_label"))
+        current_major = int(self.java_install_combo.currentData() or 17)
+        self._populate_java_install_combo(current_major)
+        self._update_java_details()
         for index, label in enumerate(self.curseforge_gateway_labels, start=1):
             label.setText(tr("curseforge.gateway.slot", index=index))
         self.reveal_curseforge_gateways.setText(tr("curseforge.gateway.reveal.toggle"))
@@ -696,7 +804,7 @@ class LauncherSettingsPage(BasePage):
             *self.curseforge_gateway_inputs,
         )
         blockers = [QSignalBlocker(control) for control in persisted_controls]
-        index = self.start_page_combo.findData(settings.get("start_page", "home"))
+        index = self.start_page_combo.findData(settings.get("start_page", "instances"))
         self.start_page_combo.setCurrentIndex(max(0, index))
         self.show_snapshots.setChecked(bool(settings.get("show_snapshots", False)))
         self.debug_mode.setChecked(bool(settings.get("debug_mode", False)))

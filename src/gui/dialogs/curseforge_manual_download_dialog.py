@@ -6,19 +6,17 @@ from PySide6.QtCore import QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QAbstractItemView, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
-from src.core.language.language_manager import tr
+from mcw_core.api.language.language_manager import tr
 from src.gui.window_sizing import resize_dialog_to_screen
-from src.models.curseforge.manual_download import CurseForgeManualDownload
-
-
 class CurseForgeManualDownloadDialog(QDialog):
     files_selected = Signal(object)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self._requirements: list[CurseForgeManualDownload] = []
-        self._installed: set[tuple[int, int]] = set()
+        self._requirements: list[object] = []
+        self._installed: set[tuple[str, str, str, str]] = set()
         self._instance_name = ""
+        self._provider_name = "CurseForge"
         resize_dialog_to_screen(self, 980, 560, 700, 420)
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 18, 18, 18)
@@ -66,13 +64,15 @@ class CurseForgeManualDownloadDialog(QDialog):
         self._update_summary()
         self._update_actions()
 
-    def set_requirements(self, requirements: tuple[CurseForgeManualDownload, ...] | list[CurseForgeManualDownload]) -> None:
+    def set_requirements(self, requirements: tuple[object, ...] | list[object]) -> None:
         self._requirements = list(requirements)
+        provider = str(getattr(self._requirements[0], "provider", "curseforge") if self._requirements else "curseforge").strip().casefold()
+        self._provider_name = "Modrinth" if provider == "modrinth" else "CurseForge"
         self._installed.clear()
         self.retranslate_dynamic()
 
-    def mark_installed(self, requirement: CurseForgeManualDownload) -> None:
-        self._installed.add((requirement.project_id, requirement.file_id))
+    def mark_installed(self, requirement: object) -> None:
+        self._installed.add(self._requirement_key(requirement))
         self._render()
 
     @property
@@ -80,26 +80,22 @@ class CurseForgeManualDownloadDialog(QDialog):
         return len(self.remaining_requirements)
 
     @property
-    def remaining_requirements(self) -> tuple[CurseForgeManualDownload, ...]:
-        return tuple(
-            item
-            for item in self._requirements
-            if (item.project_id, item.file_id) not in self._installed
-        )
+    def remaining_requirements(self) -> tuple[object, ...]:
+        return tuple(item for item in self._requirements if self._requirement_key(item) not in self._installed)
 
     @property
     def is_modpack_archive_mode(self) -> bool:
-        return bool(self._requirements) and all(item.managed_kind == "modpack_archive" for item in self._requirements)
+        return bool(self._requirements) and all(str(getattr(item, "managed_kind", "")) == "modpack_archive" for item in self._requirements)
 
     def _render(self) -> None:
         self.table.setRowCount(len(self._requirements))
         for row, requirement in enumerate(self._requirements):
-            installed = (requirement.project_id, requirement.file_id) in self._installed
+            installed = self._requirement_key(requirement) in self._installed
             values = [
-                requirement.project_name,
-                requirement.file_name,
-                f"{requirement.file_size / (1024 * 1024):.1f} MB" if requirement.file_size > 0 else "—",
-                requirement.reason,
+                getattr(requirement, "project_name", "Unknown"),
+                getattr(requirement, "file_name", "download.bin"),
+                f"{getattr(requirement, 'file_size', 0) / (1024 * 1024):.1f} MB" if getattr(requirement, "file_size", 0) > 0 else "—",
+                getattr(requirement, "reason", "Manual download required"),
                 tr("curseforge.manual.status.installed") if installed else tr("curseforge.manual.status.waiting"),
             ]
             for column, value in enumerate(values):
@@ -116,54 +112,70 @@ class CurseForgeManualDownloadDialog(QDialog):
     def _update_summary(self) -> None:
         remaining = self.remaining_count
         if self.is_modpack_archive_mode:
-            self.summary_label.setText(tr("curseforge.manual.modpack_archive_summary", instance=self._instance_name))
+            self.summary_label.setText(tr("artifact.manual.modpack_archive_summary", provider=self._provider_name, instance=self._instance_name))
         elif self._instance_name:
-            self.summary_label.setText(tr("curseforge.manual.summary_instance", count=remaining, instance=self._instance_name))
+            self.summary_label.setText(tr("artifact.manual.summary_instance", provider=self._provider_name, count=remaining, instance=self._instance_name))
         else:
-            self.summary_label.setText(tr("curseforge.manual.summary", count=remaining))
+            self.summary_label.setText(tr("artifact.manual.summary", provider=self._provider_name, count=remaining))
 
-    def _selected_requirement(self) -> CurseForgeManualDownload | None:
+    def _selected_requirement(self) -> object | None:
         row = self.table.currentRow()
         if row < 0:
             return None
         item = self.table.item(row, 0)
         requirement = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
-        return requirement if isinstance(requirement, CurseForgeManualDownload) else None
+        return requirement if requirement is not None and hasattr(requirement, "file_name") else None
 
     def _update_actions(self) -> None:
         requirement = self._selected_requirement()
-        self.open_page_button.setEnabled(requirement is not None and bool(requirement.project_url))
+        self.open_page_button.setEnabled(requirement is not None and bool(self._best_url(requirement)))
         self.add_files_button.setEnabled(self.remaining_count > 0)
 
     def _open_page(self) -> None:
         requirement = self._selected_requirement()
-        if requirement is not None and requirement.project_url:
-            QDesktopServices.openUrl(QUrl(requirement.project_url))
+        if requirement is not None:
+            url = self._best_url(requirement)
+            if url:
+                QDesktopServices.openUrl(QUrl(url))
+
+    @staticmethod
+    def _best_url(requirement: object) -> str:
+        return str(getattr(requirement, "direct_url", "") or getattr(requirement, "version_url", "") or getattr(requirement, "project_url", "")).strip()
+
+    @staticmethod
+    def _requirement_key(requirement: object) -> tuple[str, str, str, str]:
+        return (
+            str(getattr(requirement, "provider", "unknown")),
+            str(getattr(requirement, "project_id", "")),
+            str(getattr(requirement, "file_id", getattr(requirement, "version_id", ""))),
+            str(getattr(requirement, "managed_path", "")),
+        )
 
     def _select_files(self) -> None:
         if self.is_modpack_archive_mode:
             selected, _ = QFileDialog.getOpenFileName(
                 self,
-                tr("curseforge.manual.add_modpack_file_title"),
+                tr("artifact.manual.add_modpack_file_title", provider=self._provider_name),
                 str(Path.home() / "Downloads"),
-                tr("curseforge.manual.modpack_file_filter"),
+                tr("artifact.manual.modpack_file_filter"),
             )
             if selected:
                 self.files_selected.emit([Path(selected)])
             return
         selected, _ = QFileDialog.getOpenFileNames(
             self,
-            tr("curseforge.manual.add_files_title"),
+            tr("artifact.manual.add_files_title", provider=self._provider_name),
             str(Path.home() / "Downloads"),
-            tr("curseforge.manual.file_filter"),
+            tr("artifact.manual.file_filter"),
         )
         if selected:
             self.files_selected.emit([Path(path) for path in selected])
 
     def retranslate_dynamic(self) -> None:
-        title_key = "curseforge.manual.modpack_archive_title" if self.is_modpack_archive_mode else "curseforge.manual.title"
-        self.setWindowTitle(tr(title_key))
-        self.title_label.setText(tr(title_key))
+        title_key = "artifact.manual.modpack_archive_title" if self.is_modpack_archive_mode else "artifact.manual.title"
+        title = tr(title_key, provider=self._provider_name)
+        self.setWindowTitle(title)
+        self.title_label.setText(title)
         self.table.setHorizontalHeaderLabels([
             tr("curseforge.column.name"),
             tr("curseforge.manual.column.file"),
@@ -171,7 +183,7 @@ class CurseForgeManualDownloadDialog(QDialog):
             tr("curseforge.manual.column.reason"),
             tr("curseforge.manual.column.status"),
         ])
-        self.open_page_button.setText(tr("curseforge.manual.open_page"))
-        self.add_files_button.setText(tr("curseforge.manual.add_modpack_file") if self.is_modpack_archive_mode else tr("curseforge.manual.add_files"))
+        self.open_page_button.setText(tr("artifact.manual.open_link"))
+        self.add_files_button.setText(tr("artifact.manual.add_modpack_file") if self.is_modpack_archive_mode else tr("artifact.manual.add_files"))
         self.close_button.setText(tr("common.close"))
         self._render()

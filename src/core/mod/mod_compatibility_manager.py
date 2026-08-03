@@ -29,7 +29,22 @@ class ModCompatibilityManager:
         installed_versions["minecraft"] = instance.version_id
         if loader_name == ModLoaderManager.FABRIC:
             installed_versions["fabricloader"] = loader_version
+        elif loader_name == ModLoaderManager.QUILT:
+            installed_versions["quilt_loader"] = loader_version
+            installed_versions["quiltloader"] = loader_version
+            # Quilt Loader exposes Fabric Loader compatibility for Fabric mods.
+            installed_versions["fabricloader"] = loader_version
         elif loader_name == ModLoaderManager.FORGE:
+            installed_versions["forge"] = loader_version
+            installed_versions["javafml"] = loader_version
+            installed_versions["fml"] = loader_version
+        elif loader_name == ModLoaderManager.NEOFORGE:
+            installed_versions["neoforge"] = loader_version
+            # NeoForge-compatible Forge-family mods can retain a legacy
+            # mandatory dependency on the virtual ``forge`` runtime. The
+            # loader-mismatch check still blocks genuinely Forge-only mods,
+            # while provider-approved dual-loader mods such as e4mc can pass
+            # their own metadata preflight on a NeoForge instance.
             installed_versions["forge"] = loader_version
             installed_versions["javafml"] = loader_version
             installed_versions["fml"] = loader_version

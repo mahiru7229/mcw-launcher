@@ -22,8 +22,10 @@ class ForgeDiagnosticsManager:
     @classmethod
     def export(cls, instance: Instance, destination: Path, launcher_version: str) -> Path:
         loader_name, loader_version = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name != ModLoaderManager.FORGE:
-            raise RuntimeError("Forge diagnostics are available only for Forge instances.")
+        if loader_name not in ModLoaderManager.FORGE_FAMILY:
+            raise RuntimeError("Forge-family diagnostics are available only for Forge or NeoForge instances.")
+        loader_title = "NeoForge" if loader_name == ModLoaderManager.NEOFORGE else "Forge"
+        archive_root = loader_name
 
         target = Path(destination)
         if target.suffix.lower() != ".zip":
@@ -32,12 +34,12 @@ class ForgeDiagnosticsManager:
         temporary = target.with_suffix(target.suffix + ".part")
         temporary.unlink(missing_ok=True)
 
-        profile_path = Paths.forge_version_json(instance.version_id, loader_version)
+        profile_path = Paths.neoforge_version_json(instance.version_id, loader_version) if loader_name == ModLoaderManager.NEOFORGE else Paths.forge_version_json(instance.version_id, loader_version)
         try:
             profile_data = json.loads(profile_path.read_text(encoding="utf-8"))
             forge_version = VersionManager._parse_version(profile_data, profile_path)
             if forge_version is None:
-                raise RuntimeError("The cached Forge launch profile could not be parsed.")
+                raise RuntimeError(f"The cached {loader_title} launch profile could not be parsed.")
             report = ForgePreflightManager.scan(instance, forge_version, verify_files=False)
         except Exception as error:
             forge_version = None
@@ -49,6 +51,7 @@ class ForgeDiagnosticsManager:
         summary = cls._summary(
             instance=instance,
             launcher_version=launcher_version,
+            loader_name=loader_name,
             loader_version=loader_version,
             java_major=int((getattr(forge_version, "java_version", None) or {}).get("majorVersion") or 8),
             report=report,
@@ -63,17 +66,17 @@ class ForgeDiagnosticsManager:
                 if forge_version is not None:
                     cls._write_text(
                         archive,
-                        "forge/profile.json",
+                        f"{archive_root}/profile.json",
                         json.dumps(forge_version.raw_json, ensure_ascii=False, indent=2) + "\n",
                     )
                 snapshot = ForgeChangeManager.load_snapshot(instance)
                 if snapshot is not None:
                     cls._write_text(
                         archive,
-                        "forge/previous-installation.json",
+                        f"{archive_root}/previous-installation.json",
                         json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n",
                     )
-                cls._add_forge_logs(archive, instance, loader_version)
+                cls._add_forge_logs(archive, instance, loader_name, loader_version)
                 cls._write_mod_inventory(archive, instance)
                 cls._add_runtime_logs(archive, instance)
             temporary.replace(target)
@@ -86,21 +89,25 @@ class ForgeDiagnosticsManager:
         cls,
         instance: Instance,
         launcher_version: str,
+        loader_name: str,
         loader_version: str,
         java_major: int,
         report: object | None,
         preflight_error: str,
     ) -> str:
+        loader_title = "NeoForge" if loader_name == ModLoaderManager.NEOFORGE else "Forge"
+        heading = f"MCW Launcher {loader_title} Diagnostic Package"
         lines = [
-            "MCW Launcher Forge Diagnostic Package",
-            "=" * 37,
+            heading,
+            "=" * len(heading),
             f"schema_version: {cls.SCHEMA_VERSION}",
             f"generated_at: {datetime.now(timezone.utc).isoformat()}",
             f"launcher_version: {launcher_version}",
             f"instance_name: {instance.name}",
             f"instance_id: {instance.instance_id}",
             f"minecraft_version: {instance.version_id}",
-            f"forge_version: {loader_version}",
+            f"loader: {loader_name}",
+            f"loader_version: {loader_version}",
             f"required_java_major: {java_major}",
             "",
             "Pre-launch check",
@@ -142,11 +149,12 @@ class ForgeDiagnosticsManager:
         cls._write_text(archive, "mods/inventory.json", json.dumps(mods, ensure_ascii=False, indent=2) + "\n")
 
     @classmethod
-    def _add_forge_logs(cls, archive: zipfile.ZipFile, instance: Instance, loader_version: str) -> None:
-        roots = [Paths.forge_root() / "logs", Path(instance.instance_dir) / ".mcw" / "logs"]
+    def _add_forge_logs(cls, archive: zipfile.ZipFile, instance: Instance, loader_name: str, loader_version: str) -> None:
+        loader_root = Paths.neoforge_root() if loader_name == ModLoaderManager.NEOFORGE else Paths.forge_root()
+        roots = [loader_root / "logs", Path(instance.instance_dir) / ".mcw" / "logs"]
         patterns = [
             f"*{instance.version_id}*{loader_version}*.log",
-            "forge*.log",
+            f"{loader_name}*.log",
         ]
         added: set[Path] = set()
         for root in roots:
@@ -159,7 +167,7 @@ class ForgeDiagnosticsManager:
                 if path in added or not path.is_file():
                     continue
                 added.add(path)
-                cls._add_text_file(archive, path, f"forge/logs/{path.name}")
+                cls._add_text_file(archive, path, f"{loader_name}/logs/{path.name}")
 
     @classmethod
     def _add_runtime_logs(cls, archive: zipfile.ZipFile, instance: Instance) -> None:

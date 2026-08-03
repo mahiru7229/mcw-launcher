@@ -13,6 +13,7 @@ from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
 from src.core.fs.paths import Paths
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.instance.settings_manager import SettingsManager
+from src.core.java.java_major_policy import JavaMajorPolicy
 from src.core.java.java_resolver import JavaResolver
 from src.core.java.java_selector import JavaSelector
 from src.core.lan.lan_agent_manager import LanAgentManager
@@ -73,7 +74,7 @@ class RepairService:
             RepairComponent.CLIENT: lambda: cls._scan_client(scan_version, cache, normalized_mode),
             RepairComponent.LIBRARIES: lambda: cls._scan_libraries(scan_version, cache, normalized_mode),
             RepairComponent.ASSETS: lambda: cls._scan_assets(scan_version, cache, normalized_mode),
-            RepairComponent.JAVA: lambda: cls._scan_java(scan_version),
+            RepairComponent.JAVA: lambda: cls._scan_java(instance, scan_version),
             RepairComponent.MOD_LOADER: lambda: cls._scan_loader(instance, loader_issue),
             RepairComponent.MODPACK: lambda: cls._scan_modpack(instance, cache, normalized_mode, reporter),
             RepairComponent.LAN_AGENT: lambda: cls._scan_lan_agent(instance),
@@ -283,10 +284,16 @@ class RepairService:
         return cls._result(RepairComponent.ASSETS, checked, cache_hits, hashed, issues, f"Checked {len(assets)} asset objects and the asset index.")
 
     @classmethod
-    def _scan_java(cls, version: Version) -> RepairComponentResult:
-        major = int((version.java_version or {}).get("majorVersion") or 8)
+    def _scan_java(cls, instance: Instance, version: Version) -> RepairComponentResult:
+        required_major = int((version.java_version or {}).get("majorVersion") or 8)
+        managed_major = JavaMajorPolicy.resolve(required_major)
+        settings = SettingsManager.load(instance)
+        preferred_path = getattr(settings, "java_path", "")
         try:
-            path = JavaSelector.select_java(major)
+            if str(preferred_path or "").strip():
+                path = JavaResolver.resolve(required_major, preferred_path=preferred_path)
+            else:
+                path = JavaSelector.select_java(managed_major)
         except RuntimeError as error:
             issue = RepairIssue(
                 component=RepairComponent.JAVA,
@@ -295,8 +302,8 @@ class RepairService:
                 severity=RepairSeverity.ERROR,
                 repairable=True,
             )
-            return cls._result(RepairComponent.JAVA, 0, 0, 0, [issue], f"Java {major} is not ready.")
-        return cls._result(RepairComponent.JAVA, 1, 0, 0, [], f"Java {major} is available at {path}.")
+            return cls._result(RepairComponent.JAVA, 0, 0, 0, [issue], f"Java {managed_major} is not ready.")
+        return cls._result(RepairComponent.JAVA, 1, 0, 0, [], f"Java {managed_major} is available at {path}.")
 
     @classmethod
     def _scan_loader(cls, instance: Instance, loader_issue: RepairIssue | None) -> RepairComponentResult:
@@ -457,7 +464,12 @@ class RepairService:
             return
         if component is RepairComponent.JAVA:
             major = int((version.java_version or {}).get("majorVersion") or 8)
-            JavaResolver.resolve(major, reporter)
+            settings = SettingsManager.load(instance)
+            preferred_java = str(getattr(settings, "java_path", "") or "").strip()
+            if preferred_java:
+                JavaResolver.resolve(major, reporter, preferred_java)
+            else:
+                JavaResolver.resolve(major, reporter)
             return
         raise RuntimeError(f"Unsupported repair component: {component.value}")
 
@@ -486,6 +498,10 @@ class RepairService:
             path = Paths.fabric_version_json(base_version.id, loader_version)
         elif loader_name == ModLoaderManager.FORGE:
             path = Paths.forge_version_json(base_version.id, loader_version)
+        elif loader_name == ModLoaderManager.NEOFORGE:
+            path = Paths.neoforge_version_json(base_version.id, loader_version)
+        elif loader_name == ModLoaderManager.QUILT:
+            path = Paths.quilt_version_json(base_version.id, loader_version)
         else:
             issue = RepairIssue(
                 component=RepairComponent.MOD_LOADER,

@@ -19,10 +19,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.core.config.managed_content_policy import ManagedContentPolicy
-from src.core.instance.settings_manager import SettingsManager
-from src.core.language.language_manager import tr
-from src.core.system.memory import MemoryAllocationPolicy, SystemMemory
+from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
+from mcw_core.api.instance.settings_manager import SettingsManager
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.system.memory import MemoryAllocationPolicy, SystemMemory
 from src.gui.window_sizing import resize_dialog_to_screen
 from src.models.instance.settings import InstanceSettings
 

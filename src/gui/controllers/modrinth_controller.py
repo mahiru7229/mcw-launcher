@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Signal, Slot
 
-from src.core.instance.instance_manager import InstanceManager
-from src.core.modloader.mod_loader_manager import ModLoaderManager
-from src.core.modrinth.modrinth_client import ModrinthClient
-from src.core.modrinth.modrinth_mod_installer import ModrinthModInstaller
-from src.core.modrinth.modrinth_pack_installer import ModrinthPackInstaller
-from src.core.progress.progress_reporter import ProgressReporter
+from mcw_core.api.instance.instance_manager import InstanceManager
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.modrinth.modrinth_client import ModrinthClient
+from mcw_core.api.modrinth.modrinth_errors import ModrinthModpackManualDownloadRequired
+from mcw_core.api.modrinth.modrinth_manual_installer import ModrinthManualInstaller
+from mcw_core.api.modrinth.modrinth_mod_installer import ModrinthModInstaller
+from mcw_core.api.modrinth.modrinth_pack_installer import ModrinthPackInstaller
+from mcw_core.api.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 
@@ -17,7 +21,9 @@ class ModrinthController(BaseController):
     search_failed = Signal(str, str, str)
     versions_changed = Signal(str, str, str, list)
     mod_installed = Signal(object)
+    manual_files_installed = Signal(str, object)
     modpack_installed = Signal(object)
+    modpack_manual_download_required = Signal(object)
     progress_received = Signal(object)
 
     def __init__(self, task_runner: TaskRunner) -> None:
@@ -50,6 +56,24 @@ class ModrinthController(BaseController):
         normalized_loader = self._normalize_loader(loader)
         self._task_runner.run("modrinth.install.modpack", lambda: ModrinthPackInstaller.install(project_id, version_id, instance_name, install_optional_files, allowed_version_types, reporter, expected_loader=normalized_loader), f"Installing Modrinth {normalized_loader.title()} modpack '{instance_name}'...")
 
+    def install_manual_files(self, instance_name: str, requirements: tuple[object, ...] | list[object], sources: tuple[Path, ...] | list[Path]) -> bool:
+        normalized_sources = [Path(source) for source in sources]
+        if not normalized_sources:
+            return False
+        return self._task_runner.run(
+            "modrinth.install.manual.batch",
+            lambda: (instance_name, ModrinthManualInstaller.install_many(InstanceManager.load(instance_name), requirements, normalized_sources)),
+            f"Adding {len(normalized_sources)} downloaded Modrinth file(s) to '{instance_name}'...",
+        )
+
+    def install_manual_modpack(self, request: ModrinthModpackManualDownloadRequired, source: Path) -> bool:
+        reporter = ProgressReporter(self.progress_received.emit)
+        return self._task_runner.run(
+            "modrinth.install.modpack.manual",
+            lambda: ModrinthPackInstaller.install_manual_archive(request, Path(source), reporter=reporter),
+            f"Installing downloaded Modrinth modpack '{request.instance_name}'...",
+        )
+
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
         if task_id.startswith("modrinth.search."):
@@ -75,6 +99,14 @@ class ModrinthController(BaseController):
             self.status_changed.emit("Modrinth modpack installed")
             self.log_created.emit("Created instance from Modrinth modpack")
             self.modpack_installed.emit(result)
+            return
+        if task_id == "modrinth.install.manual.batch":
+            instance_name, import_result = result
+            self.manual_files_installed.emit(str(instance_name), import_result)
+            return
+        if task_id == "modrinth.install.modpack.manual":
+            self.status_changed.emit("Modrinth modpack installed")
+            self.modpack_installed.emit(result)
 
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
@@ -86,6 +118,9 @@ class ModrinthController(BaseController):
             loader = parts[3] if len(parts) > 3 else ModLoaderManager.FABRIC
             message = str(error) or "Modrinth search failed."
             self.search_failed.emit(project_type, loader, message)
+        if isinstance(error, ModrinthModpackManualDownloadRequired):
+            self.modpack_manual_download_required.emit(error)
+            return
         if task_id == "modrinth.install.mod":
             title = "Install Modrinth mod"
         elif task_id == "modrinth.install.modpack":
@@ -97,6 +132,6 @@ class ModrinthController(BaseController):
     @staticmethod
     def _normalize_loader(loader: str) -> str:
         normalized = str(loader or "").strip().lower()
-        if normalized not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+        if normalized not in ModLoaderManager.MODDED_LOADERS:
             raise RuntimeError(f"Unsupported Modrinth loader filter: {normalized or 'unknown'}")
         return normalized

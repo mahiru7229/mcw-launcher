@@ -9,6 +9,7 @@ from src.core.fs.paths import Paths
 from src.core.mod.mod_manager import ModManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.modrinth.modrinth_downloader import ModrinthDownloader
+from src.core.modrinth.modrinth_errors import ModrinthManagedFilesRequired
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.core.network.download_pause import DownloadPausedError
 from src.core.modrinth.modrinth_registry import ModrinthRegistry
@@ -175,13 +176,13 @@ def test_failed_pack_file_raises_after_three_complete_rounds(tmp_path, monkeypat
 
     monkeypatch.setattr(ModrinthDownloader, "download_urls", fail_download)
 
-    with pytest.raises(RuntimeError, match="after 3 rounds") as error:
+    with pytest.raises(ModrinthManagedFilesRequired, match="after 3 rounds") as error:
         ModrinthContentManager.ensure(instance)
 
     assert attempts == [1, 1, 1]
     assert "mods/example.jar" in str(error.value)
-    assert "Instance Settings > Managed modpack file checks" in str(error.value)
-    assert "Continue launch with warnings" in str(error.value)
+    assert len(error.value.requirements) == 1
+    assert error.value.requirements[0].managed_path == "mods/example.jar"
     assert not (instance.instance_dir / "mods" / "example.jar").exists()
     registry = ModrinthPackRegistry.load(instance)
     assert registry["lastDownloadFailures"] == [{"path": "mods/example.jar", "error": "temporary CDN failure"}]
@@ -262,7 +263,7 @@ def test_pause_is_not_swallowed_as_a_modrinth_download_failure(tmp_path, monkeyp
         ModrinthContentManager.ensure(instance)
 
 
-def test_missing_pack_files_download_in_parallel(tmp_path, monkeypatch):
+def test_missing_pack_files_download_sequentially_for_strict_cancellation(tmp_path, monkeypatch):
     from threading import Lock
     import time
 
@@ -302,5 +303,34 @@ def test_missing_pack_files_download_in_parallel(tmp_path, monkeypatch):
     monkeypatch.setattr(ModrinthDownloader, "download_urls", fake_download_urls)
 
     assert ModrinthContentManager.ensure(instance) == ()
-    assert max_active > 1
+    assert max_active == 1
     assert max_active <= ModrinthContentManager.MAX_DOWNLOAD_WORKERS
+
+
+def test_missing_pack_artifact_without_url_exposes_no_download_url_manual_fallback(tmp_path, monkeypatch):
+    instance = make_instance(tmp_path)
+    content = b"manual zip"
+    ModrinthPackRegistry.save(instance.instance_dir, {
+        "projectId": "pack-project",
+        "versionId": "pack-version",
+        "name": "Manual Pack",
+        "managedFiles": [{
+            "path": "mods/manual.zip",
+            "sha1": hashlib.sha1(content).hexdigest(),
+            "sha512": hashlib.sha512(content).hexdigest(),
+            "size": len(content),
+            "source": "download",
+            "downloads": [],
+        }],
+    })
+    monkeypatch.setattr(ModrinthContentManager, "_hydrate_pack_downloads", staticmethod(lambda *_args, **_kwargs: None))
+
+    with pytest.raises(ModrinthManagedFilesRequired) as captured:
+        ModrinthContentManager.ensure(instance)
+
+    requirement = captured.value.requirements[0]
+    assert requirement.file_name == "manual.zip"
+    assert requirement.managed_path == "mods/manual.zip"
+    assert requirement.failure_reason == "NO_DOWNLOAD_URL"
+    assert requirement.direct_url == ""
+    assert requirement.version_url.endswith("/version/pack-version")

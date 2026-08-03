@@ -54,7 +54,7 @@ class LanHostingManager:
         title="e4mc",
     )
 
-    SUPPORTED_LOADERS = {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}
+    SUPPORTED_LOADERS = ModLoaderManager.MODDED_LOADERS
 
     @staticmethod
     def normalize_auth_mode(value: object) -> str:
@@ -80,7 +80,7 @@ class LanHostingManager:
         if components:
             loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
             if loader_name not in LanHostingManager.SUPPORTED_LOADERS:
-                raise RuntimeError("The selected tunnel provider requires a Fabric or Forge instance.")
+                raise RuntimeError("The selected tunnel provider requires a Fabric, Quilt, Forge, or NeoForge instance.")
 
         return LanHostingPlan(
             auth_mode=normalized_auth,

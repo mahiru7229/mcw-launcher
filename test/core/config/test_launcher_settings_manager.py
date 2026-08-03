@@ -41,7 +41,7 @@ def test_invalid_file_is_backed_up_and_recreated(tmp_path: Path) -> None:
     data = manager.load()
 
     assert data["schema_version"] == manager.SCHEMA_VERSION
-    assert json.loads(path.read_text(encoding="utf-8"))["gui"]["start_page"] == "home"
+    assert json.loads(path.read_text(encoding="utf-8"))["gui"]["start_page"] == "instances"
     assert (tmp_path / "launcher_settings.json.broken").read_text(encoding="utf-8") == "not json"
 
 

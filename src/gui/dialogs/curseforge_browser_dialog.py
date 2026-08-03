@@ -7,10 +7,10 @@ from PySide6.QtCore import QTimer, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
-from src.core.curseforge.curseforge_client import CurseForgeClient
-from src.core.instance.instance_manager import InstanceManager
-from src.core.language.language_manager import tr
-from src.core.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
+from mcw_core.api.instance.instance_manager import InstanceManager
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.window_sizing import resize_dialog_to_screen
 from src.models.curseforge.cache import CurseForgeCacheInfo
@@ -81,7 +81,9 @@ class CurseForgeBrowserDialog(QDialog):
         self.loader_label.setObjectName("MutedLabel")
         self.loader_combo = QComboBox()
         self.loader_combo.addItem("Fabric", ModLoaderManager.FABRIC)
+        self.loader_combo.addItem("Quilt", ModLoaderManager.QUILT)
         self.loader_combo.addItem("Forge", ModLoaderManager.FORGE)
+        self.loader_combo.addItem("NeoForge", ModLoaderManager.NEOFORGE)
         self.loader_combo.currentIndexChanged.connect(self._loader_changed)
         self.sort_combo = QComboBox()
         self.sort_combo.addItem("Popularity", "popularity")
@@ -185,7 +187,7 @@ class CurseForgeBrowserDialog(QDialog):
     def loader(self) -> str:
         if self.project_type == "modpack":
             loader = str(self.loader_combo.currentData() or ModLoaderManager.FABRIC).strip().casefold()
-            return loader if loader in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE} else ModLoaderManager.FABRIC
+            return loader if loader in ModLoaderManager.MODDED_LOADERS else ModLoaderManager.FABRIC
         if self._instance is not None:
             return ModLoaderManager.normalize(self._instance.mod_loader)[0]
         return self._catalog_loader
@@ -235,7 +237,7 @@ class CurseForgeBrowserDialog(QDialog):
 
     def set_catalog_loader(self, loader: str) -> None:
         normalized = CurseForgeClient.normalize_loader(loader)
-        if normalized not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+        if normalized not in ModLoaderManager.MODDED_LOADERS:
             raise RuntimeError(f"Unsupported CurseForge loader: {loader or 'unknown'}")
         self.set_instance(None)
         self._catalog_loader = normalized

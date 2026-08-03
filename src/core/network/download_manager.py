@@ -85,8 +85,10 @@ class DownloadManager:
             raise DownloadValidationError(f"No checksum is available for '{request.display_name}'.")
 
         with self.get_path_lock(request.destination):
+            self._checkpoint(request, self._safe_size(request.temporary_path))
             valid = self.verify(request.destination, request.expected_size, request.hashes)
             if valid:
+                self._checkpoint(request, self._safe_size(request.destination))
                 size = request.destination.stat().st_size
                 self._report(reporter, progress_stage, progress_message, size, size)
                 download_journal.complete(request, size)
@@ -96,6 +98,7 @@ class DownloadManager:
             if request.force:
                 self.delete_file(request.temporary_path)
             if self.verify(request.temporary_path, request.expected_size, request.hashes):
+                self._checkpoint(request, self._safe_size(request.temporary_path))
                 request.temporary_path.replace(request.destination)
                 size = request.destination.stat().st_size
                 self._report(reporter, progress_stage, progress_message, size, size)
@@ -103,8 +106,10 @@ class DownloadManager:
                 return DownloadResult(request.destination, size, self.calculate_hashes(request.destination, request.hashes), size, "partial-cache")
 
             last_error: Exception | None = None
+            last_url = ""
             attempts_used = 0
             for url in request.urls:
+                last_url = url
                 host = (urlsplit(url).hostname or "unknown").casefold()
                 for attempt in range(1, request.max_attempts + 1):
                     attempts_used += 1
@@ -113,15 +118,20 @@ class DownloadManager:
                     try:
                         with self._slot(host):
                             resumed_from, response = self._stream(request, url, reporter, progress_stage, progress_message, client_provider)
+                        self._checkpoint(request, self._safe_size(request.temporary_path))
                         actual_hashes = self.calculate_hashes(request.temporary_path, request.hashes)
+                        self._checkpoint(request, self._safe_size(request.temporary_path))
                         self._validate_file(request, actual_hashes)
+                        self._checkpoint(request, self._safe_size(request.temporary_path))
                         request.temporary_path.replace(request.destination)
                         size = request.destination.stat().st_size
                         download_journal.complete(request, size)
                         self._report(reporter, progress_stage, progress_message, size, size)
                         return DownloadResult(request.destination, size, actual_hashes, resumed_from, url)
                     except DownloadCancelledError as error:
-                        download_journal.update(request, DownloadState.CANCELLED, downloaded_bytes=self._safe_size(request.temporary_path), error=str(error))
+                        downloaded = self._safe_size(request.temporary_path)
+                        self.delete_file(request.temporary_path)
+                        download_journal.update(request, DownloadState.CANCELLED, downloaded_bytes=downloaded, error=str(error))
                         raise
                     except DownloadPausedError as error:
                         download_journal.update(request, DownloadState.PAUSED, downloaded_bytes=self._safe_size(request.temporary_path), error=str(error))
@@ -134,15 +144,22 @@ class DownloadManager:
                         download_journal.update(request, DownloadState.FAILED, downloaded_bytes=self._safe_size(request.temporary_path), error=str(error))
                         if not decision.retry:
                             break
-                        download_pause_controller.wait(decision.delay_seconds)
+                        try:
+                            download_pause_controller.wait(decision.delay_seconds)
+                        except DownloadCancelledError as cancelled:
+                            downloaded = self._safe_size(request.temporary_path)
+                            self.delete_file(request.temporary_path)
+                            download_journal.update(request, DownloadState.CANCELLED, downloaded_bytes=downloaded, error=str(cancelled))
+                            raise
 
             reason = self.describe_error(last_error)
             download_journal.update(request, DownloadState.FAILED, downloaded_bytes=self._safe_size(request.temporary_path), error=reason)
-            raise DownloadFailedError(request.display_name, max(1, attempts_used), reason) from last_error
+            raise DownloadFailedError(request.display_name, max(1, attempts_used), reason, url=last_url) from last_error
 
     def download_and_hash(self, url: str, path: Path, max_attempts: int = 2, timeout: float = 20.0, force: bool = False, reporter: ProgressReporter | None = None, progress_stage: ProgressStage | None = None, progress_message: str | None = None, client_provider=None) -> tuple[Path, str, int]:
         request = DownloadRequest(urls=(url,), destination=path, expected_size=0, hashes={"sha1": "0" * 40}, source="direct", display_name=path.name, max_attempts=max_attempts, timeout=timeout, force=force)
         with self.get_path_lock(path):
+            self._checkpoint(request, self._safe_size(request.temporary_path))
             if path.is_file() and not force:
                 sha1 = self.calculate_hash(path, "sha1")
                 return path, sha1, path.stat().st_size
@@ -153,13 +170,17 @@ class DownloadManager:
                 try:
                     with self._slot((urlsplit(url).hostname or "unknown").casefold()):
                         self._stream(request, url, reporter, progress_stage, progress_message, client_provider, skip_expected_hash=True)
+                    self._checkpoint(request, self._safe_size(request.temporary_path))
                     sha1 = self.calculate_hash(request.temporary_path, "sha1")
                     size = request.temporary_path.stat().st_size
+                    self._checkpoint(request, size)
                     request.temporary_path.replace(path)
                     download_journal.complete(request, size)
                     return path, sha1, size
                 except DownloadCancelledError as error:
-                    download_journal.update(request, DownloadState.CANCELLED, downloaded_bytes=self._safe_size(request.temporary_path), error=str(error))
+                    downloaded = self._safe_size(request.temporary_path)
+                    self.delete_file(request.temporary_path)
+                    download_journal.update(request, DownloadState.CANCELLED, downloaded_bytes=downloaded, error=str(error))
                     raise
                 except DownloadPausedError:
                     download_journal.update(request, DownloadState.PAUSED, downloaded_bytes=self._safe_size(request.temporary_path))
@@ -171,8 +192,14 @@ class DownloadManager:
                         self.delete_file(request.temporary_path)
                     if not decision.retry:
                         break
-                    download_pause_controller.wait(decision.delay_seconds)
-            raise DownloadFailedError(path.name, max_attempts, self.describe_error(last_error)) from last_error
+                    try:
+                        download_pause_controller.wait(decision.delay_seconds)
+                    except DownloadCancelledError as cancelled:
+                        downloaded = self._safe_size(request.temporary_path)
+                        self.delete_file(request.temporary_path)
+                        download_journal.update(request, DownloadState.CANCELLED, downloaded_bytes=downloaded, error=str(cancelled))
+                        raise
+            raise DownloadFailedError(path.name, max_attempts, self.describe_error(last_error), url=url) from last_error
 
     def _stream(self, request: DownloadRequest, url: str, reporter: ProgressReporter | None, stage: ProgressStage | None, message: str | None, client_provider=None, skip_expected_hash: bool = False, target_path: Path | None = None) -> tuple[int, httpx.Response]:
         force_full = False

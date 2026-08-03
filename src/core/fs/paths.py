@@ -1,4 +1,6 @@
 from pathlib import Path
+from contextlib import contextmanager
+from collections.abc import Iterator
 from src.models.minecraft.version import Version
 from src.models.minecraft.assets import DownloadAsset
 from src.models.instance.instance import Instance
@@ -11,13 +13,15 @@ else:
 
 
 class Paths:
+    PROJECT_ROOT = PROJECT_ROOT
     CACHE_ROOT = PROJECT_ROOT / "cache" # place that saves minecraft contents
     INSTANCES_ROOT = PROJECT_ROOT / "instances"
     ACCOUNTS_ROOT = PROJECT_ROOT / "accounts"
     CONFIG_ROOT = PROJECT_ROOT / "config"
     LOGS_ROOT = PROJECT_ROOT / "logs"
     BACKUPS_ROOT = PROJECT_ROOT / "backups"
-    THEME_ROOT = PROJECT_ROOT / "themes" 
+    THEME_ROOT = PROJECT_ROOT / "themes"
+    RUNTIMES_ROOT = PROJECT_ROOT / "runtimes"
     INSTANCE_LOCKS_ROOT = INSTANCES_ROOT / ".runtime" / "locks"
     
     @staticmethod
@@ -30,6 +34,7 @@ class Paths:
             Paths.LOGS_ROOT,
             Paths.BACKUPS_ROOT,
             Paths.THEME_ROOT,
+            Paths.RUNTIMES_ROOT,
             Paths.INSTANCE_LOCKS_ROOT,
         ]
 
@@ -68,12 +73,76 @@ class Paths:
         return directory
     @staticmethod
     def root() -> Path:
-        if getattr(sys, "frozen", False):
-            # chạy từ exe
-            return Path(sys.executable).parent
+        return Path(Paths.PROJECT_ROOT)
 
-        # chạy từ source
-        return Path(__file__).resolve().parents[3]
+    @staticmethod
+    def snapshot() -> dict[str, Path]:
+        return {
+            "PROJECT_ROOT": Path(Paths.PROJECT_ROOT),
+            "CACHE_ROOT": Path(Paths.CACHE_ROOT),
+            "INSTANCES_ROOT": Path(Paths.INSTANCES_ROOT),
+            "ACCOUNTS_ROOT": Path(Paths.ACCOUNTS_ROOT),
+            "CONFIG_ROOT": Path(Paths.CONFIG_ROOT),
+            "LOGS_ROOT": Path(Paths.LOGS_ROOT),
+            "BACKUPS_ROOT": Path(Paths.BACKUPS_ROOT),
+            "THEME_ROOT": Path(Paths.THEME_ROOT),
+            "RUNTIMES_ROOT": Path(Paths.RUNTIMES_ROOT),
+            "INSTANCE_LOCKS_ROOT": Path(Paths.INSTANCE_LOCKS_ROOT),
+        }
+
+    @staticmethod
+    def restore(snapshot: dict[str, Path], initialize: bool = False) -> None:
+        required = {
+            "PROJECT_ROOT", "CACHE_ROOT", "INSTANCES_ROOT", "ACCOUNTS_ROOT",
+            "CONFIG_ROOT", "LOGS_ROOT", "BACKUPS_ROOT", "THEME_ROOT",
+            "RUNTIMES_ROOT", "INSTANCE_LOCKS_ROOT",
+        }
+        missing = required.difference(snapshot)
+        if missing:
+            raise ValueError(f"Path snapshot is missing: {', '.join(sorted(missing))}")
+        for name in required:
+            setattr(Paths, name, Path(snapshot[name]).expanduser().resolve(strict=False))
+        if initialize:
+            Paths.initialize()
+
+    @staticmethod
+    def configure(
+        root: Path | str | None = None,
+        *,
+        cache_root: Path | str | None = None,
+        instances_root: Path | str | None = None,
+        accounts_root: Path | str | None = None,
+        config_root: Path | str | None = None,
+        logs_root: Path | str | None = None,
+        backups_root: Path | str | None = None,
+        theme_root: Path | str | None = None,
+        runtimes_root: Path | str | None = None,
+        initialize: bool = True,
+    ) -> dict[str, Path]:
+        previous = Paths.snapshot()
+        base = Path(root if root is not None else Paths.PROJECT_ROOT).expanduser().resolve(strict=False)
+        Paths.PROJECT_ROOT = base
+        Paths.CACHE_ROOT = Path(cache_root).expanduser().resolve(strict=False) if cache_root is not None else base / "cache"
+        Paths.INSTANCES_ROOT = Path(instances_root).expanduser().resolve(strict=False) if instances_root is not None else base / "instances"
+        Paths.ACCOUNTS_ROOT = Path(accounts_root).expanduser().resolve(strict=False) if accounts_root is not None else base / "accounts"
+        Paths.CONFIG_ROOT = Path(config_root).expanduser().resolve(strict=False) if config_root is not None else base / "config"
+        Paths.LOGS_ROOT = Path(logs_root).expanduser().resolve(strict=False) if logs_root is not None else base / "logs"
+        Paths.BACKUPS_ROOT = Path(backups_root).expanduser().resolve(strict=False) if backups_root is not None else base / "backups"
+        Paths.THEME_ROOT = Path(theme_root).expanduser().resolve(strict=False) if theme_root is not None else base / "themes"
+        Paths.RUNTIMES_ROOT = Path(runtimes_root).expanduser().resolve(strict=False) if runtimes_root is not None else base / "runtimes"
+        Paths.INSTANCE_LOCKS_ROOT = Paths.INSTANCES_ROOT / ".runtime" / "locks"
+        if initialize:
+            Paths.initialize()
+        return previous
+
+    @staticmethod
+    @contextmanager
+    def configured(root: Path | str | None = None, **overrides: object) -> Iterator[None]:
+        previous = Paths.configure(root, **overrides)
+        try:
+            yield
+        finally:
+            Paths.restore(previous)
     @staticmethod
     def microsoft_config_root()->Path:
         return Paths.CONFIG_ROOT / "microsoft.json"
@@ -132,6 +201,12 @@ class Paths:
     def account_database_path():
         return Paths.ACCOUNTS_ROOT / "accounts.db"
 
+    @staticmethod
+    def account_skins_root() -> Path:
+        directory = Paths.ACCOUNTS_ROOT / "skins"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
 
     @staticmethod
     def accounts_path() -> Path:
@@ -170,6 +245,36 @@ class Paths:
         instance_dir = Paths.INSTANCES_ROOT
         instance_dir.mkdir(parents=True, exist_ok=True)
         return instance_dir
+
+    @staticmethod
+    def instance_runtime_root() -> Path:
+        directory = Paths.instances_root() / ".runtime"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def instance_operations_root() -> Path:
+        directory = Paths.instance_runtime_root() / "operations"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def instance_staging_root() -> Path:
+        directory = Paths.instance_runtime_root() / "staging"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def process_sessions_root() -> Path:
+        directory = Paths.instance_runtime_root() / "process-sessions"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def process_session_history_root() -> Path:
+        directory = Paths.process_sessions_root() / "history"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
     
     @staticmethod
     def load_instance_dir(name: str) -> Path:
@@ -246,6 +351,79 @@ class Paths:
         return Paths.fabric_metadata_root() / "profiles" / game / f"{loader}.json"
 
     @staticmethod
+    def quilt_version_dir(game_version: str, loader_version: str) -> Path:
+        profile_id = f"quilt-loader-{loader_version}-{game_version}"
+        return Paths.CACHE_ROOT / "versions" / profile_id
+
+    @staticmethod
+    def quilt_version_json(game_version: str, loader_version: str) -> Path:
+        directory = Paths.quilt_version_dir(game_version, loader_version)
+        return directory / f"{directory.name}.json"
+
+    @staticmethod
+    def quilt_metadata_root() -> Path:
+        return Paths.CACHE_ROOT / "modloaders" / "quilt"
+
+    @staticmethod
+    def quilt_catalog_json(game_version: str) -> Path:
+        from urllib.parse import quote
+
+        filename = quote(game_version, safe="") or "unknown"
+        return Paths.quilt_metadata_root() / "catalogs" / f"{filename}.json"
+
+    @staticmethod
+    def quilt_install_metadata_json(game_version: str, loader_version: str) -> Path:
+        from urllib.parse import quote
+
+        game = quote(game_version, safe="") or "unknown"
+        loader = quote(loader_version, safe="") or "unknown"
+        return Paths.quilt_metadata_root() / "install" / game / f"{loader}.json"
+
+    @staticmethod
+    def quilt_profile_json(game_version: str, loader_version: str) -> Path:
+        from urllib.parse import quote
+
+        game = quote(game_version, safe="") or "unknown"
+        loader = quote(loader_version, safe="") or "unknown"
+        return Paths.quilt_metadata_root() / "profiles" / game / f"{loader}.json"
+
+    @staticmethod
+    def neoforge_root() -> Path:
+        directory = Paths.CACHE_ROOT / "modloaders" / "neoforge"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def neoforge_version_dir(game_version: str, neoforge_version: str) -> Path:
+        directory = Paths.CACHE_ROOT / "versions" / f"neoforge-{game_version}-{neoforge_version}"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def neoforge_version_json(game_version: str, neoforge_version: str) -> Path:
+        directory = Paths.neoforge_version_dir(game_version, neoforge_version)
+        return directory / f"{directory.name}.json"
+
+    @staticmethod
+    def neoforge_installer_path(game_version: str, neoforge_version: str) -> Path:
+        directory = Paths.neoforge_root() / "installers" / game_version
+        directory.mkdir(parents=True, exist_ok=True)
+        if str(game_version).strip() == "1.20.1":
+            artifact = "forge"
+            prefix = f"{game_version}-"
+            coordinate_version = neoforge_version if str(neoforge_version).startswith(prefix) else f"{prefix}{neoforge_version}"
+        else:
+            artifact = "neoforge"
+            coordinate_version = neoforge_version
+        return directory / f"{artifact}-{coordinate_version}-installer.jar"
+
+    @staticmethod
+    def neoforge_staging_dir(game_version: str, neoforge_version: str) -> Path:
+        directory = Paths.neoforge_root() / "staging" / f"{game_version}-{neoforge_version}"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
     def forge_root() -> Path:
         directory = Paths.CACHE_ROOT / "modloaders" / "forge"
         directory.mkdir(parents=True, exist_ok=True)
@@ -294,9 +472,12 @@ class Paths:
     def forge_diagnostics_default_path(instance: Instance) -> Path:
         from datetime import datetime
 
+        raw_loader = getattr(instance, "mod_loader", None)
+        loader_name = str(raw_loader[0] if isinstance(raw_loader, (tuple, list)) and raw_loader else raw_loader or "").strip().casefold()
+        loader_title = {"neoforge": "NeoForge", "quilt": "Quilt"}.get(loader_name, "Forge")
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         safe_name = "".join(character if character.isalnum() or character in {"-", "_"} else "-" for character in instance.name).strip("-") or "instance"
-        return Paths.logs_root() / f"MCW-Forge-Diagnostics-{safe_name}-{timestamp}.zip"
+        return Paths.logs_root() / f"MCW-{loader_title}-Diagnostics-{safe_name}-{timestamp}.zip"
 
     @staticmethod
     def curseforge_root() -> Path:
@@ -316,6 +497,18 @@ class Paths:
     @staticmethod
     def curseforge_pack_cache(project_id: int | str, file_id: int | str, filename: str) -> Path:
         return Paths.curseforge_file_cache(project_id, file_id, filename)
+
+    @staticmethod
+    def instance_artwork_cache(provider: str, project_id: str, artwork_url: str) -> Path:
+        import hashlib
+        from urllib.parse import quote
+
+        provider_name = quote(str(provider).strip().casefold(), safe="") or "provider"
+        project_name = quote(str(project_id).strip(), safe="") or "unknown"
+        digest = hashlib.sha256(str(artwork_url).strip().encode("utf-8")).hexdigest()
+        directory = Paths.CACHE_ROOT / "content" / "artwork" / provider_name / project_name
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory / digest
 
     @staticmethod
     def curseforge_instance_registry(instance: Instance) -> Path:

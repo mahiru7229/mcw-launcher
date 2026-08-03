@@ -5,9 +5,9 @@ import re
 from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
-from src.core.instance.instance_manager import InstanceManager
-from src.core.language.language_manager import tr
-from src.core.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.instance.instance_manager import InstanceManager
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from src.models.instance.instance import Instance
 from src.models.modrinth.project import ModrinthProject, ModrinthSearchResult
 from src.models.modrinth.version import ModrinthVersion
@@ -66,7 +66,9 @@ class ModrinthBrowserDialog(QDialog):
         self.loader_label.setObjectName("MutedLabel")
         self.loader_combo = QComboBox()
         self.loader_combo.addItem("Fabric", ModLoaderManager.FABRIC)
+        self.loader_combo.addItem("Quilt", ModLoaderManager.QUILT)
         self.loader_combo.addItem("Forge", ModLoaderManager.FORGE)
+        self.loader_combo.addItem("NeoForge", ModLoaderManager.NEOFORGE)
         self.loader_combo.currentIndexChanged.connect(self._loader_changed)
         self.sort_combo = QComboBox()
         self.sort_combo.addItem("Relevance", "relevance")
@@ -151,7 +153,7 @@ class ModrinthBrowserDialog(QDialog):
     @property
     def selected_loader(self) -> str:
         loader = str(self.loader_combo.currentData() or ModLoaderManager.FABRIC).strip().lower()
-        return loader if loader in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE} else ModLoaderManager.FABRIC
+        return loader if loader in ModLoaderManager.MODDED_LOADERS else ModLoaderManager.FABRIC
 
     @property
     def allowed_version_types(self) -> tuple[str, ...]:
@@ -210,7 +212,7 @@ class ModrinthBrowserDialog(QDialog):
         if self.project_type == "modpack":
             self.instance_name_input.clear()
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader) if instance is not None else (ModLoaderManager.FABRIC, "")
-        selected_loader = loader_name if loader_name in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE} else ModLoaderManager.FABRIC
+        selected_loader = loader_name if loader_name in ModLoaderManager.MODDED_LOADERS else ModLoaderManager.FABRIC
         loader_index = self.loader_combo.findData(selected_loader)
         self.loader_combo.blockSignals(True)
         self.loader_combo.setCurrentIndex(max(0, loader_index))

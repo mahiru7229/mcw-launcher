@@ -5,15 +5,11 @@ from typing import Any
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.auth.account_authentication import AccountAuthentication
-from src.core.instance.instance_manager import InstanceManager
-from src.core.language.language_manager import tr
-from src.core.minecraft.minecraft_executor import MinecraftExecutor
-from src.core.network.download_pause import download_pause_controller, is_download_cancelled, is_download_paused
+from mcw_core.api.language.language_manager import tr
 from src.gui.controllers.base_controller import BaseController
 from src.gui.presenters.launch_error_presenter import LaunchErrorPresenter
 from src.gui.task_runner import TaskRunner
-from src.models.progress.progress_event import ProgressEvent
+from mcw_core import LaunchRequest, ProgressEvent, get_default_core, is_download_cancelled, is_download_paused
 
 
 class LaunchController(BaseController):
@@ -32,6 +28,7 @@ class LaunchController(BaseController):
         super().__init__()
 
         self._task_runner = task_runner
+        self._core = get_default_core()
         self._selected_instance = None
         self._selected_account = None
         self._debug_mode = False
@@ -52,7 +49,7 @@ class LaunchController(BaseController):
 
     def launch(self) -> None:
         if self._task_runner.is_task_active(self.TASK_ID):
-            if download_pause_controller.is_paused:
+            if self._core.operations.state.paused:
                 self.resume()
             else:
                 self.pause()
@@ -72,28 +69,27 @@ class LaunchController(BaseController):
 
         def task() -> dict[str, Any]:
             try:
-                instance = InstanceManager.load(instance_name)
-                authentication = AccountAuthentication.authenticate(account)
-                download_pause_controller.raise_if_requested()
-
-                return MinecraftExecutor.run(
-                    instance=instance,
-                    authentication=authentication,
-                    account=account,
-                    debug_mode=debug_mode,
-                    on_progress=self._on_progress,
-                    on_exit=self._on_game_exit,
+                self._core.operations.checkpoint()
+                result = self._core.launch(
+                    LaunchRequest(
+                        instance=instance_name,
+                        account=account,
+                        debug_mode=debug_mode,
+                        on_progress=self._on_progress,
+                        on_exit=self._on_game_exit,
+                    )
                 )
+                return result.as_dict()
             finally:
-                download_pause_controller.finish()
+                self._core.operations.finish()
 
-        download_pause_controller.begin()
+        self._core.operations.begin()
         started = self._task_runner.run(self.TASK_ID, task, tr("Launching '{name}'...", name=instance_name))
         if not started:
-            download_pause_controller.finish()
+            self._core.operations.finish()
 
     def pause(self) -> None:
-        if not download_pause_controller.request_pause():
+        if not self._core.operations.pause():
             return
         self.pause_requested.emit()
         self.launch_paused.emit()
@@ -101,14 +97,14 @@ class LaunchController(BaseController):
         self.log_created.emit(tr("launch.paused_log"))
 
     def resume(self) -> None:
-        if not download_pause_controller.request_resume():
+        if not self._core.operations.resume():
             return
         self.launch_resumed.emit()
         self.status_changed.emit(tr("launch.resumed"))
         self.log_created.emit(tr("launch.resumed_log"))
 
     def cancel(self) -> None:
-        if not download_pause_controller.request_cancel():
+        if not self._core.operations.cancel():
             return
         self.cancel_requested.emit()
         self.status_changed.emit(tr("launch.cancel_requested"))

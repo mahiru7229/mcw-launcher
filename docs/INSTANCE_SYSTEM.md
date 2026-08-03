@@ -72,20 +72,48 @@ Example:
     "total_play_time_seconds": 3600,
     "last_exit_code": 0,
     "last_launch_crashed": false,
+    "last_launch_state": "finished",
+    "last_started_at": "2026-07-15T11:00:00+00:00",
+    "last_finished_at": "2026-07-15T12:00:00+00:00",
     "last_game_log": ".../logs/minecraft-2026-07-15_18-30-00.log",
     "last_crash_report": "",
 
-    "icon": "grass_block",
+    "icon": ".mcw/instance-icon.png",
     "notes": "",
 
-    "launcher_version": "v0.5.0-beta.9",
-    "metadata_version": 2
+    "launcher_version": "v0.12.0",
+    "metadata_version": 3
 }
 ```
 
 Metadata only contains information describing the instance.
 
 Runtime configuration is intentionally stored elsewhere.
+
+## Icon storage
+
+The default icon is represented by the built-in key `grass_block`. A custom icon selected through the public API or GUI is copied into the instance:
+
+```text
+.mcw/instance-icon.png
+```
+
+Keeping the file inside the instance makes clone, backup, export, and import behavior predictable.
+
+## Runtime states
+
+The display state is resolved with this precedence:
+
+```text
+live preparing lock -> loading
+live Minecraft PID  -> running
+last crashed session -> crashed
+last normal session  -> finished
+no previous session  -> ready
+```
+
+Only the result of the last completed session is persisted. Live `loading` and `running` state comes from the run-lock system.
+
 
 ---
 

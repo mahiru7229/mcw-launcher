@@ -3,8 +3,8 @@ from __future__ import annotations
 from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import QApplication
 
-from src.core.theme.theme_font import ResolvedThemeFont
-from src.core.theme.theme_manager import ThemeDefinition, ThemeManager, theme_manager
+from mcw_core.api.theme.theme_font import ResolvedThemeFont
+from mcw_core.api.theme.theme_manager import ThemeDefinition, ThemeManager, theme_manager
 
 
 class ThemeFontRuntime:

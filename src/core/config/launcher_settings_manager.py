@@ -21,7 +21,7 @@ class LauncherSettingsManager:
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
         "gui": {
-            "start_page": "home",
+            "start_page": "instances",
             "show_snapshots": False,
             "remember_window_size": True,
             "language": "en-US",
@@ -168,7 +168,8 @@ class LauncherSettingsManager:
         normalized["schema_version"] = self.SCHEMA_VERSION
 
         gui = normalized.setdefault("gui", {})
-        gui["start_page"] = str(gui.get("start_page") or "home")
+        start_page = str(gui.get("start_page") or "instances").strip()
+        gui["start_page"] = start_page if start_page in {"instances", "accounts", "launcher_settings", "logs", "about"} else "instances"
         gui["show_snapshots"] = self._as_bool(gui.get("show_snapshots"), False)
         gui["remember_window_size"] = self._as_bool(gui.get("remember_window_size"), True)
         gui["language"] = str(gui.get("language") or "en-US")

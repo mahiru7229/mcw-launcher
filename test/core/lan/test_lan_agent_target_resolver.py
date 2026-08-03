@@ -211,3 +211,80 @@ def test_resolve_versions_before_117_returns_no_targets(tmp_path: Path) -> None:
 
     assert resolution.targets == ()
     assert "1.17 or newer" in resolution.warnings[0]
+
+
+def test_resolve_neoforge_emits_neoforge_srg_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    mapping_path = tmp_path / "client.txt"
+    write_mojang_mappings(mapping_path)
+    version = make_version(mapping_path, game_arguments=["--fml.neoFormVersion", "20240808.144430"])
+    instance = make_instance(tmp_path, version_id="1.21.1", loader="neoforge")
+    monkeypatch.setattr(LanAgentTargetResolver, "_ensure_client_mappings", classmethod(lambda cls, _version, _game_version, _reporter: mapping_path))
+    monkeypatch.setattr(
+        LanAgentTargetResolver,
+        "_resolve_forge_srg_target",
+        classmethod(lambda cls, _version, _game_version, _official: LanAgentTarget("forge-srg", "net/minecraft/server/MinecraftServer", "m_129985_")),
+    )
+
+    resolution = LanAgentTargetResolver.resolve(version, instance)
+
+    assert resolution.loader == "neoforge"
+    assert resolution.targets[0] == LanAgentTarget("neoforge-srg", "net/minecraft/server/MinecraftServer", "m_129985_")
+    assert LanAgentTarget("official", "net/minecraft/server/MinecraftServer", "d") in resolution.targets
+
+
+def test_find_neoforge_runtime_jars_uses_neoform_version(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    directory = tmp_path / "libraries" / "net/minecraft/client/1.21.1-20240808.144430"
+    slim_jar = directory / "client-1.21.1-20240808.144430-slim.jar"
+    srg_jar = directory / "client-1.21.1-20240808.144430-srg.jar"
+    write_class_jar(slim_jar, [("d", "(Z)V")])
+    write_class_jar(srg_jar, [("m_129985_", "(Z)V")])
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: tmp_path / "libraries"))
+    version = make_version(game_arguments=["--fml.neoFormVersion", "20240808.144430"])
+
+    artifacts = LanAgentTargetResolver._find_forge_runtime_jars(version, "1.21.1")
+
+    assert artifacts == (slim_jar, srg_jar)
+
+
+def write_quilt_hashed_v2(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = (
+        "tiny\t2\t0\tofficial\thashed\n"
+        "c\tnet/minecraft/server/MinecraftServer\tnet/minecraft/unmapped/C_abcdef\n"
+        "\tm\t(Z)V\td\tm_hashonline\n"
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("mappings/mappings.tiny", payload)
+
+
+def test_parse_quilt_hashed_mapping(tmp_path: Path) -> None:
+    mapping_jar = tmp_path / "hashed.jar"
+    write_quilt_hashed_v2(mapping_jar)
+    official = LanAgentTarget("official", "net/minecraft/server/MinecraftServer", "d")
+
+    target = LanAgentTargetResolver._parse_quilt_hashed_mappings(mapping_jar, official)
+
+    assert target == LanAgentTarget("quilt-hashed", "net/minecraft/unmapped/C_abcdef", "m_hashonline")
+
+
+def test_resolve_quilt_falls_back_to_hashed_mappings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    mapping_path = tmp_path / "client.txt"
+    write_mojang_mappings(mapping_path)
+    hashed_path = tmp_path / "libraries" / "org/quiltmc/hashed/1.20.1/hashed-1.20.1.jar"
+    write_quilt_hashed_v2(hashed_path)
+    version = make_version(mapping_path)
+    version.libraries.append(
+        {
+            "name": "org.quiltmc:hashed:1.20.1",
+            "downloads": {"artifact": {"path": "org/quiltmc/hashed/1.20.1/hashed-1.20.1.jar"}},
+        }
+    )
+    instance = make_instance(tmp_path, loader="quilt")
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: tmp_path / "libraries"))
+    monkeypatch.setattr(LanAgentTargetResolver, "_ensure_client_mappings", classmethod(lambda cls, *_args: mapping_path))
+
+    resolution = LanAgentTargetResolver.resolve(version, instance)
+
+    assert resolution.loader == "quilt"
+    assert resolution.targets[0] == LanAgentTarget("quilt-hashed", "net/minecraft/unmapped/C_abcdef", "m_hashonline")
+    assert resolution.warnings == ()

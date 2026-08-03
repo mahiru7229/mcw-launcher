@@ -4,11 +4,11 @@ from pathlib import Path
 
 from PySide6.QtCore import Signal
 
-from src.core.language.language_manager import tr
-from src.core.system.memory import MemoryAllocationPolicy
-from src.core.instance.instance_manager import InstanceManager
-from src.core.config.managed_content_policy import ManagedContentPolicy
-from src.core.instance.settings_manager import SettingsManager
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.system.memory import MemoryAllocationPolicy
+from mcw_core.api.instance.instance_manager import InstanceManager
+from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
+from mcw_core.api.instance.settings_manager import SettingsManager
 from src.gui.controllers.base_controller import BaseController
 
 

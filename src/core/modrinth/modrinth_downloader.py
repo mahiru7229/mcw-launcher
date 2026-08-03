@@ -9,10 +9,11 @@ import httpx
 from src.config import MODRINTH_USER_AGENT
 from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter  # shared singleton; retained for compatibility
 from src.core.network.download_manager import download_manager
-from src.core.network.download_models import DownloadRequest
+from src.core.network.artifact_download_service import artifact_download_service
 from src.core.network.httpx_downloader import HttpDownloader
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.modrinth.version import ModrinthFile
+from src.models.network.artifact import ArtifactRequest
 from src.models.progress.progress_stage import ProgressStage
 
 
@@ -32,7 +33,7 @@ class ModrinthDownloader:
     DEFAULT_TIMEOUT = httpx.Timeout(connect=20.0, read=90.0, write=30.0, pool=30.0)
 
     @staticmethod
-    def download_file(file: ModrinthFile, destination: Path, force: bool = False, reporter: ProgressReporter | None = None, progress_stage: ProgressStage = ProgressStage.DOWNLOADING_MODS, progress_message: str | None = None, max_retry: int = 5) -> Path:
+    def download_file(file: ModrinthFile, destination: Path, force: bool = False, reporter: ProgressReporter | None = None, progress_stage: ProgressStage = ProgressStage.DOWNLOADING_MODS, progress_message: str | None = None, max_retry: int = 5, purpose: str = "mod", page_url: str = "", project_url: str = "", project_id: str = "", version_id: str = "") -> Path:
         return ModrinthDownloader.download_urls(
             urls=(file.url,),
             destination=destination,
@@ -45,10 +46,15 @@ class ModrinthDownloader:
             reporter=reporter,
             progress_stage=progress_stage,
             progress_message=progress_message,
+            purpose=purpose,
+            page_url=page_url,
+            project_url=project_url,
+            project_id=project_id,
+            version_id=version_id,
         )
 
     @staticmethod
-    def download_urls(urls: tuple[str, ...] | list[str], destination: Path, sha1: str = "", sha512: str = "", expected_size: int = 0, force: bool = False, restrict_hosts: bool = True, max_retry: int = 5, reporter: ProgressReporter | None = None, progress_stage: ProgressStage = ProgressStage.DOWNLOADING_MODS, progress_message: str | None = None) -> Path:
+    def download_urls(urls: tuple[str, ...] | list[str], destination: Path, sha1: str = "", sha512: str = "", expected_size: int = 0, force: bool = False, restrict_hosts: bool = True, max_retry: int = 5, reporter: ProgressReporter | None = None, progress_stage: ProgressStage = ProgressStage.DOWNLOADING_MODS, progress_message: str | None = None, purpose: str = "artifact", page_url: str = "", project_url: str = "", project_id: str = "", version_id: str = "", file_id: str = "") -> Path:
         normalized_urls = tuple(dict.fromkeys(str(url).strip() for url in urls if str(url).strip()))
         if restrict_hosts:
             accepted: list[str] = []
@@ -69,19 +75,25 @@ class ModrinthDownloader:
             hashes["sha1"] = sha1
         if sha512:
             hashes["sha512"] = sha512
-        request = DownloadRequest(
-            urls=normalized_urls,
+        request = ArtifactRequest(
+            provider="modrinth",
+            purpose=purpose,
             destination=destination,
+            urls=normalized_urls,
+            page_url=page_url,
+            project_url=project_url,
+            expected_filename=destination.name,
             expected_size=max(0, int(expected_size or 0)),
             hashes=hashes,
-            source="modrinth",
-            display_name=destination.name,
+            project_id=project_id,
+            version_id=version_id,
+            file_id=file_id,
             max_attempts=max_retry,
             timeout=ModrinthDownloader.DEFAULT_TIMEOUT,
             headers={"User-Agent": MODRINTH_USER_AGENT},
             force=force,
         )
-        return download_manager.download(
+        return artifact_download_service.download(
             request,
             reporter=reporter,
             progress_stage=progress_stage,

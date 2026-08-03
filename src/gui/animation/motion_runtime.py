@@ -4,8 +4,8 @@ from PySide6.QtCore import QEasingCurve, QEvent, QObject, QPoint, QParallelAnima
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication, QDialog, QGraphicsColorizeEffect, QGraphicsOpacityEffect, QPushButton, QStackedWidget, QWidget
 
-from src.core.theme.theme_manager import ThemeManager, theme_manager
-from src.core.theme.theme_motion import MotionTransitionDefinition, ThemeMotionDefinition
+from mcw_core.api.theme.theme_manager import ThemeManager, theme_manager
+from mcw_core.api.theme.theme_motion import MotionTransitionDefinition, ThemeMotionDefinition
 from src.gui.animation.animation_clock import AnimationClock
 
 

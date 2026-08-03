@@ -212,13 +212,14 @@ def test_manual_batch_imports_non_jar_managed_file_with_matching_extension(tmp_p
     assert entry["manualImport"] is True
 
 
-def test_manual_batch_rejects_matching_hash_with_wrong_extension(tmp_path, monkeypatch):
+def test_manual_batch_accepts_matching_hash_with_different_extension_and_renames(tmp_path, monkeypatch):
     instance_dir = tmp_path / "instance"
     instance_dir.mkdir()
     instance = Instance(instance_id="id", name="Pack", version_id="1.18.2", instance_dir=instance_dir, mod_loader=("forge", "40.2.0"))
     content = b"expected archive"
     source = tmp_path / "renamed.jar"
     source.write_bytes(content)
+    CurseForgePackRegistry.save(instance, {"managedFiles": [{"projectId": 30, "fileId": 40, "fileName": "archive.zip", "path": "resourcepacks/archive.zip", "sha1": sha1(content, usedforsecurity=False).hexdigest(), "size": len(content)}]})
 
     requirement = CurseForgeManualDownload(
         project_id=30,
@@ -234,11 +235,12 @@ def test_manual_batch_rejects_matching_hash_with_wrong_extension(tmp_path, monke
     )
 
     monkeypatch.setattr(InstanceRunLock, "is_active", staticmethod(lambda _instance: False))
-    monkeypatch.setattr(ModManager, "add_mods", staticmethod(lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("wrong extension must not be added"))))
+    monkeypatch.setattr(ModManager, "add_mods", staticmethod(lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("managed artifact must not be added as a standalone mod"))))
 
     result = CurseForgeManualInstaller.install_many(instance, [requirement], [source])
 
-    assert result.imported == ()
+    assert len(result.imported) == 1
+    assert result.imported[0].installed_name == "archive.zip"
     assert result.added_mods == ()
-    assert len(result.rejected) == 1
-    assert "extension must be .zip" in result.rejected[0]
+    assert result.rejected == ()
+    assert (instance_dir / "resourcepacks" / "archive.zip").read_bytes() == content

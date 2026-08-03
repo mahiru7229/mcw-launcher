@@ -4,13 +4,13 @@ from pathlib import Path
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.curseforge.curseforge_registry import CurseForgeRegistry
-from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
-from src.core.mod.mod_manager import ModManager
-from src.core.modloader.mod_loader_manager import ModLoaderManager
-from src.core.modrinth.modrinth_mod_update_manager import ModrinthModUpdateManager
-from src.core.modrinth.modrinth_registry import ModrinthRegistry
-from src.core.progress.progress_reporter import ProgressReporter
+from mcw_core.api.curseforge.curseforge_registry import CurseForgeRegistry
+from mcw_core.api.mod.mod_compatibility_manager import ModCompatibilityManager
+from mcw_core.api.mod.mod_manager import ModManager
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.modrinth.modrinth_mod_update_manager import ModrinthModUpdateManager
+from mcw_core.api.modrinth.modrinth_registry import ModrinthRegistry
+from mcw_core.api.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 from src.models.instance.instance import Instance
@@ -55,7 +55,7 @@ class ModController(BaseController):
             return
 
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+        if loader_name not in ModLoaderManager.MODDED_LOADERS:
             self.mods_changed.emit([])
             return
 
@@ -110,7 +110,7 @@ class ModController(BaseController):
         if instance is None:
             return
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+        if loader_name not in ModLoaderManager.MODDED_LOADERS:
             self.updates_changed.emit(ModrinthModUpdateReport(entries=()))
             return
         instance_id = instance.instance_id
@@ -122,8 +122,8 @@ class ModController(BaseController):
         instance = self._require_instance()
         if instance is None or not project_ids:
             return
-        if ModLoaderManager.normalize(instance.mod_loader)[0] not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
-            self._emit_error("Manage mods", "Modrinth update actions require a Fabric or Forge instance.")
+        if ModLoaderManager.normalize(instance.mod_loader)[0] not in ModLoaderManager.MODDED_LOADERS:
+            self._emit_error("Manage mods", "Modrinth update actions require a Fabric, Quilt, Forge, or NeoForge instance.")
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
@@ -134,8 +134,8 @@ class ModController(BaseController):
         instance = self._require_instance()
         if instance is None:
             return
-        if ModLoaderManager.normalize(instance.mod_loader)[0] not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
-            self._emit_error("Manage mods", "Modrinth update actions require a Fabric or Forge instance.")
+        if ModLoaderManager.normalize(instance.mod_loader)[0] not in ModLoaderManager.MODDED_LOADERS:
+            self._emit_error("Manage mods", "Modrinth update actions require a Fabric, Quilt, Forge, or NeoForge instance.")
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)

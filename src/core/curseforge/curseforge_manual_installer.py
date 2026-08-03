@@ -3,17 +3,19 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 import hashlib
-import shutil
 
 from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
 from src.core.curseforge.curseforge_registry import CurseForgeRegistry
+from src.core.fs.paths import Paths
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.mod.mod_manager import ModManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_registry import ModrinthRegistry
+from src.core.network.artifact_download_service import artifact_download_service
 from src.models.curseforge.manual_download import CurseForgeManualDownload
 from src.models.curseforge.manual_import_result import CurseForgeManualImportedFile, CurseForgeManualImportResult
 from src.models.instance.instance import Instance
+from src.models.network.artifact import ArtifactRequest
 
 
 class CurseForgeManualInstaller:
@@ -24,25 +26,18 @@ class CurseForgeManualInstaller:
             raise RuntimeError("Close Minecraft before importing a manually downloaded file.")
         if not path.is_file():
             raise RuntimeError("The selected CurseForge file does not exist.")
-        CurseForgeManualInstaller._verify_extension(path, requirement)
-        if requirement.file_size > 0 and path.stat().st_size != requirement.file_size:
-            raise RuntimeError(
-                f"The selected file has the wrong size. Expected {requirement.file_size} bytes, got {path.stat().st_size} bytes."
-            )
-        if requirement.sha1:
-            digest = CurseForgeManualInstaller._sha1(path)
-            if digest.casefold() != requirement.sha1.casefold():
-                raise RuntimeError("The selected file does not match the expected CurseForge SHA-1 checksum.")
 
         if requirement.managed_kind == "pack":
             return CurseForgeManualInstaller._install_pack_file(instance, requirement, path)
 
-        if path.suffix.casefold() != ".jar":
+        if Path(requirement.file_name).suffix.casefold() != ".jar":
             raise RuntimeError("A standalone mod must be a .jar file.")
+        cache = Paths.curseforge_file_cache(requirement.project_id, requirement.file_id, requirement.file_name)
+        artifact_download_service.accept_manual_file(CurseForgeManualInstaller._request(requirement, cache), path)
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        metadata = ModManager.read_mod(path, preferred_loader=loader_name)
+        metadata = ModManager.read_mod(cache, preferred_loader=loader_name)
         compatibility_warning = ModManager.compatibility_warning(instance, metadata)
-        added = ModManager.add_mods(instance, [path], replace=True, allow_unverified=True)
+        added = ModManager.add_mods(instance, [cache], replace=True, allow_unverified=True)
         if not added:
             raise RuntimeError("The selected file could not be added to the instance.")
         installed_name = added[0].file_name
@@ -87,15 +82,6 @@ class CurseForgeManualInstaller:
                 pending.remove(requirement)
                 continue
 
-            checksum_requirement = next(
-                (item for item in pending if item.sha1 and item.sha1.casefold() == digest.casefold()),
-                None,
-            )
-            if checksum_requirement is not None:
-                expected = CurseForgeManualInstaller._expected_extension(checksum_requirement) or "the expected extension"
-                rejected.append(f"{source.name}: The file content matches, but the extension must be {expected}.")
-                continue
-
             filename_requirement = next((item for item in pending if item.file_name.casefold() == source.name.casefold()), None)
             if filename_requirement is not None:
                 rejected.append(
@@ -130,15 +116,14 @@ class CurseForgeManualInstaller:
 
     @staticmethod
     def _match_requirement(source: Path, size: int, digest: str, requirements: list[CurseForgeManualDownload]) -> CurseForgeManualDownload | None:
-        compatible = [item for item in requirements if CurseForgeManualInstaller._extension_matches(source, item)]
-        checksum_matches = [item for item in compatible if item.sha1 and item.sha1.casefold() == digest.casefold()]
+        checksum_matches = [item for item in requirements if item.sha1 and item.sha1.casefold() == digest.casefold()]
         if checksum_matches:
             exact_name = next((item for item in checksum_matches if item.file_name.casefold() == source.name.casefold()), None)
             return exact_name or checksum_matches[0]
 
         name_matches = [
             item
-            for item in compatible
+            for item in requirements
             if not item.sha1
             and item.file_name.casefold() == source.name.casefold()
             and (item.file_size <= 0 or item.file_size == size)
@@ -152,10 +137,7 @@ class CurseForgeManualInstaller:
             requirement.managed_path,
             requirement.file_name,
         )
-        target.parent.mkdir(parents=True, exist_ok=True)
-        temporary = target.with_suffix(target.suffix + ".part")
-        shutil.copy2(source, temporary)
-        temporary.replace(target)
+        artifact_download_service.accept_manual_file(CurseForgeManualInstaller._request(requirement, target), source)
 
         compatibility_warning = ""
         if target.suffix.casefold() == ".jar":
@@ -247,28 +229,25 @@ class CurseForgeManualInstaller:
         CurseForgeRegistry.save(instance, registry)
 
     @staticmethod
-    def _expected_extension(requirement: CurseForgeManualDownload) -> str:
-        expected_name = Path(requirement.managed_path or requirement.file_name).name
-        return Path(expected_name).suffix.casefold()
-
-    @staticmethod
-    def _extension_matches(source: Path, requirement: CurseForgeManualDownload) -> bool:
-        expected = CurseForgeManualInstaller._expected_extension(requirement)
-        return not expected or source.suffix.casefold() == expected
-
-    @staticmethod
-    def _verify_extension(source: Path, requirement: CurseForgeManualDownload) -> None:
-        expected = CurseForgeManualInstaller._expected_extension(requirement)
-        if expected and source.suffix.casefold() != expected:
-            raise RuntimeError(f"The selected file must use the {expected} extension.")
-
-    @staticmethod
     def copy_to_cache(source: Path, destination: Path) -> Path:
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        temporary = destination.with_suffix(destination.suffix + ".part")
-        shutil.copy2(source, temporary)
-        temporary.replace(destination)
-        return destination
+        request = ArtifactRequest(provider="curseforge", purpose="manual-cache", destination=destination, expected_filename=destination.name, allow_unverified=True)
+        return artifact_download_service.accept_manual_file(request, source)
+
+    @staticmethod
+    def _request(requirement: CurseForgeManualDownload, destination: Path) -> ArtifactRequest:
+        return ArtifactRequest(
+            provider="curseforge",
+            purpose="manual-modpack-artifact" if requirement.managed_kind == "pack" else "manual-mod",
+            destination=destination,
+            urls=(requirement.direct_url,) if requirement.direct_url else (),
+            page_url=requirement.version_url,
+            project_url=requirement.project_url,
+            expected_filename=requirement.file_name,
+            expected_size=requirement.file_size,
+            hashes={"sha1": requirement.sha1} if requirement.sha1 else {},
+            project_id=str(requirement.project_id),
+            file_id=str(requirement.file_id),
+        )
 
     @staticmethod
     def _sha1(path: Path) -> str:

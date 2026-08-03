@@ -61,6 +61,7 @@ def test_runtime_arguments_are_emitted_only_for_private_offline(tmp_path: Path, 
 
     assert arguments == [
         "-Dmcw.lan.offline=true",
+        "-Dmcw.lan.loader=fabric",
         "-Dmcw.lan.targets=net/minecraft/server/MinecraftServer#method_3864;net/minecraft/server/MinecraftServer#d",
         f"-Dmcw.lan.log={agent_log.resolve().as_posix()}",
         f"-javaagent:{installed}",
@@ -107,7 +108,7 @@ def test_prepare_log_replaces_previous_run_and_read_log_returns_content(tmp_path
     assert "stale log" not in text
     assert "MCW LAN Agent launch diagnostics" in text
     assert "Instance: Pack" in text
-    assert "Runtime targets: resolved from Mojang/Fabric mappings" in text
+    assert "Runtime targets: resolved from Mojang, Fabric, Quilt, Forge, and NeoForge mappings" in text
 
 
 def test_sanitize_user_arguments_removes_only_mcw_agent_overrides() -> None:
@@ -122,3 +123,43 @@ def test_sanitize_user_arguments_removes_only_mcw_agent_overrides() -> None:
     )
 
     assert arguments == ["-javaagent:C:/tools/other-agent.jar", "-Dexample=true"]
+
+
+def test_runtime_arguments_identify_neoforge_loader(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    installed = tmp_path / "mcw-lan-agent.jar"
+    agent_log = tmp_path / "logs" / LanAgentManager.AGENT_LOG_FILENAME
+    instance = make_instance(tmp_path, "1.21.1", loader="neoforge")
+    resolution = LanAgentTargetResolution(
+        game_version="1.21.1",
+        loader="neoforge",
+        targets=(LanAgentTarget("neoforge-srg", "net/minecraft/server/MinecraftServer", "m_129985_"),),
+    )
+    monkeypatch.setattr(LanAgentManager, "install", classmethod(lambda cls: LanAgentInstallResult(installed, False)))
+    monkeypatch.setattr(LanAgentManager, "log_path", classmethod(lambda cls, _instance: agent_log))
+    monkeypatch.setattr(LanAgentManager, "prepare_log", classmethod(lambda cls, _instance, _auth_mode=None: agent_log))
+    monkeypatch.setattr(LanAgentTargetResolver, "resolve", classmethod(lambda cls, _version, _instance, _reporter=None: resolution))
+
+    arguments = LanAgentManager.runtime_arguments(make_version("1.21.1"), "private_offline", instance)
+
+    assert "-Dmcw.lan.loader=neoforge" in arguments
+    assert "-Dmcw.lan.targets=net/minecraft/server/MinecraftServer#m_129985_" in arguments
+
+
+def test_runtime_arguments_identify_quilt_loader(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    installed = tmp_path / "mcw-lan-agent.jar"
+    agent_log = tmp_path / "logs" / LanAgentManager.AGENT_LOG_FILENAME
+    instance = make_instance(tmp_path, "1.20.1", loader="quilt")
+    resolution = LanAgentTargetResolution(
+        game_version="1.20.1",
+        loader="quilt",
+        targets=(LanAgentTarget("quilt-hashed", "net/minecraft/unmapped/C_abcdef", "m_hashonline"),),
+    )
+    monkeypatch.setattr(LanAgentManager, "install", classmethod(lambda cls: LanAgentInstallResult(installed, False)))
+    monkeypatch.setattr(LanAgentManager, "log_path", classmethod(lambda cls, _instance: agent_log))
+    monkeypatch.setattr(LanAgentManager, "prepare_log", classmethod(lambda cls, _instance, _auth_mode=None: agent_log))
+    monkeypatch.setattr(LanAgentTargetResolver, "resolve", classmethod(lambda cls, _version, _instance, _reporter=None: resolution))
+
+    arguments = LanAgentManager.runtime_arguments(make_version("1.20.1"), "private_offline", instance)
+
+    assert "-Dmcw.lan.loader=quilt" in arguments
+    assert "-Dmcw.lan.targets=net/minecraft/unmapped/C_abcdef#m_hashonline" in arguments

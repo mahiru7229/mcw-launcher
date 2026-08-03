@@ -219,7 +219,9 @@ class HttpDownloader:
                 download_journal.complete(request, path.stat().st_size)
                 return path
             except DownloadCancelledError as error:
-                download_journal.update(request, DownloadState.CANCELLED, downloaded_bytes=download_manager._safe_size(temp_path), error=str(error))
+                downloaded = download_manager._safe_size(temp_path)
+                HttpDownloader.delete_file(temp_path)
+                download_journal.update(request, DownloadState.CANCELLED, downloaded_bytes=downloaded, error=str(error))
                 raise
             except DownloadPausedError as error:
                 download_journal.update(request, DownloadState.PAUSED, downloaded_bytes=download_manager._safe_size(temp_path), error=str(error))
@@ -232,8 +234,14 @@ class HttpDownloader:
                 download_journal.update(request, DownloadState.FAILED, downloaded_bytes=download_manager._safe_size(temp_path), error=str(error))
                 if not decision.retry:
                     break
-                HttpDownloader._sleep_retry(decision.delay_seconds)
+                try:
+                    HttpDownloader._sleep_retry(decision.delay_seconds)
+                except DownloadCancelledError as cancelled:
+                    downloaded = download_manager._safe_size(temp_path)
+                    HttpDownloader.delete_file(temp_path)
+                    download_journal.update(request, DownloadState.CANCELLED, downloaded_bytes=downloaded, error=str(cancelled))
+                    raise
 
         reason = HttpDownloader._describe_error(last_error)
         download_journal.update(request, DownloadState.FAILED, downloaded_bytes=download_manager._safe_size(temp_path), error=reason)
-        raise DownloadFailedError(path.name, max_retry, reason) from last_error
+        raise DownloadFailedError(path.name, max_retry, reason, url=str(download_info.url)) from last_error

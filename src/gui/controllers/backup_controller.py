@@ -4,9 +4,9 @@ from pathlib import Path
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.backup.instance_backup_manager import InstanceBackupManager
-from src.core.instance.instance_manager import InstanceManager
-from src.core.language.language_manager import tr
+from mcw_core.api.backup.instance_backup_manager import InstanceBackupManager
+from mcw_core.api.instance.instance_manager import InstanceManager
+from mcw_core.api.language.language_manager import tr
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 

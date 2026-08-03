@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Protocol
 
-from src.core.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from src.models.instance.instance import Instance
 
 
@@ -26,6 +26,6 @@ def compatible_instances(instances: Iterable[Instance], version: CompatibleModVe
 
 def normalize_supported_loader(loader: str) -> str:
     normalized = str(loader or "").strip().lower()
-    if normalized not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+    if normalized not in ModLoaderManager.MODDED_LOADERS:
         raise RuntimeError(f"Unsupported mod loader: {normalized or 'unknown'}")
     return normalized

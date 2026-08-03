@@ -6,7 +6,7 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
 
-from src.core.theme.theme_manager import ThemeManager, theme_manager
+from mcw_core.api.theme.theme_manager import ThemeManager, theme_manager
 from src.gui.theme.accent_runtime import ThemeAccentRuntime, theme_accent_runtime
 from src.gui.theme.font_runtime import ThemeFontRuntime, theme_font_runtime
 from src.gui.widget.themed_animated_label import ThemedAnimatedLabel

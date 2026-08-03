@@ -3,13 +3,13 @@ from urllib.parse import unquote, urlparse
 from typing import Any
 import re
 
-from src.core.java.java_major_policy import JavaMajorPolicy
 from src.core.network.httpx_downloader import HttpDownloader
 from src.models.java.java_release import JavaRelease
 
 
 class AdoptiumClient:
     ASSETS_URL = "https://api.adoptium.net/v3/assets/latest/{major}/hotspot"
+    AVAILABLE_RELEASES_URL = "https://api.adoptium.net/v3/info/available_releases"
     ASSETS_PARAMS = {
         "architecture": "x64",
         "heap_size": "normal",
@@ -22,7 +22,7 @@ class AdoptiumClient:
 
     @staticmethod
     def get_latest_windows_x64_jdk(major: int, timeout: float = 30.0) -> JavaRelease:
-        managed_major = JavaMajorPolicy.resolve(major)
+        managed_major = AdoptiumClient.normalize_feature_major(major)
         api_url = AdoptiumClient.ASSETS_URL.format(major=managed_major)
         client = HttpDownloader.get_client()
         response = client.get(api_url, params=AdoptiumClient.ASSETS_PARAMS, timeout=timeout)
@@ -41,6 +41,50 @@ class AdoptiumClient:
         release_name = AdoptiumClient._release_name(asset.get("release_name"), filename)
 
         return JavaRelease(major=managed_major, url=download_url, sha256=sha256, size=size, filename=filename, release_name=release_name)
+
+    @staticmethod
+    def get_latest_feature_release(timeout: float = 15.0) -> int:
+        client = HttpDownloader.get_client()
+        response = client.get(AdoptiumClient.AVAILABLE_RELEASES_URL, timeout=timeout)
+        response.raise_for_status()
+
+        try:
+            payload = response.json()
+        except ValueError as error:
+            raise RuntimeError("Invalid Adoptium available-releases response.") from error
+        return AdoptiumClient._parse_latest_feature_release(payload)
+
+    @staticmethod
+    def _parse_latest_feature_release(payload: Any) -> int:
+        if not isinstance(payload, dict):
+            raise RuntimeError("Adoptium available-releases response must be an object.")
+
+        direct = payload.get("most_recent_feature_release")
+        if direct is not None:
+            return AdoptiumClient.normalize_feature_major(direct)
+
+        available = payload.get("available_releases")
+        if isinstance(available, list):
+            majors: list[int] = []
+            for value in available:
+                try:
+                    majors.append(AdoptiumClient.normalize_feature_major(value))
+                except RuntimeError:
+                    continue
+            if majors:
+                return max(majors)
+
+        raise RuntimeError("Adoptium did not report a latest GA Java feature release.")
+
+    @staticmethod
+    def normalize_feature_major(value: Any) -> int:
+        try:
+            major = int(value)
+        except (TypeError, ValueError) as error:
+            raise RuntimeError(f"Invalid Java feature version: {value!r}.") from error
+        if major < 8 or major > 99:
+            raise RuntimeError(f"Unsupported Java feature version: {major}.")
+        return major
 
     @staticmethod
     def _select_package(payload: Any, major: int) -> tuple[dict[str, Any], dict[str, Any]]:

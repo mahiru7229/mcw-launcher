@@ -21,11 +21,13 @@ class ForgeLaunchCommandManager:
         "asm",
         "JarJarFileSystems",
         "client-extra",
+        "mixinextras-neoforge",
         "fmlcore",
         "javafmllanguage",
         "lowcodelanguage",
         "mclanguage",
         "forge-",
+        "neoforge-",
     )
 
     @classmethod
@@ -34,25 +36,26 @@ class ForgeLaunchCommandManager:
         if not cls.is_modern_forge(version):
             return arguments
 
+        loader_title = cls._loader_title(version)
         module_path_index, module_path, inline = cls._find_module_path(arguments)
         if module_path_index is None:
             raise RuntimeError(
-                "The Forge launch profile does not define a module path. "
-                "Repair or reinstall Forge for this instance."
+                f"The {loader_title} launch profile does not define a module path. "
+                f"Repair or reinstall {loader_title} for this instance."
             )
 
         if "${" in module_path:
             raise RuntimeError(
-                "The Forge module path still contains unresolved launcher placeholders. "
-                "Repair or reinstall Forge, then try again."
+                f"The {loader_title} module path still contains unresolved launcher placeholders. "
+                f"Repair or reinstall {loader_title}, then try again."
             )
 
         entries = cls._module_path_entries(module_path)
         entries = cls._remove_minecraft_version_jars(entries, version, client_path)
         if not entries:
             raise RuntimeError(
-                "The Forge launch profile contains an empty module path after removing "
-                "Minecraft version JARs. Repair or reinstall Forge for this instance."
+                f"The {loader_title} launch profile contains an empty module path after removing "
+                f"Minecraft version JARs. Repair or reinstall {loader_title} for this instance."
             )
 
         missing = [entry for entry in entries if not Path(entry).is_file()]
@@ -61,8 +64,8 @@ class ForgeLaunchCommandManager:
             remaining = len(missing) - min(len(missing), 8)
             suffix = f"\n- ... and {remaining} more" if remaining > 0 else ""
             raise RuntimeError(
-                "Forge cannot start because required module-path libraries are missing. "
-                "Use Repair Forge and try again.\n"
+                f"{loader_title} cannot start because required module-path libraries are missing. "
+                f"Use Repair {loader_title} and try again.\n"
                 f"{preview}{suffix}"
             )
 
@@ -89,11 +92,23 @@ class ForgeLaunchCommandManager:
     @classmethod
     def is_modern_forge(cls, version: Version) -> bool:
         raw = getattr(version, "raw_json", None)
-        forge_metadata = raw.get("forge") if isinstance(raw, dict) else None
-        return (
-            str(getattr(version, "main_class", "")).strip() == cls.MODERN_MAIN_CLASS
-            and isinstance(forge_metadata, dict)
-        )
+        loader_metadata = cls._loader_metadata(raw)
+        return str(getattr(version, "main_class", "")).strip() == cls.MODERN_MAIN_CLASS and loader_metadata is not None
+
+    @staticmethod
+    def _loader_metadata(raw: object) -> dict | None:
+        if not isinstance(raw, dict):
+            return None
+        for key in ("neoforge", "forge"):
+            metadata = raw.get(key)
+            if isinstance(metadata, dict):
+                return metadata
+        return None
+
+    @staticmethod
+    def _loader_title(version: Version) -> str:
+        raw = getattr(version, "raw_json", None)
+        return "NeoForge" if isinstance(raw, dict) and isinstance(raw.get("neoforge"), dict) else "Forge"
 
     @classmethod
     def _find_module_path(cls, arguments: list[str]) -> tuple[int | None, str, bool]:

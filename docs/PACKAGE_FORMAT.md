@@ -29,6 +29,8 @@ My Instance.mcwpack
 ├── package.json
 ├── instance.json
 ├── settings.json
+├── .mcw/
+│   └── instance-icon.png
 ├── mods/
 ├── resourcepacks/
 ├── shaderpacks/
@@ -57,7 +59,9 @@ Example:
 
     "created_at": "...",
 
-    "include_saves": false
+    "include_saves": false,
+    "instance_name": "My Instance",
+    "instance_icon": ".mcw/instance-icon.png"
 }
 ```
 
@@ -72,6 +76,8 @@ Example:
 | launcher_version | Launcher version |
 | created_at | Export time |
 | include_saves | Whether world saves are included |
+| instance_name | Optional display name for package previews |
+| instance_icon | Optional built-in icon key or archive-relative icon path |
 
 ---
 
@@ -183,6 +189,8 @@ instance.json
 ```
 
 This separation allows package information and instance information to evolve independently.
+
+Custom instance icons are stored inside the instance and are exported with the other instance files. Legacy absolute icon paths are converted to an archive-relative `.mcw/instance-icon.<ext>` path during export.
 
 ---
 

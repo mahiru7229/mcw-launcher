@@ -97,7 +97,14 @@ def test_write_bundle_is_bounded_redacted_and_self_verifying(tmp_path, monkeypat
     with zipfile.ZipFile(result, "r") as archive:
         assert archive.testzip() is None
         names = set(archive.namelist())
-        assert {"report.txt", "download-recovery.json", "manifest.json"} <= names
+        assert {
+            "report.txt",
+            "download-recovery.json",
+            "instance-health.json",
+            "process-sessions.json",
+            "operation-journals.json",
+            "manifest.json",
+        } <= names
         assert any(name.startswith("logs/") for name in names)
         assert not any("account" in name.casefold() for name in names)
         combined = b"\n".join(archive.read(name) for name in names)
@@ -137,3 +144,64 @@ def test_bundle_limits_log_count_and_uses_log_tails(tmp_path, monkeypatch):
         assert len(log_names) == DiagnosticsManager.MAX_LOG_FILES
         assert all(len(archive.read(name)) <= DiagnosticsManager.MAX_LOG_BYTES + 64 for name in log_names)
         assert all(b"[log tail truncated]" in archive.read(name) for name in log_names)
+
+
+
+def test_bundle_marks_invalid_operation_journals_without_leaking_content(tmp_path, monkeypatch):
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    instances = tmp_path / "instances"
+    operations = instances / ".runtime" / "operations"
+    operations.mkdir(parents=True)
+    (operations / "broken.json").write_text('{"access_token":"secret-token"', encoding="utf-8")
+    monkeypatch.setattr(Paths, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(Paths, "INSTANCES_ROOT", instances)
+    monkeypatch.setattr(Paths, "LOGS_ROOT", logs)
+    monkeypatch.setattr(InstanceManager, "list_instances", lambda: [])
+    monkeypatch.setattr(InstanceRunLock, "list_active", lambda: [])
+    monkeypatch.setattr(diagnostics_manager.ProcessSupervisor, "list_active", lambda: ())
+    monkeypatch.setattr(diagnostics_manager.download_recovery_manager, "inspect", lambda: SimpleNamespace(items=(), resumable_count=0))
+
+    result = DiagnosticsManager.write_bundle(tmp_path / "invalid-journal.zip", "0.12.0-beta.8")
+
+    with zipfile.ZipFile(result, "r") as archive:
+        payload = json.loads(archive.read("operation-journals.json"))
+        assert payload["journals"] == [{"journal": "broken.json", "state": "invalid"}]
+        assert b"secret-token" not in archive.read("operation-journals.json")
+
+
+def test_instance_health_bundle_uses_safe_relative_paths(tmp_path, monkeypatch):
+    from src.models.instance.instance_health import InstanceHealthIssue, InstanceHealthReport, InstanceHealthSeverity, InstanceHealthState
+
+    instances = tmp_path / "instances"
+    instance_dir = instances / "Example"
+    instance_dir.mkdir(parents=True)
+    monkeypatch.setattr(Paths, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(Paths, "INSTANCES_ROOT", instances)
+    monkeypatch.setattr(
+        diagnostics_manager.InstanceHealthManager,
+        "list",
+        lambda _instances: [
+            InstanceHealthReport(
+                instance_id="id",
+                name="Example",
+                state=InstanceHealthState.MISSING_FILES,
+                issues=(
+                    InstanceHealthIssue(
+                        code="missing",
+                        state=InstanceHealthState.MISSING_FILES,
+                        severity=InstanceHealthSeverity.ERROR,
+                        message="Missing file",
+                        path=instance_dir / "mods" / "missing.jar",
+                    ),
+                ),
+                checked_at="now",
+            )
+        ],
+    )
+    monkeypatch.setattr(InstanceManager, "list_instances", lambda: [])
+
+    payload = json.loads(DiagnosticsManager._instance_health_json())
+
+    assert payload["instances"][0]["issues"][0]["path"] == "instances/Example/mods/missing.jar"
+    assert str(tmp_path) not in json.dumps(payload)

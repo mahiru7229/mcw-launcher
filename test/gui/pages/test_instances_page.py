@@ -121,3 +121,25 @@ def test_modpack_repair_button_emits_and_recovers_after_busy(app, monkeypatch, t
 
     page._confirm_modpack_repair()
     assert emitted == ["Pack"]
+
+
+def test_manage_neoforge_versions_and_repair_are_available(app):
+    from src.models.modloader.neoforge_loader_version import NeoForgeLoaderVersion
+
+    page = InstancesPage()
+    instance = make_instance(name="NeoForge", version_id="1.21.1", mod_loader=("neoforge", "21.1.200"))
+    page.set_instances([instance], instance.name)
+    page.set_neoforge_versions(
+        instance.version_id,
+        [
+            NeoForgeLoaderVersion("1.21.1", "21.1.201"),
+            NeoForgeLoaderVersion("1.21.1", "21.1.200"),
+        ],
+    )
+
+    assert page.manage_loader_combo.currentData() == "neoforge"
+    assert page.manage_loader_version_combo.currentData() == "21.1.200"
+    assert page.selected_manage_loader() == ("neoforge", "21.1.200")
+    assert page.manage_mods_button.isEnabled() is True
+    assert page.repair_loader_button.isEnabled() is True
+    assert page.export_forge_diagnostics_button.isEnabled() is True

@@ -10,3 +10,5 @@ class PackageMetadata:
     launcher_version: str
     created_at: str
     include_saves: bool
+    instance_name: str = ""
+    instance_icon: str = ""

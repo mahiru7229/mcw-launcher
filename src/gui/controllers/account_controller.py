@@ -5,11 +5,12 @@ from threading import Event
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.account.account_manager import AccountManager
-from src.core.auth.microsoft.microsoft_auth_gate import MicrosoftAuthenticationLockedError
-from src.core.auth.microsoft.oauth_callback_server import MicrosoftAuthorizationCancelledError
-from src.core.language.language_manager import tr
-from src.core.security.account_security_manager import AccountSecurityManager
+from mcw_core.api.account.account_manager import AccountManager
+from mcw_core.api.account.account_skin_manager import AccountSkinManager
+from mcw_core.api.auth.microsoft.microsoft_auth_gate import MicrosoftAuthenticationLockedError
+from mcw_core.api.auth.microsoft.oauth_callback_server import MicrosoftAuthorizationCancelledError
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.security.account_security_manager import AccountSecurityManager
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 
@@ -18,6 +19,7 @@ class AccountController(BaseController):
     MICROSOFT_TASK_ID = "account.microsoft.create"
     SECURITY_AUDIT_TASK_ID = "account.security.audit"
     SECURITY_REPROTECT_TASK_ID = "account.security.reprotect"
+    PROFILE_SYNC_TASK_ID = "account.microsoft.profile_sync"
 
     accounts_changed = Signal(list, str)
     selected_account_changed = Signal(object)
@@ -30,6 +32,8 @@ class AccountController(BaseController):
         super().__init__()
         self._task_runner = task_runner
         self._microsoft_cancel_event = Event()
+        self._profile_sync_attempted: set[str] = set()
+        self._profile_sync_account_id = ""
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
 
@@ -45,6 +49,7 @@ class AccountController(BaseController):
         self.accounts_changed.emit(accounts, selected_id)
         self.selected_account_changed.emit(selected)
         self.log_created.emit(tr("Accounts refreshed: {count} found", count=len(accounts)))
+        self._sync_selected_profile_if_needed(selected)
 
     def create_offline(self, username: str) -> None:
         username = username.strip()
@@ -105,10 +110,15 @@ class AccountController(BaseController):
             updated = AccountManager.set_selected_account(account_id)
             if updated is False:
                 raise RuntimeError(tr("The selected account could not be saved."))
+            selected = AccountManager.get_account(account_id)
         except Exception as error:
             self._emit_error(tr("Select account"), error)
+            self.refresh()
             return
-        self.status_changed.emit(tr("Selected account updated"))
+        if selected is not None:
+            self.selected_account_changed.emit(selected)
+            self.status_changed.emit(tr("account.selection.switched", username=selected.username))
+            self.log_created.emit(tr("account.selection.switched", username=selected.username))
         self.refresh()
 
     def remove(self, account_id: str) -> None:
@@ -125,8 +135,35 @@ class AccountController(BaseController):
         self.log_created.emit(tr("Account removed: {account_id}", account_id=account_id))
         self.refresh()
 
+    def _sync_selected_profile_if_needed(self, account: object | None) -> None:
+        if account is None:
+            return
+        account_id = str(getattr(account, "account_id", "") or "")
+        account_type = str(getattr(getattr(account, "account_type", None), "value", "") or "").casefold()
+        if not account_id or account_type != "microsoft" or account_id in self._profile_sync_attempted:
+            return
+        if getattr(account, "skin_url", None) and AccountSkinManager.cached_texture(account) is not None:
+            return
+        if self._task_runner.is_task_active(self.PROFILE_SYNC_TASK_ID):
+            return
+        self._profile_sync_attempted.add(account_id)
+        self._profile_sync_account_id = account_id
+        self._task_runner.run(
+            self.PROFILE_SYNC_TASK_ID,
+            lambda: AccountManager.synchronize_microsoft_profile(account_id),
+            tr("account.skin.loading"),
+            blocking=False,
+        )
+
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
+        if task_id == self.PROFILE_SYNC_TASK_ID:
+            self._profile_sync_account_id = ""
+            account = result
+            username = str(getattr(account, "username", ""))
+            self.log_created.emit(tr("account.skin.ready", username=username))
+            self.refresh()
+            return
         if task_id == self.SECURITY_AUDIT_TASK_ID:
             self.security_report_changed.emit(result)
             return
@@ -149,6 +186,12 @@ class AccountController(BaseController):
 
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
+        if task_id == self.PROFILE_SYNC_TASK_ID:
+            if self._profile_sync_account_id:
+                self._profile_sync_attempted.discard(self._profile_sync_account_id)
+            self._profile_sync_account_id = ""
+            self.log_created.emit(f"Microsoft profile sync: {type(error).__name__}: {error}")
+            return
         if task_id in {self.SECURITY_AUDIT_TASK_ID, self.SECURITY_REPROTECT_TASK_ID}:
             self._emit_error(tr("account.security.title"), error)
             return

@@ -87,29 +87,28 @@ class LanAgentTargetResolver:
         except Exception as error:
             warnings.append(f"Mojang mapping resolution failed safely: {type(error).__name__}: {error}")
 
-        if loader in {ModLoaderManager.FABRIC, "quilt"} and official_target is not None:
+        if loader in {ModLoaderManager.FABRIC, ModLoaderManager.QUILT} and official_target is not None:
             try:
-                intermediary_path = cls._find_intermediary_jar(version)
-                if intermediary_path is None:
-                    warnings.append("Fabric intermediary mappings were not found in the downloaded libraries.")
+                mapping_target = cls._resolve_fabric_family_target(version, loader, official_target)
+                if mapping_target is None:
+                    mapping_label = "intermediary or Hashed" if loader == ModLoaderManager.QUILT else "intermediary"
+                    warnings.append(f"{loader.title()} {mapping_label} mappings did not contain the LAN authentication setter or were not downloaded.")
                 else:
-                    intermediary_target = cls._parse_intermediary_mappings(intermediary_path, official_target)
-                    if intermediary_target is None:
-                        warnings.append("Fabric intermediary mappings did not contain the LAN authentication setter.")
-                    else:
-                        targets.insert(0, intermediary_target)
+                    targets.insert(0, mapping_target)
             except Exception as error:
-                warnings.append(f"Fabric mapping resolution failed safely: {type(error).__name__}: {error}")
+                warnings.append(f"{loader.title()} mapping resolution failed safely: {type(error).__name__}: {error}")
 
-        if loader == ModLoaderManager.FORGE and official_target is not None:
+        if loader in ModLoaderManager.FORGE_FAMILY and official_target is not None:
+            loader_title = "NeoForge" if loader == ModLoaderManager.NEOFORGE else "Forge"
             try:
                 forge_target = cls._resolve_forge_srg_target(version, game_version, official_target)
                 if forge_target is None:
-                    warnings.append("Forge SRG runtime artifacts did not contain the LAN authentication setter.")
+                    warnings.append(f"{loader_title} SRG runtime artifacts did not contain the LAN authentication setter; named and official targets remain available.")
                 else:
-                    targets.insert(0, forge_target)
+                    namespace = "neoforge-srg" if loader == ModLoaderManager.NEOFORGE else "forge-srg"
+                    targets.insert(0, LanAgentTarget(namespace, forge_target.class_name, forge_target.method_name))
             except Exception as error:
-                warnings.append(f"Forge SRG mapping resolution failed safely: {type(error).__name__}: {error}")
+                warnings.append(f"{loader_title} SRG mapping resolution failed safely: {type(error).__name__}: {error}")
 
         return LanAgentTargetResolution(
             game_version=game_version,
@@ -188,12 +187,33 @@ class LanAgentTargetResolver:
         return None
 
     @classmethod
+    def _resolve_fabric_family_target(cls, version: Version, loader: str, official_target: LanAgentTarget) -> LanAgentTarget | None:
+        intermediary_path = cls._find_intermediary_jar(version)
+        if intermediary_path is not None:
+            target = cls._parse_intermediary_mappings(intermediary_path, official_target)
+            if target is not None:
+                return target
+        if loader == ModLoaderManager.QUILT:
+            hashed_path = cls._find_quilt_hashed_jar(version)
+            if hashed_path is not None:
+                return cls._parse_quilt_hashed_mappings(hashed_path, official_target)
+        return None
+
+    @classmethod
     def _find_intermediary_jar(cls, version: Version) -> Path | None:
+        return cls._find_mapping_jar(version, "net.fabricmc:intermediary:")
+
+    @classmethod
+    def _find_quilt_hashed_jar(cls, version: Version) -> Path | None:
+        return cls._find_mapping_jar(version, "org.quiltmc:hashed:")
+
+    @classmethod
+    def _find_mapping_jar(cls, version: Version, coordinate_prefix: str) -> Path | None:
         for library in getattr(version, "libraries", []) or []:
             if not isinstance(library, dict):
                 continue
             coordinate = str(library.get("name", "")).strip()
-            if not coordinate.startswith("net.fabricmc:intermediary:"):
+            if not coordinate.startswith(coordinate_prefix):
                 continue
             artifact = library.get("downloads", {}).get("artifact", {})
             if isinstance(artifact, dict) and artifact.get("path"):
@@ -204,7 +224,9 @@ class LanAgentTargetResolver:
             parts = coordinate.split(":")
             if len(parts) >= 3:
                 group, artifact_name, artifact_version = parts[:3]
-                filename = f"{artifact_name}-{artifact_version}.jar"
+                classifier = parts[3] if len(parts) > 3 else ""
+                suffix = f"-{classifier}" if classifier else ""
+                filename = f"{artifact_name}-{artifact_version}{suffix}.jar"
                 candidate = Paths.libraries() / Path(*group.split("."), artifact_name, artifact_version, filename)
                 if candidate.is_file():
                     return candidate
@@ -264,11 +286,12 @@ class LanAgentTargetResolver:
         raw_json = getattr(version, "raw_json", {}) or {}
         arguments = getattr(version, "arguments", None) or raw_json.get("arguments", {})
         game_arguments = arguments.get("game", []) if isinstance(arguments, dict) else []
-        for index, value in enumerate(game_arguments):
-            if value == "--fml.mcpVersion" and index + 1 < len(game_arguments):
-                next_value = game_arguments[index + 1]
-                if isinstance(next_value, str):
-                    return next_value.strip()
+        for flag in ("--fml.neoFormVersion", "--fml.mcpVersion"):
+            for index, value in enumerate(game_arguments):
+                if value == flag and index + 1 < len(game_arguments):
+                    next_value = game_arguments[index + 1]
+                    if isinstance(next_value, str):
+                        return next_value.strip()
         return ""
 
     @classmethod
@@ -369,6 +392,14 @@ class LanAgentTargetResolver:
 
     @classmethod
     def _parse_intermediary_mappings(cls, path: Path, official_target: LanAgentTarget) -> LanAgentTarget | None:
+        return cls._parse_tiny_mapping_jar(path, official_target, "intermediary", "intermediary")
+
+    @classmethod
+    def _parse_quilt_hashed_mappings(cls, path: Path, official_target: LanAgentTarget) -> LanAgentTarget | None:
+        return cls._parse_tiny_mapping_jar(path, official_target, "hashed", "quilt-hashed")
+
+    @classmethod
+    def _parse_tiny_mapping_jar(cls, path: Path, official_target: LanAgentTarget, target_namespace: str, result_namespace: str) -> LanAgentTarget | None:
         with zipfile.ZipFile(path) as archive:
             payload = archive.read("mappings/mappings.tiny").decode("utf-8", errors="replace")
 
@@ -377,27 +408,22 @@ class LanAgentTargetResolver:
             return None
         header = lines[0].split("\t")
         if header[0] == "v1":
-            return cls._parse_tiny_v1(lines, header, official_target)
+            return cls._parse_tiny_v1(lines, header, official_target, target_namespace, result_namespace)
         if header[0] == "tiny" and len(header) >= 5 and header[1] == "2":
-            return cls._parse_tiny_v2(lines, header, official_target)
-        raise RuntimeError("Unsupported Fabric intermediary mapping format.")
+            return cls._parse_tiny_v2(lines, header, official_target, target_namespace, result_namespace)
+        raise RuntimeError("Unsupported Tiny mapping format.")
 
     @classmethod
-    def _parse_tiny_v1(cls, lines: list[str], header: list[str], official_target: LanAgentTarget) -> LanAgentTarget | None:
+    def _parse_tiny_v1(cls, lines: list[str], header: list[str], official_target: LanAgentTarget, target_namespace: str = "intermediary", result_namespace: str = "intermediary") -> LanAgentTarget | None:
         namespaces = header[1:]
         try:
             official_index = namespaces.index("official")
-            intermediary_index = namespaces.index("intermediary")
+            target_index = namespaces.index(target_namespace)
         except ValueError as error:
-            raise RuntimeError("Fabric intermediary mappings are missing required namespaces.") from error
+            raise RuntimeError(f"Mappings are missing the official or {target_namespace} namespace.") from error
 
-        # Tiny v1 may omit an explicit CLASS row when the class name is an
-        # identity mapping. MinecraftServer is one such case in Fabric 1.20.1:
-        # the owner remains net/minecraft/server/MinecraftServer while only the
-        # method name is remapped. Start with the official owner as a safe
-        # identity fallback and replace it if an explicit class mapping exists.
-        intermediary_class = cls._normalize_internal_name(official_target.class_name)
-        intermediary_method = ""
+        target_class = cls._normalize_internal_name(official_target.class_name)
+        target_method = ""
         official_class = cls._normalize_internal_name(official_target.class_name)
 
         for line in lines[1:]:
@@ -407,32 +433,28 @@ class LanAgentTargetResolver:
             if columns[0] == "CLASS" and len(columns) >= 1 + len(namespaces):
                 names = columns[1:1 + len(namespaces)]
                 if cls._normalize_internal_name(names[official_index]) == official_class:
-                    intermediary_class = cls._normalize_internal_name(names[intermediary_index])
+                    target_class = cls._normalize_internal_name(names[target_index])
             elif columns[0] == "METHOD" and len(columns) >= 3 + len(namespaces):
                 owner = cls._normalize_internal_name(columns[1])
                 descriptor = columns[2].strip()
                 names = columns[3:3 + len(namespaces)]
-                if (
-                    owner == official_class
-                    and descriptor == cls.TARGET_DESCRIPTOR
-                    and names[official_index].strip() == official_target.method_name
-                ):
-                    intermediary_method = names[intermediary_index].strip()
-            if intermediary_method:
-                return LanAgentTarget("intermediary", intermediary_class, intermediary_method)
+                if owner == official_class and descriptor == cls.TARGET_DESCRIPTOR and names[official_index].strip() == official_target.method_name:
+                    target_method = names[target_index].strip()
+            if target_method:
+                return LanAgentTarget(result_namespace, target_class, target_method)
         return None
 
     @classmethod
-    def _parse_tiny_v2(cls, lines: list[str], header: list[str], official_target: LanAgentTarget) -> LanAgentTarget | None:
+    def _parse_tiny_v2(cls, lines: list[str], header: list[str], official_target: LanAgentTarget, target_namespace: str = "intermediary", result_namespace: str = "intermediary") -> LanAgentTarget | None:
         namespaces = header[3:]
         try:
             official_index = namespaces.index("official")
-            intermediary_index = namespaces.index("intermediary")
+            target_index = namespaces.index(target_namespace)
         except ValueError as error:
-            raise RuntimeError("Fabric intermediary mappings are missing required namespaces.") from error
+            raise RuntimeError(f"Mappings are missing the official or {target_namespace} namespace.") from error
 
         current_official_class = ""
-        current_intermediary_class = ""
+        current_target_class = ""
         for line in lines[1:]:
             stripped = line.lstrip("\t")
             columns = stripped.split("\t")
@@ -440,15 +462,15 @@ class LanAgentTargetResolver:
                 continue
             if not line.startswith("\t") and columns[0] == "c" and len(columns) >= 1 + len(namespaces):
                 names = columns[1:1 + len(namespaces)]
-                current_official_class = names[official_index]
-                current_intermediary_class = names[intermediary_index]
+                current_official_class = cls._normalize_internal_name(names[official_index])
+                current_target_class = cls._normalize_internal_name(names[target_index])
                 continue
-            if current_official_class != official_target.class_name or columns[0] != "m" or len(columns) < 2 + len(namespaces):
+            if current_official_class != cls._normalize_internal_name(official_target.class_name) or columns[0] != "m" or len(columns) < 2 + len(namespaces):
                 continue
             descriptor = columns[1]
             names = columns[2:2 + len(namespaces)]
             if descriptor == cls.TARGET_DESCRIPTOR and names[official_index] == official_target.method_name:
-                return LanAgentTarget("intermediary", current_intermediary_class, names[intermediary_index])
+                return LanAgentTarget(result_namespace, current_target_class, names[target_index])
         return None
 
     @staticmethod

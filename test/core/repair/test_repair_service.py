@@ -227,3 +227,28 @@ def test_cache_only_repair_plan_does_not_require_safety_backup() -> None:
     )
 
     assert RepairService.build_plan(report).requires_safety_backup is False
+
+
+def test_version_for_scan_loads_quilt_profile(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    base_path = tmp_path / "base.json"
+    base_raw = {"id": "1.20.1", "mainClass": "net.minecraft.client.main.Main", "libraries": [], "downloads": {}, "assetIndex": {}, "assets": "legacy", "arguments": {"game": [], "jvm": []}, "javaVersion": {"majorVersion": 17}, "type": "release"}
+    base_path.write_text(json.dumps(base_raw), encoding="utf-8")
+    base_version = VersionManager._parse_version(base_raw, base_path)
+    assert base_version is not None
+
+    quilt_path = tmp_path / "quilt.json"
+    quilt_raw = {
+        **base_raw,
+        "id": "quilt-loader-0.28.0-1.20.1",
+        "inheritsFrom": "1.20.1",
+        "mainClass": "org.quiltmc.loader.impl.launch.knot.KnotClient",
+        "quilt": {"schemaVersion": 1, "gameVersion": "1.20.1", "loaderVersion": "0.28.0"},
+    }
+    quilt_path.write_text(json.dumps(quilt_raw), encoding="utf-8")
+    monkeypatch.setattr(Paths, "quilt_version_json", staticmethod(lambda game, loader: quilt_path))
+    instance = SimpleNamespace(version_id="1.20.1", mod_loader=("quilt", "0.28.0"))
+
+    resolved, issue = RepairService._version_for_scan(instance, base_version)
+
+    assert issue is None
+    assert resolved.id == "quilt-loader-0.28.0-1.20.1"

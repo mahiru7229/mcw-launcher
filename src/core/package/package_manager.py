@@ -31,8 +31,18 @@ class PackageManager:
     LAUNCHER_VERSION = VERSION_TAG
 
     @staticmethod
-    def create_instance_package_metadata(include_saves: bool) -> PackageMetadata:
-        return PackageMetadata(format=PackageManager.FORMAT, format_version=PackageManager.FORMAT_VERSION, package_type=PackageManager.PACKAGE_TYPE_INSTANCE, launcher_name=PackageManager.LAUNCHER_NAME, launcher_version=PackageManager.LAUNCHER_VERSION, created_at=datetime.now(UTC).isoformat(), include_saves=include_saves)
+    def create_instance_package_metadata(include_saves: bool, instance: Instance | None = None, icon: str = "") -> PackageMetadata:
+        return PackageMetadata(
+            format=PackageManager.FORMAT,
+            format_version=PackageManager.FORMAT_VERSION,
+            package_type=PackageManager.PACKAGE_TYPE_INSTANCE,
+            launcher_name=PackageManager.LAUNCHER_NAME,
+            launcher_version=PackageManager.LAUNCHER_VERSION,
+            created_at=datetime.now(UTC).isoformat(),
+            include_saves=include_saves,
+            instance_name=str(getattr(instance, "name", "") or ""),
+            instance_icon=str(icon or getattr(instance, "icon", "") or ""),
+        )
 
     @staticmethod
     def package_metadata_to_dict(metadata: PackageMetadata) -> dict:
@@ -44,6 +54,8 @@ class PackageManager:
             "launcher_version": metadata.launcher_version,
             "created_at": metadata.created_at,
             "include_saves": metadata.include_saves,
+            "instance_name": metadata.instance_name,
+            "instance_icon": metadata.instance_icon,
         }
 
     @staticmethod
@@ -54,7 +66,17 @@ class PackageManager:
             data = json.loads(archive.read("package.json").decode("utf-8-sig"))
             if not isinstance(data, dict):
                 raise ValueError("package.json must contain an object.")
-            return PackageMetadata(format=data["format"], format_version=int(data["format_version"]), package_type=data["package_type"], launcher_name=data["launcher_name"], launcher_version=data["launcher_version"], created_at=data["created_at"], include_saves=bool(data["include_saves"]))
+            return PackageMetadata(
+                format=data["format"],
+                format_version=int(data["format_version"]),
+                package_type=data["package_type"],
+                launcher_name=data["launcher_name"],
+                launcher_version=data["launcher_version"],
+                created_at=data["created_at"],
+                include_saves=bool(data["include_saves"]),
+                instance_name=str(data.get("instance_name") or ""),
+                instance_icon=str(data.get("instance_icon") or ""),
+            )
         except (KeyError, TypeError, ValueError, UnicodeError, json.JSONDecodeError) as error:
             raise RuntimeError("Invalid package: package.json is malformed.") from error
 
@@ -81,9 +103,10 @@ class PackageManager:
         reporter.status(stage=ProgressStage.EXPORTING_INSTANCE, message=f"Scanning files for '{instance.name}'...")
         temporary_path = output_path.with_name(f".{output_path.name}.part")
         files = PackageManager._collect_export_files(instance_dir, include_saves, {output_path.resolve(), temporary_path.resolve()})
-        metadata = PackageManager.create_instance_package_metadata(include_saves)
+        files, file_overrides, exported_icon = PackageManager._prepare_instance_icon_export(instance, instance_dir, files)
+        metadata = PackageManager.create_instance_package_metadata(include_saves, instance=instance, icon=exported_icon)
         metadata_bytes = (json.dumps(PackageManager.package_metadata_to_dict(metadata), indent=4, ensure_ascii=False) + "\n").encode("utf-8")
-        total_bytes = len(metadata_bytes) + sum(size for _, _, size in files)
+        total_bytes = len(metadata_bytes) + sum(len(file_overrides.get(relative, b"")) if relative in file_overrides else size for _, relative, size in files)
         processed_bytes = 0
 
         reporter.bytes(stage=ProgressStage.EXPORTING_INSTANCE, message=f"Exporting '{instance.name}'...", current=0, total=total_bytes)
@@ -95,6 +118,12 @@ class PackageManager:
                 reporter.bytes(stage=ProgressStage.EXPORTING_INSTANCE, message="Exporting package metadata...", current=processed_bytes, total=total_bytes)
 
                 for source_path, relative_path, _size in files:
+                    override = file_overrides.get(relative_path)
+                    if override is not None:
+                        archive.writestr(relative_path.as_posix(), override)
+                        processed_bytes += len(override)
+                        reporter.bytes(stage=ProgressStage.EXPORTING_INSTANCE, message=f"Exporting {relative_path.as_posix()}...", current=min(processed_bytes, total_bytes), total=total_bytes)
+                        continue
                     with source_path.open("rb") as source, archive.open(relative_path.as_posix(), "w", force_zip64=True) as destination:
                         while chunk := source.read(PackageManager.COPY_CHUNK_SIZE):
                             destination.write(chunk)
@@ -184,6 +213,41 @@ class PackageManager:
         return data
 
     @staticmethod
+    def _prepare_instance_icon_export(instance: Instance, instance_dir: Path, files: list[tuple[Path, PurePosixPath, int]]) -> tuple[list[tuple[Path, PurePosixPath, int]], dict[PurePosixPath, bytes], str]:
+        icon_value = str(getattr(instance, "icon", "") or "grass_block").strip() or "grass_block"
+        icon_path = Path(icon_value)
+        if not icon_path.is_absolute():
+            candidate = instance_dir / icon_path
+            if candidate.is_file():
+                return files, {}, icon_path.as_posix()
+            return files, {}, icon_value
+        if not icon_path.is_file():
+            return files, {}, "grass_block"
+        try:
+            icon_path.resolve().relative_to(instance_dir.resolve())
+            relative_icon = PurePosixPath(icon_path.resolve().relative_to(instance_dir.resolve()).as_posix())
+            return files, {}, relative_icon.as_posix()
+        except ValueError:
+            pass
+
+        extension = icon_path.suffix.casefold() if icon_path.suffix else ".png"
+        archive_icon = PurePosixPath(f".mcw/instance-icon{extension}")
+        filtered = [item for item in files if item[1] != archive_icon]
+        filtered.append((icon_path, archive_icon, max(0, icon_path.stat().st_size)))
+        filtered.sort(key=lambda item: item[1].as_posix().casefold())
+
+        metadata_path = instance_dir / "instance.json"
+        try:
+            instance_data = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+            instance_data = {}
+        overrides: dict[PurePosixPath, bytes] = {}
+        if isinstance(instance_data, dict):
+            instance_data["icon"] = archive_icon.as_posix()
+            overrides[PurePosixPath("instance.json")] = (json.dumps(instance_data, indent=4, ensure_ascii=False) + "\n").encode("utf-8")
+        return filtered, overrides, archive_icon.as_posix()
+
+    @staticmethod
     def _collect_export_files(instance_dir: Path, include_saves: bool, excluded_paths: set[Path]) -> list[tuple[Path, PurePosixPath, int]]:
         files: list[tuple[Path, PurePosixPath, int]] = []
         for path in instance_dir.rglob("*"):
@@ -224,7 +288,7 @@ class PackageManager:
         members: list[tuple[ZipInfo, PurePosixPath, Path]] = []
         extracted_bytes = 0
         extracted_files = 0
-        seen_paths: set[str] = set()
+        seen_paths: dict[str, ZipInfo] = {}
         output_root = output_dir.resolve()
 
         for member in archive.infolist():
@@ -236,9 +300,12 @@ class PackageManager:
                 continue
 
             path_key = relative.as_posix().casefold()
-            if path_key in seen_paths:
-                raise RuntimeError(f"Invalid package: duplicate path '{relative.as_posix()}'.")
-            seen_paths.add(path_key)
+            previous = seen_paths.get(path_key)
+            if previous is not None:
+                if PackageManager._duplicate_members_match(previous, member):
+                    continue
+                raise RuntimeError(f"Invalid package: conflicting duplicate path '{relative.as_posix()}'.")
+            seen_paths[path_key] = member
 
             target = output_dir.joinpath(*relative.parts)
             resolved_target = target.resolve(strict=False)
@@ -256,6 +323,14 @@ class PackageManager:
             members.append((member, relative, target))
 
         return members, extracted_bytes
+
+    @staticmethod
+    def _duplicate_members_match(first: ZipInfo, second: ZipInfo) -> bool:
+        if first.is_dir() and second.is_dir():
+            return True
+        if first.is_dir() != second.is_dir():
+            return False
+        return int(first.file_size or 0) == int(second.file_size or 0) and int(first.CRC or 0) == int(second.CRC or 0)
 
     @staticmethod
     def _safe_relative_path(value: str) -> PurePosixPath | None:

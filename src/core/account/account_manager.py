@@ -3,6 +3,7 @@ import uuid
 
 from src.core.auth.offline_auth import OfflineAuthentication
 from src.core.account.repository.account_repository import AccountRepository
+from src.core.account.account_skin_manager import AccountSkinManager
 from src.models.account.account import Account
 from src.models.account.account_source import AccountSource
 from src.core.auth.microsoft.microsoft_account_authenticator import MicrosoftAccountAuthenticator
@@ -46,6 +47,8 @@ class AccountManager:
             existing_account.access_token = authenticated_account.access_token
             existing_account.refresh_token = authenticated_account.refresh_token
             existing_account.token_expires_at = authenticated_account.token_expires_at
+            existing_account.skin_url = authenticated_account.skin_url
+            existing_account.skin_variant = authenticated_account.skin_variant
             account = existing_account
         else:
             account = authenticated_account
@@ -102,13 +105,31 @@ class AccountManager:
         return AccountRepository.set_selected_account(account_id)
 
     @staticmethod
+    def synchronize_microsoft_profile(account_id: str) -> Account:
+        account = AccountRepository.get(account_id)
+        if account is None:
+            raise RuntimeError("Account was not found.")
+        if account.account_type is not AccountSource.MICROSOFT:
+            return account
+        account = MicrosoftAccountAuthenticator.synchronize_profile(account)
+        AccountRepository.save(account)
+        return account
+
+    @staticmethod
     def remove_account(account_id: str) -> bool:
         selected_account = AccountRepository.get_selected_account()
 
+        account_to_remove = AccountRepository.get(account_id)
         removed = AccountRepository.remove(account_id)
 
         if not removed:
             return False
+
+        if account_to_remove is not None:
+            try:
+                AccountSkinManager.remove_cached_texture(account_to_remove)
+            except OSError:
+                pass
 
         if selected_account is None:
             return True

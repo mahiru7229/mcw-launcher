@@ -11,6 +11,7 @@ from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.instance.settings_manager import SettingsManager
 from src.core.lan.lan_agent_manager import LanAgentManager
 from src.core.lan.lan_hosting_manager import LanHostingManager
+from src.core.java.java_major_policy import JavaMajorPolicy
 from src.core.java.java_resolver import JavaResolver
 from src.core.java.java_runtime import JavaRuntime
 from src.core.minecraft.asset_manager import AssetManager
@@ -27,6 +28,7 @@ from src.core.network.download_pause import download_pause_controller
 from src.core.progress.progress_reporter import ProgressReporter
 from src.core.repair.verification_cache import VerificationCache
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
+from src.core.runtime.process_supervisor import ProcessSupervisor
 from src.models.account.account import Account
 from src.models.auth.authentication import Authentication
 from src.models.instance.instance import Instance
@@ -51,10 +53,13 @@ class MinecraftExecutor:
     def run(instance: Instance, authentication: Authentication, account: Account, debug_mode: bool = False, on_progress: ProgressCallback | None = None, on_exit: Callable[[GameExitResult], None] | None = None) -> dict:
         run_lock = InstanceRunLock.acquire(instance)
         process_started = False
+        process = None
+        process_session = None
         lan_log_path = None
         verification_cache: VerificationCache | None = None
 
         try:
+            process_session = ProcessSupervisor.begin(instance)
             reporter = ProgressReporter(on_progress)
             download_pause_controller.raise_if_requested()
             reporter.status(stage=ProgressStage.PREPARING, message="Preparing Minecraft...")
@@ -123,18 +128,25 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.SELECTING_JAVA, message="Selecting Java runtime...")
-            java_major = version.java_version.get("majorVersion") or 8
-            java = JavaResolver.resolve(java_major, reporter)
-            LanAgentManager.append_log_path(lan_log_path, f"Java selected: {java} (major {java_major}).")
+            required_java_major = int(version.java_version.get("majorVersion") or 8)
+            java_major = JavaMajorPolicy.resolve(required_java_major)
+            preferred_java = str(getattr(settings, "java_path", "") or "").strip()
+            java = JavaResolver.resolve(required_java_major, reporter, preferred_java) if preferred_java else JavaResolver.resolve(required_java_major, reporter)
+            LanAgentManager.append_log_path(lan_log_path, f"Java selected: {java} (required {required_java_major}; compatibility target {java_major}).")
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.LAUNCHING, message=f"Launching Minecraft {version.id}...")
+            crash_report_snapshot = GameRuntimeManager.crash_report_snapshot(instance)
             started_at = datetime.now(timezone.utc)
             process = JavaRuntime.run(java, command, instance)
             process_started = True
             LanAgentManager.append_log_path(lan_log_path, f"Minecraft process started; pid={getattr(process, 'pid', 'unknown')}.")
             run_lock.track_process(process)
-            GameRuntimeManager.watch(process, instance, version.id, started_at, on_exit)
+            ProcessSupervisor.attach(process_session.session_id, process)
+            GameRuntimeManager.record_start(instance, started_at, process_session.session_id)
+            watched = GameRuntimeManager.watch(process, instance, version.id, started_at, on_exit, process_session.session_id, crash_report_snapshot)
+            if watched is False and callable(getattr(process, "poll", None)):
+                raise RuntimeError("Minecraft process could not be registered with the runtime manager.")
             reporter.status(stage=ProgressStage.FINISHED, message=f"Minecraft {version.id} launched successfully.")
 
             if debug_mode:
@@ -160,7 +172,17 @@ class MinecraftExecutor:
                     lan_log_path,
                     f"Launcher aborted: {type(error).__name__}: {error}",
                 )
-            if not process_started:
+            if process_started and process is not None:
+                try:
+                    ProcessSupervisor.stop_process(process, 1.5)
+                except Exception:
+                    pass
+                if process_session is not None:
+                    ProcessSupervisor.abort(process_session.session_id, f"{type(error).__name__}: {error}")
+                run_lock.release()
+            elif not process_started:
+                if process_session is not None:
+                    ProcessSupervisor.abort(process_session.session_id, f"{type(error).__name__}: {error}")
                 run_lock.release()
             raise
         finally:

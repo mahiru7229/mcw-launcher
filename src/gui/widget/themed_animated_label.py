@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel, QWidget
 
-from src.core.theme.theme_manager import ThemeManager, theme_manager
+from mcw_core.api.theme.theme_manager import ThemeManager, theme_manager
 from src.gui.animation.theme_animation_player import ThemeAnimationPlayer
 from src.gui.theme.accent_runtime import theme_accent_runtime
 

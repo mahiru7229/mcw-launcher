@@ -4,9 +4,9 @@ from PySide6.QtCore import QElapsedTimer, Qt, QTimer
 from PySide6.QtGui import QColor, QGuiApplication, QPalette
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
-from src.core.config.launcher_settings_manager import LauncherSettingsManager
-from src.core.language.language_manager import tr
-from src.core.theme.theme_manager import theme_manager
+from mcw_core.api.config.launcher_settings_manager import LauncherSettingsManager
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.theme.theme_manager import theme_manager
 from src.gui.config import VERSION_ID
 from src.gui.theme.accent_runtime import theme_accent_runtime
 from src.gui.widget.themed_progress_bar import ThemedProgressBar

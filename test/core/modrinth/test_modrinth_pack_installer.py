@@ -8,6 +8,7 @@ import pytest
 
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
+from src.core.instance.instance_artwork_manager import InstanceArtworkManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_client import ModrinthClient
@@ -31,7 +32,7 @@ def make_pack(path: Path, file_content: bytes = b"fabric-mod", loader: str = "fa
             "downloads": ["https://cdn.modrinth.com/data/project/example.jar"],
             "fileSize": len(file_content),
         }],
-        "dependencies": {"minecraft": "1.20.1", "fabric-loader" if loader == "fabric" else "forge": loader_version},
+        "dependencies": {"minecraft": "1.20.1", {"fabric": "fabric-loader", "quilt": "quilt-loader", "forge": "forge", "neoforge": "neoforge"}[loader]: loader_version},
     }
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("modrinth.index.json", json.dumps(index))
@@ -55,15 +56,17 @@ def test_rejects_unsafe_pack_paths():
 def test_installs_fabric_modpack_as_new_instance(tmp_path, monkeypatch):
     configure_paths(tmp_path, monkeypatch)
     pack_source = make_pack(tmp_path / "pack.mrpack")
-    project = ModrinthProject(project_id="pack-project", slug="pack", title="Test Pack", description="", project_type="modpack")
+    project = ModrinthProject(project_id="pack-project", slug="pack", title="Test Pack", description="", project_type="modpack", icon_url="https://cdn.example/modrinth.png")
     version = ModrinthVersion(version_id="pack-version", project_id="pack-project", name="1.0", version_number="1.0", version_type="release", game_versions=("1.20.4",), loaders=("fabric",), files=(ModrinthFile(url="https://cdn.modrinth.com/pack.mrpack", filename="pack.mrpack", sha1="a", sha512="b", size=1, primary=True),))
     monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: project)
     monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: version)
-    monkeypatch.setattr(ModrinthDownloader, "download_file", lambda file, destination, force=False: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(pack_source.read_bytes()) or destination)
+    monkeypatch.setattr(ModrinthDownloader, "download_file", lambda file, destination, force=False, **kwargs: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(pack_source.read_bytes()) or destination)
 
     monkeypatch.setattr(VersionManager, "load", lambda version_id: SimpleNamespace(id=version_id))
     monkeypatch.setattr(ModLoaderManager, "resolve", lambda game_version, loader_name, loader_version="auto": ("fabric", loader_version))
     monkeypatch.setattr(ModLoaderManager, "prepare", lambda version, loader_name, loader_version, reporter=None: version)
+    artwork_calls = []
+    monkeypatch.setattr(InstanceArtworkManager, "apply_provider_artwork", classmethod(lambda cls, instance, provider, project_id, artwork_url, reporter=None: artwork_calls.append((provider, project_id, artwork_url)) or False))
 
     result = ModrinthPackInstaller.install("pack-project", "pack-version", "Test Instance", True)
 
@@ -80,6 +83,7 @@ def test_installs_fabric_modpack_as_new_instance(tmp_path, monkeypatch):
     assert {item["path"] for item in metadata["managedFiles"]} == {"mods/example.jar", "config/example.json", "options.txt"}
     queued = next(item for item in metadata["managedFiles"] if item["path"] == "mods/example.jar")
     assert queued["downloads"] == ["https://cdn.modrinth.com/data/project/example.jar"]
+    assert artwork_calls == [("modrinth", "pack-project", "https://cdn.example/modrinth.png")]
 
 
 def test_cleanup_removes_instance_when_finalization_fails(tmp_path, monkeypatch):
@@ -89,7 +93,7 @@ def test_cleanup_removes_instance_when_finalization_fails(tmp_path, monkeypatch)
     version = ModrinthVersion(version_id="pack-version", project_id="pack-project", name="1.0", version_number="1.0", version_type="release", game_versions=("1.20.1",), loaders=("fabric",), files=(ModrinthFile(url="https://cdn.modrinth.com/pack.mrpack", filename="pack.mrpack", sha1="a", sha512="b", size=1, primary=True),))
     monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: project)
     monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: version)
-    monkeypatch.setattr(ModrinthDownloader, "download_file", lambda file, destination, force=False: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(pack_source.read_bytes()) or destination)
+    monkeypatch.setattr(ModrinthDownloader, "download_file", lambda file, destination, force=False, **kwargs: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(pack_source.read_bytes()) or destination)
     monkeypatch.setattr(ModrinthDownloader, "download_urls", lambda urls, destination, **kwargs: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(b"fabric-mod") or destination)
     monkeypatch.setattr(VersionManager, "load", lambda version_id: SimpleNamespace(id=version_id))
     monkeypatch.setattr(ModLoaderManager, "resolve", lambda game_version, loader_name, loader_version="auto": ("fabric", loader_version))
@@ -131,7 +135,7 @@ def test_installs_forge_modpack_with_declared_forge_version(tmp_path, monkeypatc
     calls = []
     monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: project)
     monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: version)
-    monkeypatch.setattr(ModrinthDownloader, "download_file", lambda file, destination, force=False: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(pack_source.read_bytes()) or destination)
+    monkeypatch.setattr(ModrinthDownloader, "download_file", lambda file, destination, force=False, **kwargs: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(pack_source.read_bytes()) or destination)
     base_version = SimpleNamespace(id="1.20.1")
     monkeypatch.setattr(VersionManager, "load", lambda version_id: base_version)
     monkeypatch.setattr(ModLoaderManager, "resolve", lambda game_version, loader_name, loader_version="auto": calls.append(("resolve", game_version, loader_name, loader_version)) or (loader_name, loader_version))
@@ -147,6 +151,30 @@ def test_installs_forge_modpack_with_declared_forge_version(tmp_path, monkeypatc
     assert metadata["loaderVersion"] == "47.4.21"
 
 
+def test_installs_neoforge_modpack_with_declared_neoforge_version(tmp_path, monkeypatch):
+    configure_paths(tmp_path, monkeypatch)
+    pack_source = make_pack(tmp_path / "neoforge-pack.mrpack", file_content=b"neoforge-mod", loader="neoforge", loader_version="21.1.200")
+    project = ModrinthProject(project_id="neoforge-pack", slug="neoforge-pack", title="NeoForge Pack", description="", project_type="modpack")
+    version = ModrinthVersion(version_id="neoforge-version", project_id="neoforge-pack", name="1.0", version_number="1.0", version_type="release", game_versions=("1.21.1",), loaders=("neoforge",), files=(ModrinthFile(url="https://cdn.modrinth.com/neoforge-pack.mrpack", filename="neoforge-pack.mrpack", sha1="a", sha512="b", size=1, primary=True),))
+    calls = []
+    monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: project)
+    monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: version)
+    monkeypatch.setattr(ModrinthDownloader, "download_file", lambda file, destination, force=False, **kwargs: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(pack_source.read_bytes()) or destination)
+    base_version = SimpleNamespace(id="1.20.1")
+    monkeypatch.setattr(VersionManager, "load", lambda version_id: base_version)
+    monkeypatch.setattr(ModLoaderManager, "resolve", lambda game_version, loader_name, loader_version="auto": calls.append(("resolve", game_version, loader_name, loader_version)) or (loader_name, loader_version))
+    monkeypatch.setattr(ModLoaderManager, "prepare", lambda version, loader_name, loader_version, reporter=None: calls.append(("prepare", loader_name, loader_version)) or version)
+
+    result = ModrinthPackInstaller.install("neoforge-pack", "neoforge-version", "NeoForge Instance", True, expected_loader="neoforge")
+
+    assert result.instance.mod_loader == ("neoforge", "21.1.200")
+    assert ("resolve", "1.20.1", "neoforge", "21.1.200") in calls
+    assert ("prepare", "neoforge", "21.1.200") in calls
+    metadata = json.loads((tmp_path / "instances" / "NeoForge Instance" / ".mcw" / "modrinth-pack.json").read_text(encoding="utf-8"))
+    assert metadata["loader"] == "neoforge"
+    assert metadata["loaderVersion"] == "21.1.200"
+
+
 def test_rejects_modpack_when_browser_loader_filter_does_not_match_manifest(tmp_path, monkeypatch):
     configure_paths(tmp_path, monkeypatch)
     pack_source = make_pack(tmp_path / "forge-pack.mrpack", loader="forge", loader_version="47.4.21")
@@ -154,14 +182,47 @@ def test_rejects_modpack_when_browser_loader_filter_does_not_match_manifest(tmp_
     version = ModrinthVersion(version_id="forge-version", project_id="forge-pack", name="1.0", version_number="1.0", version_type="release", game_versions=("1.20.1",), loaders=("forge",), files=(ModrinthFile(url="https://cdn.modrinth.com/forge-pack.mrpack", filename="forge-pack.mrpack", sha1="a", sha512="b", size=1, primary=True),))
     monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: project)
     monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: version)
-    monkeypatch.setattr(ModrinthDownloader, "download_file", lambda file, destination, force=False: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(pack_source.read_bytes()) or destination)
+    monkeypatch.setattr(ModrinthDownloader, "download_file", lambda file, destination, force=False, **kwargs: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(pack_source.read_bytes()) or destination)
 
     with pytest.raises(RuntimeError, match="browser filter is set to Fabric"):
         ModrinthPackInstaller.install("forge-pack", "forge-version", "Wrong Filter", True, expected_loader="fabric")
 
 
-def test_parse_dependencies_rejects_neoforge_and_ambiguous_loaders():
-    with pytest.raises(RuntimeError, match="unsupported loader"):
-        ModrinthPackInstaller._parse_dependencies({"dependencies": {"minecraft": "1.20.1", "neoforge": "20.1.1"}})
+def test_parse_dependencies_accepts_neoforge_and_rejects_ambiguous_loaders():
+    assert ModrinthPackInstaller._parse_dependencies({"dependencies": {"minecraft": "1.20.1", "neoforge": "47.1.106"}}) == ("1.20.1", "neoforge", "47.1.106")
     with pytest.raises(RuntimeError, match="more than one"):
         ModrinthPackInstaller._parse_dependencies({"dependencies": {"minecraft": "1.20.1", "fabric-loader": "0.16.0", "forge": "47.4.21"}})
+
+
+def test_selected_files_preserve_artifact_without_download_url_for_manual_fallback():
+    content = b"manual artifact"
+    index = {
+        "files": [{
+            "path": "mods/manual.zip",
+            "hashes": {"sha1": hashlib.sha1(content).hexdigest(), "sha512": hashlib.sha512(content).hexdigest()},
+            "downloads": [],
+            "fileSize": len(content),
+            "env": {"client": "required"},
+        }],
+    }
+
+    selected, skipped_optional, skipped_server = ModrinthPackInstaller._selected_files(index, True)
+
+    assert selected == index["files"]
+    assert skipped_optional == 0
+    assert skipped_server == 0
+    assert ModrinthPackInstaller._managed_download_entries(selected)[0]["downloads"] == []
+
+
+def test_parse_dependencies_accepts_quilt_loader():
+    assert ModrinthPackInstaller._parse_dependencies({"dependencies": {"minecraft": "1.20.1", "quilt-loader": "0.27.1"}}) == ("1.20.1", "quilt", "0.27.1")
+
+
+def test_inspect_reports_quilt_loader(tmp_path):
+    pack = make_pack(tmp_path / "quilt-pack.mrpack", loader="quilt", loader_version="0.27.1")
+
+    details = ModrinthPackInstaller.inspect(pack)
+
+    assert details["loader"] == "quilt"
+    assert details["quilt_loader"] == "0.27.1"
+    assert details["fabric_loader"] == ""

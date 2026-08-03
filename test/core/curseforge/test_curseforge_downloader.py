@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.core.curseforge.curseforge_downloader import CurseForgeDownloader, CurseForgeManualDownloadRequired
+from src.core.network.download_models import DownloadResult
 from src.models.curseforge.file import CurseForgeFile
 
 
@@ -38,7 +39,7 @@ def test_unavailable_file_returns_structured_manual_requirement(tmp_path: Path) 
 
 
 def test_missing_hash_is_rejected_before_download(tmp_path: Path) -> None:
-    with pytest.raises(RuntimeError, match="does not provide a SHA-1"):
+    with pytest.raises(CurseForgeManualDownloadRequired, match="does not provide a SHA-1"):
         CurseForgeDownloader.download_file(make_file(sha1=""), tmp_path / "example.jar")
 
 
@@ -55,12 +56,12 @@ def test_missing_download_url_is_resolved_shortly_before_download(monkeypatch, t
         staticmethod(lambda *args, **kwargs: None),
     )
 
-    def fake_download(source, target, **kwargs):
-        calls["url"] = source.download_url
-        calls["target"] = target
-        return target
+    def fake_download(request, **kwargs):
+        calls["url"] = request.direct_url
+        calls["target"] = request.destination
+        return DownloadResult(request.destination, request.expected_size, request.hashes, source_url=request.direct_url)
 
-    monkeypatch.setattr("src.core.curseforge.curseforge_downloader.HttpDownloader.download", staticmethod(fake_download))
+    monkeypatch.setattr("src.core.curseforge.curseforge_downloader.artifact_download_service.download", fake_download)
 
     result = CurseForgeDownloader.download_file(make_file(download_url=""), destination)
 
@@ -98,13 +99,13 @@ def test_gateway_failure_uses_exact_modrinth_sha1_mirror(monkeypatch, tmp_path: 
     )
     captured = {}
 
-    def fake_download(source, destination, **kwargs):
-        captured["url"] = source.download_url
-        captured["sha1"] = source.sha1
-        captured["destination"] = destination
-        return destination
+    def fake_download(request, **kwargs):
+        captured["url"] = request.direct_url
+        captured["sha1"] = request.hashes["sha1"]
+        captured["destination"] = request.destination
+        return DownloadResult(request.destination, request.expected_size, request.hashes, source_url=request.direct_url)
 
-    monkeypatch.setattr("src.core.curseforge.curseforge_downloader.HttpDownloader.download", staticmethod(fake_download))
+    monkeypatch.setattr("src.core.curseforge.curseforge_downloader.artifact_download_service.download", fake_download)
     destination = tmp_path / "example.jar"
 
     result = CurseForgeDownloader.download_file(make_file(download_url=""), destination)

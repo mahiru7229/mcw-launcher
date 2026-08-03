@@ -35,3 +35,12 @@ def test_duplicate_fabric_version_request_is_ignored_silently() -> None:
     controller.load_fabric_versions("1.21.1")
 
     assert runner.run_calls == []
+
+
+def test_duplicate_neoforge_version_request_is_ignored_silently() -> None:
+    runner = _Runner()
+    controller = ModLoaderController(runner)
+
+    controller.load_neoforge_versions("1.21.1")
+
+    assert runner.run_calls == []

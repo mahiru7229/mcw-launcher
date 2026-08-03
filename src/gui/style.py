@@ -57,6 +57,81 @@ QFrame#RightPanel {
     border-left: 3px solid #11120f;
 }
 
+
+
+QFrame#InstanceToolbar {
+    background: #242722;
+    border: 2px solid #11120f;
+    border-bottom-color: #0b0c0a;
+}
+
+QFrame#InstanceLibrary {
+    background: #262923;
+    border: 2px solid #151713;
+}
+
+QFrame#InstanceActionPanel {
+    background: #343730;
+    border: 2px solid #161713;
+    border-bottom-color: #0d0e0c;
+    border-right-color: #0d0e0c;
+}
+
+QListWidget#InstanceLibraryList {
+    background: #20221f;
+    color: #ffffff;
+    border: 2px solid #11120f;
+    outline: none;
+    padding: 6px;
+}
+
+QListWidget#InstanceLibraryList::item {
+    background: #2d302b;
+    color: #ffffff;
+    border: 2px solid #161713;
+    padding: 8px;
+    margin: 3px;
+}
+
+QListWidget#InstanceLibraryList::item:hover {
+    background: #3a3f36;
+    border-color: #56674a;
+}
+
+QListWidget#InstanceLibraryList::item:selected {
+    background: #435538;
+    border: 3px solid #83b75f;
+    color: #ffffff;
+}
+
+QListWidget#InstanceEditorNavigation {
+    background: #20221f;
+    color: #ffffff;
+    border: 2px solid #11120f;
+    outline: none;
+    padding: 5px;
+}
+
+QListWidget#InstanceEditorNavigation::item {
+    padding: 10px 12px;
+    border: 2px solid transparent;
+}
+
+QListWidget#InstanceEditorNavigation::item:hover {
+    background: #2e312b;
+    border-color: #161713;
+}
+
+QListWidget#InstanceEditorNavigation::item:selected {
+    background: #3d4c32;
+    border-color: #83b75f;
+}
+
+QSplitter#InstanceWorkspaceSplitter::handle {
+    background: #11120f;
+    width: 4px;
+}
+
 QFrame#LaunchControl {
     background: #1e201d;
     border-top: 3px solid #11120f;

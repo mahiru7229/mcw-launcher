@@ -6,9 +6,9 @@ from PySide6.QtCore import QTimer, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem
 
-from src.core.curseforge.curseforge_client import CurseForgeClient
-from src.core.language.language_manager import tr
-from src.core.modloader.mod_loader_manager import ModLoaderManager
+from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
+from mcw_core.api.language.language_manager import tr
+from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
@@ -79,7 +79,9 @@ class ModsPage(BasePage):
         self.loader_label.setObjectName("MutedLabel")
         self.loader_combo = QComboBox()
         self.loader_combo.addItem("Fabric", ModLoaderManager.FABRIC)
+        self.loader_combo.addItem("Quilt", ModLoaderManager.QUILT)
         self.loader_combo.addItem("Forge", ModLoaderManager.FORGE)
+        self.loader_combo.addItem("NeoForge", ModLoaderManager.NEOFORGE)
         self.loader_combo.currentIndexChanged.connect(self._loader_changed)
 
         selector_grid.addWidget(self.provider_label, 0, 0)
@@ -207,7 +209,7 @@ class ModsPage(BasePage):
     @property
     def selected_loader(self) -> str:
         loader = str(self.loader_combo.currentData() or ModLoaderManager.FABRIC).strip().lower()
-        return loader if loader in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE} else ModLoaderManager.FABRIC
+        return loader if loader in ModLoaderManager.MODDED_LOADERS else ModLoaderManager.FABRIC
 
     @property
     def allowed_version_types(self) -> tuple[str, ...]:

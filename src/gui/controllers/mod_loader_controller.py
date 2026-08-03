@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal, Slot
 
-from src.core.modloader.fabric.fabric_meta_client import FabricMetaClient
-from src.core.modloader.forge.forge_metadata_client import ForgeMetadataClient
+from mcw_core.api.modloader.fabric.fabric_meta_client import FabricMetaClient
+from mcw_core.api.modloader.forge.forge_metadata_client import ForgeMetadataClient
+from mcw_core.api.modloader.neoforge.neoforge_metadata_client import NeoForgeMetadataClient
+from mcw_core.api.modloader.quilt.quilt_meta_client import QuiltMetaClient
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 
@@ -11,6 +13,8 @@ from src.gui.task_runner import TaskRunner
 class ModLoaderController(BaseController):
     fabric_versions_changed = Signal(str, list)
     forge_versions_changed = Signal(str, list)
+    neoforge_versions_changed = Signal(str, list)
+    quilt_versions_changed = Signal(str, list)
 
     def __init__(self, task_runner: TaskRunner) -> None:
         super().__init__()
@@ -19,43 +23,60 @@ class ModLoaderController(BaseController):
         self._task_runner.task_failed.connect(self._on_task_failed)
 
     def load_fabric_versions(self, game_version: str) -> None:
-        game_version = game_version.strip()
-        if not game_version:
-            return
+        self._load_versions("fabric", game_version, FabricMetaClient.list_loader_versions, "Fabric")
 
-        task_id = f"fabric.versions:{game_version}"
-        if self._task_runner.is_task_active(task_id):
-            return
-        self._task_runner.run(task_id, lambda: (game_version, FabricMetaClient.list_loader_versions(game_version)), f"Loading Fabric versions for Minecraft {game_version}...", blocking=False)
+    def load_quilt_versions(self, game_version: str) -> None:
+        self._load_versions("quilt", game_version, QuiltMetaClient.list_loader_versions, "Quilt")
 
     def load_forge_versions(self, game_version: str) -> None:
+        self._load_versions("forge", game_version, ForgeMetadataClient.list_versions, "Forge")
+
+    def load_neoforge_versions(self, game_version: str) -> None:
+        self._load_versions("neoforge", game_version, NeoForgeMetadataClient.list_versions, "NeoForge")
+
+    def _load_versions(self, loader: str, game_version: str, resolver, title: str) -> None:
         game_version = game_version.strip()
         if not game_version:
             return
-        task_id = f"forge.versions:{game_version}"
+        task_id = f"{loader}.versions:{game_version}"
         if self._task_runner.is_task_active(task_id):
             return
-        self._task_runner.run(task_id, lambda: (game_version, ForgeMetadataClient.list_versions(game_version)), f"Loading Forge versions for Minecraft {game_version}...", blocking=False)
+        self._task_runner.run(task_id, lambda: (game_version, resolver(game_version)), f"Loading {title} versions for Minecraft {game_version}...", blocking=False)
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
+        game_version, versions = result if isinstance(result, tuple) and len(result) == 2 else ("", ())
         if task_id.startswith("fabric.versions:"):
-            game_version, versions = result
             self.fabric_versions_changed.emit(game_version, list(versions))
-            self.log_created.emit(f"Fabric versions loaded for Minecraft {game_version}: {len(versions)}")
-            return
-        if task_id.startswith("forge.versions:"):
-            game_version, versions = result
+            title = "Fabric"
+        elif task_id.startswith("quilt.versions:"):
+            self.quilt_versions_changed.emit(game_version, list(versions))
+            title = "Quilt"
+        elif task_id.startswith("forge.versions:"):
             self.forge_versions_changed.emit(game_version, list(versions))
-            self.log_created.emit(f"Forge versions loaded for Minecraft {game_version}: {len(versions)}")
+            title = "Forge"
+        elif task_id.startswith("neoforge.versions:"):
+            self.neoforge_versions_changed.emit(game_version, list(versions))
+            title = "NeoForge"
+        else:
+            return
+        self.log_created.emit(f"{title} versions loaded for Minecraft {game_version}: {len(versions)}")
 
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
+        game_version = task_id.partition(":")[2]
         if task_id.startswith("fabric.versions:"):
-            game_version = task_id.partition(":")[2]
             self.fabric_versions_changed.emit(game_version, [])
-            self._emit_error("Fabric Loader", error)
+            title = "Fabric Loader"
+        elif task_id.startswith("quilt.versions:"):
+            self.quilt_versions_changed.emit(game_version, [])
+            title = "Quilt Loader"
         elif task_id.startswith("forge.versions:"):
-            game_version = task_id.partition(":")[2]
             self.forge_versions_changed.emit(game_version, [])
-            self._emit_error("Minecraft Forge", error)
+            title = "Minecraft Forge"
+        elif task_id.startswith("neoforge.versions:"):
+            self.neoforge_versions_changed.emit(game_version, [])
+            title = "NeoForge"
+        else:
+            return
+        self._emit_error(title, error)

@@ -11,6 +11,7 @@ from src.core.network.download_manager import download_manager
 from src.core.network.download_recovery import download_recovery_manager
 from src.core.network.network_session import DEFAULT_MAX_CONCURRENT_DOWNLOADS
 from src.core.security.account_security_manager import AccountSecurityManager
+from src.core.runtime.startup_recovery_manager import startup_recovery_manager
 
 BootstrapProgressCallback = Callable[[int, str], None]
 
@@ -25,24 +26,27 @@ def initialize_application(progress_callback: BootstrapProgressCallback | None =
     _report(progress_callback, 8, "startup.preparing_directories")
     Paths.initialize()
 
-    _report(progress_callback, 24, "startup.loading_settings")
+    _report(progress_callback, 18, "startup.recovering_instances")
+    startup_recovery_manager.reconcile()
+
+    _report(progress_callback, 28, "startup.loading_settings")
     settings_manager = LauncherSettingsManager()
     settings_manager.initialize()
     settings = settings_manager.load()
 
-    _report(progress_callback, 42, "startup.configuring_downloads")
+    _report(progress_callback, 44, "startup.configuring_downloads")
     network_settings = settings.get("network", {})
     download_bandwidth_limiter.configure_mbps(network_settings.get("download_limit_mbps", 0.0))
     configured_concurrency = int(network_settings.get("download_concurrency", 0) or 0)
     download_manager.configure(configured_concurrency or DEFAULT_MAX_CONCURRENT_DOWNLOADS)
 
-    _report(progress_callback, 52, "startup.recovering_downloads")
+    _report(progress_callback, 56, "startup.recovering_downloads")
     download_recovery_manager.reconcile(delete_invalid_parts=True)
 
-    _report(progress_callback, 62, "startup.preparing_accounts")
+    _report(progress_callback, 68, "startup.preparing_accounts")
     AccountDatabase.initialize()
 
-    _report(progress_callback, 80, "startup.protecting_accounts")
+    _report(progress_callback, 82, "startup.protecting_accounts")
     AccountSecurityManager.migrate_if_needed()
 
     _report(progress_callback, 90, "startup.core_ready")

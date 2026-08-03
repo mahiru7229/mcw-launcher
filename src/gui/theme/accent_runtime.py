@@ -6,9 +6,9 @@ from pathlib import Path
 from PySide6.QtGui import QColor, QImage, QPalette, QPixmap
 from PySide6.QtWidgets import QApplication
 
-from src.core.fs.paths import Paths
-from src.core.theme.theme_manager import ThemeDefinition, ThemeManager, theme_manager
-from src.core.theme.theme_palette import DEFAULT_THEME_PALETTE, ThemePaletteDefinition, derive_custom_accent, normalize_hex_color
+from mcw_core.api.fs.paths import Paths
+from mcw_core.api.theme.theme_manager import ThemeDefinition, ThemeManager, theme_manager
+from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, ThemePaletteDefinition, derive_custom_accent, normalize_hex_color
 from src.gui.dark_theme import create_forced_dark_palette
 
 

@@ -7,14 +7,15 @@ import pytest
 from src.core.modloader.forge.forge_launch_command_manager import ForgeLaunchCommandManager
 
 
-def make_version(*, modern: bool = True):
+def make_version(*, modern: bool = True, loader: str = "forge"):
+    metadata = {loader: {"loaderVersion": "21.1.200" if loader == "neoforge" else "47.4.21"}} if modern else {}
     return SimpleNamespace(
         main_class=(
             "cpw.mods.bootstraplauncher.BootstrapLauncher"
             if modern
             else "net.minecraft.client.main.Main"
         ),
-        raw_json={"forge": {"loaderVersion": "47.4.21"}} if modern else {},
+        raw_json=metadata,
     )
 
 
@@ -179,3 +180,20 @@ def test_prepare_adds_default_ignore_list_when_profile_omits_it(tmp_path: Path) 
     assert "securejarhandler" in values
     assert "JarJarFileSystems" in values
     assert "1.20.1.jar" in values
+
+
+def test_prepare_supports_modern_neoforge_profile(tmp_path: Path) -> None:
+    module_path = make_module_path(tmp_path)
+
+    result = ForgeLaunchCommandManager.prepare(make_version(loader="neoforge"), ["--module-path", module_path])
+
+    assert "--add-modules" in result
+    ignore_list = next(value for value in result if value.startswith("-DignoreList="))
+    assert "neoforge-" in ignore_list
+    assert "mixinextras-neoforge" in ignore_list
+    assert ForgeLaunchCommandManager.is_modern_forge(make_version(loader="neoforge"))
+
+
+def test_neoforge_error_message_names_neoforge() -> None:
+    with pytest.raises(RuntimeError, match="NeoForge launch profile"):
+        ForgeLaunchCommandManager.prepare(make_version(loader="neoforge"), [])

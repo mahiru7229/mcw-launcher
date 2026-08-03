@@ -12,3 +12,5 @@ class Account:
     access_token: str | None = None
     refresh_token: str | None = None
     token_expires_at: int | None = None
+    skin_url: str | None = None
+    skin_variant: str | None = None

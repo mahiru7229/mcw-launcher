@@ -13,11 +13,8 @@ SIDEBAR_WIDTH = 220
 RIGHT_PANEL_WIDTH = 400
 
 NAVIGATION_ITEMS = (
-    ("home", "Home"),
-    ("accounts", "Accounts"),
     ("instances", "Instances"),
-    ("mods", "Mods"),
-    ("instance_settings", "Instance Settings"),
+    ("accounts", "Accounts"),
     ("launcher_settings", "Launcher Settings"),
     ("logs", "Logs"),
     ("about", "About"),
