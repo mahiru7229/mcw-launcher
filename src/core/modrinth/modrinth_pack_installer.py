@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path, PurePosixPath
 from uuid import uuid4
+from types import SimpleNamespace
 import hashlib
 import json
 import re
@@ -23,6 +24,7 @@ from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.core.network.artifact_download_service import ArtifactDownloadError, artifact_download_service
 from src.core.network.download_pause import download_pause_controller
 from src.core.progress.progress_reporter import ProgressReporter
+from src.core.package.provider_package_store import ProviderPackageStore
 from src.models.modrinth.install_result import ModrinthModpackInstallResult
 from src.models.modrinth.manual_download import ModrinthManualDownload
 from src.models.network.artifact import ArtifactRequest
@@ -95,6 +97,41 @@ class ModrinthPackInstaller:
             )
             raise ModrinthModpackManualDownloadRequired(requirement, project.project_id, version.version_id, normalized_name, install_optional_files, allowed_types, expected_loader, settings_override) from error
         return ModrinthPackInstaller._install_archive(project, version, pack_path, normalized_name, install_optional_files, reporter, expected_loader, settings_override)
+
+    @staticmethod
+    def install_local_archive(pack_path: Path, instance_name: str = "", install_optional_files: bool = True, reporter: ProgressReporter | None = None, settings_override: dict | None = None) -> ModrinthModpackInstallResult:
+        source = Path(pack_path)
+        if not source.is_file():
+            raise RuntimeError("The selected Modrinth package does not exist.")
+        details = ModrinthPackInstaller.inspect(source)
+        requested_name = str(instance_name or details.get("name") or source.stem).strip()
+        normalized_name = ModrinthPackInstaller._validated_instance_name(requested_name)
+        if InstanceManager.is_instance_exist(normalized_name):
+            normalized_name = InstanceManager.next_available_name(normalized_name)
+        with zipfile.ZipFile(source, "r") as archive:
+            index = ModrinthPackInstaller._read_index(archive)
+        version_label = str(index.get("versionId") or index.get("name") or source.stem).strip()
+        project = SimpleNamespace(project_id="", title=str(index.get("name") or source.stem), icon_url="")
+        version = SimpleNamespace(version_id=version_label, version_number=version_label)
+        result = ModrinthPackInstaller._install_archive(project, version, source, normalized_name, install_optional_files, reporter, "", settings_override)
+        try:
+            ProviderPackageStore.store_native_package(
+                result.instance,
+                source,
+                provider="modrinth",
+                package_format="mrpack",
+                origin={
+                    "projectId": "",
+                    "versionId": version_label,
+                    "packName": project.title,
+                    "packVersion": version_label,
+                    "source": "local_import",
+                },
+            )
+        except Exception:
+            InstanceManager.delete_instance(result.instance.name)
+            raise
+        return result
 
     @staticmethod
     def install_manual_archive(request: ModrinthModpackManualDownloadRequired, source: Path, reporter: ProgressReporter | None = None) -> ModrinthModpackInstallResult:

@@ -24,7 +24,7 @@ from src.gui.window_sizing import resize_dialog_to_screen
 
 class CreateInstanceDialog(QDialog):
     create_requested = Signal(str, str, str)
-    import_requested = Signal()
+    import_modpack_package_requested = Signal()
     browse_modrinth_requested = Signal()
     browse_curseforge_requested = Signal()
     browse_ftb_requested = Signal()
@@ -170,7 +170,7 @@ class CreateInstanceDialog(QDialog):
         self.accept()
 
     def _import_package(self) -> None:
-        self.import_requested.emit()
+        self.import_modpack_package_requested.emit()
         self.accept()
 
     def retranslate_dynamic(self) -> None:
@@ -189,7 +189,7 @@ class CreateInstanceDialog(QDialog):
         self.curseforge_button.setText(tr("workspace.create.browse_curseforge"))
         self.ftb_button.setText(tr("workspace.create.browse_ftb"))
         self.curseforge_button.setVisible(CurseForgeConfigManager.is_configured())
-        self.import_button.setText(tr("workspace.create.import_package"))
+        self.import_button.setText(tr("modpack_package.import.local_button"))
         self.create_button.setText(tr("workspace.create.create_button"))
         if self.cancel_button is not None:
             self.cancel_button.setText(tr("common.cancel"))

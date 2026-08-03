@@ -84,6 +84,7 @@ class CurseForgePackRegistry:
                 "acceptedUnverified": bool(raw.get("acceptedUnverified", False)),
                 "compatibilityWarning": str(raw.get("compatibilityWarning") or "").strip(),
                 "manualImport": bool(raw.get("manualImport", False)),
+                "resolvePathFromProvider": bool(raw.get("resolvePathFromProvider", False)),
                 "provider": "curseforge",
             })
         output = dict(data)

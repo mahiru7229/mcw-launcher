@@ -286,7 +286,12 @@ class ModProvenanceRegistry:
             "sha512": str(raw.get("sha512") or "").strip().casefold(),
             "size": size,
             "downloadUrls": list(dict.fromkeys(str(url).strip() for url in urls if str(url).strip())),
+            "sources": ModProvenanceRegistry._normalize_sources(raw.get("sources")),
             "projectUrl": str(raw.get("projectUrl") or "").strip(),
+            "licenseId": str(raw.get("licenseId") or "").strip(),
+            "licenseName": str(raw.get("licenseName") or "").strip(),
+            "licenseUrl": str(raw.get("licenseUrl") or "").strip(),
+            "redistributionAllowed": bool(raw.get("redistributionAllowed", False)),
             "managedByModpack": bool(raw.get("managedByModpack", False)),
             "packProvider": str(raw.get("packProvider") or "").strip().casefold(),
             "packProjectId": str(raw.get("packProjectId") or "").strip(),
@@ -295,10 +300,38 @@ class ModProvenanceRegistry:
         }
 
     @staticmethod
+    def _normalize_sources(value: object) -> list[dict]:
+        if not isinstance(value, (list, tuple)):
+            return []
+        output: list[dict] = []
+        seen: set[tuple] = set()
+        for index, raw in enumerate(value, start=1):
+            if not isinstance(raw, dict):
+                continue
+            provider = str(raw.get("provider") or "direct").strip().casefold() or "direct"
+            urls = raw.get("urls") if isinstance(raw.get("urls"), (list, tuple)) else []
+            normalized = {
+                "provider": provider,
+                "projectId": str(raw.get("projectId") or "").strip(),
+                "versionId": str(raw.get("versionId") or "").strip(),
+                "fileId": str(raw.get("fileId") or "").strip(),
+                "urls": list(dict.fromkeys(str(url).strip() for url in urls if str(url).strip())),
+                "priority": max(1, int(raw.get("priority", index * 10) or index * 10)),
+            }
+            identity = (normalized["provider"], normalized["projectId"], normalized["versionId"], normalized["fileId"], tuple(normalized["urls"]))
+            if identity in seen or not any(identity[1:]):
+                continue
+            seen.add(identity)
+            output.append(normalized)
+        output.sort(key=lambda source: (source["priority"], source["provider"]))
+        return output
+
+    @staticmethod
     def _is_mod_path(value: object) -> bool:
         normalized = str(value or "").replace("\\", "/").strip().lstrip("/")
         path = PurePosixPath(normalized)
-        return len(path.parts) >= 2 and path.parts[0].casefold() == "mods" and path.name.casefold().endswith(".jar")
+        lowered = path.name.casefold()
+        return len(path.parts) >= 2 and path.parts[0].casefold() == "mods" and (lowered.endswith(".jar") or lowered.endswith(".jar.disabled"))
 
     @staticmethod
     def _safe_mod_path(value: object, filename: str) -> str:
@@ -307,7 +340,8 @@ class ModProvenanceRegistry:
         path = PurePosixPath(normalized)
         if not normalized or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
             return fallback
-        if len(path.parts) < 2 or path.parts[0].casefold() != "mods" or path.name.casefold() != filename.casefold():
+        allowed_names = {filename.casefold(), f"{filename}.disabled".casefold()}
+        if len(path.parts) < 2 or path.parts[0].casefold() != "mods" or path.name.casefold() not in allowed_names:
             return fallback
         return path.as_posix()
 

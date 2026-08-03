@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/Stable-v0.12.0-brightgreen" alt="Current stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Beta-v1.0.0--beta.5-orange" alt="Current beta version">
+    <img src="https://img.shields.io/badge/Beta-v1.0.0--beta.6-orange" alt="Current beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -25,12 +25,12 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v1.0.0-beta.5.md">v1.0 beta notes</a> ·
+  <a href="docs/RELEASE-v1.0.0-beta.6.md">v1.0 beta notes</a> ·
   <a href="docs/UPDATE_PACKAGES.md">Updater packages</a>
 </p>
 
 > [!NOTE]
-> `v0.12.0` là bản Stable hiện tại. `v1.0.0-beta.5` bổ sung Installed Content Library để quản lý nội dung của từng instance tại một nơi; bản này chỉ được nhận khi người dùng chủ động tham gia tester program.
+> `v0.12.0` là bản Stable hiện tại. `v1.0.0-beta.6` bổ sung import/export modpack giữ nguyên nguồn provider, Portable MCWPack và nút ẩn/hiện sidebar rõ nghĩa; bản này chỉ được nhận khi người dùng chủ động tham gia tester program.
 
 ---
 
@@ -41,6 +41,15 @@
 MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độc lập**, tiến trình tải rõ ràng, khả năng sửa chữa an toàn và kiến trúc tách biệt giữa GUI với launcher core.
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
+
+### Điểm nổi bật của `v1.0.0-beta.6`
+
+- Tách **Duyệt modpack trực tuyến** và **Import package từ provider**, tự nhận dạng Modrinth `.mrpack`, CurseForge ZIP, MCW Provider Profile và Portable MCWPack bằng nội dung archive.
+- Đọc manifest local, giữ provenance/provider ID/hash/overrides và tiếp tục tải mod ở lần Launch đầu tiên thay vì tải ngay khi import.
+- Thêm hai lựa chọn export: **Provider Profile** giữ package/reference gốc kèm settings sidecar, và **Portable MCWPack** với Smart hoặc Full/offline mode.
+- Smart mode giữ nguồn tải, chuyển file không thể phân phối sang tải thủ công; Full mode giữ tùy chọn đóng gói mod hiện có cho backup/chia sẻ riêng tư và luôn kèm distribution notice.
+- Portable import xác minh hash/kích thước, dựng lại registry provider, hỗ trợ manual-download flow và giữ trạng thái mod bị vô hiệu hóa.
+- Thay nút mũi tên dễ nhầm với Back bằng nút menu `☰` có nhãn/tooltip Ẩn hoặc Hiện thanh bên.
 
 ### Điểm nổi bật của `v1.0.0-beta.5`
 
@@ -194,6 +203,15 @@ Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
 MCW Launcher is an open-source Minecraft launcher centered around **isolated instances**, visible download progress, safe repair workflows, and a GUI that remains separate from launcher logic.
 
 Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
+
+### `v1.0.0-beta.6` highlights
+
+- Separate **online modpack browsing** from **provider-package import**, detecting Modrinth `.mrpack`, CurseForge ZIP, MCW Provider Profile, and Portable MCWPack by archive contents.
+- Parse local manifests, preserve provenance/provider IDs/hashes/overrides, and retain first-launch deferred downloads.
+- Add two export choices: **Provider Profile** for the original package/reference plus settings sidecar, and **Portable MCWPack** with Smart or Full/offline modes.
+- Smart mode preserves sources and routes non-redistributable files to manual download; Full mode remains available for private/offline transfer and always includes a distribution notice.
+- Verify hashes/sizes on portable import, rebuild provider registries, support manual-file completion, and preserve disabled-mod state.
+- Replace the back-like arrow with a labelled `☰` Hide/Show sidebar control.
 
 ### `v1.0.0-beta.5` highlights
 

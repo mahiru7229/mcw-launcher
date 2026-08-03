@@ -55,6 +55,8 @@ from src.gui.dialogs.curseforge_manual_download_dialog import CurseForgeManualDo
 from src.gui.dialogs.ftb_browser_dialog import FTBBrowserDialog
 from src.gui.dialogs.lan_agent_log_dialog import LanAgentLogDialog
 from src.gui.dialogs.instance_import_settings_dialog import InstanceImportSettingsDialog
+from src.gui.dialogs.modpack_export_dialog import ModpackExportDialog
+from src.gui.dialogs.modpack_import_settings_dialog import ModpackImportSettingsDialog
 from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
@@ -136,6 +138,7 @@ class MainWindow(QMainWindow):
         self._modrinth_pending_modpack_install: ModrinthModpackManualDownloadRequired | None = None
         self._curseforge_manual_instance_name = ""
         self._curseforge_pending_modpack_install: CurseForgeModpackManualDownloadRequired | None = None
+        self._portable_manual_request: object | None = None
         self.running_instances_timer.setInterval(1000)
 
         self._build_ui()
@@ -233,6 +236,7 @@ class MainWindow(QMainWindow):
         self.shader_pack_browser_dialog = ContentPackBrowserDialog(ContentPackManager.SHADER_PACK, self)
         self.ftb_modpack_dialog = FTBBrowserDialog(self)
         self.curseforge_manual_dialog = CurseForgeManualDownloadDialog(self)
+        self.portable_manual_dialog = CurseForgeManualDownloadDialog(self)
         self.repair_center_dialog = RepairCenterDialog(self)
 
         self.pages = {
@@ -307,6 +311,8 @@ class MainWindow(QMainWindow):
         self.instances_page.delete_requested.connect(self.instance_controller.delete)
         self.instances_page.import_requested.connect(self.instance_controller.inspect_package)
         self.instances_page.export_requested.connect(self.instance_controller.export_package)
+        self.instances_page.import_modpack_package_requested.connect(self.instance_controller.inspect_modpack_package)
+        self.instances_page.export_modpack_requested.connect(self._open_modpack_export)
         self.instances_page.backup_requested.connect(self.backup_controller.create)
         self.instances_page.restore_backup_requested.connect(self.backup_controller.restore)
         self.instances_page.open_backups_requested.connect(self._open_backups_folder)
@@ -402,6 +408,8 @@ class MainWindow(QMainWindow):
         self.instance_controller.forge_diagnostics_finished.connect(self._forge_diagnostics_finished)
         self.instance_controller.export_finished.connect(self._show_export_finished)
         self.instance_controller.import_preview_ready.connect(self._show_instance_import_settings)
+        self.instance_controller.modpack_import_preview_ready.connect(self._show_modpack_import_settings)
+        self.instance_controller.modpack_export_finished.connect(self._show_modpack_export_finished)
 
         self.instance_settings_controller.settings_loaded.connect(self.instance_settings_page.set_settings)
         self.gui_settings_controller.settings_changed.connect(self._apply_gui_settings)
@@ -451,6 +459,9 @@ class MainWindow(QMainWindow):
         self.modrinth_controller.modpack_installed.connect(self._modrinth_modpack_installed)
         self.modrinth_controller.modpack_manual_download_required.connect(self._modrinth_modpack_manual_download_required)
         self.modrinth_manual_dialog.files_selected.connect(self._install_manual_modrinth_files)
+        self.launch_controller.portable_manual_download_required.connect(self._portable_manual_download_required)
+        self.portable_manual_dialog.files_selected.connect(self._install_portable_manual_files)
+        self.instance_controller.portable_manual_files_installed.connect(self._portable_manual_files_installed)
 
         self.curseforge_mod_dialog.search_requested.connect(self._search_curseforge_mods)
         self.curseforge_modpack_dialog.search_requested.connect(self._search_curseforge_modpacks)
@@ -1958,6 +1969,7 @@ class MainWindow(QMainWindow):
             self.resource_pack_browser_dialog,
             self.shader_pack_browser_dialog,
             self.curseforge_manual_dialog,
+            self.portable_manual_dialog,
             self.repair_center_dialog,
         ):
             retranslate_dynamic = getattr(widget, "retranslate_dynamic", None)
@@ -2280,6 +2292,90 @@ class MainWindow(QMainWindow):
         self.instance_controller.import_package(
             preview.package_path,
             dialog.selected_settings_override,
+        )
+
+    def _show_modpack_import_settings(self, preview: object) -> None:
+        launcher_defaults = self.gui_settings_controller.current.get("instance_defaults", {})
+        dialog = ModpackImportSettingsDialog(preview, launcher_defaults, self)
+        if not dialog.exec():
+            self._set_status(tr("modpack_package.import.cancelled"))
+            return
+        self.instance_controller.import_modpack_package(
+            preview.package_path,
+            dialog.selected_settings_override,
+            dialog.install_optional_files,
+            dialog.instance_name,
+        )
+
+    def _open_modpack_export(self, instance_name: str) -> None:
+        name = str(instance_name or "").strip()
+        if not name:
+            return
+        dialog = ModpackExportDialog(name, self)
+        if not dialog.exec() or dialog.output_path is None:
+            return
+        options = dialog.options
+        self.instance_controller.export_modpack(
+            name,
+            dialog.output_path,
+            options.mode,
+            options.portable_mode,
+            options.include_saves,
+        )
+
+    def _show_modpack_export_finished(self, result: object) -> None:
+        path = Path(getattr(result, "output_path", ""))
+        referenced = int(getattr(result, "referenced_files", 0) or 0)
+        embedded = int(getattr(result, "embedded_files", 0) or 0)
+        manual = int(getattr(result, "manual_files", 0) or 0)
+        native = bool(getattr(result, "native_package_included", False))
+        if native:
+            detail = tr("modpack_package.export.result.provider")
+        else:
+            detail = tr(
+                "modpack_package.export.result.portable",
+                referenced=referenced,
+                embedded=embedded,
+                manual=manual,
+            )
+        self.toast_manager.show(
+            tr("modpack_package.export.result.saved", path=path, detail=detail),
+            "success",
+            tr("modpack_package.export.result.title"),
+        )
+
+    def _portable_manual_download_required(self, request: object) -> None:
+        requirements = tuple(getattr(request, "requirements", ()) or ())
+        instance = getattr(request, "instance", None)
+        if not requirements or instance is None:
+            self._show_error(tr("portable.manual.title"), tr("portable.manual.invalid"))
+            return
+        self._portable_manual_request = request
+        self.portable_manual_dialog.set_instance_context(str(getattr(instance, "name", "")), getattr(instance, "instance_dir", None))
+        self.portable_manual_dialog.set_requirements(requirements)
+        self.portable_manual_dialog.show()
+        self.portable_manual_dialog.raise_()
+        self.portable_manual_dialog.activateWindow()
+
+    def _install_portable_manual_files(self, sources: object) -> None:
+        request = self._portable_manual_request
+        paths = tuple(Path(source) for source in (sources or ())) if isinstance(sources, (list, tuple)) else ()
+        requirements = tuple(getattr(request, "requirements", ()) or ()) if request is not None else ()
+        instance = getattr(request, "instance", None) if request is not None else None
+        if instance is None or not requirements or not paths:
+            return
+        self.instance_controller.install_portable_manual_files(str(getattr(instance, "name", "")), requirements, paths)
+
+    def _portable_manual_files_installed(self, result: object) -> None:
+        count = len(result.get("installed", ())) if isinstance(result, dict) else 0
+        instance_name = str(result.get("instanceName", "")) if isinstance(result, dict) else ""
+        self.portable_manual_dialog.close()
+        self._portable_manual_request = None
+        self.instance_controller.refresh(selected_name=instance_name)
+        QMessageBox.information(
+            self,
+            tr("portable.manual.title"),
+            tr("portable.manual.installed", count=count),
         )
 
     def closeEvent(self, event: QCloseEvent) -> None:

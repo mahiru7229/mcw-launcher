@@ -21,6 +21,7 @@ from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
 from src.core.progress.progress_reporter import ProgressReporter
+from src.core.package.provider_package_store import ProviderPackageStore
 from src.models.curseforge.install_result import CurseForgeModpackInstallResult
 from src.models.curseforge.manual_download import CurseForgeManualDownload
 from src.models.progress.progress_stage import ProgressStage
@@ -52,6 +53,63 @@ class CurseForgePackInstaller:
             )
             raise CurseForgeModpackManualDownloadRequired(requirement, project_id, file_id, name, install_optional_files, allowed, expected_loader, settings_override) from error
         return CurseForgePackInstaller._install_from_archive(project_id, file_id, name, install_optional_files, project, file, pack_path, reporter, expected_loader, settings_override)
+
+    @staticmethod
+    def install_local_archive(pack_path: Path, instance_name: str = "", install_optional_files: bool = True, reporter: ProgressReporter | None = None, settings_override: dict | None = None) -> CurseForgeModpackInstallResult:
+        source = Path(pack_path)
+        if not source.is_file():
+            raise RuntimeError("The selected CurseForge package does not exist.")
+        try:
+            archive = zipfile.ZipFile(source, "r")
+        except (OSError, zipfile.BadZipFile) as error:
+            raise RuntimeError("The selected CurseForge modpack archive is not a valid ZIP file.") from error
+        with archive:
+            manifest = CurseForgePackInstaller._read_manifest(archive)
+            minecraft_version, loader_name, loader_version = CurseForgePackInstaller._parse_loader(manifest)
+            pack_name = str(manifest.get("name") or source.stem).strip() or source.stem
+            version_name = str(manifest.get("version") or manifest.get("versionName") or "Imported").strip() or "Imported"
+            requested = str(instance_name or pack_name).strip()
+            name = CurseForgePackInstaller._validated_instance_name(requested)
+            if InstanceManager.is_instance_exist(name):
+                name = InstanceManager.next_available_name(name)
+            entries, skipped = CurseForgePackInstaller._unresolved_files(manifest, install_optional_files)
+            version = VersionManager.load(minecraft_version)
+            resolved_loader = ModLoaderManager.resolve(minecraft_version, loader_name, loader_version)
+            instance = InstanceManager.create(name=name, version=version, mod_loader=resolved_loader)
+            try:
+                if settings_override is not None:
+                    SettingsManager.save_dict(instance, settings_override)
+                override_mods = CurseForgePackInstaller._extract_overrides(archive, str(manifest.get("overrides") or "overrides"), Path(instance.instance_dir), reporter)
+                CurseForgePackRegistry.save(instance, {
+                    "projectId": 0,
+                    "fileId": 0,
+                    "name": pack_name,
+                    "versionName": version_name,
+                    "minecraftVersion": minecraft_version,
+                    "loader": loader_name,
+                    "loaderVersion": loader_version,
+                    "installOptionalFiles": bool(install_optional_files),
+                    "managedFiles": entries,
+                    "lastDownloadFailures": [],
+                    "importedFromNativePackage": True,
+                })
+                ModProvenanceRegistry.synchronize(instance)
+                ModProvenanceRegistry.record_many(instance, [{**entry, "provider": "curseforge", "managedByModpack": True, "packProvider": "curseforge"} for entry in override_mods])
+                ProviderPackageStore.store_native_package(
+                    instance,
+                    source,
+                    provider="curseforge",
+                    package_format="curseforge_zip",
+                    origin={
+                        "packName": pack_name,
+                        "packVersion": version_name,
+                        "source": "local_import",
+                    },
+                )
+            except Exception:
+                InstanceManager.delete_instance(name)
+                raise
+        return CurseForgeModpackInstallResult(instance=instance, pack_name=pack_name, pack_version=version_name, managed_files=len(entries), skipped_optional_files=skipped)
 
     @staticmethod
     def install_manual_archive(request: CurseForgeModpackManualDownloadRequired, source: Path, reporter: ProgressReporter | None = None) -> CurseForgeModpackInstallResult:
@@ -251,6 +309,39 @@ class CurseForgePackInstaller:
                 f"This CurseForge modpack uses {actual_loader.title()}, "
                 f"but the browser filter is set to {expected.title()}."
             )
+
+    @staticmethod
+    def _unresolved_files(manifest: dict, install_optional_files: bool) -> tuple[list[dict], int]:
+        raw_files = manifest.get("files", [])
+        selected = [item for item in raw_files if isinstance(item, dict) and (bool(item.get("required", True)) or install_optional_files)]
+        skipped = len(raw_files) - len(selected)
+        results: list[dict] = []
+        seen: set[tuple[int, int]] = set()
+        for item in selected:
+            project_id = int(item.get("projectID") or item.get("projectId") or 0)
+            file_id = int(item.get("fileID") or item.get("fileId") or 0)
+            if project_id <= 0 or file_id <= 0:
+                raise RuntimeError("The CurseForge modpack contains an invalid project or file ID.")
+            key = (project_id, file_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            synthetic_name = f"curseforge-{project_id}-{file_id}.jar"
+            results.append({
+                "projectId": project_id,
+                "fileId": file_id,
+                "fileName": synthetic_name,
+                "path": f"mods/{synthetic_name}",
+                "displayName": f"CurseForge {project_id}/{file_id}",
+                "sha1": "",
+                "size": 0,
+                "downloadUrl": "",
+                "required": bool(item.get("required", True)),
+                "provider": "curseforge",
+                "pendingDownload": True,
+                "resolvePathFromProvider": True,
+            })
+        return sorted(results, key=lambda item: (item["projectId"], item["fileId"])), skipped
 
     @staticmethod
     def _resolve_files(manifest: dict, game_version: str, install_optional_files: bool, reporter: ProgressReporter | None) -> tuple[list[dict], int]:

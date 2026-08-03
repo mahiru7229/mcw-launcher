@@ -193,7 +193,8 @@ class CurseForgeContentManager:
 
                 compatibility_warning = ""
                 if item["kind"] == "pack":
-                    target, relative = CurseForgePackRegistry.managed_path(instance, str(item["path"]), file.file_name)
+                    requested_path = "" if bool(entry.get("resolvePathFromProvider", False)) else str(item["path"])
+                    target, relative = CurseForgePackRegistry.managed_path(instance, requested_path, file.file_name)
                     request = CurseForgeContentManager._artifact_request(file, target, item)
                     artifact_download_service.accept_manual_file(request, cache)
                     entry["fileName"] = target.name
@@ -220,6 +221,7 @@ class CurseForgeContentManager:
                 entry["retryableDownload"] = True
                 entry["acceptedUnverified"] = bool(compatibility_warning)
                 entry["compatibilityWarning"] = compatibility_warning
+                entry["resolvePathFromProvider"] = False
                 downloaded += 1
                 accepted_unverified += int(bool(compatibility_warning))
             except Exception as error:

@@ -48,6 +48,8 @@ class InstanceWorkspacePage(BasePage):
     delete_requested = Signal(str)
     import_requested = Signal(object)
     export_requested = Signal(str, object, bool)
+    import_modpack_package_requested = Signal(object)
+    export_modpack_requested = Signal(str)
     fabric_versions_requested = Signal(str)
     quilt_versions_requested = Signal(str)
     forge_versions_requested = Signal(str)
@@ -248,7 +250,7 @@ class InstanceWorkspacePage(BasePage):
 
     def _connect_dialogs(self) -> None:
         self.create_dialog.create_requested.connect(self.create_requested.emit)
-        self.create_dialog.import_requested.connect(self._choose_import)
+        self.create_dialog.import_modpack_package_requested.connect(self._choose_modpack_import)
         self.create_dialog.browse_modrinth_requested.connect(self.browse_modpacks_requested.emit)
         self.create_dialog.browse_curseforge_requested.connect(self.browse_curseforge_modpacks_requested.emit)
         self.create_dialog.browse_ftb_requested.connect(self.browse_ftb_modpacks_requested.emit)
@@ -274,6 +276,8 @@ class InstanceWorkspacePage(BasePage):
             "delete_requested",
             "import_requested",
             "export_requested",
+            "import_modpack_package_requested",
+            "export_modpack_requested",
             "fabric_versions_requested",
             "quilt_versions_requested",
             "forge_versions_requested",
@@ -730,6 +734,16 @@ class InstanceWorkspacePage(BasePage):
         if path:
             self.import_requested.emit(Path(path))
 
+    def _choose_modpack_import(self) -> None:
+        path, _selected_filter = QFileDialog.getOpenFileName(
+            self,
+            tr("modpack_package.import.file_title"),
+            "",
+            tr("modpack_package.import.file_filter"),
+        )
+        if path:
+            self.import_modpack_package_requested.emit(Path(path))
+
     def _choose_clone(self) -> None:
         name = self.current_instance_name()
         if not name:
@@ -749,23 +763,8 @@ class InstanceWorkspacePage(BasePage):
 
     def _choose_export(self) -> None:
         name = self.current_instance_name()
-        if not name:
-            return
-        path, _selected_filter = QFileDialog.getSaveFileName(self, tr("Export MCW instance"), f"{name}.mcwpack", tr("MCW Package (*.mcwpack)"))
-        if not path:
-            return
-        output_path = Path(path)
-        if output_path.suffix.lower() != ".mcwpack":
-            output_path = output_path.with_suffix(".mcwpack")
-        answer = QMessageBox.question(
-            self,
-            tr("workspace.export.title"),
-            tr("workspace.export.include_saves"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
-        )
-        if answer == QMessageBox.StandardButton.Cancel:
-            return
-        self.export_requested.emit(name, output_path, answer == QMessageBox.StandardButton.Yes)
+        if name:
+            self.export_modpack_requested.emit(name)
 
     def _confirm_delete(self) -> None:
         name = self.current_instance_name()

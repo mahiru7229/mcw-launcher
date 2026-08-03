@@ -29,10 +29,17 @@ class InstanceController(BaseController):
     forge_diagnostics_finished = Signal(object)
     instance_created = Signal(object)
     import_preview_ready = Signal(object)
+    modpack_import_preview_ready = Signal(object)
+    modpack_export_finished = Signal(object)
+    portable_manual_files_installed = Signal(object)
 
     CREATE_TASK_ID = "instance.create"
     IMPORT_INSPECT_TASK_ID = "instance.import.inspect"
     IMPORT_TASK_ID = "instance.import"
+    MODPACK_IMPORT_INSPECT_TASK_ID = "modpack.import.inspect"
+    MODPACK_IMPORT_TASK_ID = "modpack.import"
+    MODPACK_EXPORT_TASK_ID = "modpack.export"
+    PORTABLE_MANUAL_TASK_ID = "modpack.manual.install"
     REPAIR_TASK_ID = "instance.repair.full"
     REPAIR_SCAN_TASK_ID = "instance.repair.scan"
     REPAIR_EXECUTE_TASK_ID = "instance.repair.execute"
@@ -256,6 +263,51 @@ class InstanceController(BaseController):
             f"Importing '{package_path.name}'...",
         )
 
+    def inspect_modpack_package(self, package_path: Path) -> None:
+        path = Path(package_path)
+        self._task_runner.run(
+            self.MODPACK_IMPORT_INSPECT_TASK_ID,
+            lambda: self._core.instances.inspect_modpack_package(path),
+            f"Reading modpack package '{path.name}'...",
+        )
+
+    def import_modpack_package(self, package_path: Path, settings_override: dict | None = None, install_optional_files: bool = True, instance_name: str = "") -> None:
+        path = Path(package_path)
+        normalized_override = copy.deepcopy(settings_override)
+        self._task_runner.run(
+            self.MODPACK_IMPORT_TASK_ID,
+            lambda: self._core.instances.import_modpack_package(
+                path,
+                self._on_package_progress,
+                settings_override=normalized_override,
+                install_optional_files=install_optional_files,
+                instance_name=instance_name,
+            ),
+            f"Importing modpack package '{path.name}'...",
+        )
+
+    def export_modpack(self, name: str, output_path: Path, mode: str, portable_mode: str = "smart", include_saves: bool = False) -> None:
+        name = name.strip()
+        if not name:
+            return
+        self._task_runner.run(
+            self.MODPACK_EXPORT_TASK_ID,
+            lambda: self._core.instances.export_modpack(name, output_path, mode, portable_mode, include_saves, self._on_package_progress),
+            f"Exporting modpack profile for '{name}'...",
+        )
+
+    def install_portable_manual_files(self, name: str, requirements: object, sources: object) -> None:
+        normalized_name = str(name or "").strip()
+        if not normalized_name:
+            return
+        requirement_values = tuple(requirements or ())
+        source_values = tuple(Path(source) for source in (sources or ()))
+        self._task_runner.run(
+            self.PORTABLE_MANUAL_TASK_ID,
+            lambda: self._core.instances.install_portable_manual_files(normalized_name, requirement_values, source_values),
+            f"Importing manually downloaded files for '{normalized_name}'...",
+        )
+
     def change_icon(self, name: str, source_path: Path) -> None:
         name = name.strip()
         if not name:
@@ -289,6 +341,12 @@ class InstanceController(BaseController):
             self.log_created.emit(f"Instance package inspected: {result.package_path}")
             return
 
+        if task_id == self.MODPACK_IMPORT_INSPECT_TASK_ID:
+            self.modpack_import_preview_ready.emit(result)
+            self.status_changed.emit(f"Ready to import modpack '{result.name}'")
+            self.log_created.emit(f"Provider modpack package inspected: {result.package_path}")
+            return
+
         selected_name = self._selected_name
         if task_id == self.CREATE_TASK_ID:
             selected_name = result.name
@@ -309,6 +367,17 @@ class InstanceController(BaseController):
         elif task_id == self.IMPORT_TASK_ID:
             selected_name = result.name
             self.status_changed.emit(f"Imported '{selected_name}'")
+        elif task_id == self.MODPACK_IMPORT_TASK_ID:
+            selected_name = result.name
+            self.status_changed.emit(f"Imported modpack '{selected_name}'")
+        elif task_id == self.MODPACK_EXPORT_TASK_ID:
+            self.modpack_export_finished.emit(result)
+            self.status_changed.emit(f"Exported modpack package to '{result.output_path}'")
+            return
+        elif task_id == self.PORTABLE_MANUAL_TASK_ID:
+            self.portable_manual_files_installed.emit(result)
+            self.status_changed.emit(f"Imported {len(result.get('installed', ())) or 0} manual modpack file(s)")
+            return
         elif task_id == self.LOADER_CHANGE_TASK_ID:
             selected_name = result.name
             loader_name, loader_version = self._core.loaders.normalize(result.mod_loader)

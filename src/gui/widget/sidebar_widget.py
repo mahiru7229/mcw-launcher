@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Property, QSize, Signal
-from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QStyle, QVBoxLayout
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
 from mcw_core.api.language.language_manager import tr
 from src.gui.config import DEVELOPER_NAME, LAUNCHER_NAME, NAVIGATION_ITEMS
@@ -120,11 +121,12 @@ class SidebarWidget(QFrame):
         for page_id, button in self._buttons.items():
             button.setText(self._button_text(page_id))
             button.setToolTip(self._button_labels.get(page_id, "") if self._collapsed else "")
-        arrow = QStyle.StandardPixmap.SP_ArrowRight if self._collapsed else QStyle.StandardPixmap.SP_ArrowLeft
-        self._toggle_button.setText("")
-        self._toggle_button.setIcon(self.style().standardIcon(arrow))
-        self._toggle_button.setToolTip(tr("motion.sidebar.expand" if self._collapsed else "motion.sidebar.collapse"))
-        self._toggle_button.setAccessibleName(self._toggle_button.toolTip())
+        label = tr("sidebar.toggle.show" if self._collapsed else "sidebar.toggle.hide")
+        self._toggle_button.setIcon(QIcon())
+        self._toggle_button.setText("☰" if self._collapsed else f"☰  {label}")
+        self._toggle_button.setToolTip(label)
+        self._toggle_button.setAccessibleName(label)
+        self._toggle_button.setAccessibleDescription(tr("sidebar.toggle.description"))
 
     def retranslate_dynamic(self) -> None:
         self.set_collapsed_visual(self._collapsed)

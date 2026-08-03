@@ -18,12 +18,15 @@ from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.forge.forge_change_manager import ForgeChangeManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.progress.progress_reporter import ProgressReporter
+from src.core.package.modpack_package_manager import ModpackPackageManager
+from src.core.package.portable_content_manager import PortableContentManager
 from src.core.repair.repair_service import RepairService
 from src.core.runtime.instance_repair_manager import InstanceRepairManager
 from src.models.instance.instance import Instance
 from src.models.instance.instance_state import InstanceStatus
 from src.models.instance.instance_health import InstanceHealthReport
 from src.models.progress.progress_callback import ProgressCallback
+from src.models.package.modpack_export import ModpackExportOptions
 
 from mcw_core.models import InstanceCreateRequest
 
@@ -182,6 +185,26 @@ class InstanceService:
     @staticmethod
     def export_package(name: str, output_path: Path, include_saves: bool = False, on_progress: ProgressCallback | None = None) -> Path:
         return InstanceManager.export(name, Path(output_path), include_saves, on_progress)
+
+    @staticmethod
+    def inspect_modpack_package(package_path: Path):
+        return ModpackPackageManager.inspect(Path(package_path))
+
+    @staticmethod
+    def import_modpack_package(package_path: Path, on_progress: ProgressCallback | None = None, settings_override: dict | None = None, install_optional_files: bool = True, instance_name: str = "") -> Instance:
+        return ModpackPackageManager.import_package(Path(package_path), settings_override=settings_override, install_optional_files=install_optional_files, on_progress=on_progress, instance_name=instance_name)
+
+    @staticmethod
+    def export_modpack(name: str, output_path: Path, mode: str, portable_mode: str = "smart", include_saves: bool = False, on_progress: ProgressCallback | None = None):
+        instance = InstanceManager.load(name)
+        options = ModpackExportOptions(mode=mode, portable_mode=portable_mode, include_saves=include_saves)
+        return ModpackPackageManager.export(instance, Path(output_path), options, on_progress)
+
+    @staticmethod
+    def install_portable_manual_files(name: str, requirements: object, sources: object) -> dict[str, object]:
+        instance = InstanceManager.load(name)
+        installed = PortableContentManager.install_many(instance, tuple(requirements or ()), tuple(Path(source) for source in (sources or ())))
+        return {"instanceName": instance.name, "installed": installed}
 
 
 class JavaService:

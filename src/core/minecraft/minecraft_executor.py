@@ -27,6 +27,7 @@ from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
 from src.core.network.download_pause import download_pause_controller
 from src.core.progress.progress_reporter import ProgressReporter
+from src.core.package.portable_content_manager import PortableContentManager
 from src.core.repair.verification_cache import VerificationCache
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.core.runtime.process_supervisor import ProcessSupervisor
@@ -78,9 +79,12 @@ class MinecraftExecutor:
             block_curseforge_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "curseforge")
             block_forge_preflight_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "forge_preflight")
             launch_lock_token = getattr(run_lock, "token", None)
+            PortableContentManager.ensure(instance)
+            PortableContentManager.prefetch_referenced(instance, reporter)
             modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
             curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
             ftb_warnings = FTBContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
+            PortableContentManager.finalize_disabled(instance)
 
             download_pause_controller.raise_if_requested()
             VersionManifestManager.get()
