@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/Stable-v0.12.0-brightgreen" alt="Current stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Beta-v1.0.0--beta.1-orange" alt="Current beta version">
+    <img src="https://img.shields.io/badge/Beta-v1.0.0--beta.2-orange" alt="Current beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -25,12 +25,12 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v1.0.0-beta.1.md">v1.0 beta notes</a> ·
+  <a href="docs/RELEASE-v1.0.0-beta.2.md">v1.0 beta notes</a> ·
   <a href="docs/UPDATE_PACKAGES.md">Updater packages</a>
 </p>
 
 > [!NOTE]
-> `v0.12.0` là bản Stable hiện tại. `v1.0.0-beta.1` mở đầu dòng trải nghiệm nội dung mới và chỉ được nhận khi người dùng chủ động tham gia tester program.
+> `v0.12.0` là bản Stable hiện tại. `v1.0.0-beta.2` thêm FTB Modpacks vào Content Browser và chỉ được nhận khi người dùng chủ động tham gia tester program.
 
 ---
 
@@ -42,12 +42,14 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
-### Điểm nổi bật của `v1.0.0-beta.1`
+### Điểm nổi bật của `v1.0.0-beta.2`
 
-- Thêm icon cho kết quả mod/modpack Modrinth và CurseForge với cache ảnh HTTPS có giới hạn.
-- Click project sẽ mở bảng chi tiết thay vì cài ngay, gồm mô tả, tác giả, lượt tải, metadata tương thích, gallery và link web khi provider cung cấp.
-- Giữ bước chọn Minecraft version, loader và project version trước khi cài đặt.
-- Dùng chung detail panel trong Manage Mods và browser mod/modpack, tạo nền cho FTB, resource pack, shader pack và datapack ở các beta sau.
+- Thêm **FTB Modpacks** vào Add Instance, trang Instances và instance workspace.
+- Duyệt pack phổ biến hoặc tìm kiếm, xem icon/thông tin dự án rồi chọn phiên bản trước khi cài.
+- Hiển thị Minecraft version, mod loader, file client, dung lượng tải và RAM khuyến nghị từ manifest phiên bản.
+- Tải URL chính rồi tự chuyển qua mirrors, xác minh SHA-1/size, bỏ qua file server-only và hỗ trợ file tùy chọn.
+- Cài bằng staging directory, ghi registry `.mcw/ftb-pack.json`, áp dụng artwork và rollback instance nếu bước sau tạo instance thất bại.
+- Giữ nguyên Rich Content Browser của beta.1 cho Modrinth/CurseForge và dùng chung detail panel cho FTB.
 
 ### Điểm nổi bật của `v0.12.0-beta.6`
 
@@ -114,7 +116,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.12.0` là bản Stable hiện tại; `v1.0.0-beta.1` dành cho tester muốn thử content browser mới.
+- `v0.12.0` là bản Stable hiện tại; `v1.0.0-beta.2` dành cho tester muốn thử Content Browser cùng FTB Modpacks.
 - Stable là kênh mặc định. Để nhận bản thử nghiệm, người dùng phải chủ động bật:
 
 ```text
@@ -193,12 +195,14 @@ MCW Launcher is an open-source Minecraft launcher centered around **isolated ins
 
 Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
 
-### `v1.0.0-beta.1` highlights
+### `v1.0.0-beta.2` highlights
 
-- Add project icons to Modrinth and CurseForge mod/modpack results through a bounded HTTPS image cache.
-- Open a rich details panel on selection instead of installing immediately, including descriptions, authors, downloads, compatibility metadata, gallery media, and provider links when available.
-- Keep Minecraft version, loader, and project version selection as an explicit step before installation.
-- Share the same details panel across Manage Mods and provider browsers, establishing the foundation for FTB, resource packs, shader packs, and datapacks in later betas.
+- Add **FTB Modpacks** to Add Instance, the Instances page, and the instance workspace.
+- Browse popular packs or search, review project details, and choose an exact pack version before installation.
+- Preview Minecraft version, mod loader, client file count, download size, and recommended memory from the version manifest.
+- Try the primary URL and FTB mirrors with SHA-1/size verification, skip server-only files, and support optional files.
+- Install through a staging directory, save `.mcw/ftb-pack.json`, apply artwork, and roll back the instance when a post-create step fails.
+- Preserve the beta.1 Rich Content Browser for Modrinth/CurseForge and reuse its details panel for FTB.
 
 ### `v0.11.0` highlights
 
@@ -441,6 +445,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
+| [`docs/RELEASE-v1.0.0-beta.2.md`](docs/RELEASE-v1.0.0-beta.2.md) | FTB modpack browsing, verified mirror downloads and transactional installation |
 | [`docs/RELEASE-v1.0.0-beta.1.md`](docs/RELEASE-v1.0.0-beta.1.md) | Rich Modrinth/CurseForge project browsing foundation |
 | [`docs/RELEASE-v0.12.0.md`](docs/RELEASE-v0.12.0.md) | Complete v0.12.0 Stable release notes |
 | [`docs/RELEASE-v0.12.0-beta.6.md`](docs/RELEASE-v0.12.0-beta.6.md) | Instance icons and runtime-state badges |
@@ -466,7 +471,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v1.0.0-beta.1 |
+| Component | Status in v1.0.0-beta.2 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |
@@ -483,6 +488,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 | Theme schema 1–6 | Available — animation, custom fonts, authoring tools, palette and custom accent support |
 | CurseForge Gateway mods | Available — icon cards, rich project details, Fabric/Quilt/Forge/NeoForge install, required dependencies, transactional apply, public gateway, cache and manual fallback |
 | CurseForge modpacks | Available — Fabric/Quilt/Forge/NeoForge manifest-driven install with universal dependency support |
+| FTB modpacks | Available — project/version browser, primary plus mirror downloads, SHA-1/size verification, optional/client filtering, staging and rollback |
 
 ## Contributing and bug reports
 

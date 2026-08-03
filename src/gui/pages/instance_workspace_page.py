@@ -61,6 +61,7 @@ class InstanceWorkspacePage(BasePage):
     manage_mods_requested = Signal(str)
     browse_modpacks_requested = Signal()
     browse_curseforge_modpacks_requested = Signal()
+    browse_ftb_modpacks_requested = Signal()
     backup_requested = Signal(str, str)
     restore_backup_requested = Signal(str, object)
     open_backups_requested = Signal(str)
@@ -112,6 +113,7 @@ class InstanceWorkspacePage(BasePage):
         self.import_button = set_theme_icon(QPushButton(), "icon.action.import")
         self.modrinth_button = set_theme_icon(QPushButton(), "icon.action.modrinth")
         self.browse_curseforge_modpacks_button = set_theme_icon(QPushButton(), "icon.action.download")
+        self.browse_ftb_modpacks_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.refresh_button = set_theme_icon(QPushButton(), "icon.action.refresh")
         self.account_button = set_theme_icon(QPushButton(), "icon.action.account")
         self.account_button.setIconSize(QSize(32, 32))
@@ -121,6 +123,7 @@ class InstanceWorkspacePage(BasePage):
         self.import_button.clicked.connect(self._choose_import)
         self.modrinth_button.clicked.connect(self.browse_modpacks_requested.emit)
         self.browse_curseforge_modpacks_button.clicked.connect(self.browse_curseforge_modpacks_requested.emit)
+        self.browse_ftb_modpacks_button.clicked.connect(self.browse_ftb_modpacks_requested.emit)
         self.refresh_button.clicked.connect(self.refresh_requested.emit)
         self.account_button.clicked.connect(self.manage_accounts_requested.emit)
 
@@ -128,6 +131,7 @@ class InstanceWorkspacePage(BasePage):
         toolbar_layout.addWidget(self.import_button)
         toolbar_layout.addWidget(self.modrinth_button)
         toolbar_layout.addWidget(self.browse_curseforge_modpacks_button)
+        toolbar_layout.addWidget(self.browse_ftb_modpacks_button)
         toolbar_layout.addWidget(self.refresh_button)
         toolbar_layout.addStretch(1)
         toolbar_layout.addWidget(self.account_button)
@@ -239,6 +243,7 @@ class InstanceWorkspacePage(BasePage):
         self.create_dialog.import_requested.connect(self._choose_import)
         self.create_dialog.browse_modrinth_requested.connect(self.browse_modpacks_requested.emit)
         self.create_dialog.browse_curseforge_requested.connect(self.browse_curseforge_modpacks_requested.emit)
+        self.create_dialog.browse_ftb_requested.connect(self.browse_ftb_modpacks_requested.emit)
 
         self.management_dialog.launch_requested.connect(self._request_launch)
         self.management_dialog.open_folder_requested.connect(self.open_instance_folder_requested.emit)
@@ -274,6 +279,7 @@ class InstanceWorkspacePage(BasePage):
             "manage_mods_requested",
             "browse_modpacks_requested",
             "browse_curseforge_modpacks_requested",
+            "browse_ftb_modpacks_requested",
             "backup_requested",
             "restore_backup_requested",
             "open_backups_requested",
@@ -823,6 +829,7 @@ class InstanceWorkspacePage(BasePage):
         self.import_button.setText(tr("workspace.toolbar.import"))
         self.modrinth_button.setText(tr("workspace.toolbar.modrinth"))
         self.browse_curseforge_modpacks_button.setText(tr("workspace.toolbar.curseforge"))
+        self.browse_ftb_modpacks_button.setText(tr("workspace.toolbar.ftb"))
         self.browse_curseforge_modpacks_button.setVisible(CurseForgeConfigManager.is_configured())
         self.refresh_button.setText(tr("workspace.toolbar.refresh"))
         self.search_input.setPlaceholderText(tr("workspace.search.placeholder"))

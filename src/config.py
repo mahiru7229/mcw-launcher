@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-VERSION = "v1.0.0-beta.1"
-VERSION_ID = "1.0.0-beta.1"
+VERSION = "v1.0.0-beta.2"
+VERSION_ID = "1.0.0-beta.2"
 VERSION_TAG = f"v{VERSION_ID}"
 UPDATE_CHANNEL = "beta"
 GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
@@ -10,6 +10,7 @@ LAUNCHER_SLUG = "mcw-launcher"
 LAUNCHER_NAME = f"MCW LAUNCHER {VERSION}"
 MODRINTH_USER_AGENT = f"{DEVELOPER_NAME}/{LAUNCHER_SLUG}/{VERSION_ID} (https://github.com/{GITHUB_REPOSITORY})"
 CURSEFORGE_USER_AGENT = MODRINTH_USER_AGENT
+FTB_USER_AGENT = MODRINTH_USER_AGENT
 
 # Public CurseForge gateway used by default on fresh installations. Custom
 # HTTPS gateways configured by the user or deployment environment still take

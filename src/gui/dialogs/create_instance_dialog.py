@@ -27,6 +27,7 @@ class CreateInstanceDialog(QDialog):
     import_requested = Signal()
     browse_modrinth_requested = Signal()
     browse_curseforge_requested = Signal()
+    browse_ftb_requested = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -108,12 +109,15 @@ class CreateInstanceDialog(QDialog):
 
         self.modrinth_button = set_theme_icon(QPushButton(), "icon.action.modrinth")
         self.curseforge_button = set_theme_icon(QPushButton(), "icon.action.download")
+        self.ftb_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.import_button = set_theme_icon(QPushButton(), "icon.action.import")
         self.modrinth_button.clicked.connect(self._browse_modrinth)
         self.curseforge_button.clicked.connect(self._browse_curseforge)
+        self.ftb_button.clicked.connect(self._browse_ftb)
         self.import_button.clicked.connect(self._import_package)
         layout.addWidget(self.modrinth_button)
         layout.addWidget(self.curseforge_button)
+        layout.addWidget(self.ftb_button)
         layout.addWidget(self.import_button)
         layout.addStretch(1)
         return tab
@@ -161,6 +165,10 @@ class CreateInstanceDialog(QDialog):
         self.browse_curseforge_requested.emit()
         self.accept()
 
+    def _browse_ftb(self) -> None:
+        self.browse_ftb_requested.emit()
+        self.accept()
+
     def _import_package(self) -> None:
         self.import_requested.emit()
         self.accept()
@@ -179,6 +187,7 @@ class CreateInstanceDialog(QDialog):
         self.modpack_hint.setText(tr("workspace.create.modpack_hint"))
         self.modrinth_button.setText(tr("workspace.create.browse_modrinth"))
         self.curseforge_button.setText(tr("workspace.create.browse_curseforge"))
+        self.ftb_button.setText(tr("workspace.create.browse_ftb"))
         self.curseforge_button.setVisible(CurseForgeConfigManager.is_configured())
         self.import_button.setText(tr("workspace.create.import_package"))
         self.create_button.setText(tr("workspace.create.create_button"))
