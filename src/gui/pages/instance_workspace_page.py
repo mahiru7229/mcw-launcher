@@ -48,6 +48,8 @@ class InstanceWorkspacePage(BasePage):
     delete_requested = Signal(str)
     import_requested = Signal(object)
     export_requested = Signal(str, object, bool)
+    import_modpack_package_requested = Signal(object)
+    export_modpack_requested = Signal(str)
     fabric_versions_requested = Signal(str)
     quilt_versions_requested = Signal(str)
     forge_versions_requested = Signal(str)
@@ -59,8 +61,11 @@ class InstanceWorkspacePage(BasePage):
     export_forge_diagnostics_requested = Signal(str)
     repair_instance_requested = Signal(str)
     manage_mods_requested = Signal(str)
+    manage_content_packs_requested = Signal(str)
+    manage_content_library_requested = Signal(str)
     browse_modpacks_requested = Signal()
     browse_curseforge_modpacks_requested = Signal()
+    browse_ftb_modpacks_requested = Signal()
     backup_requested = Signal(str, str)
     restore_backup_requested = Signal(str, object)
     open_backups_requested = Signal(str)
@@ -112,6 +117,7 @@ class InstanceWorkspacePage(BasePage):
         self.import_button = set_theme_icon(QPushButton(), "icon.action.import")
         self.modrinth_button = set_theme_icon(QPushButton(), "icon.action.modrinth")
         self.browse_curseforge_modpacks_button = set_theme_icon(QPushButton(), "icon.action.download")
+        self.browse_ftb_modpacks_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.refresh_button = set_theme_icon(QPushButton(), "icon.action.refresh")
         self.account_button = set_theme_icon(QPushButton(), "icon.action.account")
         self.account_button.setIconSize(QSize(32, 32))
@@ -121,6 +127,7 @@ class InstanceWorkspacePage(BasePage):
         self.import_button.clicked.connect(self._choose_import)
         self.modrinth_button.clicked.connect(self.browse_modpacks_requested.emit)
         self.browse_curseforge_modpacks_button.clicked.connect(self.browse_curseforge_modpacks_requested.emit)
+        self.browse_ftb_modpacks_button.clicked.connect(self.browse_ftb_modpacks_requested.emit)
         self.refresh_button.clicked.connect(self.refresh_requested.emit)
         self.account_button.clicked.connect(self.manage_accounts_requested.emit)
 
@@ -128,6 +135,7 @@ class InstanceWorkspacePage(BasePage):
         toolbar_layout.addWidget(self.import_button)
         toolbar_layout.addWidget(self.modrinth_button)
         toolbar_layout.addWidget(self.browse_curseforge_modpacks_button)
+        toolbar_layout.addWidget(self.browse_ftb_modpacks_button)
         toolbar_layout.addWidget(self.refresh_button)
         toolbar_layout.addStretch(1)
         toolbar_layout.addWidget(self.account_button)
@@ -191,6 +199,8 @@ class InstanceWorkspacePage(BasePage):
         self.launch_button.setObjectName("PrimaryButton")
         self.edit_button = set_theme_icon(QPushButton(), "icon.action.edit")
         self.manage_mods_button = set_theme_icon(QPushButton(), "icon.action.mods")
+        self.manage_content_packs_button = set_theme_icon(QPushButton(), "icon.action.download")
+        self.manage_content_library_button = set_theme_icon(QPushButton(), "icon.action.search")
         self.settings_button = set_theme_icon(QPushButton(), "icon.action.settings")
         self.change_icon_button = set_theme_icon(QPushButton(), "icon.action.edit")
         self.open_folder_button = set_theme_icon(QPushButton(), "icon.action.folder")
@@ -203,6 +213,8 @@ class InstanceWorkspacePage(BasePage):
         self.launch_button.clicked.connect(self._request_launch)
         self.edit_button.clicked.connect(self._open_management_dialog)
         self.manage_mods_button.clicked.connect(lambda: self.manage_mods_requested.emit(self.current_instance_name()))
+        self.manage_content_packs_button.clicked.connect(lambda: self.manage_content_packs_requested.emit(self.current_instance_name()))
+        self.manage_content_library_button.clicked.connect(lambda: self.manage_content_library_requested.emit(self.current_instance_name()))
         self.settings_button.clicked.connect(lambda: self.instance_settings_requested.emit(self.current_instance_name()))
         self.change_icon_button.clicked.connect(self._choose_icon)
         self.open_folder_button.clicked.connect(lambda: self.open_instance_folder_requested.emit(self.current_instance_name()))
@@ -219,7 +231,9 @@ class InstanceWorkspacePage(BasePage):
         self.action_panel.layout.addSpacing(4)
         self.action_panel.layout.addWidget(self.launch_button)
         self.action_panel.layout.addWidget(self.edit_button)
+        self.action_panel.layout.addWidget(self.manage_content_library_button)
         self.action_panel.layout.addWidget(self.manage_mods_button)
+        self.action_panel.layout.addWidget(self.manage_content_packs_button)
         self.action_panel.layout.addWidget(self.settings_button)
         self.action_panel.layout.addWidget(self.change_icon_button)
         self.action_panel.layout.addWidget(self.open_folder_button)
@@ -236,9 +250,10 @@ class InstanceWorkspacePage(BasePage):
 
     def _connect_dialogs(self) -> None:
         self.create_dialog.create_requested.connect(self.create_requested.emit)
-        self.create_dialog.import_requested.connect(self._choose_import)
+        self.create_dialog.import_modpack_package_requested.connect(self._choose_modpack_import)
         self.create_dialog.browse_modrinth_requested.connect(self.browse_modpacks_requested.emit)
         self.create_dialog.browse_curseforge_requested.connect(self.browse_curseforge_modpacks_requested.emit)
+        self.create_dialog.browse_ftb_requested.connect(self.browse_ftb_modpacks_requested.emit)
 
         self.management_dialog.launch_requested.connect(self._request_launch)
         self.management_dialog.open_folder_requested.connect(self.open_instance_folder_requested.emit)
@@ -261,6 +276,8 @@ class InstanceWorkspacePage(BasePage):
             "delete_requested",
             "import_requested",
             "export_requested",
+            "import_modpack_package_requested",
+            "export_modpack_requested",
             "fabric_versions_requested",
             "quilt_versions_requested",
             "forge_versions_requested",
@@ -274,6 +291,7 @@ class InstanceWorkspacePage(BasePage):
             "manage_mods_requested",
             "browse_modpacks_requested",
             "browse_curseforge_modpacks_requested",
+            "browse_ftb_modpacks_requested",
             "backup_requested",
             "restore_backup_requested",
             "open_backups_requested",
@@ -597,6 +615,8 @@ class InstanceWorkspacePage(BasePage):
             self.running_label.setText("")
             self.health_label.setText("")
             self.manage_mods_button.setEnabled(False)
+            self.manage_content_packs_button.setEnabled(False)
+            self.manage_content_library_button.setEnabled(False)
             self.management_dialog.set_instance(None)
             return
 
@@ -628,6 +648,8 @@ class InstanceWorkspacePage(BasePage):
         self.health_label.style().unpolish(self.health_label)
         self.health_label.style().polish(self.health_label)
         self.manage_mods_button.setEnabled(enabled and loader_name in {"fabric", "quilt", "forge", "neoforge"})
+        self.manage_content_packs_button.setEnabled(enabled)
+        self.manage_content_library_button.setEnabled(enabled)
         self.management_dialog.set_instance(instance)
 
     def _update_library_status(self) -> None:
@@ -708,9 +730,19 @@ class InstanceWorkspacePage(BasePage):
             self.reset_icon_requested.emit(name)
 
     def _choose_import(self) -> None:
-        path, _selected_filter = QFileDialog.getOpenFileName(self, tr("Import MCW instance"), "", tr("MCW Package (*.mcwpack *.zip)"))
+        path, _selected_filter = QFileDialog.getOpenFileName(self, tr("Import MCW instance"), "", tr("modpack_package.import.universal_filter"))
         if path:
             self.import_requested.emit(Path(path))
+
+    def _choose_modpack_import(self) -> None:
+        path, _selected_filter = QFileDialog.getOpenFileName(
+            self,
+            tr("modpack_package.import.file_title"),
+            "",
+            tr("modpack_package.import.file_filter"),
+        )
+        if path:
+            self.import_modpack_package_requested.emit(Path(path))
 
     def _choose_clone(self) -> None:
         name = self.current_instance_name()
@@ -731,23 +763,8 @@ class InstanceWorkspacePage(BasePage):
 
     def _choose_export(self) -> None:
         name = self.current_instance_name()
-        if not name:
-            return
-        path, _selected_filter = QFileDialog.getSaveFileName(self, tr("Export MCW instance"), f"{name}.mcwpack", tr("MCW Package (*.mcwpack)"))
-        if not path:
-            return
-        output_path = Path(path)
-        if output_path.suffix.lower() != ".mcwpack":
-            output_path = output_path.with_suffix(".mcwpack")
-        answer = QMessageBox.question(
-            self,
-            tr("workspace.export.title"),
-            tr("workspace.export.include_saves"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
-        )
-        if answer == QMessageBox.StandardButton.Cancel:
-            return
-        self.export_requested.emit(name, output_path, answer == QMessageBox.StandardButton.Yes)
+        if name:
+            self.export_modpack_requested.emit(name)
 
     def _confirm_delete(self) -> None:
         name = self.current_instance_name()
@@ -787,7 +804,9 @@ class InstanceWorkspacePage(BasePage):
         edit = menu.addAction(tr("workspace.action.edit"))
         change_icon = menu.addAction(tr("workspace.action.change_icon"))
         reset_icon = menu.addAction(tr("workspace.action.reset_icon"))
+        manage_library = menu.addAction(tr("workspace.action.manage_content_library"))
         manage_mods = menu.addAction(tr("workspace.action.manage_mods"))
+        manage_content = menu.addAction(tr("workspace.action.manage_content_packs"))
         menu.addSeparator()
         open_folder = menu.addAction(tr("workspace.action.open_folder"))
         repair = menu.addAction(tr("workspace.action.repair"))
@@ -795,7 +814,9 @@ class InstanceWorkspacePage(BasePage):
         export = menu.addAction(tr("workspace.action.export"))
         menu.addSeparator()
         delete = menu.addAction(tr("workspace.action.delete"))
+        manage_library.setEnabled(self.manage_content_library_button.isEnabled())
         manage_mods.setEnabled(self.manage_mods_button.isEnabled())
+        manage_content.setEnabled(self.manage_content_packs_button.isEnabled())
         chosen = menu.exec(self.instance_list.mapToGlobal(position))
         if chosen is launch:
             self._request_launch()
@@ -805,8 +826,12 @@ class InstanceWorkspacePage(BasePage):
             self._choose_icon()
         elif chosen is reset_icon:
             self._confirm_reset_icon()
+        elif chosen is manage_library:
+            self.manage_content_library_requested.emit(self.current_instance_name())
         elif chosen is manage_mods:
             self.manage_mods_requested.emit(self.current_instance_name())
+        elif chosen is manage_content:
+            self.manage_content_packs_requested.emit(self.current_instance_name())
         elif chosen is open_folder:
             self.open_instance_folder_requested.emit(self.current_instance_name())
         elif chosen is repair:
@@ -823,12 +848,15 @@ class InstanceWorkspacePage(BasePage):
         self.import_button.setText(tr("workspace.toolbar.import"))
         self.modrinth_button.setText(tr("workspace.toolbar.modrinth"))
         self.browse_curseforge_modpacks_button.setText(tr("workspace.toolbar.curseforge"))
+        self.browse_ftb_modpacks_button.setText(tr("workspace.toolbar.ftb"))
         self.browse_curseforge_modpacks_button.setVisible(CurseForgeConfigManager.is_configured())
         self.refresh_button.setText(tr("workspace.toolbar.refresh"))
         self.search_input.setPlaceholderText(tr("workspace.search.placeholder"))
         self.launch_button.setText(tr("workspace.action.launch"))
         self.edit_button.setText(tr("workspace.action.edit"))
+        self.manage_content_library_button.setText(tr("workspace.action.manage_content_library"))
         self.manage_mods_button.setText(tr("workspace.action.manage_mods"))
+        self.manage_content_packs_button.setText(tr("workspace.action.manage_content_packs"))
         self.settings_button.setText(tr("workspace.action.instance_settings"))
         self.change_icon_button.setText(tr("workspace.action.change_icon"))
         self.open_folder_button.setText(tr("workspace.action.open_folder"))

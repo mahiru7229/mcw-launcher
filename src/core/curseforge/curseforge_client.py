@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import Event, Lock
 from urllib.parse import quote, urlparse
@@ -30,7 +30,10 @@ class CurseForgeClient:
     MINECRAFT_GAME_ID = 432
 
     CLASS_MODS = 6
+    CLASS_RESOURCE_PACKS = 12
     CLASS_MODPACKS = 4471
+    CLASS_SHADERS = 6552
+    CLASS_IDS = {"mod": CLASS_MODS, "modpack": CLASS_MODPACKS, "resourcepack": CLASS_RESOURCE_PACKS, "shader": CLASS_SHADERS}
     SEARCH_TTL_SECONDS = 2 * 60
     FILES_TTL_SECONDS = 5 * 60
     PROJECT_TTL_SECONDS = 10 * 60
@@ -86,8 +89,8 @@ class CurseForgeClient:
     @staticmethod
     def search_projects(project_type: str, query: str = "", game_version: str = "", loader: str = "forge", index: int = 0, page_size: int = 25, sort: str = "popularity", force_refresh: bool = False, manual_refresh: bool = False) -> CurseForgeSearchResult:
         kind = str(project_type).strip().lower()
-        if kind not in {"mod", "modpack"}:
-            raise ValueError("CurseForge project type must be 'mod' or 'modpack'.")
+        if kind not in CurseForgeClient.CLASS_IDS:
+            raise ValueError("Unsupported CurseForge project type.")
         normalized_query = " ".join(str(query).strip().split())
         if not normalized_query:
             return CurseForgeSearchResult(
@@ -97,8 +100,8 @@ class CurseForgeClient:
                 page_size=min(max(1, int(page_size)), 50),
                 cache_info=CurseForgeCache.status(),
             )
-        normalized_loader = CurseForgeClient.normalize_loader(loader)
-        class_id = CurseForgeClient.CLASS_MODS if kind == "mod" else CurseForgeClient.CLASS_MODPACKS
+        normalized_loader = CurseForgeClient.normalize_loader(loader) if kind in {"mod", "modpack"} else ""
+        class_id = CurseForgeClient.CLASS_IDS[kind]
         sort_field = {"popularity": 2, "updated": 3, "newest": 11, "downloads": 6}.get(str(sort).lower(), 2)
         params: dict[str, object] = {
             "query": normalized_query,
@@ -161,6 +164,26 @@ class CurseForgeClient:
         if not isinstance(data, dict):
             raise RuntimeError(f"CurseForge project {identifier} is unavailable.")
         return CurseForgeClient._parse_project(data)
+
+    @staticmethod
+    def get_project_details(project_id: int | str, force_refresh: bool = False) -> CurseForgeProject:
+        identifier = CurseForgeClient._positive_int(project_id, "Project ID")
+        project = CurseForgeClient.get_project(identifier, force_refresh=force_refresh)
+        try:
+            lookup = CurseForgeClient._request_json(
+                "GET",
+                "/description",
+                params={"modId": identifier},
+                ttl=CurseForgeClient.PROJECT_TTL_SECONDS,
+                force_refresh=force_refresh,
+                allow_stale_on_error=True,
+                namespace="project-description",
+            )
+        except RuntimeError:
+            return project
+        payload = lookup.payload.get("data") if isinstance(lookup.payload, dict) else ""
+        description = str(payload or "").strip()
+        return replace(project, description=description) if description else project
 
     @staticmethod
     def get_projects_batch(project_ids: list[int] | tuple[int, ...] | set[int]) -> dict[int, CurseForgeProject]:
@@ -526,8 +549,19 @@ class CurseForgeClient:
             if isinstance(item, dict) and loader_names.get(int(item.get("modLoader", -1) or -1), "") not in {"", "any"}
         ))
         if not project_url and slug:
-            category = "modpacks" if int(data.get("classId", 0) or 0) == CurseForgeClient.CLASS_MODPACKS else "mc-mods"
+            class_id = int(data.get("classId", 0) or 0)
+            category = {CurseForgeClient.CLASS_MODPACKS: "modpacks", CurseForgeClient.CLASS_RESOURCE_PACKS: "texture-packs", CurseForgeClient.CLASS_SHADERS: "shaders"}.get(class_id, "mc-mods")
             project_url = f"https://www.curseforge.com/minecraft/{category}/{quote(slug, safe='-')}"
+        categories = tuple(
+            str(item.get("name") or "").strip()
+            for item in data.get("categories", [])
+            if isinstance(item, dict) and str(item.get("name") or "").strip()
+        )
+        screenshots = tuple(
+            str(item.get("url") or item.get("thumbnailUrl") or "").strip()
+            for item in data.get("screenshots", [])
+            if isinstance(item, dict) and str(item.get("url") or item.get("thumbnailUrl") or "").strip()
+        )
         return CurseForgeProject(
             project_id=project_id,
             name=str(data.get("name") or "Unknown project").strip(),
@@ -541,6 +575,15 @@ class CurseForgeClient:
             project_url=project_url,
             game_versions=game_versions,
             loaders=loaders,
+            source_url=str(links.get("sourceUrl") or "").strip(),
+            issues_url=str(links.get("issuesUrl") or "").strip(),
+            wiki_url=str(links.get("wikiUrl") or "").strip(),
+            categories=categories,
+            screenshot_urls=screenshots,
+            date_created=str(data.get("dateCreated") or "").strip(),
+            date_released=str(data.get("dateReleased") or "").strip(),
+            status=str(data.get("status") or "").strip(),
+            is_featured=bool(data.get("isFeatured", False)),
         )
 
     @staticmethod

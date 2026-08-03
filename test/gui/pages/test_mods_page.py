@@ -5,6 +5,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
+from mcw_core.api.language.language_manager import tr
 from src.gui.pages.mods_page import ModsPage
 from src.models.curseforge.cache import CurseForgeCacheInfo
 from src.models.curseforge.file import CurseForgeFile
@@ -86,6 +87,11 @@ def test_mods_page_filters_versions_by_loader_and_requests_instance_choice(gui_a
 
     page._request_install()
 
+    assert page.install_button.isEnabled() is False
+    assert page.details_label.text() == tr("content.install.preparing")
+    assert emitted == []
+    gui_app.processEvents()
+
     assert len(emitted) == 1
     assert emitted[0][0].version_id == "fabric-version"
     assert emitted[0][1] == "fabric"
@@ -113,7 +119,10 @@ def test_channel_checkbox_updates_before_deferred_reload(gui_app):
     assert page.include_beta_checkbox.isChecked() is True
     assert emitted == []
 
-    QTest.qWait(40)
+    assert page.include_beta_checkbox.isEnabled() is False
+    assert page.release_channel_label.text() == tr("content.channels.applying")
+
+    QTest.qWait(90)
     gui_app.processEvents()
 
     assert emitted == [(True, False)]
@@ -141,6 +150,10 @@ def test_provider_and_loader_selector_use_the_same_inline_catalog(gui_app):
     assert modrinth_searches == []
 
     page.search_button.click()
+
+    assert page.search_button.isEnabled() is False
+    assert curseforge_searches == []
+    gui_app.processEvents()
 
     assert curseforge_searches == [("Evil Hunter", "popularity", 0, "forge")]
     assert modrinth_searches == []
@@ -174,6 +187,10 @@ def test_curseforge_results_files_and_install_are_rendered_inline(gui_app):
 
     page._request_install()
 
+    assert page.install_button.isEnabled() is False
+    assert install_requested == []
+    gui_app.processEvents()
+
     assert len(install_requested) == 1
     assert install_requested[0][0].file_id == 99
     assert install_requested[0][1] == "fabric"
@@ -194,3 +211,15 @@ def test_catalog_selector_controls_follow_busy_state(gui_app):
     assert page.provider_combo.isEnabled() is True
     assert page.loader_combo.isEnabled() is True
     assert page.search_button.isEnabled() is True
+
+
+def test_project_description_is_hidden_until_launcher_setting_enables_it(gui_app):
+    page = ModsPage()
+
+    assert page.detail_panel.description_visible is False
+
+    page.set_show_project_descriptions(True)
+    assert page.detail_panel.description_visible is True
+
+    page.set_show_project_descriptions(False)
+    assert page.detail_panel.description_visible is False

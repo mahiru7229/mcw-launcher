@@ -487,3 +487,58 @@ def test_quilt_loader_compatibility_accepts_fabric_as_fallback() -> None:
 
     assert CurseForgeClient.loader_compatibility(fabric_file, "quilt") == "compatible"
     assert CurseForgeClient._loader_rank(quilt_file.loaders, "quilt") < CurseForgeClient._loader_rank(fabric_file.loaders, "quilt")
+
+
+def test_project_parser_keeps_rich_detail_metadata() -> None:
+    project = CurseForgeClient._parse_project({
+        "id": 42,
+        "name": "Example Project",
+        "slug": "example-project",
+        "summary": "A useful project",
+        "downloadCount": 9001,
+        "authors": [{"name": "Mahiru"}],
+        "logo": {"thumbnailUrl": "https://media.forgecdn.net/icon.png"},
+        "classId": CurseForgeClient.CLASS_MODS,
+        "dateModified": "2026-08-01T00:00:00Z",
+        "dateCreated": "2025-01-01T00:00:00Z",
+        "dateReleased": "2026-07-31T00:00:00Z",
+        "status": 4,
+        "isFeatured": True,
+        "links": {
+            "websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/example-project",
+            "sourceUrl": "https://github.com/example/project",
+            "issuesUrl": "https://github.com/example/project/issues",
+            "wikiUrl": "https://example.invalid/wiki",
+        },
+        "categories": [{"name": "Technology"}, {"name": "Magic"}],
+        "screenshots": [{"url": "https://media.forgecdn.net/screenshot.png"}],
+        "latestFilesIndexes": [
+            {"gameVersion": "1.21.1", "fileId": 1, "modLoader": 4},
+            {"gameVersion": "1.21.1", "fileId": 2, "modLoader": 6},
+        ],
+    })
+
+    assert project.authors == ("Mahiru",)
+    assert project.categories == ("Technology", "Magic")
+    assert project.screenshot_urls == ("https://media.forgecdn.net/screenshot.png",)
+    assert project.game_versions == ("1.21.1",)
+    assert project.loaders == ("fabric", "neoforge")
+    assert project.source_url == "https://github.com/example/project"
+    assert project.is_featured is True
+
+
+def test_search_supports_resource_pack_and_shader_class_ids(monkeypatch, tmp_path: Path) -> None:
+    class_ids = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        class_ids.append(request.url.params["classId"])
+        return httpx.Response(200, request=request, json={"data": [], "pagination": {"index": 0, "pageSize": 25, "totalCount": 0}})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    configure_gateway(monkeypatch, tmp_path, client)
+
+    CurseForgeClient.search_projects("resourcepack", query="faithful", game_version="1.21.1", loader="fabric", force_refresh=True)
+    CurseForgeClient.search_projects("shader", query="complementary", game_version="1.21.1", loader="forge", force_refresh=True)
+
+    assert class_ids == ["12", "6552"]
+    client.close()

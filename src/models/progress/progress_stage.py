@@ -22,6 +22,7 @@ class ProgressStage(Enum):
     DOWNLOADING_ASSETS = "downloading_assets"
     CHECKING_MODS = "checking_mods"
     DOWNLOADING_MODS = "downloading_mods"
+    DOWNLOADING_CONTENT = "downloading_content"
     CHECKING_MODPACK = "checking_modpack"
     DOWNLOADING_MODPACK = "downloading_modpack"
     DOWNLOADING_UPDATE = "downloading_update"

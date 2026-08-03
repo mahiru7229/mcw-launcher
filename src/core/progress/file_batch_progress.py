@@ -33,10 +33,10 @@ class FileBatchProgress:
 
     def complete(self, token: object) -> None:
         with self._lock:
+            speed = self._aggregate_speed_locked()
             self._rates.pop(token, None)
             self._completed = min(self._completed + 1, self._total)
             current = self._completed
-            speed = self._aggregate_speed_locked()
         self._emit(current=current, bytes_per_second=speed, force=self._total <= 20 or current >= self._total)
 
     def discard(self, token: object) -> None:

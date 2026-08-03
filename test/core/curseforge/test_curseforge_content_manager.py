@@ -198,3 +198,55 @@ def test_manual_requirements_preserve_structured_failure_and_all_links(monkeypat
     assert requirement.failure_reason == "HTTP_404"
     assert requirement.http_status == 404
     assert requirement.attempts == 5
+
+
+def test_download_round_reports_only_aggregate_mod_progress(tmp_path, monkeypatch):
+    from src.core.progress.progress_reporter import ProgressReporter
+    from src.models.progress.progress_stage import ProgressStage
+    from src.models.progress.progress_unit import ProgressUnit
+
+    instance_dir = tmp_path / "instance-progress"
+    instance_dir.mkdir()
+    instance = Instance(instance_id="id", name="Pack", version_id="1.20.1", instance_dir=instance_dir, mod_loader=("forge", "47.4.0"))
+    cache_path = tmp_path / "cache-progress" / "example.jar"
+    file = CurseForgeFile(
+        file_id=2,
+        project_id=1,
+        display_name="Very Verbose Mod Name",
+        file_name="example.jar",
+        release_type="release",
+        file_date="",
+        file_length=3,
+        download_url="https://example.invalid/example.jar",
+        sha1="a" * 40,
+        game_versions=("1.20.1",),
+        dependencies=(),
+        loaders=("forge",),
+    )
+    events = []
+
+    monkeypatch.setattr(Paths, "curseforge_file_cache", staticmethod(lambda *args: cache_path))
+
+    def fake_download(_file, destination, reporter=None, **_kwargs):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if reporter is not None:
+            reporter.bytes(ProgressStage.DOWNLOADING_MODS, "Very Verbose Mod Name", 1, 3, bytes_per_second=1_500_000)
+        destination.write_bytes(b"jar")
+        return destination
+
+    monkeypatch.setattr(CurseForgeDownloader, "download_file", staticmethod(fake_download))
+    monkeypatch.setattr(ModManager, "add_mods", staticmethod(lambda *_args, **_kwargs: [SimpleNamespace(file_name="example.jar")]))
+    entry = {"projectId": 1, "fileId": 2, "fileName": "example.jar", "path": "mods/example.jar", "sha1": "a" * 40, "size": 3, "downloadUrl": file.download_url}
+    missing = [{"kind": "mod", "key": "mod:1:2", "path": "mods/example.jar", "entry": entry}]
+    monkeypatch.setattr(ModManager, "read_mod", staticmethod(lambda *_args, **_kwargs: SimpleNamespace()))
+    monkeypatch.setattr(ModManager, "compatibility_warning", staticmethod(lambda *_args, **_kwargs: ""))
+
+    result = CurseForgeContentManager._download_round(instance, missing, ProgressReporter(events.append), 1, "token")
+
+    assert result["errors"] == {}
+    progress = [event for event in events if event.stage is ProgressStage.DOWNLOADING_MODS]
+    assert progress
+    assert all(event.unit is ProgressUnit.FILES for event in progress)
+    assert all(event.message == "Downloading modpack mods..." for event in progress)
+    assert all("Very Verbose Mod Name" not in event.message for event in progress)
+    assert any((event.bytes_per_second or 0) > 0 for event in progress)

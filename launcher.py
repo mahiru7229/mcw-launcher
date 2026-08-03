@@ -137,6 +137,14 @@ def main() -> None:
         language_manager.reload()
         language_manager.set_language(settings.get("gui", {}).get("language", "en-US"), notify=False)
         splash.retranslate()
+
+        from mcw_core.api.hardware.gpu_preference_manager import GpuPreferenceManager
+
+        def detect_graphics(progress_callback):
+            progress_callback(91, "startup.detecting_graphics")
+            return GpuPreferenceManager.detect()
+
+        gpu_detection = run_startup_task(detect_graphics, update_startup_progress, app.processEvents, timeout_seconds=12.0)
         startup_stage_key = "startup.loading_interface"
         splash.update_progress(93, startup_stage_key)
 
@@ -146,7 +154,7 @@ def main() -> None:
         # above is isolated so a locked database cannot freeze the splash forever.
         from src.gui.main_window_2 import MainWindow
 
-        window = MainWindow()
+        window = MainWindow(gpu_detection)
         startup_stage_key = "startup.finalizing"
         splash.update_progress(99, startup_stage_key)
         window.show()
@@ -154,6 +162,17 @@ def main() -> None:
         startup_stage_key = "startup.ready"
         splash.update_progress(100, startup_stage_key, "startup.ready_detail")
         splash.finish(window)
+
+        from PySide6.QtWidgets import QDialog
+        from mcw_core.api.config.launcher_settings_manager import LauncherSettingsManager
+        from src.gui.dialogs.first_run_setup_dialog import FirstRunSetupDialog
+
+        if FirstRunSetupDialog.should_show(settings):
+            setup_dialog = FirstRunSetupDialog(settings, gpu_detection, window)
+            if setup_dialog.exec() == QDialog.DialogCode.Accepted:
+                LauncherSettingsManager().save(setup_dialog.selected_settings())
+                window.gui_settings_controller.load()
+                window.launcher_settings_page.set_gpu_detection(gpu_detection)
     except Exception as error:
         from PySide6.QtWidgets import QMessageBox
         from mcw_core.api.language.language_manager import tr

@@ -36,7 +36,7 @@ def test_dialog_renders_modrinth_update_and_lock_state(gui_app, tmp_path):
 
     try:
         dialog.set_instance(instance)
-        dialog.set_mods([ModInfo(path=tmp_path / "example.jar", file_name="example.jar", enabled=True, mod_id="example", name="Example", version="1.0")])
+        dialog.set_mods([ModInfo(path=tmp_path / "example.jar", file_name="example.jar", enabled=True, mod_id="example", name="Example", version="1.0", source="modrinth", source_project_id="project", source_version_id="old")])
         dialog.set_update_report(ModrinthModUpdateReport(entries=(ModrinthModUpdateEntry(project_id="project", title="Example", file_name="example.jar", current_version_id="old", current_version_number="1.0", latest_version_id="new", latest_version_number="2.0", latest_version_type="release", locked=True),)))
         dialog.set_health_report(ModHealthReport(issues=(), enabled_mods=1, disabled_mods=0))
 
@@ -84,6 +84,39 @@ def test_forge_instance_enables_modrinth_browse_and_update_actions(gui_app, tmp_
 
         assert dialog.modrinth_button.isEnabled()
         assert dialog.update_all_button.isEnabled()
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+        gui_app.processEvents()
+
+
+def test_dialog_shows_modpack_provenance_in_source_column_and_details(gui_app, tmp_path):
+    instance = Instance(instance_id="id", name="Pack", version_id="1.20.1", instance_dir=tmp_path, mod_loader=("fabric", "0.19.3"))
+    dialog = ModManagerDialog()
+
+    try:
+        dialog.set_instance(instance)
+        dialog.set_mods([ModInfo(
+            path=tmp_path / "pack-mod.jar",
+            file_name="pack-mod.jar",
+            enabled=True,
+            mod_id="pack_mod",
+            name="Pack Mod",
+            version="1.0",
+            source="curseforge",
+            source_project_id="123",
+            source_file_id="456",
+            managed_by_modpack=True,
+            source_pack_provider="curseforge",
+        )])
+
+        assert dialog.table.item(0, 3).text() == "CurseForge • Modpack"
+        dialog.table.selectRow(0)
+        gui_app.processEvents()
+        details = dialog.details.toPlainText()
+        assert "CurseForge" in details
+        assert "123" in details
+        assert "456" in details
     finally:
         dialog.close()
         dialog.deleteLater()

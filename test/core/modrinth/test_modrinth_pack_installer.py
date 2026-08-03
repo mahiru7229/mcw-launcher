@@ -79,7 +79,7 @@ def test_installs_fabric_modpack_as_new_instance(tmp_path, monkeypatch):
     metadata_path = instance_dir / ".mcw" / "modrinth-pack.json"
     assert metadata_path.is_file()
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert metadata["schemaVersion"] == 4
+    assert metadata["schemaVersion"] == 5
     assert {item["path"] for item in metadata["managedFiles"]} == {"mods/example.jar", "config/example.json", "options.txt"}
     queued = next(item for item in metadata["managedFiles"] if item["path"] == "mods/example.jar")
     assert queued["downloads"] == ["https://cdn.modrinth.com/data/project/example.jar"]
@@ -145,7 +145,7 @@ def test_installs_forge_modpack_with_declared_forge_version(tmp_path, monkeypatc
 
     assert result.instance.mod_loader == ("forge", "47.4.21")
     assert ("resolve", "1.20.1", "forge", "47.4.21") in calls
-    assert ("prepare", "forge", "47.4.21") in calls
+    assert ("prepare", "forge", "47.4.21") not in calls
     metadata = json.loads((tmp_path / "instances" / "Forge Instance" / ".mcw" / "modrinth-pack.json").read_text(encoding="utf-8"))
     assert metadata["loader"] == "forge"
     assert metadata["loaderVersion"] == "47.4.21"
@@ -169,7 +169,7 @@ def test_installs_neoforge_modpack_with_declared_neoforge_version(tmp_path, monk
 
     assert result.instance.mod_loader == ("neoforge", "21.1.200")
     assert ("resolve", "1.20.1", "neoforge", "21.1.200") in calls
-    assert ("prepare", "neoforge", "21.1.200") in calls
+    assert ("prepare", "neoforge", "21.1.200") not in calls
     metadata = json.loads((tmp_path / "instances" / "NeoForge Instance" / ".mcw" / "modrinth-pack.json").read_text(encoding="utf-8"))
     assert metadata["loader"] == "neoforge"
     assert metadata["loaderVersion"] == "21.1.200"

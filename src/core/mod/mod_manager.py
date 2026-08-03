@@ -13,6 +13,7 @@ from src.core.fs.paths import Paths
 from src.core.instance.errors import InstanceModChangeBlockedError
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
 from src.models.instance.instance import Instance
 from src.models.mod.mod_info import ModInfo
 
@@ -30,7 +31,23 @@ class ModManager:
         directory = ModManager.mods_dir(instance)
         paths = [path for path in directory.iterdir() if path.is_file() and ModManager._is_mod_file(path)]
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        return sorted((ModManager.read_mod(path, preferred_loader=loader_name) for path in paths), key=lambda mod: (not mod.enabled, mod.name.casefold(), mod.file_name.casefold()))
+        provenance = ModProvenanceRegistry.entries_by_file(instance)
+        mods: list[ModInfo] = []
+        for path in paths:
+            mod = ModManager.read_mod(path, preferred_loader=loader_name)
+            source = provenance.get(mod.file_name.casefold())
+            if isinstance(source, dict):
+                mod = dataclass_replace(
+                    mod,
+                    source=str(source.get("provider") or "unknown").strip().casefold(),
+                    source_project_id=str(source.get("projectId") or "").strip(),
+                    source_version_id=str(source.get("versionId") or "").strip(),
+                    source_file_id=str(source.get("fileId") or "").strip(),
+                    managed_by_modpack=bool(source.get("managedByModpack", False)),
+                    source_pack_provider=str(source.get("packProvider") or "").strip().casefold(),
+                )
+            mods.append(mod)
+        return sorted(mods, key=lambda mod: (not mod.enabled, mod.name.casefold(), mod.file_name.casefold()))
 
     @staticmethod
     def add_mods(instance: Instance, source_paths: Iterable[Path], replace: bool = False, launch_lock_token: str | None = None, allow_unverified: bool = False) -> list[ModInfo]:
@@ -95,11 +112,14 @@ class ModManager:
         ModManager._ensure_modifiable(instance)
         directory = ModManager.mods_dir(instance).resolve()
 
+        removed_names: list[str] = []
         for path in paths:
             candidate = Path(path).resolve()
             if candidate.parent != directory:
                 raise RuntimeError("Refusing to remove a file outside the instance mods folder.")
+            removed_names.append(candidate.name)
             candidate.unlink(missing_ok=True)
+        ModProvenanceRegistry.remove_by_filenames(instance, removed_names)
 
     @staticmethod
     def set_enabled(instance: Instance, paths: Iterable[Path], enabled: bool) -> list[ModInfo]:

@@ -11,7 +11,7 @@ from src.models.progress.progress_stage import ProgressStage
 
 
 class ModrinthPackRegistry:
-    SCHEMA_VERSION = 4
+    SCHEMA_VERSION = 5
     FILE_NAME = "modrinth-pack.json"
 
     @staticmethod
@@ -191,6 +191,10 @@ class ModrinthPackRegistry:
                 "sha512": str(item.get("sha512") or "").lower(),
                 "size": max(0, int(item.get("size", 0) or 0)),
                 "source": str(item.get("source") or "pack"),
+                "provider": str(item.get("provider") or ("modrinth" if str(item.get("source") or "") == "download" else "pack")).strip().casefold(),
+                "projectId": str(item.get("projectId") or "").strip(),
+                "versionId": str(item.get("versionId") or "").strip(),
+                "fileName": Path(str(item.get("fileName") or relative.name)).name,
                 "downloads": ModrinthPackRegistry._normalize_downloads(item.get("downloads", [])),
                 "required": bool(item.get("required", True)),
             }

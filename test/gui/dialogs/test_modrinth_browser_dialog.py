@@ -5,7 +5,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QSizePolicy
 
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
 from src.models.instance.instance import Instance
@@ -101,6 +101,9 @@ def test_mod_browser_defaults_to_instance_loader_and_emits_forge_filter(app, tmp
     dialog._request_search()
 
     assert dialog.selected_loader == "forge"
+    assert dialog.search_button.isEnabled() is False
+    assert requested == []
+    app.processEvents()
     assert requested == [("mod", "forge")]
     assert "Forge" in dialog.context_label.text()
 
@@ -135,3 +138,26 @@ def test_dialog_distinguishes_searching_and_failed_states(app):
     assert "failed" in dialog.result_count_label.text().lower()
     assert "HTTP 503" in dialog.details_label.text()
     assert not dialog.install_button.isEnabled()
+
+
+def test_modpack_dialog_keeps_version_and_instance_fields_on_separate_rows(app):
+    dialog = ModrinthBrowserDialog("modpack")
+
+    assert dialog.detail_panel.actions_layout.count() == 3
+    assert dialog.version_combo.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
+    assert dialog.instance_name_input.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
+    assert dialog.install_button.minimumWidth() >= 210
+
+
+def test_dialog_is_wide_and_description_is_opt_in(app):
+    dialog = ModrinthBrowserDialog("modpack")
+
+    assert dialog.width() >= dialog.height()
+    assert dialog.width() <= 1240
+    assert dialog.height() <= 620
+    assert dialog.maximumWidth() == dialog.width()
+    assert dialog.maximumHeight() == dialog.height()
+    assert dialog.detail_panel.description_visible is False
+
+    dialog.set_show_project_descriptions(True)
+    assert dialog.detail_panel.description_visible is True

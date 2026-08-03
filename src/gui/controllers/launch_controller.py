@@ -6,6 +6,7 @@ from typing import Any
 from PySide6.QtCore import Signal, Slot
 
 from mcw_core.api.language.language_manager import tr
+from mcw_core.api.package.portable_content_manager import PortableManualDownloadRequired
 from src.gui.controllers.base_controller import BaseController
 from src.gui.presenters.launch_error_presenter import LaunchErrorPresenter
 from src.gui.task_runner import TaskRunner
@@ -21,6 +22,7 @@ class LaunchController(BaseController):
     launch_resumed = Signal()
     cancel_requested = Signal()
     launch_cancelled = Signal()
+    portable_manual_download_required = Signal(object)
 
     TASK_ID = "minecraft.launch"
 
@@ -175,6 +177,12 @@ class LaunchController(BaseController):
             self.launch_paused.emit()
             self.status_changed.emit(tr("launch.paused"))
             self.log_created.emit(tr("launch.paused_log"))
+            return
+
+        if isinstance(error, PortableManualDownloadRequired):
+            self.portable_manual_download_required.emit(error)
+            self.status_changed.emit(tr("portable.manual.required", count=len(error.requirements)))
+            self.log_created.emit(f"PortableManualDownloadRequired: {len(error.requirements)} file(s)")
             return
 
         view = LaunchErrorPresenter.present(error)

@@ -1,138 +1,179 @@
 # MCW Launcher
 
 <p align="center">
-  <strong>Trình khởi chạy Minecraft theo từng instance, được viết bằng Python và PySide6.</strong><br>
-  <em>An instance-first Minecraft launcher built with Python and PySide6.</em>
+  <strong>Minecraft launcher theo hướng instance-first, viết bằng Python và PySide6.</strong><br>
+  Quản lý Minecraft, mod loader, mod, modpack và nội dung của từng instance trong một giao diện thống nhất.
 </p>
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Stable-v0.11.0-brightgreen" alt="Current stable version">
+    <img src="https://img.shields.io/badge/Stable-v1.0.0-brightgreen" alt="Stable version">
   </a>
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Tester-opt--in-orange" alt="Experimental builds require tester opt-in">
-  </a>
-  <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
-    <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
+  <a href="https://github.com/mahiru7229/mcw-launcher/actions">
+    <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
   </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License">
   </a>
   <img src="https://img.shields.io/badge/Platform-Windows-0078D4" alt="Windows">
   <img src="https://img.shields.io/badge/GUI-PySide6-41CD52" alt="PySide6">
+  <img src="https://img.shields.io/badge/Python-3.12+-3776AB" alt="Python 3.12+">
 </p>
 
 <p align="center">
-  <a href="#tiếng-việt">Tiếng Việt</a> ·
-  <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v0.11.0.md">v0.11.0 release notes</a> ·
-  <a href="docs/UPDATE_PACKAGES.md">Updater packages</a>
+  <a href="#giới-thiệu">Giới thiệu</a> ·
+  <a href="#tính-năng-nổi-bật">Tính năng</a> ·
+  <a href="#tải-và-cài-đặt">Tải xuống</a> ·
+  <a href="#chạy-từ-source">Chạy source</a> ·
+  <a href="#mcw-core">MCW Core</a>
 </p>
 
-> [!NOTE]
-> `v0.11.0` là bản Stable hiện tại. Stable là kênh mặc định; bản thử nghiệm chỉ được nhận khi người dùng chủ động tham gia tester program.
+---
+
+## Giới thiệu
+
+**MCW Launcher** là một Minecraft launcher mã nguồn mở dành cho Windows, được xây dựng xoay quanh mô hình **instance độc lập**.
+
+Mỗi instance có riêng:
+
+- Phiên bản Minecraft và mod loader.
+- Mods, resource packs, shader packs và saves.
+- Java runtime, RAM, JVM arguments và cấu hình cửa sổ.
+- Trạng thái runtime, lịch sử launch, backup và dữ liệu repair.
+- Metadata nguồn cho mod/modpack từ Modrinth, CurseForge hoặc FTB.
+
+Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 
 ---
 
-## Tiếng Việt
+## Tính năng nổi bật
 
-### MCW Launcher là gì?
+### Quản lý instance
 
-MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độc lập**, tiến trình tải rõ ràng, khả năng sửa chữa an toàn và kiến trúc tách biệt giữa GUI với launcher core.
+- Tạo, đổi tên, clone, xóa, import và export instance.
+- Hỗ trợ **Vanilla, Fabric, Quilt, Forge và NeoForge**.
+- Thư viện instance dạng icon với tìm kiếm, trạng thái runtime và thao tác nhanh.
+- Mỗi instance có Java, RAM, độ phân giải, fullscreen, JVM arguments và game arguments riêng.
+- Run lock ngăn khởi chạy trùng cùng một instance.
 
-Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
+### Tài khoản và khởi chạy
 
-### Điểm nổi bật của `v0.12.0-beta.6`
+- Tài khoản Offline và Microsoft OAuth PKCE.
+- Hỗ trợ nhiều tài khoản Microsoft.
+- Bảo vệ dữ liệu nhạy cảm bằng Windows DPAPI.
+- Theo dõi process Minecraft, exit code, crash state và game log.
+- Pause, resume và cancel trong các bước tải được hỗ trợ.
 
-- Nâng `instance.json` lên metadata schema 3 với icon, kết quả phiên gần nhất và dữ liệu runtime đã chuẩn hóa.
-- Hiển thị badge **đang tải / đang chạy / đã kết thúc / crash** trực tiếp trên icon từng instance.
-- Cho phép đổi icon bằng PNG, JPEG, WebP, BMP hoặc ICO; icon được chép vào `.mcw/instance-icon.<ext>` để instance tự chứa dữ liệu.
-- `.mcwpack` mang theo icon và thêm `instance_name` / `instance_icon` vào `package.json` để phục vụ preview.
-- Public API bổ sung `InstanceState`, `InstanceStatus`, `status()`, `list_statuses()`, `set_icon()` và `reset_icon()`.
+### Mod và modpack
 
-### Điểm nổi bật của `v0.12.0-beta.5`
+- Duyệt và cài mod/modpack từ **Modrinth** và **CurseForge**.
+- Duyệt và cài modpack từ **FTB**.
+- Trang chi tiết project có icon, mô tả, metadata, gallery, phiên bản và link web.
+- Chọn Minecraft version, loader và release channel trước khi cài.
+- Deferred download: cài modpack chỉ lưu manifest; mod được tải ở lần Launch đầu tiên.
+- Giữ provenance của từng mod: provider, project ID, version/file ID, hash và modpack sở hữu.
+- Manual-download fallback cho file không thể tải tự động.
 
-- Chuyển màn hình mặc định thành **thư viện instance** dạng icon, có tìm kiếm và panel thao tác nhanh.
-- Thêm workflow Add Instance / Import / Modrinth Packs / CurseForge Packs trên cùng một toolbar.
-- Thêm cửa sổ **Edit Instance** theo hướng instance-centered với Overview, Mods, Settings, Maintenance và Diagnostics.
-- Hỗ trợ double-click để launch, menu chuột phải, clone, export, repair và mở thư mục ngay từ thư viện.
-- Rút gọn sidebar và giữ Launch Control cố định; toàn bộ GUI vẫn chỉ gọi public API của `mcw_core`.
+### Import và export modpack
 
-### Điểm nổi bật của `v0.12.0-beta.4`
+MCW Launcher hỗ trợ hai hướng import:
 
-- Thêm package headless **`mcw_core`**, import và sử dụng được mà không cần PySide6.
-- Thêm facade `MCWCore`, `CorePaths`, request/result models và pause/resume/cancel API công khai.
-- Cho phép chương trình Python hoặc CLI bên ngoài load instance, cài Java/mod loader và launch Minecraft bằng cùng core của launcher.
-- Chuyển GUI và entrypoint sang boundary `mcw_core` / `mcw_core.api`, đồng thời khóa chiều phụ thuộc bằng architectural tests.
-- Build được wheel không chứa `src/gui`, nhưng vẫn đóng gói MCW LAN Agent cho Fabric, Quilt, Forge và NeoForge.
+- **Duyệt trực tuyến** từ provider.
+- **Import package native** như Modrinth `.mrpack`, CurseForge `.zip`, Provider Profile hoặc Portable MCWPack.
 
-### Điểm nổi bật của `v0.11.0`
+Hai chế độ export chính:
 
-- Thêm **Theme Animation Engine** dùng chung cho spritesheet, progress xác định/không xác định và animated state assets.
-- Theme có thể đóng gói custom font `.ttf`/`.otf` và áp dụng cho toàn bộ chữ do Qt render.
-- Thêm chuyển trang, sidebar collapse, button feedback, dialog fade, Launch Control motion và toast notification.
-- Có các chế độ **Full / Reduced / Off**, giới hạn FPS và tự pause khi launcher bị ẩn hoặc minimize.
-- Thêm **Theme Authoring Toolkit**: validation chi tiết, live reload, duplicate, import/export ZIP, checksum và preview.
-- Khóa **Theme Runtime Contract v1** cùng Theme Schema 6, asset catalog và package format machine-readable cho MCW Theme Studio.
-- Theme hỗ trợ palette và `accent_assets`; Launcher Settings cho phép dùng màu theme hoặc chọn màu chủ đạo tùy chỉnh.
-- Đồng bộ accent với QPalette, QSS, focus, selection, progress, scrollbar, splash và PNG/spritesheet opt-in.
-- Giữ tương thích theme schema 1–6 và updater từ v0.10.0.
-- Bao gồm các hotfix startup splash và circular import đã xác minh trong RC2.
+- **Provider Profile** — giữ nguyên package/reference của provider và chỉ thêm instance settings của MCW.
+- **Portable MCWPack** — manifest portable với nguồn tải, hash, embedded file được phép và manual-download fallback.
 
-### Tính năng mới trong `v0.10.0`
+Full/offline export vẫn có thể dùng cho backup hoặc chia sẻ riêng tư, kèm cảnh báo về giấy phép và chính sách phân phối.
 
-- Thêm **cài đặt mặc định cho instance** trong Launcher Settings: Java, RAM, kích thước cửa sổ/toàn màn hình, LAN, chính sách file được quản lý, Forge preflight, JVM arguments và game arguments.
-- Mọi instance Vanilla/Fabric/Quilt/Forge/NeoForge mới và mọi modpack Modrinth/CurseForge mới đều sao chép bộ mặc định này; instance hiện có vẫn giữ `settings.json` riêng.
-- Khi import `.mcwpack`, hiển thị thông tin gói và cho chọn ghi đè bằng setting tổng, giữ setting trong gói hoặc mở toàn bộ setting của gói để chỉnh trước khi nhập.
-- Cài mod **Fabric trực tiếp từ CurseForge** trong catalog Mods hiện có; vẫn hỗ trợ Forge bằng cùng một luồng.
-- Cài **modpack Fabric từ CurseForge**: chọn Fabric/Forge trong trình duyệt, đọc loader và phiên bản chính xác từ `manifest.json`, rồi tạo instance tương ứng.
-- Giữ mọi file trong release channel đã bật, ưu tiên loader cùng nhãn Minecraft chính xác/gần nhất rồi cài dependency bắt buộc; nhãn phiên bản không còn chặn cài đặt.
-- Dùng gateway công khai cho metadata; CurseForge API key vẫn chỉ nằm phía server và file mod được tải trực tiếp bằng Download Engine của launcher.
-- Kiểm tra metadata thật trong JAR trước khi thay đổi instance. Nhãn Minecraft và Fabric/Forge của CurseForge chỉ được dùng để ưu tiên kết quả.
-- Chuẩn bị toàn bộ file tự động trước khi cài và rollback mod cùng registry nếu một bước ghi thất bại.
-- Giữ fallback tải thủ công có xác minh size/SHA-1 khi tác giả tắt phân phối bên thứ ba.
+### Resource pack và shader pack
 
-### Nền tảng hiện có
+- Duyệt từ Modrinth hoặc CurseForge.
+- Cài, import file local, bật/tắt, gỡ và mở thư mục.
+- Kiểm tra ZIP, `pack.mcmeta`, cấu trúc shader và archive security.
+- Lưu metadata provider để phục vụ update và export sau này.
 
-- Tạo và chạy instance **Vanilla, Fabric, Quilt, Forge hoặc NeoForge**; cài đặt, thay đổi và repair mod loader tương ứng.
-- Tài khoản Offline và Microsoft OAuth PKCE, hỗ trợ nhiều tài khoản Microsoft và bảo vệ refresh token bằng Windows DPAPI.
-- Tìm, cài và cập nhật mod từ **Modrinth**; nhãn Minecraft chỉ để ưu tiên, còn manifest `.mrpack` quyết định phiên bản của modpack.
-- Tìm và cài mod/modpack **CurseForge** qua gateway công khai, có cache, failover và luồng tải thủ công được xác minh khi tác giả hạn chế phân phối.
-- Backup/restore `.mcwbackup`, import/export `.mcwpack`, runtime lock, theo dõi tiến trình Minecraft, game log và crash report.
-- **MCW LAN Agent** cùng LAN hosting profiles cho chế độ Microsoft-only hoặc bạn bè Microsoft + Offline trên các cấu hình được hỗ trợ.
-- Giao diện PySide6 responsive, progress thống nhất, ngôn ngữ Việt/Anh và theme PNG ngoài EXE.
+### Installed Content Library
 
-### Tải và chạy
+- Xem modpack, mod, resource pack và shader pack trong một thư viện chung.
+- Lọc theo loại, provider và trạng thái.
+- Hiển thị `Ready`, `Disabled`, `Pending`, `Missing` hoặc `Broken`.
+- Hỗ trợ thao tác hàng loạt, pin version và ignore update.
+- Bảo vệ mod được quản lý bởi modpack khỏi việc xóa nhầm.
 
-Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
+### Repair, backup và diagnostics
 
-- [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.11.0` là bản Stable hiện tại dành cho người dùng thông thường.
-- Stable là kênh mặc định. Để nhận bản thử nghiệm, người dùng phải chủ động bật:
+- Fast scan và full repair cho instance.
+- Backup/restore `.mcwbackup`.
+- Diagnostic bundle có redaction dữ liệu nhạy cảm.
+- Cleanup file `.part`, stale session và trạng thái runtime cũ.
+- Xác minh hash, size và rollback khi thao tác thất bại.
+
+### Giao diện và trải nghiệm
+
+- GUI PySide6 responsive, hỗ trợ DPI Windows.
+- First Run Setup cho ngôn ngữ, cập nhật, Java, RAM và phần cứng.
+- Tùy chọn ưu tiên dedicated GPU khi máy có GPU rời.
+- Hỗ trợ tiếng Việt và English.
+- Theme ngoài EXE, animation, custom font, accent color và text color.
+- Navigation Back/Forward riêng, sidebar có thể thu gọn.
+
+### LAN và multiplayer offline
+
+- MCW LAN Agent cho các cấu hình được hỗ trợ.
+- Profile Microsoft-only hoặc Microsoft + Offline friends.
+- Tích hợp workflow e4mc/LAN theo từng instance.
+
+---
+
+## Tải và cài đặt
+
+Tải bản Windows mới nhất tại:
+
+**[GitHub Releases](https://github.com/mahiru7229/mcw-launcher/releases)**
+
+Thông thường release sẽ có:
 
 ```text
-Launcher Settings
-└── Launcher updates
-    └── Tham gia chương trình tester và nhận bản cập nhật thử nghiệm
+MCW Launcher.exe
+MCW-Launcher-v1.0.0-windows-x64.zip
+MCW-Launcher-v1.0.0-windows-x64.zip.sha256
 ```
 
-Tắt tùy chọn này sẽ đưa launcher trở lại kênh Stable. Bản thử nghiệm có thể chứa lỗi hoặc vấn đề tương thích; hãy backup instance và world quan trọng trước khi tham gia.
+### Yêu cầu hệ thống
 
-Yêu cầu cơ bản:
+- Windows 10 hoặc Windows 11 64-bit.
+- Kết nối Internet cho lần tải Minecraft, Java, loader, mod hoặc modpack đầu tiên.
+- Dung lượng trống phù hợp với số instance, assets, mods và backups.
 
-- Windows 10 hoặc Windows 11, 64-bit.
-- Kết nối Internet khi tải phiên bản Minecraft, Java, mod loader, mods hoặc modpack lần đầu.
-- Đủ dung lượng trống cho assets, libraries, Java runtimes, instances, backups và mods.
+Java tương thích có thể được launcher tự phát hiện hoặc cài đặt.
 
-Java tương thích có thể được launcher tự phát hiện hoặc tải khi cần.
+---
 
-### Chạy từ source
+## Bắt đầu sử dụng
 
-Python `3.12` được khuyến nghị.
+1. Mở `MCW Launcher.exe`.
+2. Hoàn thành **First Run Setup**.
+3. Thêm tài khoản Offline hoặc Microsoft.
+4. Nhấn **Thêm instance**.
+5. Chọn tạo instance thường hoặc cài/import modpack.
+6. Kiểm tra Java, RAM và setting của instance.
+7. Nhấn **Launch**.
+
+Ở lần chạy đầu tiên, launcher sẽ tải những file Minecraft hoặc mod còn thiếu rồi mới khởi chạy game.
+
+---
+
+## Chạy từ source
+
+Python `3.12` trở lên được khuyến nghị.
 
 ```powershell
 git clone https://github.com/mahiru7229/mcw-launcher.git
 cd mcw-launcher
+
 git switch main
 
 python -m venv .venv
@@ -142,346 +183,198 @@ python -m pip install -r requirements.txt
 python launcher.py
 ```
 
-### Kiểm thử
+---
+
+## Kiểm thử
+
+Chạy toàn bộ test suite:
 
 ```powershell
-python -m pytest test -q
+python -m pytest -q
 ```
 
-Quy tắc release của dự án: chỉ build khi test không có `failed` hoặc `error`.
+Chạy release preflight:
 
-### Build EXE và gói updater
+```powershell
+python -m tools.release_preflight
+```
 
-Từ working tree sạch, có thể chạy toàn bộ preflight, test, build và đóng gói bằng một lệnh:
+Một bản release chỉ nên được đóng gói khi:
+
+- Không có test thất bại.
+- Không có lỗi collection/runtime.
+- Hai language pack có đủ key.
+- Không còn merge marker.
+- Metadata version và update channel chính xác.
+
+---
+
+## Build bản Windows
+
+Chạy quy trình release tự động:
 
 ```powershell
 .\build_release.ps1
 ```
 
-Hoặc chạy thủ công:
+Hoặc build EXE thủ công:
 
 ```powershell
-python -m tools.release_preflight
-python -m pytest test -q
 python -m PyInstaller --clean --noconfirm mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.11.0"
 ```
 
-Kết quả updater package:
+EXE được tạo tại:
 
 ```text
-MCW-Launcher-v0.11.0-windows-x64.zip
-MCW-Launcher-v0.11.0-windows-x64.zip.sha256
+dist/MCW Launcher.exe
 ```
-
-Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
 
 ---
 
-## English
+## MCW Core
 
-### What is MCW Launcher?
+Từ phiên bản 1.0.0, launcher có một core headless riêng dưới package:
 
-MCW Launcher is an open-source Minecraft launcher centered around **isolated instances**, visible download progress, safe repair workflows, and a GUI that remains separate from launcher logic.
+```python
+import mcw_core
+```
 
-Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
+MCW Core cung cấp API cho:
 
-### `v0.11.0` highlights
+- Instance lifecycle.
+- Launch lifecycle.
+- Java management.
+- Mod loader và modpack.
+- Modrinth, CurseForge và FTB.
+- Repair, backup và diagnostics.
+- Progress, pause, resume và cancel.
+- Portable package import/export.
 
-- Add a shared **Theme Animation Engine** for sprite sheets, determinate/indeterminate progress, and animated state assets.
-- Allow themes to bundle `.ttf`/`.otf` fonts and apply them across Qt-rendered text.
-- Add page transitions, sidebar collapse, button feedback, dialog fades, Launch Control motion, and toast notifications.
-- Provide **Full / Reduced / Off** motion modes, FPS limits, and automatic pause while hidden or minimized.
-- Add a **Theme Authoring Toolkit** with detailed validation, live reload, duplication, ZIP import/export, checksums, and previews.
-- Freeze **Theme Runtime Contract v1** with Theme Schema 6, a machine-readable asset catalog, and package format for MCW Theme Studio.
-- Add theme palettes and `accent_assets`, plus a Launcher Settings option for theme or custom accent colors.
-- Synchronize accents with QPalette, QSS, focus, selection, progress, scrollbars, the splash, and opt-in PNG/sprite assets.
-- Preserve compatibility with theme schemas 1–6 and updater paths from v0.10.0.
-- Include the verified RC2 startup splash and circular-import hotfixes.
+Cài wheel:
 
-### Highlights of `v0.12.0-beta.6`
+```powershell
+python -m pip install mcw-core==1.0.0
+```
 
-- Upgrade `instance.json` to metadata schema 3 with normalized icon and completed-session runtime fields.
-- Show **loading / running / finished / crashed** badges directly on every instance icon.
-- Allow PNG, JPEG, WebP, BMP, and ICO files; selected icons are copied to `.mcw/instance-icon.<ext>` so instances remain self-contained.
-- Include icons in `.mcwpack` exports and add `instance_name` / `instance_icon` to `package.json` for previews.
-- Extend the public API with `InstanceState`, `InstanceStatus`, `status()`, `list_statuses()`, `set_icon()`, and `reset_icon()`.
+Tài liệu core nằm trong repository/package riêng:
 
-### Highlights of `v0.12.0-beta.5`
+- `README.md`
+- `docs/QUICKSTART.md`
+- `docs/API_OVERVIEW.md`
+- `docs/USAGE.md`
+- `docs/MIGRATION.md`
+- `docs/CORE_ARCHITECTURE.md`
 
-- Make the icon-based **instance library** the default screen, with search and a selected-instance action panel.
-- Put Add Instance, Import, Modrinth Packs, CurseForge Packs, and Refresh on one toolbar.
-- Add an instance-centered **Edit Instance** window with Overview, Mods, Settings, Maintenance, and Diagnostics.
-- Support double-click launch, context-menu actions, cloning, export, repair, and folder access directly from the library.
-- Reduce the sidebar while keeping Launch Control permanent; the GUI continues to call only the public `mcw_core` API.
+---
 
-### Highlights of `v0.12.0-beta.4`
+## Kiến trúc
 
-- Add the headless **`mcw_core`** package, importable and usable without PySide6.
-- Add the public `MCWCore` facade, `CorePaths`, request/result models, and pause/resume/cancel controls.
-- Allow external Python programs and the CLI to load instances, install Java/mod loaders, and launch Minecraft through the same launcher core.
-- Move the GUI and launcher entrypoint behind the `mcw_core` / `mcw_core.api` boundary and enforce it with architectural tests.
-- Build a wheel that excludes `src/gui` while still bundling the MCW LAN Agent for Fabric, Quilt, Forge, and NeoForge.
-
-### New in `v0.10.0`
-
-- Add **default instance settings** under Launcher Settings for Java, memory, window/fullscreen, LAN, managed-file policies, Forge preflight, JVM arguments, and game arguments.
-- Every new Vanilla/Fabric/Quilt/Forge/NeoForge instance and every new Modrinth/CurseForge modpack copies these defaults, while existing instances retain their own `settings.json`.
-- Before importing a `.mcwpack`, show its package details and let the user overwrite settings with launcher defaults, keep package settings, or review and edit the complete package settings first.
-- Install **Fabric mods directly from CurseForge** in the existing Mods catalog while retaining the same Forge workflow.
-- Install **Fabric CurseForge modpacks** by selecting Fabric/Forge in the browser, validating the exact loader and version from `manifest.json`, and creating the matching instance.
-- Keep every file in the enabled release channels, rank selected-loader and exact/nearby Minecraft labels first, then resolve required dependencies; version labels no longer block installation.
-- Fetch metadata through the public gateway, keep the CurseForge API key server-side, and download mod files directly with the launcher's Download Engine.
-- Validate real JAR metadata before changing an instance. CurseForge Minecraft and Fabric/Forge labels are ranking hints rather than the final authority.
-- Prepare every automatic file before installation and roll back both mods and registry data if an apply step fails.
-- Preserve the size/SHA-1-verified manual fallback when an author disables third-party distribution.
-
-### Existing foundation
-
-- Create and launch **Vanilla, Fabric, Quilt, Forge, and NeoForge** instances; install, change, and repair their mod loaders.
-- Use Offline or Microsoft OAuth PKCE accounts, including multiple Microsoft accounts and Windows DPAPI protection for refresh tokens.
-- Search, install, and update **Modrinth** mods; Minecraft labels only affect ranking, while each `.mrpack` manifest determines its modpack version.
-- Search and install **CurseForge** mods/modpacks through the public gateway, with caching, failover, and verified manual downloads for restricted files.
-- Backup/restore `.mcwbackup`, import/export `.mcwpack`, enforce runtime locks, and track the Minecraft process, game logs, and crash reports.
-- Use **MCW LAN Agent** and LAN hosting profiles for Microsoft-only or Microsoft + Offline friends on supported configurations.
-- Use a responsive PySide6 interface with unified progress, English/Vietnamese language packs, and external PNG themes.
-
-### Download and run
-
-Packaged Windows builds are published on the **Releases** page:
-
-- [Open releases](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.11.0` is the current Stable release for regular users.
-- Stable is the default channel. Experimental builds require explicitly enabling:
+MCW Launcher giữ GUI ở phía ngoài và chỉ giao tiếp qua public core API:
 
 ```text
-Launcher Settings
-└── Launcher updates
-    └── Join tester program and receive experimental updates
+PySide6 GUI
+    ↓
+mcw_core / mcw_core.api
+    ↓
+Domain services
+    ↓
+Filesystem · Network · Providers · Minecraft Runtime
 ```
 
-Disabling this option returns the launcher to Stable. Experimental builds may contain bugs or compatibility issues; back up important instances and worlds before joining.
+GUI không nên trực tiếp:
 
-Requirements:
+- Truy cập database nội bộ.
+- Tải file riêng ngoài Download Engine.
+- Gọi private implementation của core.
+- Xử lý authentication hoặc manifest provider một cách độc lập.
 
-- 64-bit Windows 10 or Windows 11.
-- Internet access for first-time Minecraft, Java, loader, mod, and modpack downloads.
-- Enough storage for assets, libraries, runtimes, instances, backups, and mods.
+---
 
-A compatible Java runtime can be detected or provisioned automatically.
+## Ngôn ngữ và theme
 
-### Run from source
+Language packs mặc định:
 
-Python `3.12` is recommended.
-
-```powershell
-git clone https://github.com/mahiru7229/mcw-launcher.git
-cd mcw-launcher
-git switch main
-
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python launcher.py
+```text
+lang/en-US.json
+lang/vi-VN.json
 ```
 
-### Test
+Theme hỗ trợ:
+
+- Palette và accent color.
+- Text color tùy chỉnh.
+- PNG assets và spritesheet animation.
+- Custom font `.ttf` / `.otf`.
+- Full, Reduced hoặc Off motion mode.
+- Live reload và theme authoring tools.
+
+Tài liệu theme:
+
+- `docs/THEME_CREATION_GUIDE.md`
+- `docs/THEME_ASSET_GUIDE.md`
+- `docs/THEME_ANIMATION_GUIDE.md`
+- `docs/THEME_MOTION_GUIDE.md`
+
+---
+
+## Cảnh báo phân phối modpack
+
+> Người dùng có trách nhiệm bảo đảm việc chia sẻ, xuất bản hoặc lưu trữ modpack tuân thủ giấy phép của từng mod, quyền của tác giả và chính sách của provider. MCW Launcher không xác nhận hoặc khuyến khích việc phân phối lại trái phép.
+
+Khi export công khai, nên ưu tiên:
+
+- Provider Profile.
+- Manifest/reference chính thức.
+- File có license cho phép redistribution rõ ràng.
+- Manual-download flow nếu quyền phân phối không rõ.
+
+---
+
+## Bảo mật
+
+Vui lòng không đưa vào issue công khai:
+
+- Microsoft access/refresh token.
+- CurseForge API key.
+- Cookie hoặc credential.
+- Diagnostic bundle chưa kiểm tra.
+- Đường dẫn hoặc dữ liệu cá nhân không cần thiết.
+
+Khi báo lỗi, hãy dùng diagnostic bundle đã được launcher redaction và kiểm tra lại trước khi upload.
+
+---
+
+## Đóng góp
+
+Issue và pull request đều được chào đón.
+
+Trước khi gửi PR:
 
 ```powershell
-python -m pytest test -q
-```
-
-The release flow requires zero failed tests and zero collection/runtime errors before packaging.
-
-### Build the EXE and updater package
-
-From a clean working tree, run the complete preflight, tests, build, and packaging flow with one command:
-
-```powershell
-.\build_release.ps1
-```
-
-Or run each step manually:
-
-```powershell
+python -m pytest -q
 python -m tools.release_preflight
-python -m pytest test -q
-python -m PyInstaller --clean --noconfirm mcw_launcher.spec
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.11.0"
 ```
 
-Expected updater assets:
+Nên giữ:
 
-```text
-MCW-Launcher-v0.11.0-windows-x64.zip
-MCW-Launcher-v0.11.0-windows-x64.zip.sha256
-```
-
-See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
+- GUI phụ thuộc public `mcw_core` API.
+- Progress thống nhất cho mọi tác vụ dài.
+- en-US và vi-VN đầy đủ key.
+- Test hồi quy cho bug được sửa.
+- Không commit token, cache, instance cá nhân hoặc build output.
 
 ---
 
-## Core capabilities
+## Giấy phép
 
-### Instances and runtime
+MCW Launcher được phát hành theo giấy phép **MIT**.
 
-- Per-instance metadata and settings.
-- Create, rename, clone, delete, import, and export.
-- `.mcwpack` packages and `.mcwbackup` backups.
-- Runtime locks that prevent duplicate launches.
-- Transactional restore and full-instance repair without deleting personal content.
-- Configurable resolution, fullscreen, JVM/game arguments, Java path, and memory.
-
-### Minecraft and Java
-
-- Modern and legacy Minecraft argument formats.
-- Client, library, asset, native, and logging downloads with checksum verification.
-- Java scanning through `JAVA_HOME`, PATH, Program Files, Windows Registry, and managed runtimes.
-- Compatible Java selection based on Minecraft metadata.
-- Automatic runtime provisioning for supported Java majors.
-
-### Downloads and recovery
-
-- Shared HTTP client with connection pooling and configurable simultaneous downloads.
-- Global/per-host concurrency limits plus one bandwidth limit shared across active transfers.
-- Verified `.part` files, HTTP Range resume, atomic replacement, and recovery after restart.
-- Bounded retries for temporary failures, `Retry-After` support, and verified fallback URLs.
-- Persistent sanitized journal with best-effort startup reconciliation.
-
-### Mods and modpacks
-
-- Fabric and Forge mod metadata parsing.
-- Enable/disable, drag-and-drop, dependency analysis, duplicate-ID detection, and loader mismatch checks.
-- Modrinth dependency installation, advisory Minecraft-version ranking, update checks, update locks, retry/resume, and fallback URLs.
-- CurseForge Gateway search, advisory loader/Minecraft ranking, dependency installation, automatic/manual distribution handling, local JSON caching, refresh cooldown, and stale fallback.
-- Managed modpack registry with update preview, repair, conflict preservation, backup, rollback, and verification cache.
-
-### Repair, backup, and diagnostics
-
-- Quick Check and Full Verification with persistent verification cache.
-- Component health reports, repair plans, estimated download size, and selective repair.
-- Recovery points for instance-scoped repairs with automatic rollback on failure.
-- Transactional `.mcwbackup` restore, including a Windows-safe staged-folder fallback.
-- Bounded diagnostic ZIP bundles with safe paths, integrity validation, hashes, and privacy filtering.
-
-### Accounts and privacy
-
-- Offline and Microsoft accounts.
-- Microsoft PKCE/Xbox/XSTS/Minecraft Services flow.
-- Windows DPAPI protection for persisted refresh tokens.
-- Access tokens kept in memory only.
-- Credential and bearer-token redaction in logs and diagnostics.
-
-### Interface
-
-- PySide6 GUI with full and compact display profiles.
-- Unified progress for launcher updates, Minecraft files, Java, mods, modpacks, imports, exports, and repairs.
-- Separate Pause/Resume and Cancel controls for supported active operations.
-- English and Vietnamese language packs.
-- External PNG theme system with per-asset fallback.
+Minecraft, Microsoft, Mojang, Modrinth, CurseForge, FTB và các thương hiệu liên quan thuộc về chủ sở hữu tương ứng. MCW Launcher là dự án độc lập và không phải sản phẩm chính thức của các bên này.
 
 ---
 
-## Project structure
+## English summary
 
-```text
-mcw-launcher/
-├── launcher.py
-├── mcw_launcher.spec
-├── config/
-├── docs/
-├── lang/
-├── src/
-│   ├── core/
-│   │   ├── account/
-│   │   ├── auth/
-│   │   ├── backup/
-│   │   ├── diagnostics/
-│   │   ├── instance/
-│   │   ├── java/
-│   │   ├── lan/
-│   │   ├── minecraft/
-│   │   ├── mod/
-│   │   ├── modloader/
-│   │   ├── modrinth/
-│   │   ├── curseforge/
-│   │   ├── network/
-│   │   ├── progress/
-│   │   ├── repair/
-│   │   ├── runtime/
-│   │   ├── security/
-│   │   ├── system/
-│   │   ├── theme/
-│   │   └── update/
-│   ├── gui/
-│   └── models/
-├── test/
-├── themes/
-└── tools/
-```
+MCW Launcher is an open-source, Windows-focused, instance-first Minecraft launcher built with Python and PySide6. It supports Vanilla, Fabric, Quilt, Forge and NeoForge instances; Offline and Microsoft accounts; Modrinth, CurseForge and FTB modpacks; resource/shader packs; repair, backup, diagnostics, provider-native import, portable export, theming and a public headless `mcw_core` package.
 
-The GUI calls public core services instead of implementing Minecraft behavior directly.
-
-## Documentation
-
-| Document | Purpose |
-|---|---|
-| [`docs/RELEASE-v0.12.0-beta.6.md`](docs/RELEASE-v0.12.0-beta.6.md) | Instance icons and runtime-state badges |
-| [`docs/RELEASE-v0.12.0-beta.5.md`](docs/RELEASE-v0.12.0-beta.5.md) | Instance-centered GUI workflow |
-| [`docs/RELEASE-v0.11.0.md`](docs/RELEASE-v0.11.0.md) | Complete v0.11.0 Stable release notes |
-| [`docs/RELEASE-v0.11.0-rc.2.md`](docs/RELEASE-v0.11.0-rc.2.md) | Final v0.11.0 release candidate: theme palette and user accent color |
-| [`docs/RELEASE-v0.9.0.md`](docs/RELEASE-v0.9.0.md) | Complete v0.9.0 Stable release notes |
-| [`docs/RELEASE-v0.8.1.md`](docs/RELEASE-v0.8.1.md) | v0.8.1 CurseForge and managed-modpack hotfix notes |
-| [`docs/RELEASE-v0.8.0.md`](docs/RELEASE-v0.8.0.md) | Complete v0.8.0 Stable release notes |
-| [`docs/RELEASE-v0.7.2.md`](docs/RELEASE-v0.7.2.md) | Complete v0.7.2 Stable maintenance release notes |
-| [`docs/FORGE_CURSEFORGE.md`](docs/FORGE_CURSEFORGE.md) | CurseForge Gateway, cache and manual fallback |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core architecture |
-| [`docs/INSTANCE_SYSTEM.md`](docs/INSTANCE_SYSTEM.md) | Instance metadata and lifecycle |
-| [`docs/MODRINTH_INTEGRATION.md`](docs/MODRINTH_INTEGRATION.md) | Modrinth integration |
-| [`docs/FORGE_MODRINTH.md`](docs/FORGE_MODRINTH.md) | Forge and Modrinth behavior |
-| [`docs/PACKAGE_FORMAT.md`](docs/PACKAGE_FORMAT.md) | `.mcwpack` format |
-| [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md) | Updater-compatible release ZIPs |
-| [`docs/LANGUAGE_PACKS.md`](docs/LANGUAGE_PACKS.md) | Language pack format |
-| [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) | PNG theme assets and sizes |
-| [`docs/THEME_RUNTIME_CONTRACT.md`](docs/THEME_RUNTIME_CONTRACT.md) | Frozen schema 6, asset catalog, validation API and package contract |
-| [`docs/gui-api.en.md`](docs/gui-api.en.md) / [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API |
-| [`docs/MCW_CORE_LIBRARY.md`](docs/MCW_CORE_LIBRARY.md) | Headless MCW Core public API and CLI |
-
-## Support status
-
-| Component | Status in v0.12.0-beta.6 |
-|---|---|
-| Vanilla instances | Available |
-| Fabric Loader and mods | Available |
-| Quilt Loader and compatible Fabric mods | Available — beta |
-| Forge Loader and mods | Available |
-| NeoForge Loader and mods | Available — beta |
-| Modrinth mods and `.mrpack` modpacks | Available — preview, update, repair, backup and rollback supported |
-| Download resume and recovery | Available — verified `.part` files and persistent journal |
-| Repair Center | Available — Quick Check, Full Verification and recovery points |
-| Diagnostic ZIP export | Available — bounded and privacy-filtered |
-| Microsoft accounts | Available |
-| Offline accounts | Available |
-| English / Vietnamese | Available |
-| Theme schema 1–6 | Available — animation, custom fonts, authoring tools, palette and custom accent support |
-| CurseForge Gateway mods | Available — Fabric/Quilt/Forge/NeoForge install, required dependencies, transactional apply, public gateway, cache and manual fallback |
-| CurseForge modpacks | Available — Fabric/Quilt/Forge/NeoForge manifest-driven install with universal dependency support |
-
-## Contributing and bug reports
-
-Focused issues and pull requests are welcome. A useful bug report includes:
-
-- MCW Launcher version.
-- Windows and screen resolution/DPI.
-- Minecraft, Java, and mod-loader versions.
-- Reproduction steps.
-- Relevant launcher/game logs and screenshots.
-
-Never publish account databases, access/refresh tokens, private worlds, or other personal runtime data.
-
-## License
-
-MCW Launcher is released under the [MIT License](LICENSE).
-
-Copyright © mahiru7229.
+Download the latest build from **[GitHub Releases](https://github.com/mahiru7229/mcw-launcher/releases)**.

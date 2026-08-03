@@ -32,8 +32,8 @@ class ModrinthClient:
     @staticmethod
     def search_projects(project_type: str, query: str = "", game_version: str = "", loader: str = "fabric", index: str = "relevance", offset: int = 0, limit: int = 25, force_refresh: bool = False) -> ModrinthSearchResult:
         normalized_type = str(project_type).strip().lower()
-        if normalized_type not in {"mod", "modpack"}:
-            raise ValueError("Modrinth project type must be 'mod' or 'modpack'.")
+        if normalized_type not in {"mod", "modpack", "resourcepack", "shader"}:
+            raise ValueError("Unsupported Modrinth project type.")
 
         normalized_loader = str(loader).strip().lower()
         normalized_game_version = str(game_version).strip()
@@ -235,21 +235,49 @@ class ModrinthClient:
     @staticmethod
     def _parse_project(data: dict) -> ModrinthProject:
         project_id = str(data.get("project_id") or data.get("id") or "").strip()
+        slug = str(data.get("slug") or project_id).strip()
+        project_type = str(data.get("project_type") or "mod").strip().lower()
+        license_data = data.get("license") if isinstance(data.get("license"), dict) else {}
+        gallery = data.get("gallery") if isinstance(data.get("gallery"), list) else []
+        gallery_urls = tuple(
+            str(item.get("url") or "").strip()
+            for item in gallery
+            if isinstance(item, dict) and str(item.get("url") or "").strip()
+        )
+        loaders = tuple(str(item).strip().lower() for item in data.get("loaders", []) if str(item).strip())
+        categories = tuple(str(item) for item in data.get("categories", []) if str(item).strip())
+        if not loaders:
+            known_loaders = {"fabric", "forge", "neoforge", "quilt"}
+            loaders = tuple(item.casefold() for item in categories if item.casefold() in known_loaders)
+        project_url = f"https://modrinth.com/{quote(project_type, safe='')}/{quote(slug, safe='-')}" if slug else ""
         return ModrinthProject(
             project_id=project_id,
-            slug=str(data.get("slug") or project_id).strip(),
+            slug=slug,
             title=str(data.get("title") or data.get("name") or project_id or "Unknown project").strip(),
             description=str(data.get("description") or "").strip(),
-            project_type=str(data.get("project_type") or "mod").strip().lower(),
+            project_type=project_type,
             author=str(data.get("author") or "").strip(),
             downloads=int(data.get("downloads", 0) or 0),
             icon_url=str(data.get("icon_url") or "").strip(),
-            categories=tuple(str(item) for item in data.get("categories", []) if str(item).strip()),
+            categories=categories,
             versions=tuple(str(item) for item in data.get("versions", []) if str(item).strip()),
             latest_version=str(data.get("latest_version") or "").strip(),
             client_side=str(data.get("client_side") or "unknown").strip().lower(),
             server_side=str(data.get("server_side") or "unknown").strip().lower(),
             date_modified=str(data.get("date_modified") or data.get("updated") or "").strip(),
+            body=str(data.get("body") or "").strip(),
+            project_url=project_url,
+            source_url=str(data.get("source_url") or "").strip(),
+            issues_url=str(data.get("issues_url") or "").strip(),
+            wiki_url=str(data.get("wiki_url") or "").strip(),
+            discord_url=str(data.get("discord_url") or "").strip(),
+            license_id=str(license_data.get("id") or "").strip(),
+            license_name=str(license_data.get("name") or "").strip(),
+            license_url=str(license_data.get("url") or "").strip(),
+            followers=int(data.get("followers", 0) or 0),
+            date_published=str(data.get("published") or "").strip(),
+            gallery_urls=gallery_urls,
+            loaders=loaders,
         )
 
     @staticmethod

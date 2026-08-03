@@ -5,6 +5,8 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
+from PySide6.QtWidgets import QSizePolicy
+
 from src.gui.dialogs.curseforge_browser_dialog import CurseForgeBrowserDialog
 from src.models.curseforge.file import CurseForgeFile
 from src.models.curseforge.project import CurseForgeProject, CurseForgeSearchResult
@@ -76,5 +78,53 @@ def test_modpack_dialog_ignores_stale_loader_results_and_emits_selected_loader(g
     dialog._request_install()
 
     assert dialog.file_combo.count() == 1
+    assert dialog.install_button.isEnabled() is False
+    assert emitted == []
+    gui_app.processEvents()
     assert emitted
     assert emitted[0][-1] == "forge"
+
+
+def test_modpack_dialog_keeps_long_install_controls_on_separate_rows(gui_app) -> None:
+    dialog = CurseForgeBrowserDialog("modpack")
+
+    assert dialog.detail_panel.minimumWidth() >= 500
+    assert dialog.detail_panel.actions_layout.count() == 3
+    assert dialog.file_combo.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
+    assert dialog.instance_name_input.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
+    assert dialog.install_button.minimumWidth() >= 220
+
+
+def test_project_detail_metadata_wraps_into_short_rows(gui_app) -> None:
+    html = CurseForgeBrowserDialog("modpack").detail_panel._metadata_html(
+        {"Downloads": "1", "Updated": "2", "Minecraft": "3", "Loader": "4", "Categories": "5"}
+    )
+
+    assert html.count("<br>") == 2
+
+
+def test_dialog_is_wide_and_description_is_opt_in(gui_app) -> None:
+    dialog = CurseForgeBrowserDialog("modpack")
+
+    assert dialog.width() >= dialog.height()
+    assert dialog.width() <= 1240
+    assert dialog.height() <= 620
+    assert dialog.maximumWidth() == dialog.width()
+    assert dialog.maximumHeight() == dialog.height()
+    assert dialog.detail_panel.description_visible is False
+
+    dialog.set_show_project_descriptions(True)
+    assert dialog.detail_panel.description_visible is True
+
+
+def test_clear_cache_feedback_is_visible_before_dispatch(gui_app) -> None:
+    dialog = CurseForgeBrowserDialog("modpack")
+    emitted = []
+    dialog.clear_cache_requested.connect(lambda: emitted.append(True))
+
+    dialog._request_clear_cache()
+
+    assert dialog.clear_cache_button.isEnabled() is False
+    assert emitted == []
+    gui_app.processEvents()
+    assert emitted == [True]

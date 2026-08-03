@@ -6,7 +6,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QSizePolicy
 
 from src.gui.widget.launch_control_widget import LaunchControlWidget
 from src.models.progress.progress_event import ProgressEvent
@@ -127,8 +127,41 @@ def test_completed_operation_sets_terminal_ready_progress(app):
     widget.set_operation_completed("loader.progress.ready", "loader.progress.ready_detail")
 
     assert widget.progress_bar.value() == 100
-    assert widget.progress_bar.format() == "100%"
+    assert widget.progress_bar.format() == ""
+    assert widget.percentage_label.text() == "100%"
     assert widget.stage_label.text() == "READY"
     assert widget.stage_label.property("state") == "success"
     assert widget.status_label.text() == "Mod loader ready"
     assert "instance is ready" in widget.detail_label.text()
+
+
+def test_idle_launch_fills_controls_and_active_state_splits_pause_cancel(app):
+    widget = LaunchControlWidget()
+    widget.resize(1000, 120)
+    widget.show()
+    app.processEvents()
+
+    assert widget.launch_button.sizePolicy().horizontalPolicy() is QSizePolicy.Policy.Expanding
+    assert widget.launch_button.sizePolicy().verticalPolicy() is QSizePolicy.Policy.Expanding
+    assert widget.cancel_button.sizePolicy().horizontalPolicy() is QSizePolicy.Policy.Expanding
+    assert widget.cancel_button.sizePolicy().verticalPolicy() is QSizePolicy.Policy.Expanding
+    assert widget.controls_widget.sizePolicy().horizontalPolicy() is QSizePolicy.Policy.Expanding
+    assert widget.controls_widget.sizePolicy().verticalPolicy() is QSizePolicy.Policy.Expanding
+    assert widget.controls_widget.width() < widget.width() * 0.4
+    assert widget.progress_bar.format() == ""
+    assert widget.percentage_label.text() == "0%"
+    assert widget.launch_button.minimumHeight() >= 74
+    assert widget.cancel_button.minimumHeight() >= 74
+    assert widget.cancel_button.isVisible() is False
+    idle_width = widget.launch_button.width()
+    idle_height = widget.launch_button.height()
+
+    widget.set_launch_active(True)
+    app.processEvents()
+
+    assert widget.launch_button.text() == "Pause"
+    assert widget.cancel_button.isVisible() is True
+    assert widget.launch_button.width() < idle_width
+    assert abs(widget.launch_button.width() - widget.cancel_button.width()) <= 2
+    assert widget.launch_button.height() == widget.cancel_button.height()
+    assert widget.launch_button.height() >= idle_height - 2

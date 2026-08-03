@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QWidget
 from src.gui.display_profile import fit_dialog_size
 
 
-def resize_dialog_to_screen(widget: QWidget, preferred_width: int, preferred_height: int, minimum_width: int = 480, minimum_height: int = 320) -> tuple[int, int]:
+def resize_dialog_to_screen(widget: QWidget, preferred_width: int, preferred_height: int, minimum_width: int = 480, minimum_height: int = 320, lock_maximum: bool = True) -> tuple[int, int]:
     screen = widget.screen() or QGuiApplication.primaryScreen()
     if screen is None:
         width = max(int(minimum_width), int(preferred_width))
@@ -23,4 +23,6 @@ def resize_dialog_to_screen(widget: QWidget, preferred_width: int, preferred_hei
         )
 
     widget.resize(width, height)
+    if lock_maximum:
+        widget.setMaximumSize(width, height)
     return width, height

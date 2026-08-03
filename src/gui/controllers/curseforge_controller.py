@@ -20,6 +20,7 @@ from src.models.curseforge.manual_download import CurseForgeManualDownload
 class CurseForgeController(BaseController):
     search_results_changed = Signal(str, str, object)
     files_changed = Signal(str, int, str, list)
+    project_details_changed = Signal(str, int, str, object)
     cache_info_changed = Signal(str, object)
     catalog_search_results_changed = Signal(str, object)
     catalog_files_changed = Signal(int, str, list)
@@ -65,6 +66,16 @@ class CurseForgeController(BaseController):
                 ),
             ),
             f"Searching CurseForge {project_type}s...",
+            blocking=False,
+        )
+
+    def load_project_details(self, project_type: str, project_id: int, loader: str = "forge") -> bool:
+        normalized_loader = CurseForgeClient.normalize_loader(loader) or "forge"
+        task_id = f"curseforge.details.{project_type}.{project_id}.{normalized_loader}"
+        return self._task_runner.run(
+            task_id,
+            lambda: (project_type, int(project_id), normalized_loader, CurseForgeClient.get_project_details(project_id)),
+            "Loading CurseForge project details...",
             blocking=False,
         )
 
@@ -136,7 +147,7 @@ class CurseForgeController(BaseController):
             f"Adding {len(normalized_sources)} downloaded mod file(s) to '{instance_name}'...",
         )
 
-    def install_modpack(self, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: tuple[str, ...], expected_loader: str = "") -> bool:
+    def install_modpack(self, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: tuple[str, ...], expected_loader: str = "", settings_override: dict | None = None) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
         return self._task_runner.run(
             "curseforge.install.modpack",
@@ -148,6 +159,7 @@ class CurseForgeController(BaseController):
                 allowed_release_types=allowed_release_types,
                 reporter=reporter,
                 expected_loader=expected_loader,
+                settings_override=settings_override,
             ),
             f"Installing CurseForge modpack '{instance_name}'...",
         )
@@ -182,6 +194,13 @@ class CurseForgeController(BaseController):
             else:
                 self.search_results_changed.emit(str(project_type), str(loader), search_result)
                 self.cache_info_changed.emit(str(project_type), getattr(search_result, "cache_info", CurseForgeClient.cache_status()))
+            return
+        if task_id.startswith("curseforge.details."):
+            if not isinstance(result, tuple) or len(result) != 4:
+                self._emit_error("CurseForge", "CurseForge project details returned an invalid result.")
+                return
+            project_type, project_id, loader, project = result
+            self.project_details_changed.emit(str(project_type), int(project_id), str(loader), project)
             return
         if task_id.startswith("curseforge.files."):
             if not isinstance(result, tuple) or len(result) != 5:
@@ -242,6 +261,9 @@ class CurseForgeController(BaseController):
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if not task_id.startswith("curseforge."):
+            return
+        if task_id.startswith("curseforge.details."):
+            self.log_created.emit(f"Could not load CurseForge project details: {error}")
             return
         if task_id.startswith("curseforge.search.catalog."):
             loader = task_id.rsplit(".", 1)[-1]

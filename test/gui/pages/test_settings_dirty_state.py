@@ -37,6 +37,7 @@ def _launcher_settings() -> dict:
         "debug_mode": False,
         "remember_window_size": True,
         "language": "en-US",
+        "show_content_descriptions": False,
         "auto_check_updates": True,
         "update_channel": "stable",
         "tester_mode": False,
@@ -95,6 +96,17 @@ def test_launcher_settings_has_five_masked_gateway_slots(gui_app):
     assert all(field.echoMode() == QLineEdit.EchoMode.Password for field in page.curseforge_gateway_inputs)
     assert page.curseforge_gateway_inputs[0].text() == "https://one.example/api/curseforge"
     assert page.form_data()["curseforge_gateway_urls"][1:] == ["", "", "", ""]
+
+
+def test_launcher_settings_round_trips_content_description_visibility(gui_app):
+    page = LauncherSettingsPage()
+    settings = _launcher_settings()
+    settings["show_content_descriptions"] = True
+
+    page.set_settings(settings)
+
+    assert page.show_content_descriptions.isChecked() is True
+    assert page.form_data()["show_content_descriptions"] is True
 
 
 def test_launcher_settings_round_trips_motion_mode(gui_app):

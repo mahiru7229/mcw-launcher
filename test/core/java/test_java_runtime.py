@@ -584,3 +584,29 @@ def test_run_reports_actionable_error_when_winerror_206_cannot_be_compacted(monk
 
     with pytest.raises(RuntimeError, match="Move MCW Launcher to a shorter folder"):
         JavaRuntime.run(java=Path("javaw.exe"), command=["example.Main", "x" * 40_000], instance=instance)
+
+
+def test_run_applies_saved_dedicated_gpu_preference(
+    monkeypatch: pytest.MonkeyPatch,
+    instance,
+    instance_dir: Path,
+):
+    received = {}
+    monkeypatch.setattr("src.core.java.java_runtime.datetime", FixedDateTime)
+    monkeypatch.setattr(
+        "src.core.java.java_runtime.LauncherSettingsManager.load",
+        lambda self: {"launch": {"prefer_dedicated_gpu": True}},
+    )
+    monkeypatch.setattr(
+        "src.core.java.java_runtime.GpuPreferenceManager.apply_to_java",
+        lambda java, enabled: received.update(java=java, enabled=enabled) or True,
+    )
+    monkeypatch.setattr(
+        "src.core.java.java_runtime.subprocess.Popen",
+        lambda *args, **kwargs: object(),
+    )
+
+    java = Path("C:/Java/bin/javaw.exe")
+    JavaRuntime.run(java=java, command=[], instance=instance)
+
+    assert received == {"java": java, "enabled": True}

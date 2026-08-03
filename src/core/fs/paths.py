@@ -480,6 +480,21 @@ class Paths:
         return Paths.logs_root() / f"MCW-{loader_title}-Diagnostics-{safe_name}-{timestamp}.zip"
 
     @staticmethod
+    def ftb_root() -> Path:
+        directory = Paths.CACHE_ROOT / "content" / "ftb"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def ftb_file_cache(project_id: int | str, version_id: int | str, filename: str) -> Path:
+        safe_name = Path(str(filename)).name or "download.bin"
+        return Paths.ftb_root() / "files" / str(project_id) / str(version_id) / safe_name
+
+    @staticmethod
+    def ftb_pack_registry(instance: Instance) -> Path:
+        return Path(instance.instance_dir) / ".mcw" / "ftb-pack.json"
+
+    @staticmethod
     def curseforge_root() -> Path:
         directory = Paths.CACHE_ROOT / "content" / "curseforge"
         directory.mkdir(parents=True, exist_ok=True)
@@ -565,6 +580,10 @@ class Paths:
         directory = Path(instance.instance_dir) / "mods"
         directory.mkdir(parents=True, exist_ok=True)
         return directory
+
+    @staticmethod
+    def mod_provenance_registry(instance: Instance) -> Path:
+        return Path(instance.instance_dir) / ".mcw" / "mod-provenance.json"
 
     @staticmethod
     def modrinth_root() -> Path:

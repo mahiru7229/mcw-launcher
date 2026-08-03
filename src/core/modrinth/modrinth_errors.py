@@ -15,7 +15,7 @@ class ModrinthManagedFilesRequired(RuntimeError):
 
 
 class ModrinthModpackManualDownloadRequired(RuntimeError):
-    def __init__(self, requirement: ModrinthManualDownload, project_id: str, version_id: str, instance_name: str, install_optional_files: bool, allowed_version_types: tuple[str, ...], expected_loader: str = "") -> None:
+    def __init__(self, requirement: ModrinthManualDownload, project_id: str, version_id: str, instance_name: str, install_optional_files: bool, allowed_version_types: tuple[str, ...], expected_loader: str = "", settings_override: dict | None = None) -> None:
         super().__init__(requirement.reason)
         self.requirement = requirement
         self.project_id = str(project_id)
@@ -24,3 +24,4 @@ class ModrinthModpackManualDownloadRequired(RuntimeError):
         self.install_optional_files = bool(install_optional_files)
         self.allowed_version_types = tuple(allowed_version_types)
         self.expected_loader = str(expected_loader).strip().casefold()
+        self.settings_override = dict(settings_override) if isinstance(settings_override, dict) else None

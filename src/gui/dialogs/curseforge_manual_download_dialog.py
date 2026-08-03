@@ -66,8 +66,9 @@ class CurseForgeManualDownloadDialog(QDialog):
 
     def set_requirements(self, requirements: tuple[object, ...] | list[object]) -> None:
         self._requirements = list(requirements)
-        provider = str(getattr(self._requirements[0], "provider", "curseforge") if self._requirements else "curseforge").strip().casefold()
-        self._provider_name = "Modrinth" if provider == "modrinth" else "CurseForge"
+        providers = {str(getattr(item, "provider", "manual") or "manual").strip().casefold() for item in self._requirements}
+        provider = next(iter(providers), "manual") if len(providers) == 1 else "mixed"
+        self._provider_name = {"modrinth": "Modrinth", "curseforge": "CurseForge"}.get(provider, "MCWPack")
         self._installed.clear()
         self.retranslate_dynamic()
 

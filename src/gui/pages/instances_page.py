@@ -21,6 +21,8 @@ class InstancesPage(BasePage):
     delete_requested = Signal(str)
     import_requested = Signal(object)
     export_requested = Signal(str, object, bool)
+    import_modpack_package_requested = Signal(object)
+    export_modpack_requested = Signal(str)
     fabric_versions_requested = Signal(str)
     quilt_versions_requested = Signal(str)
     forge_versions_requested = Signal(str)
@@ -34,6 +36,7 @@ class InstancesPage(BasePage):
     manage_mods_requested = Signal(str)
     browse_modpacks_requested = Signal()
     browse_curseforge_modpacks_requested = Signal()
+    browse_ftb_modpacks_requested = Signal()
     backup_requested = Signal(str, str)
     restore_backup_requested = Signal(str, object)
     open_backups_requested = Signal(str)
@@ -104,6 +107,10 @@ class InstancesPage(BasePage):
         self.browse_curseforge_modpacks_button = set_theme_icon(QPushButton("Browse CurseForge modpacks"), "icon.action.download")
         self.browse_curseforge_modpacks_button.setVisible(CurseForgeConfigManager.is_configured())
         self.browse_curseforge_modpacks_button.clicked.connect(self.browse_curseforge_modpacks_requested.emit)
+        self.browse_ftb_modpacks_button = set_theme_icon(QPushButton(tr("ftb.modpack.browse")), "icon.action.download")
+        self.browse_ftb_modpacks_button.clicked.connect(self.browse_ftb_modpacks_requested.emit)
+        self.import_modpack_package_button = set_theme_icon(QPushButton(tr("modpack_package.import.local_button")), "icon.action.import")
+        self.import_modpack_package_button.clicked.connect(self._choose_modpack_import)
         create_card.layout.addWidget(QLabel("Name"))
         create_card.layout.addWidget(self.create_name_input)
         create_card.layout.addWidget(QLabel("Minecraft version"))
@@ -115,6 +122,8 @@ class InstancesPage(BasePage):
         create_card.layout.addWidget(create_button)
         create_card.layout.addWidget(self.browse_modpacks_button)
         create_card.layout.addWidget(self.browse_curseforge_modpacks_button)
+        create_card.layout.addWidget(self.browse_ftb_modpacks_button)
+        create_card.layout.addWidget(self.import_modpack_package_button)
         self.root_layout.addWidget(create_card)
 
         manage_card = CardWidget("Manage selected instance", "Change the selected instance's Fabric, Quilt, Forge, or NeoForge version without recreating it.")
@@ -644,27 +653,28 @@ class InstancesPage(BasePage):
         if answer == QMessageBox.StandardButton.Yes:
             self.delete_requested.emit(name)
 
+    def _choose_modpack_import(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, tr("modpack_package.import.file_title"), "", tr("modpack_package.import.file_filter"))
+        if path:
+            self.import_modpack_package_requested.emit(Path(path))
+
     def _choose_import(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, tr("Import MCW instance"), "", tr("MCW Package (*.mcwpack *.zip)"))
+        path, _ = QFileDialog.getOpenFileName(self, tr("Import MCW instance"), "", tr("modpack_package.import.universal_filter"))
         if path:
             self.import_requested.emit(Path(path))
 
     def _choose_export(self) -> None:
         name = self.current_instance_name()
-        if not name:
-            return
-        path, _ = QFileDialog.getSaveFileName(self, tr("Export MCW instance"), f"{name}.mcwpack", tr("MCW Package (*.mcwpack)"))
-        if path:
-            output_path = Path(path)
-            if output_path.suffix.lower() != ".mcwpack":
-                output_path = output_path.with_suffix(".mcwpack")
-            self.export_requested.emit(name, output_path, self.include_saves_checkbox.isChecked())
+        if name:
+            self.export_modpack_requested.emit(name)
 
     def retranslate_dynamic(self) -> None:
         self.open_instance_folder_button.setText(tr("instances.open_folder"))
         self.refresh_instances_button.setText(tr("instances.refresh"))
         self.browse_modpacks_button.setText(tr("modrinth.modpack.browse"))
         self.browse_curseforge_modpacks_button.setText(tr("curseforge.modpack.browse"))
+        self.browse_ftb_modpacks_button.setText(tr("ftb.modpack.browse"))
+        self.import_modpack_package_button.setText(tr("modpack_package.import.local_button"))
         self.restore_forge_button.setText(tr("forge.restore_previous"))
         self.restore_forge_button.setToolTip(tr("forge.restore.tooltip"))
         self.open_forge_logs_button.setText(tr("forge.open_logs"))

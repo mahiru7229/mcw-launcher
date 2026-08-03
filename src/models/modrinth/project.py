@@ -19,6 +19,19 @@ class ModrinthProject:
     client_side: str = "unknown"
     server_side: str = "unknown"
     date_modified: str = ""
+    body: str = ""
+    project_url: str = ""
+    source_url: str = ""
+    issues_url: str = ""
+    wiki_url: str = ""
+    discord_url: str = ""
+    license_id: str = ""
+    license_name: str = ""
+    license_url: str = ""
+    followers: int = 0
+    date_published: str = ""
+    gallery_urls: tuple[str, ...] = ()
+    loaders: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path, PurePosixPath
 from uuid import uuid4
+from types import SimpleNamespace
 import hashlib
 import json
 import re
@@ -11,9 +12,11 @@ import zipfile
 
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
+from src.core.instance.settings_manager import SettingsManager
 from src.core.instance.instance_artwork_manager import InstanceArtworkManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
 from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_downloader import ModrinthDownloader
 from src.core.modrinth.modrinth_errors import ModrinthModpackManualDownloadRequired
@@ -21,6 +24,7 @@ from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.core.network.artifact_download_service import ArtifactDownloadError, artifact_download_service
 from src.core.network.download_pause import download_pause_controller
 from src.core.progress.progress_reporter import ProgressReporter
+from src.core.package.provider_package_store import ProviderPackageStore
 from src.models.modrinth.install_result import ModrinthModpackInstallResult
 from src.models.modrinth.manual_download import ModrinthManualDownload
 from src.models.network.artifact import ArtifactRequest
@@ -40,7 +44,7 @@ class ModrinthPackInstaller:
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
 
     @staticmethod
-    def install(project_id: str, version_id: str, instance_name: str, install_optional_files: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None, expected_loader: str = "") -> ModrinthModpackInstallResult:
+    def install(project_id: str, version_id: str, instance_name: str, install_optional_files: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None, expected_loader: str = "", settings_override: dict | None = None) -> ModrinthModpackInstallResult:
         project = ModrinthClient.get_project(project_id)
         requested_name = str(instance_name or "").strip()
         base_name = ModrinthPackInstaller._validated_instance_name(requested_name or project.title)
@@ -91,8 +95,43 @@ class ModrinthPackInstaller:
                 retryable=error.failure.retryable,
                 managed_kind="modpack_archive",
             )
-            raise ModrinthModpackManualDownloadRequired(requirement, project.project_id, version.version_id, normalized_name, install_optional_files, allowed_types, expected_loader) from error
-        return ModrinthPackInstaller._install_archive(project, version, pack_path, normalized_name, install_optional_files, reporter, expected_loader)
+            raise ModrinthModpackManualDownloadRequired(requirement, project.project_id, version.version_id, normalized_name, install_optional_files, allowed_types, expected_loader, settings_override) from error
+        return ModrinthPackInstaller._install_archive(project, version, pack_path, normalized_name, install_optional_files, reporter, expected_loader, settings_override)
+
+    @staticmethod
+    def install_local_archive(pack_path: Path, instance_name: str = "", install_optional_files: bool = True, reporter: ProgressReporter | None = None, settings_override: dict | None = None) -> ModrinthModpackInstallResult:
+        source = Path(pack_path)
+        if not source.is_file():
+            raise RuntimeError("The selected Modrinth package does not exist.")
+        details = ModrinthPackInstaller.inspect(source)
+        requested_name = str(instance_name or details.get("name") or source.stem).strip()
+        normalized_name = ModrinthPackInstaller._validated_instance_name(requested_name)
+        if InstanceManager.is_instance_exist(normalized_name):
+            normalized_name = InstanceManager.next_available_name(normalized_name)
+        with zipfile.ZipFile(source, "r") as archive:
+            index = ModrinthPackInstaller._read_index(archive)
+        version_label = str(index.get("versionId") or index.get("name") or source.stem).strip()
+        project = SimpleNamespace(project_id="", title=str(index.get("name") or source.stem), icon_url="")
+        version = SimpleNamespace(version_id=version_label, version_number=version_label)
+        result = ModrinthPackInstaller._install_archive(project, version, source, normalized_name, install_optional_files, reporter, "", settings_override)
+        try:
+            ProviderPackageStore.store_native_package(
+                result.instance,
+                source,
+                provider="modrinth",
+                package_format="mrpack",
+                origin={
+                    "projectId": "",
+                    "versionId": version_label,
+                    "packName": project.title,
+                    "packVersion": version_label,
+                    "source": "local_import",
+                },
+            )
+        except Exception:
+            InstanceManager.delete_instance(result.instance.name)
+            raise
+        return result
 
     @staticmethod
     def install_manual_archive(request: ModrinthModpackManualDownloadRequired, source: Path, reporter: ProgressReporter | None = None) -> ModrinthModpackInstallResult:
@@ -114,10 +153,10 @@ class ModrinthPackInstaller:
             version_id=requirement.version_id,
         )
         artifact_download_service.accept_manual_file(artifact_request, Path(source))
-        return ModrinthPackInstaller._install_archive(project, version, pack_path, request.instance_name, request.install_optional_files, reporter, request.expected_loader)
+        return ModrinthPackInstaller._install_archive(project, version, pack_path, request.instance_name, request.install_optional_files, reporter, request.expected_loader, request.settings_override)
 
     @staticmethod
-    def _install_archive(project, version, pack_path: Path, normalized_name: str, install_optional_files: bool, reporter: ProgressReporter | None, expected_loader: str) -> ModrinthModpackInstallResult:
+    def _install_archive(project, version, pack_path: Path, normalized_name: str, install_optional_files: bool, reporter: ProgressReporter | None, expected_loader: str, settings_override: dict | None = None) -> ModrinthModpackInstallResult:
         staging = Paths.modrinth_staging_root() / uuid4().hex
         staging.mkdir(parents=True, exist_ok=False)
         created_instance = None
@@ -138,11 +177,13 @@ class ModrinthPackInstaller:
                 raise RuntimeError(f"This modpack uses {loader_name.title()}, but the browser filter is set to {selected_loader.title()}.")
             base_version = VersionManager.load(minecraft_version)
             resolved_loader = ModLoaderManager.resolve(minecraft_version, loader_name, loader_version)
-            ModLoaderManager.prepare(base_version, *resolved_loader, reporter=reporter)
             download_pause_controller.raise_if_requested()
             created_instance = InstanceManager.create(name=normalized_name, version=base_version, mod_loader=resolved_loader)
+            if settings_override is not None:
+                SettingsManager.save_dict(created_instance, settings_override)
             shutil.copytree(staging, created_instance.instance_dir, dirs_exist_ok=True)
             ModrinthPackInstaller._write_metadata(created_instance.instance_dir, project.project_id, version.version_id, project.title, version.version_number, minecraft_version, loader_name, loader_version, list(managed_files.values()), install_optional_files)
+            ModProvenanceRegistry.synchronize(created_instance)
             if InstanceArtworkManager.apply_provider_artwork(created_instance, "modrinth", project.project_id, getattr(project, "icon_url", ""), reporter):
                 created_instance = InstanceManager.load(created_instance.name)
             return ModrinthModpackInstallResult(instance=created_instance, pack_name=project.title, pack_version=version.version_number, installed_files=len(selected_files), skipped_optional_files=skipped_optional, skipped_server_files=skipped_server)
@@ -267,7 +308,7 @@ class ModrinthPackInstaller:
             relative = ModrinthPackInstaller._safe_relative_path(str(item.get("path") or ""))
             hashes = item.get("hashes", {}) if isinstance(item.get("hashes"), dict) else {}
             client_state = str((item.get("env") or {}).get("client") or "required").strip().lower() if isinstance(item.get("env"), dict) else "required"
-            managed.append({"path": relative.as_posix(), "sha1": str(hashes.get("sha1") or "").lower(), "sha512": str(hashes.get("sha512") or "").lower(), "size": int(item.get("fileSize", 0) or 0), "source": "download", "downloads": [str(url).strip() for url in item.get("downloads", []) if str(url).strip()], "required": client_state == "required"})
+            managed.append({"path": relative.as_posix(), "fileName": relative.name, "sha1": str(hashes.get("sha1") or "").lower(), "sha512": str(hashes.get("sha512") or "").lower(), "size": int(item.get("fileSize", 0) or 0), "source": "download", "provider": "modrinth", "downloads": [str(url).strip() for url in item.get("downloads", []) if str(url).strip()], "required": client_state == "required"})
         return managed
 
     @staticmethod
@@ -299,7 +340,7 @@ class ModrinthPackInstaller:
                     sha1.update(chunk)
                     sha512.update(chunk)
                     written += len(chunk)
-            managed.append({"path": relative.as_posix(), "sha1": sha1.hexdigest(), "sha512": sha512.hexdigest(), "size": written, "source": prefix})
+            managed.append({"path": relative.as_posix(), "fileName": relative.name, "sha1": sha1.hexdigest(), "sha512": sha512.hexdigest(), "size": written, "source": prefix, "provider": "pack"})
         return managed
 
     @staticmethod

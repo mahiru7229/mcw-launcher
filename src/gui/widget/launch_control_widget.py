@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 
 from mcw_core.api.language.language_manager import tr
 from src.gui.presenters.progress_presenter import ProgressPresenter
@@ -30,6 +30,8 @@ class LaunchControlWidget(QFrame):
         self.setObjectName("LaunchControl")
         self._compact = bool(compact)
         self.setProperty("compactLayout", self._compact)
+        self.setMinimumHeight(116 if self._compact else 152)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
         self._mode = "idle"
         self._last_event: object | None = None
         self._last_result: dict | None = None
@@ -85,26 +87,33 @@ class LaunchControlWidget(QFrame):
         self.detail_label.setWordWrap(True)
 
         self.progress_bar = ThemedProgressBar()
+        self.percentage_label = QLabel(self._percentage_text(0))
+        self.percentage_label.setObjectName("TinyLabel")
+        self.percentage_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("%p%")
+        self.progress_bar.setFormat("")
 
         progress_layout.addLayout(status_row)
         progress_layout.addWidget(self.detail_label)
+        progress_layout.addWidget(self.percentage_label)
         progress_layout.addWidget(self.progress_bar)
 
-        controls_layout = QVBoxLayout()
+        self.controls_widget = QWidget()
+        self.controls_widget.setMinimumWidth(210 if self._compact else 260)
+        self.controls_widget.setMinimumHeight(86 if self._compact else 112)
+        self.controls_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        controls_layout = QHBoxLayout(self.controls_widget)
         controls_layout.setContentsMargins(0, 0, 0, 0)
-        controls_layout.setSpacing(4)
+        controls_layout.setSpacing(8)
 
         self.launch_button = set_theme_icon(QPushButton(tr(self.LAUNCH_TEXT)), "icon.action.launch", 26 if self._compact else 32)
         set_theme_static_text(self.launch_button, "control.launch", tr(self.LAUNCH_TEXT))
         self.launch_button.setObjectName("PrimaryButton")
         self.launch_button.setProperty("themeRole", "launch")
-        if self._compact:
-            self.launch_button.setFixedSize(190, 34)
-        else:
-            self.launch_button.setFixedSize(230, 42)
+        self.launch_button.setMinimumHeight(74 if self._compact else 100)
+        self.launch_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.launch_button.clicked.connect(self.launch_clicked.emit)
 
         self.cancel_button = set_theme_icon(QPushButton(tr(self.CANCEL_TEXT)), "icon.action.cancel", 18 if self._compact else 20)
@@ -113,18 +122,16 @@ class LaunchControlWidget(QFrame):
         self.cancel_button.setProperty("themeRole", "cancel")
         self.cancel_button.setProperty("motionVisibilityOnly", True)
         self.cancel_button.setProperty("motionVisibleTarget", False)
-        if self._compact:
-            self.cancel_button.setFixedSize(190, 22)
-        else:
-            self.cancel_button.setFixedSize(230, 26)
+        self.cancel_button.setMinimumHeight(74 if self._compact else 100)
+        self.cancel_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.cancel_button.clicked.connect(self.cancel_clicked.emit)
         self.cancel_button.setVisible(False)
 
-        controls_layout.addWidget(self.launch_button)
-        controls_layout.addWidget(self.cancel_button)
+        controls_layout.addWidget(self.launch_button, 1)
+        controls_layout.addWidget(self.cancel_button, 1)
 
-        layout.addLayout(progress_layout, 1)
-        layout.addLayout(controls_layout)
+        layout.addLayout(progress_layout, 3)
+        layout.addWidget(self.controls_widget, 1)
 
     def set_motion_runtime(self, runtime: "MotionRuntime | None") -> None:
         self._motion_runtime = runtime
@@ -165,11 +172,13 @@ class LaunchControlWidget(QFrame):
         if view.percentage is None:
             self.progress_bar.setRange(0, 0)
             self.progress_bar.setFormat("")
+            self.percentage_label.setText("")
             return
 
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(view.percentage)
-        self.progress_bar.setFormat(f"{view.percentage}%")
+        self.progress_bar.setFormat("")
+        self.percentage_label.setText(self._percentage_text(view.percentage))
 
     def set_result(self, result: dict) -> None:
         self._mode = "result"
@@ -179,7 +188,8 @@ class LaunchControlWidget(QFrame):
 
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100)
-        self.progress_bar.setFormat("100%")
+        self.progress_bar.setFormat("")
+        self.percentage_label.setText(self._percentage_text(100))
         warnings = tuple(result.get("warnings", ()) or ())
         if warnings:
             self.status_label.setText(tr("Minecraft {version} launched with warnings", version=version))
@@ -206,7 +216,8 @@ class LaunchControlWidget(QFrame):
         self._cancel_pending = False
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100)
-        self.progress_bar.setFormat("100%")
+        self.progress_bar.setFormat("")
+        self.percentage_label.setText(self._percentage_text(100))
         self.status_label.setText(tr(self._last_completed_status))
         self.detail_label.setText(tr(self._last_completed_detail))
         self.stage_label.setText(tr("READY"))
@@ -224,7 +235,8 @@ class LaunchControlWidget(QFrame):
         duration = tr("{minutes}m {seconds}s", minutes=minutes, seconds=seconds)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0 if crashed else 100)
-        self.progress_bar.setFormat(tr("CRASHED") if crashed else tr("FINISHED"))
+        self.progress_bar.setFormat("")
+        self.percentage_label.setText(tr("CRASHED") if crashed else tr("FINISHED"))
         if crashed:
             self.status_label.setText(tr("Minecraft crashed: {name}", name=instance_name))
             self.detail_label.setText(tr("Exit code: {code} • Play time: {duration}", code=exit_code, duration=duration))
@@ -245,7 +257,8 @@ class LaunchControlWidget(QFrame):
         detail_text = self._compact_failure_text(self._last_error_detail, "launch.error.logs_hint", 180)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat(tr("FAILED"))
+        self.progress_bar.setFormat("")
+        self.percentage_label.setText(tr("FAILED"))
         self.status_label.setText(status_text)
         self.detail_label.setText(detail_text)
         self.stage_label.setText(tr("FAILED"))
@@ -258,7 +271,8 @@ class LaunchControlWidget(QFrame):
         self._last_error_detail = detail or "progress.cancelled.detail"
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat(tr("CANCELLED"))
+        self.progress_bar.setFormat("")
+        self.percentage_label.setText(tr("CANCELLED"))
         self.status_label.setText(tr(self._last_error_status))
         self.detail_label.setText(tr(self._last_error_detail))
         self.stage_label.setText(tr("CANCELLED"))
@@ -296,7 +310,7 @@ class LaunchControlWidget(QFrame):
         self.status_label.setText(tr("launch.paused"))
         self.detail_label.setText(tr("launch.paused_detail"))
         self.stage_label.setText(tr("launch.paused_badge"))
-        self.progress_bar.setFormat(tr("launch.paused_badge"))
+        self.progress_bar.setFormat("")
         self._set_stage_state("warning")
         self._refresh_launch_button()
 
@@ -310,7 +324,7 @@ class LaunchControlWidget(QFrame):
         self.status_label.setText(tr("launch.resumed"))
         self.detail_label.setText(tr("launch.resumed_detail"))
         self.stage_label.setText(tr("launch.running_badge"))
-        self.progress_bar.setFormat("%p%")
+        self.progress_bar.setFormat("")
         self._set_stage_state("busy")
         self._refresh_launch_button()
 
@@ -336,7 +350,8 @@ class LaunchControlWidget(QFrame):
         self._detail_message = "Select an account and an instance, then launch."
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("%p%")
+        self.progress_bar.setFormat("")
+        self.percentage_label.setText(self._percentage_text(0))
         self.status_label.setText(tr("Ready"))
         self.detail_label.setText(tr("Select an account and an instance, then launch."))
         self.stage_label.setText(tr("READY"))
@@ -404,6 +419,10 @@ class LaunchControlWidget(QFrame):
             self.detail_label.setText(tr(self._detail_message))
             self.stage_label.setText(tr("READY"))
             self._refresh_launch_button()
+
+    @staticmethod
+    def _percentage_text(value: int) -> str:
+        return f"{max(0, min(100, int(value)))}%"
 
     @staticmethod
     def _compact_failure_text(value: str, fallback: str, max_length: int) -> str:
