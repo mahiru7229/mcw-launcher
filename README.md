@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/Stable-v0.12.0-brightgreen" alt="Current stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Beta-v1.0.0--beta.4-orange" alt="Current beta version">
+    <img src="https://img.shields.io/badge/Beta-v1.0.0--beta.5-orange" alt="Current beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -25,12 +25,12 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v1.0.0-beta.4.md">v1.0 beta notes</a> ·
+  <a href="docs/RELEASE-v1.0.0-beta.5.md">v1.0 beta notes</a> ·
   <a href="docs/UPDATE_PACKAGES.md">Updater packages</a>
 </p>
 
 > [!NOTE]
-> `v0.12.0` là bản Stable hiện tại. `v1.0.0-beta.4` mở rộng quản lý nội dung, dependency và nguồn mod; bản này chỉ được nhận khi người dùng chủ động tham gia tester program.
+> `v0.12.0` là bản Stable hiện tại. `v1.0.0-beta.5` bổ sung Installed Content Library để quản lý nội dung của từng instance tại một nơi; bản này chỉ được nhận khi người dùng chủ động tham gia tester program.
 
 ---
 
@@ -42,13 +42,14 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
-### Điểm nổi bật của `v1.0.0-beta.4`
+### Điểm nổi bật của `v1.0.0-beta.5`
 
-- Lưu nguồn chính xác cho từng mod được quản lý bởi modpack: Modrinth, CurseForge hoặc FTB thay vì hiển thị dấu `-`.
-- Thêm `.mcw/mod-provenance.json` làm registry thống nhất cho provider/project/version/file ID, hash, URL và modpack sở hữu file.
-- Tự đồng bộ provenance từ manifest ngay khi tạo instance, trước cả lần Launch đầu tiên tải mod.
-- Manage Mods hiển thị rõ nguồn trực tiếp hay nguồn do modpack quản lý, phục vụ update, repair và manifest export ở beta.6.
-- Hoàn thiện Launch Control để Launch hoặc Pause/Cancel mở rộng theo cả chiều ngang lẫn chiều cao.
+- Thêm **Installed Content Library** cho từng instance, gom modpack, mod, resource pack và shader pack vào một bảng quản lý chung.
+- Hiển thị nguồn Modrinth, CurseForge, FTB, local hoặc manual; mod do modpack quản lý vẫn giữ provider và pack sở hữu từ provenance registry.
+- Nhận biết nội dung ready, disabled, pending, missing hoặc broken, kể cả mod chưa tải ở lần Launch đầu tiên.
+- Hỗ trợ tìm kiếm, lọc theo loại/nguồn/trạng thái, xem dung lượng và metadata định danh, mở trình quản lý, thư mục hoặc trang project tương ứng.
+- Cho phép chọn nhiều mục để bật/tắt, gỡ nội dung không được modpack bảo vệ, ghim phiên bản và bỏ qua cập nhật.
+- Lưu tùy chọn thư viện tại `.mcw/content-library.json`, chuẩn bị dữ liệu thống nhất cho update workflow và manifest export ở beta.6.
 
 ### Điểm nổi bật của `v0.12.0-beta.6`
 
@@ -115,7 +116,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.12.0` là bản Stable hiện tại; `v1.0.0-beta.4` dành cho tester muốn thử provenance, update/dependency và content workflow mới.
+- `v0.12.0` là bản Stable hiện tại; `v1.0.0-beta.5` dành cho tester muốn thử Installed Content Library và workflow quản lý nội dung hợp nhất.
 - Stable là kênh mặc định. Để nhận bản thử nghiệm, người dùng phải chủ động bật:
 
 ```text
@@ -194,13 +195,14 @@ MCW Launcher is an open-source Minecraft launcher centered around **isolated ins
 
 Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
 
-### `v1.0.0-beta.4` highlights
+### `v1.0.0-beta.5` highlights
 
-- Preserve exact Modrinth, CurseForge, or FTB provenance for every mod managed by a modpack instead of showing an unknown `-` source.
-- Add `.mcw/mod-provenance.json` as a unified per-instance registry for provider/project/version/file IDs, hashes, URLs, and owning modpack identity.
-- Synchronize provenance as soon as a manifest creates an instance, before first-launch mod downloads begin.
-- Show whether a mod was installed directly or is managed by a modpack in Manage Mods, preparing update, repair, and beta.6 manifest-export workflows.
-- Expand Launch and Pause/Cancel controls across the available action area in both dimensions.
+- Add an **Installed Content Library** per instance that combines modpacks, mods, resource packs, and shader packs in one management view.
+- Preserve Modrinth, CurseForge, FTB, local, and manual source identity, including the owning pack for modpack-managed mods.
+- Surface ready, disabled, pending, missing, and broken states, including manifest entries waiting for first-launch download.
+- Add search and filters by type/provider/status, aggregate size and identity details, plus shortcuts to the relevant manager, folder, or project page.
+- Support multi-selection for enable/disable, safe removal of unprotected content, version pinning, and ignored-update preferences.
+- Store library preferences in `.mcw/content-library.json`, preparing a unified input for future updates and beta.6 manifest export.
 
 ### `v0.11.0` highlights
 

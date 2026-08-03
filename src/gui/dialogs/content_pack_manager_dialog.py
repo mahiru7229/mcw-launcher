@@ -149,6 +149,10 @@ class ContentPackManagerDialog(QDialog):
     def current_kind(self) -> str:
         return ContentPackManager.RESOURCE_PACK if self.tabs.currentIndex() == 0 else ContentPackManager.SHADER_PACK
 
+    def set_current_kind(self, content_type: str) -> None:
+        kind = ContentPackManager.normalize_type(content_type)
+        self.tabs.setCurrentIndex(0 if kind == ContentPackManager.RESOURCE_PACK else 1)
+
     def selected_entry(self) -> ContentPackEntry | None:
         table = self._tables[self.current_kind()]
         row = table.currentRow()
