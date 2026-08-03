@@ -32,8 +32,8 @@ class ModrinthClient:
     @staticmethod
     def search_projects(project_type: str, query: str = "", game_version: str = "", loader: str = "fabric", index: str = "relevance", offset: int = 0, limit: int = 25, force_refresh: bool = False) -> ModrinthSearchResult:
         normalized_type = str(project_type).strip().lower()
-        if normalized_type not in {"mod", "modpack"}:
-            raise ValueError("Modrinth project type must be 'mod' or 'modpack'.")
+        if normalized_type not in {"mod", "modpack", "resourcepack", "shader"}:
+            raise ValueError("Unsupported Modrinth project type.")
 
         normalized_loader = str(loader).strip().lower()
         normalized_game_version = str(game_version).strip()

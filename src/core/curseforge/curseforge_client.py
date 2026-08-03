@@ -30,7 +30,10 @@ class CurseForgeClient:
     MINECRAFT_GAME_ID = 432
 
     CLASS_MODS = 6
+    CLASS_RESOURCE_PACKS = 12
     CLASS_MODPACKS = 4471
+    CLASS_SHADERS = 6552
+    CLASS_IDS = {"mod": CLASS_MODS, "modpack": CLASS_MODPACKS, "resourcepack": CLASS_RESOURCE_PACKS, "shader": CLASS_SHADERS}
     SEARCH_TTL_SECONDS = 2 * 60
     FILES_TTL_SECONDS = 5 * 60
     PROJECT_TTL_SECONDS = 10 * 60
@@ -86,8 +89,8 @@ class CurseForgeClient:
     @staticmethod
     def search_projects(project_type: str, query: str = "", game_version: str = "", loader: str = "forge", index: int = 0, page_size: int = 25, sort: str = "popularity", force_refresh: bool = False, manual_refresh: bool = False) -> CurseForgeSearchResult:
         kind = str(project_type).strip().lower()
-        if kind not in {"mod", "modpack"}:
-            raise ValueError("CurseForge project type must be 'mod' or 'modpack'.")
+        if kind not in CurseForgeClient.CLASS_IDS:
+            raise ValueError("Unsupported CurseForge project type.")
         normalized_query = " ".join(str(query).strip().split())
         if not normalized_query:
             return CurseForgeSearchResult(
@@ -97,8 +100,8 @@ class CurseForgeClient:
                 page_size=min(max(1, int(page_size)), 50),
                 cache_info=CurseForgeCache.status(),
             )
-        normalized_loader = CurseForgeClient.normalize_loader(loader)
-        class_id = CurseForgeClient.CLASS_MODS if kind == "mod" else CurseForgeClient.CLASS_MODPACKS
+        normalized_loader = CurseForgeClient.normalize_loader(loader) if kind in {"mod", "modpack"} else ""
+        class_id = CurseForgeClient.CLASS_IDS[kind]
         sort_field = {"popularity": 2, "updated": 3, "newest": 11, "downloads": 6}.get(str(sort).lower(), 2)
         params: dict[str, object] = {
             "query": normalized_query,
@@ -546,7 +549,8 @@ class CurseForgeClient:
             if isinstance(item, dict) and loader_names.get(int(item.get("modLoader", -1) or -1), "") not in {"", "any"}
         ))
         if not project_url and slug:
-            category = "modpacks" if int(data.get("classId", 0) or 0) == CurseForgeClient.CLASS_MODPACKS else "mc-mods"
+            class_id = int(data.get("classId", 0) or 0)
+            category = {CurseForgeClient.CLASS_MODPACKS: "modpacks", CurseForgeClient.CLASS_RESOURCE_PACKS: "texture-packs", CurseForgeClient.CLASS_SHADERS: "shaders"}.get(class_id, "mc-mods")
             project_url = f"https://www.curseforge.com/minecraft/{category}/{quote(slug, safe='-')}"
         categories = tuple(
             str(item.get("name") or "").strip()

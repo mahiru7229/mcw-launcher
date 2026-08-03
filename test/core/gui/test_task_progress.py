@@ -13,6 +13,7 @@ def test_profiles_cover_requested_long_running_tasks() -> None:
         "update.prepare": ProgressStage.DOWNLOADING_UPDATE,
         "modrinth.install.modpack": ProgressStage.DOWNLOADING_MODPACK,
         "curseforge.install.mod": ProgressStage.DOWNLOADING_MODS,
+        "content.install.modrinth": ProgressStage.DOWNLOADING_CONTENT,
     }
 
     assert {task_id: task_progress_profile(task_id).stage for task_id in expected} == expected

@@ -406,3 +406,19 @@ def test_project_parser_keeps_rich_detail_metadata() -> None:
     assert project.gallery_urls == ("https://cdn.modrinth.com/gallery.png",)
     assert project.loaders == ("fabric", "quilt")
     assert project.followers == 321
+
+
+def test_search_supports_resource_pack_and_shader_project_types(monkeypatch):
+    calls = []
+
+    def fake_get_json(path, params=None, **_kwargs):
+        calls.append(json.loads(params["facets"]))
+        return {"hits": [], "total_hits": 0, "offset": 0, "limit": 25}
+
+    monkeypatch.setattr(ModrinthClient, "_get_json", fake_get_json)
+
+    ModrinthClient.search_projects("resourcepack", "faithful")
+    ModrinthClient.search_projects("shader", "complementary")
+
+    assert ["project_type:resourcepack"] in calls[0]
+    assert ["project_type:shader"] in calls[1]

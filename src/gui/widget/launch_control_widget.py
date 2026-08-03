@@ -30,6 +30,8 @@ class LaunchControlWidget(QFrame):
         self.setObjectName("LaunchControl")
         self._compact = bool(compact)
         self.setProperty("compactLayout", self._compact)
+        self.setMinimumHeight(104 if self._compact else 132)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
         self._mode = "idle"
         self._last_event: object | None = None
         self._last_result: dict | None = None
@@ -95,7 +97,8 @@ class LaunchControlWidget(QFrame):
 
         self.controls_widget = QWidget()
         self.controls_widget.setMinimumWidth(260 if self._compact else 340)
-        self.controls_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.controls_widget.setMinimumHeight(70 if self._compact else 94)
+        self.controls_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         controls_layout = QHBoxLayout(self.controls_widget)
         controls_layout.setContentsMargins(0, 0, 0, 0)
         controls_layout.setSpacing(8)
@@ -104,8 +107,8 @@ class LaunchControlWidget(QFrame):
         set_theme_static_text(self.launch_button, "control.launch", tr(self.LAUNCH_TEXT))
         self.launch_button.setObjectName("PrimaryButton")
         self.launch_button.setProperty("themeRole", "launch")
-        self.launch_button.setMinimumHeight(36 if self._compact else 48)
-        self.launch_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.launch_button.setMinimumHeight(58 if self._compact else 82)
+        self.launch_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.launch_button.clicked.connect(self.launch_clicked.emit)
 
         self.cancel_button = set_theme_icon(QPushButton(tr(self.CANCEL_TEXT)), "icon.action.cancel", 18 if self._compact else 20)
@@ -114,8 +117,8 @@ class LaunchControlWidget(QFrame):
         self.cancel_button.setProperty("themeRole", "cancel")
         self.cancel_button.setProperty("motionVisibilityOnly", True)
         self.cancel_button.setProperty("motionVisibleTarget", False)
-        self.cancel_button.setMinimumHeight(36 if self._compact else 48)
-        self.cancel_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.cancel_button.setMinimumHeight(58 if self._compact else 82)
+        self.cancel_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.cancel_button.clicked.connect(self.cancel_clicked.emit)
         self.cancel_button.setVisible(False)
 

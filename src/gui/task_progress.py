@@ -48,5 +48,7 @@ def task_progress_profile(task_id: str) -> TaskProgressProfile | None:
         return TaskProgressProfile(ProgressStage.DOWNLOADING_MODPACK, "modpack.install.completed", "modpack.install.completed_detail", "modpack.install.failed")
     if task.startswith("modrinth.install.mod") or task.startswith("curseforge.install.mod"):
         return TaskProgressProfile(ProgressStage.DOWNLOADING_MODS, "mods.install.completed", "mods.install.completed_detail", "mods.install.failed")
+    if task.startswith("content.install."):
+        return TaskProgressProfile(ProgressStage.DOWNLOADING_CONTENT, "content.task.install.completed", "content.task.install.completed_detail", "content.task.install.failed")
 
     return None

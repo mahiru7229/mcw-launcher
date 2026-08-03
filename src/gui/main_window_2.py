@@ -8,6 +8,7 @@ from PySide6.QtGui import QCloseEvent, QDesktopServices, QGuiApplication, QScree
 from PySide6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget
 
 from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
+from mcw_core.api.content.content_pack_manager import ContentPackManager
 from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
 from mcw_core.api.curseforge.curseforge_errors import CurseForgeManagedFilesRequired, CurseForgeModpackManualDownloadRequired
 from mcw_core.api.diagnostics.diagnostics_manager import DiagnosticsManager
@@ -27,6 +28,7 @@ from src.gui.animation.motion_runtime import MotionRuntime
 from src.gui.config import LAUNCHER_NAME, VERSION_ID
 from src.gui.controllers.account_controller import AccountController
 from src.gui.controllers.curseforge_controller import CurseForgeController
+from src.gui.controllers.content_pack_controller import ContentPackController
 from src.gui.controllers.ftb_controller import FTBController
 from src.gui.controllers.backup_controller import BackupController
 from src.gui.controllers.java_controller import JavaController
@@ -44,6 +46,8 @@ from src.gui.controllers.version_controller import VersionController
 from src.gui.controllers.update_controller import UpdateController
 from src.gui.dialogs.compatible_instance_dialog import CompatibleInstanceDialog
 from src.gui.dialogs.curseforge_browser_dialog import CurseForgeBrowserDialog
+from src.gui.dialogs.content_pack_browser_dialog import ContentPackBrowserDialog
+from src.gui.dialogs.content_pack_manager_dialog import ContentPackManagerDialog
 from src.gui.dialogs.curseforge_manual_download_dialog import CurseForgeManualDownloadDialog
 from src.gui.dialogs.ftb_browser_dialog import FTBBrowserDialog
 from src.gui.dialogs.lan_agent_log_dialog import LanAgentLogDialog
@@ -100,6 +104,7 @@ class MainWindow(QMainWindow):
         self.mod_catalog_controller = ModCatalogController(self.task_runner)
         self.modrinth_controller = ModrinthController(self.task_runner)
         self.curseforge_controller = CurseForgeController(self.task_runner)
+        self.content_pack_controller = ContentPackController(self.task_runner)
         self.ftb_controller = FTBController(self.task_runner)
         self.instance_settings_controller = InstanceSettingsController()
         self.gui_settings_controller = GuiSettingsController()
@@ -117,6 +122,7 @@ class MainWindow(QMainWindow):
         self._curseforge_tasks: set[str] = set()
         self._ftb_tasks: set[str] = set()
         self._curseforge_catalog_tasks: set[str] = set()
+        self._content_tasks: set[str] = set()
         self._suppress_loader_progress = False
         self._prompted_update_versions: set[str] = set()
         self._selected_instance: object | None = None
@@ -217,6 +223,9 @@ class MainWindow(QMainWindow):
         self.modrinth_manual_dialog = CurseForgeManualDownloadDialog(self)
         self.curseforge_mod_dialog = CurseForgeBrowserDialog("mod", self)
         self.curseforge_modpack_dialog = CurseForgeBrowserDialog("modpack", self)
+        self.content_pack_manager_dialog = ContentPackManagerDialog(self)
+        self.resource_pack_browser_dialog = ContentPackBrowserDialog(ContentPackManager.RESOURCE_PACK, self)
+        self.shader_pack_browser_dialog = ContentPackBrowserDialog(ContentPackManager.SHADER_PACK, self)
         self.ftb_modpack_dialog = FTBBrowserDialog(self)
         self.curseforge_manual_dialog = CurseForgeManualDownloadDialog(self)
         self.repair_center_dialog = RepairCenterDialog(self)
@@ -283,6 +292,7 @@ class MainWindow(QMainWindow):
         self.repair_center_dialog.scan_requested.connect(self.instance_controller.scan_repair_center)
         self.repair_center_dialog.repair_requested.connect(self.instance_controller.execute_repair_plan)
         self.instances_page.manage_mods_requested.connect(self._open_mod_manager)
+        self.instances_page.manage_content_packs_requested.connect(self._open_content_pack_manager)
         self.instances_page.browse_modpacks_requested.connect(self._open_modrinth_modpacks)
         self.instances_page.browse_curseforge_modpacks_requested.connect(self._open_curseforge_modpacks)
         self.instances_page.browse_ftb_modpacks_requested.connect(self._open_ftb_modpacks)
@@ -471,6 +481,32 @@ class MainWindow(QMainWindow):
         self.ftb_controller.version_details_changed.connect(self.ftb_modpack_dialog.set_version_details)
         self.ftb_controller.cache_cleared.connect(lambda info: (self.ftb_modpack_dialog.set_cache_info(info), QMessageBox.information(self, tr("ftb.modpack.title"), tr("ftb.cache.cleared"))))
         self.ftb_controller.modpack_installed.connect(self._ftb_modpack_installed)
+
+        self.content_pack_manager_dialog.browse_requested.connect(self._open_content_pack_browser)
+        self.content_pack_manager_dialog.import_requested.connect(self._import_content_pack)
+        self.content_pack_manager_dialog.refresh_requested.connect(self._refresh_content_pack_entries)
+        self.content_pack_manager_dialog.toggle_requested.connect(self._toggle_content_pack)
+        self.content_pack_manager_dialog.remove_requested.connect(self._remove_content_pack)
+        self.content_pack_manager_dialog.open_folder_requested.connect(self._open_content_pack_folder)
+        for dialog in (self.resource_pack_browser_dialog, self.shader_pack_browser_dialog):
+            dialog.search_requested.connect(self.content_pack_controller.search)
+            dialog.versions_requested.connect(self.content_pack_controller.load_versions)
+            dialog.project_details_requested.connect(self.content_pack_controller.load_project_details)
+            dialog.install_modrinth_requested.connect(self.content_pack_controller.install_modrinth)
+            dialog.install_curseforge_requested.connect(self._install_curseforge_content_pack)
+            dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
+        self.content_pack_controller.search_results_changed.connect(self.resource_pack_browser_dialog.set_search_result)
+        self.content_pack_controller.search_results_changed.connect(self.shader_pack_browser_dialog.set_search_result)
+        self.content_pack_controller.search_failed.connect(self.resource_pack_browser_dialog.set_search_error)
+        self.content_pack_controller.search_failed.connect(self.shader_pack_browser_dialog.set_search_error)
+        self.content_pack_controller.versions_changed.connect(self.resource_pack_browser_dialog.set_versions)
+        self.content_pack_controller.versions_changed.connect(self.shader_pack_browser_dialog.set_versions)
+        self.content_pack_controller.files_changed.connect(self.resource_pack_browser_dialog.set_files)
+        self.content_pack_controller.files_changed.connect(self.shader_pack_browser_dialog.set_files)
+        self.content_pack_controller.project_details_changed.connect(self.resource_pack_browser_dialog.set_project_details)
+        self.content_pack_controller.project_details_changed.connect(self.shader_pack_browser_dialog.set_project_details)
+        self.content_pack_controller.entries_changed.connect(self.content_pack_manager_dialog.set_entries)
+        self.content_pack_controller.installed.connect(self._content_pack_installed)
         self.curseforge_manual_dialog.files_selected.connect(self._install_manual_curseforge_files)
 
         self.launch_controller.progress_received.connect(self._on_progress)
@@ -478,6 +514,7 @@ class MainWindow(QMainWindow):
         self.modrinth_controller.progress_received.connect(self._on_progress)
         self.curseforge_controller.progress_received.connect(self._on_progress)
         self.ftb_controller.progress_received.connect(self._on_progress)
+        self.content_pack_controller.progress_received.connect(self._on_progress)
         self.mod_controller.progress_received.connect(self._on_progress)
         self.java_controller.progress_received.connect(self._on_progress)
         self.modpack_lifecycle_controller.progress_received.connect(self._on_progress)
@@ -529,6 +566,7 @@ class MainWindow(QMainWindow):
             self.modrinth_controller,
             self.curseforge_controller,
             self.ftb_controller,
+            self.content_pack_controller,
             self.instance_settings_controller,
             self.gui_settings_controller,
             self.launch_controller,
@@ -679,6 +717,98 @@ class MainWindow(QMainWindow):
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         if loader_name in ModLoaderManager.MODDED_LOADERS and not self.task_runner.is_task_active("mods.update.check"):
             QTimer.singleShot(0, lambda: self.mod_controller.check_updates(self.mod_manager_dialog.allowed_version_types, force_refresh=False))
+
+    def _open_content_pack_manager(self, instance_name: str) -> None:
+        name = str(instance_name or "").strip()
+        if not name:
+            QMessageBox.information(self, tr("content.manager.title"), tr("Select an instance first."))
+            return
+        try:
+            instance = InstanceManager.load(name)
+        except Exception as error:
+            self._show_error(tr("content.manager.title"), str(error))
+            return
+        self.content_pack_manager_dialog.set_instance(instance)
+        self.content_pack_manager_dialog.show()
+        self.content_pack_manager_dialog.raise_()
+        self.content_pack_manager_dialog.activateWindow()
+        self.content_pack_controller.refresh_entries(name, ContentPackManager.RESOURCE_PACK)
+        self.content_pack_controller.refresh_entries(name, ContentPackManager.SHADER_PACK)
+
+    def _open_content_pack_browser(self, content_type: str) -> None:
+        instance = self.content_pack_manager_dialog.instance
+        if instance is None:
+            QMessageBox.information(self, tr("content.manager.title"), tr("Select an instance first."))
+            return
+        kind = ContentPackManager.normalize_type(content_type)
+        dialog = self.resource_pack_browser_dialog if kind == ContentPackManager.RESOURCE_PACK else self.shader_pack_browser_dialog
+        dialog.set_instance(instance)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+        dialog.set_searching(dialog.provider)
+        self.content_pack_controller.search(dialog.provider, kind, "", "downloads", 0, instance.version_id)
+
+    def _import_content_pack(self, content_type: str, source: object) -> None:
+        instance = self.content_pack_manager_dialog.instance
+        if instance is not None:
+            self.content_pack_controller.import_local(instance.name, content_type, Path(source))
+
+    def _refresh_content_pack_entries(self, content_type: str) -> None:
+        instance = self.content_pack_manager_dialog.instance
+        if instance is not None:
+            self.content_pack_controller.refresh_entries(instance.name, content_type)
+
+    def _toggle_content_pack(self, content_type: str, entry_id: str, enabled: bool) -> None:
+        instance = self.content_pack_manager_dialog.instance
+        if instance is not None:
+            self.content_pack_controller.set_enabled(instance.name, content_type, entry_id, enabled)
+
+    def _remove_content_pack(self, content_type: str, entry_id: str) -> None:
+        instance = self.content_pack_manager_dialog.instance
+        if instance is not None:
+            self.content_pack_controller.remove(instance.name, content_type, entry_id)
+
+    def _open_content_pack_folder(self, content_type: str) -> None:
+        instance = self.content_pack_manager_dialog.instance
+        if instance is None:
+            return
+        try:
+            path = ContentPackManager.destination_dir(instance, content_type)
+        except Exception as error:
+            self._show_error(tr("content.manager.title"), str(error))
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+
+    def _install_curseforge_content_pack(self, instance_name: str, content_type: str, project_name: str, file: object) -> None:
+        kind = ContentPackManager.normalize_type(content_type)
+        dialog = self.resource_pack_browser_dialog if kind == ContentPackManager.RESOURCE_PACK else self.shader_pack_browser_dialog
+        project = dialog.selected_project()
+        project_url = str(getattr(project, "project_url", "") or "")
+        self.content_pack_controller.install_curseforge(instance_name, kind, project_name, project_url, file)
+
+    def _content_pack_installed(self, result: object) -> None:
+        instance_name = str(getattr(result, "instance_name", "") or "")
+        content_type = str(getattr(result, "content_type", "") or "")
+        if instance_name and content_type:
+            self.content_pack_controller.refresh_entries(instance_name, content_type)
+        kind_name = tr("content.kind.resourcepack") if content_type == ContentPackManager.RESOURCE_PACK else tr("content.kind.shader")
+        message = tr("content.install.success", kind=kind_name, name=str(getattr(result, "project_name", "") or getattr(result, "file_name", "")))
+        if content_type == ContentPackManager.SHADER_PACK and instance_name and not self._shader_environment_available(instance_name):
+            message += "\n\n" + tr("content.shader.environment_warning")
+        QMessageBox.information(self, tr("content.manager.title"), message)
+
+    @staticmethod
+    def _shader_environment_available(instance_name: str) -> bool:
+        try:
+            instance = InstanceManager.load(instance_name)
+        except Exception:
+            return False
+        mods_dir = Path(instance.instance_dir) / "minecraft" / "mods"
+        if not mods_dir.is_dir():
+            return False
+        markers = ("iris", "oculus", "optifine", "canvas")
+        return any(path.is_file() and any(marker in path.name.casefold() for marker in markers) for path in mods_dir.iterdir())
 
     def _open_modrinth_mod_browser(self) -> None:
         instance = self.mod_controller.current_instance
@@ -1691,6 +1821,8 @@ class MainWindow(QMainWindow):
         self.curseforge_mod_dialog.set_channel_preferences(include_beta, include_alpha)
         self.curseforge_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
         self.ftb_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.resource_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.shader_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
         self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
         show_content_descriptions = bool(settings.get("show_content_descriptions", False))
         self.mods_page.set_show_project_descriptions(show_content_descriptions)
@@ -1699,6 +1831,8 @@ class MainWindow(QMainWindow):
         self.curseforge_mod_dialog.set_show_project_descriptions(show_content_descriptions)
         self.curseforge_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
         self.ftb_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
+        self.resource_pack_browser_dialog.set_show_project_descriptions(show_content_descriptions)
+        self.shader_pack_browser_dialog.set_show_project_descriptions(show_content_descriptions)
         curseforge_available = bool(settings.get("curseforge_gateway_urls", ()))
         self.instances_page.browse_curseforge_modpacks_button.setVisible(curseforge_available)
         self.mod_manager_dialog.curseforge_button.setVisible(curseforge_available)
@@ -1734,6 +1868,8 @@ class MainWindow(QMainWindow):
         self.curseforge_mod_dialog.set_channel_preferences(include_beta, include_alpha)
         self.curseforge_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
         self.ftb_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.resource_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.shader_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
         self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
         self.gui_settings_controller.set_modrinth_channels(include_beta, include_alpha)
 
@@ -1760,6 +1896,9 @@ class MainWindow(QMainWindow):
             self.curseforge_mod_dialog,
             self.curseforge_modpack_dialog,
             self.ftb_modpack_dialog,
+            self.content_pack_manager_dialog,
+            self.resource_pack_browser_dialog,
+            self.shader_pack_browser_dialog,
             self.curseforge_manual_dialog,
             self.repair_center_dialog,
         ):
@@ -1795,6 +1934,11 @@ class MainWindow(QMainWindow):
         if task_id.startswith("ftb."):
             self._ftb_tasks.add(task_id)
             self.ftb_modpack_dialog.set_busy(True)
+        if task_id.startswith("content."):
+            self._content_tasks.add(task_id)
+            self.content_pack_manager_dialog.set_busy(True)
+            self.resource_pack_browser_dialog.set_busy(True)
+            self.shader_pack_browser_dialog.set_busy(True)
         if task_id.startswith("curseforge."):
             self._curseforge_tasks.add(task_id)
             self.curseforge_mod_dialog.set_busy(True)
@@ -1845,6 +1989,12 @@ class MainWindow(QMainWindow):
         if task_id.startswith("ftb."):
             self._ftb_tasks.discard(task_id)
             self.ftb_modpack_dialog.set_busy(bool(self._ftb_tasks))
+        if task_id.startswith("content."):
+            self._content_tasks.discard(task_id)
+            busy = bool(self._content_tasks)
+            self.content_pack_manager_dialog.set_busy(busy)
+            self.resource_pack_browser_dialog.set_busy(busy)
+            self.shader_pack_browser_dialog.set_busy(busy)
         if task_id.startswith("curseforge."):
             self._curseforge_tasks.discard(task_id)
             busy = bool(self._curseforge_tasks)
@@ -1975,6 +2125,8 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.set_busy(busy)
         self.launch_control.set_busy(busy)
         self.right_panel.set_busy(busy)
+        if not self._content_tasks:
+            self.content_pack_manager_dialog.set_busy(busy)
 
     def _export_diagnostics(self) -> None:
         suggested = Paths.diagnostics_default_path()

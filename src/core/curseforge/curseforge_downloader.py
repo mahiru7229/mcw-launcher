@@ -22,7 +22,7 @@ class CurseForgeManualDownloadRequired(RuntimeError):
 
 class CurseForgeDownloader:
     @staticmethod
-    def download_file(file: CurseForgeFile, destination: Path, reporter: ProgressReporter | None = None, stage: ProgressStage = ProgressStage.DOWNLOADING_MODS, message: str | None = None, project_name: str = "", purpose: str = "mod", managed_kind: str = "mod", managed_path: str = "") -> Path:
+    def download_file(file: CurseForgeFile, destination: Path, reporter: ProgressReporter | None = None, stage: ProgressStage = ProgressStage.DOWNLOADING_MODS, message: str | None = None, project_name: str = "", purpose: str = "mod", managed_kind: str = "mod", managed_path: str = "", project_url: str = "") -> Path:
         resolved = file
         gateway_error: RuntimeError | None = None
         if not resolved.download_url and resolved.is_available:
@@ -45,8 +45,8 @@ class CurseForgeDownloader:
                 )
 
         name = str(project_name).strip() or f"CurseForge project {resolved.project_id}"
-        project_url = f"https://www.curseforge.com/minecraft/mc-mods/{resolved.project_id}"
-        version_url = f"{project_url}/files/{resolved.file_id}"
+        canonical_project_url = str(project_url).strip() or f"https://www.curseforge.com/minecraft/mc-mods/{resolved.project_id}"
+        version_url = f"{canonical_project_url.rstrip('/')}/files/{resolved.file_id}"
         hashes = {"sha1": resolved.sha1} if resolved.sha1 else {}
         request = ArtifactRequest(
             provider="curseforge",
@@ -54,7 +54,7 @@ class CurseForgeDownloader:
             destination=destination,
             urls=(resolved.download_url,) if resolved.download_url else (),
             page_url=version_url,
-            project_url=project_url,
+            project_url=canonical_project_url,
             expected_filename=resolved.file_name,
             expected_size=resolved.file_length,
             hashes=hashes,

@@ -59,6 +59,7 @@ class InstanceWorkspacePage(BasePage):
     export_forge_diagnostics_requested = Signal(str)
     repair_instance_requested = Signal(str)
     manage_mods_requested = Signal(str)
+    manage_content_packs_requested = Signal(str)
     browse_modpacks_requested = Signal()
     browse_curseforge_modpacks_requested = Signal()
     browse_ftb_modpacks_requested = Signal()
@@ -195,6 +196,7 @@ class InstanceWorkspacePage(BasePage):
         self.launch_button.setObjectName("PrimaryButton")
         self.edit_button = set_theme_icon(QPushButton(), "icon.action.edit")
         self.manage_mods_button = set_theme_icon(QPushButton(), "icon.action.mods")
+        self.manage_content_packs_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.settings_button = set_theme_icon(QPushButton(), "icon.action.settings")
         self.change_icon_button = set_theme_icon(QPushButton(), "icon.action.edit")
         self.open_folder_button = set_theme_icon(QPushButton(), "icon.action.folder")
@@ -207,6 +209,7 @@ class InstanceWorkspacePage(BasePage):
         self.launch_button.clicked.connect(self._request_launch)
         self.edit_button.clicked.connect(self._open_management_dialog)
         self.manage_mods_button.clicked.connect(lambda: self.manage_mods_requested.emit(self.current_instance_name()))
+        self.manage_content_packs_button.clicked.connect(lambda: self.manage_content_packs_requested.emit(self.current_instance_name()))
         self.settings_button.clicked.connect(lambda: self.instance_settings_requested.emit(self.current_instance_name()))
         self.change_icon_button.clicked.connect(self._choose_icon)
         self.open_folder_button.clicked.connect(lambda: self.open_instance_folder_requested.emit(self.current_instance_name()))
@@ -224,6 +227,7 @@ class InstanceWorkspacePage(BasePage):
         self.action_panel.layout.addWidget(self.launch_button)
         self.action_panel.layout.addWidget(self.edit_button)
         self.action_panel.layout.addWidget(self.manage_mods_button)
+        self.action_panel.layout.addWidget(self.manage_content_packs_button)
         self.action_panel.layout.addWidget(self.settings_button)
         self.action_panel.layout.addWidget(self.change_icon_button)
         self.action_panel.layout.addWidget(self.open_folder_button)
@@ -603,6 +607,7 @@ class InstanceWorkspacePage(BasePage):
             self.running_label.setText("")
             self.health_label.setText("")
             self.manage_mods_button.setEnabled(False)
+            self.manage_content_packs_button.setEnabled(False)
             self.management_dialog.set_instance(None)
             return
 
@@ -634,6 +639,7 @@ class InstanceWorkspacePage(BasePage):
         self.health_label.style().unpolish(self.health_label)
         self.health_label.style().polish(self.health_label)
         self.manage_mods_button.setEnabled(enabled and loader_name in {"fabric", "quilt", "forge", "neoforge"})
+        self.manage_content_packs_button.setEnabled(enabled)
         self.management_dialog.set_instance(instance)
 
     def _update_library_status(self) -> None:
@@ -794,6 +800,7 @@ class InstanceWorkspacePage(BasePage):
         change_icon = menu.addAction(tr("workspace.action.change_icon"))
         reset_icon = menu.addAction(tr("workspace.action.reset_icon"))
         manage_mods = menu.addAction(tr("workspace.action.manage_mods"))
+        manage_content = menu.addAction(tr("workspace.action.manage_content_packs"))
         menu.addSeparator()
         open_folder = menu.addAction(tr("workspace.action.open_folder"))
         repair = menu.addAction(tr("workspace.action.repair"))
@@ -802,6 +809,7 @@ class InstanceWorkspacePage(BasePage):
         menu.addSeparator()
         delete = menu.addAction(tr("workspace.action.delete"))
         manage_mods.setEnabled(self.manage_mods_button.isEnabled())
+        manage_content.setEnabled(self.manage_content_packs_button.isEnabled())
         chosen = menu.exec(self.instance_list.mapToGlobal(position))
         if chosen is launch:
             self._request_launch()
@@ -813,6 +821,8 @@ class InstanceWorkspacePage(BasePage):
             self._confirm_reset_icon()
         elif chosen is manage_mods:
             self.manage_mods_requested.emit(self.current_instance_name())
+        elif chosen is manage_content:
+            self.manage_content_packs_requested.emit(self.current_instance_name())
         elif chosen is open_folder:
             self.open_instance_folder_requested.emit(self.current_instance_name())
         elif chosen is repair:
@@ -836,6 +846,7 @@ class InstanceWorkspacePage(BasePage):
         self.launch_button.setText(tr("workspace.action.launch"))
         self.edit_button.setText(tr("workspace.action.edit"))
         self.manage_mods_button.setText(tr("workspace.action.manage_mods"))
+        self.manage_content_packs_button.setText(tr("workspace.action.manage_content_packs"))
         self.settings_button.setText(tr("workspace.action.instance_settings"))
         self.change_icon_button.setText(tr("workspace.action.change_icon"))
         self.open_folder_button.setText(tr("workspace.action.open_folder"))

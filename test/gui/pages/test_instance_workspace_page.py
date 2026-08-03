@@ -85,3 +85,16 @@ def test_workspace_create_dialog_emits_public_create_contract(gui_app):
     page.create_dialog._request_create()
 
     assert emitted == [("New Quilt", "1.21.1", "quilt")]
+
+
+def test_workspace_exposes_content_pack_management_for_selected_instance(gui_app):
+    page = InstanceWorkspacePage()
+    instance = make_instance("Visual Pack", ("fabric", "0.16.14"), "1.21.1")
+    emitted: list[str] = []
+    page.manage_content_packs_requested.connect(emitted.append)
+
+    page.set_instances([instance], instance.name)
+    page.manage_content_packs_button.click()
+
+    assert page.manage_content_packs_button.isEnabled() is True
+    assert emitted == ["Visual Pack"]

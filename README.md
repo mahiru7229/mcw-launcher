@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/Stable-v0.12.0-brightgreen" alt="Current stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Beta-v1.0.0--beta.2-orange" alt="Current beta version">
+    <img src="https://img.shields.io/badge/Beta-v1.0.0--beta.3-orange" alt="Current beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -25,12 +25,12 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v1.0.0-beta.2.md">v1.0 beta notes</a> ·
+  <a href="docs/RELEASE-v1.0.0-beta.3.md">v1.0 beta notes</a> ·
   <a href="docs/UPDATE_PACKAGES.md">Updater packages</a>
 </p>
 
 > [!NOTE]
-> `v0.12.0` là bản Stable hiện tại. `v1.0.0-beta.2` thêm FTB Modpacks vào Content Browser và chỉ được nhận khi người dùng chủ động tham gia tester program.
+> `v0.12.0` là bản Stable hiện tại. `v1.0.0-beta.3` mở rộng trải nghiệm nội dung với FTB modpack, resource pack, shader pack và Launch Control mới; bản beta chỉ được nhận khi người dùng chủ động tham gia tester program.
 
 ---
 
@@ -42,14 +42,15 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
-### Điểm nổi bật của `v1.0.0-beta.2`
+### Điểm nổi bật của `v1.0.0-beta.3`
 
-- Thêm **FTB Modpacks** vào Add Instance, trang Instances và instance workspace.
-- Duyệt pack phổ biến hoặc tìm kiếm, xem icon/thông tin dự án rồi chọn phiên bản trước khi cài.
-- Hiển thị Minecraft version, mod loader, file client, dung lượng tải và RAM khuyến nghị từ manifest phiên bản.
-- Tải URL chính rồi tự chuyển qua mirrors, xác minh SHA-1/size, bỏ qua file server-only và hỗ trợ file tùy chọn.
-- Cài bằng staging directory, ghi registry `.mcw/ftb-pack.json`, áp dụng artwork và rollback instance nếu bước sau tạo instance thất bại.
-- Giữ nguyên Rich Content Browser của beta.1 cho Modrinth/CurseForge và dùng chung detail panel cho FTB.
+- Thêm trình quản lý **Resource Packs** và **Shader Packs** theo từng instance, hỗ trợ duyệt Modrinth/CurseForge và nhập ZIP cục bộ.
+- Dùng lại Content Browser có icon, metadata, gallery, mô tả tùy chọn, chọn phiên bản và nút mở trang dự án trước khi cài.
+- Xác minh ZIP, `pack.mcmeta`, `pack_format`, thư mục shader, hash, kích thước và đường dẫn an toàn trước khi thay đổi instance.
+- Lưu provider/project/version/file IDs, hash, URL nguồn và trạng thái bật/tắt vào `.mcw/content-packs.json` để phục vụ update, repair và manifest export sau này.
+- Cho phép bật/tắt, gỡ, mở thư mục và xem project của content pack đã cài mà không làm mất file ngoài ý muốn.
+- Mở rộng nút Launch/Pause/Cancel theo cả chiều ngang lẫn chiều cao; Launch chiếm toàn vùng điều khiển khi rảnh và Pause/Cancel chia đều khi tác vụ chạy.
+- Giữ FTB modpack và deferred download của beta.2: instance chỉ lưu manifest lúc tạo, còn file quản lý được tải ở lần Launch đầu.
 
 ### Điểm nổi bật của `v0.12.0-beta.6`
 
@@ -116,7 +117,7 @@ Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, sa
 Bản đóng gói dành cho Windows được phát hành tại trang **Releases**:
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
-- `v0.12.0` là bản Stable hiện tại; `v1.0.0-beta.2` dành cho tester muốn thử Content Browser cùng FTB Modpacks.
+- `v0.12.0` là bản Stable hiện tại; `v1.0.0-beta.3` dành cho tester muốn thử FTB, resource pack, shader pack và Launch Control mới.
 - Stable là kênh mặc định. Để nhận bản thử nghiệm, người dùng phải chủ động bật:
 
 ```text
@@ -195,14 +196,15 @@ MCW Launcher is an open-source Minecraft launcher centered around **isolated ins
 
 Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
 
-### `v1.0.0-beta.2` highlights
+### `v1.0.0-beta.3` highlights
 
-- Add **FTB Modpacks** to Add Instance, the Instances page, and the instance workspace.
-- Browse popular packs or search, review project details, and choose an exact pack version before installation.
-- Preview Minecraft version, mod loader, client file count, download size, and recommended memory from the version manifest.
-- Try the primary URL and FTB mirrors with SHA-1/size verification, skip server-only files, and support optional files.
-- Install through a staging directory, save `.mcw/ftb-pack.json`, apply artwork, and roll back the instance when a post-create step fails.
-- Preserve the beta.1 Rich Content Browser for Modrinth/CurseForge and reuse its details panel for FTB.
+- Add per-instance **Resource Pack** and **Shader Pack** management with Modrinth/CurseForge browsing and local ZIP import.
+- Reuse the rich Content Browser with icons, metadata, gallery media, optional long descriptions, explicit version selection, and project web links.
+- Validate ZIP structure, `pack.mcmeta`, `pack_format`, shader directories, hashes, sizes, and safe paths before changing an instance.
+- Persist provider/project/version/file IDs, hashes, source URLs, and enable state in `.mcw/content-packs.json` for later update, repair, and manifest export workflows.
+- Enable, disable, remove, open folders, and view installed content projects without silently overwriting unrelated files.
+- Expand Launch/Pause/Cancel in both dimensions; Launch fills the idle control area while Pause and Cancel split it evenly during active work.
+- Preserve beta.2 FTB and deferred modpack behavior: instance creation stores manifests, while managed files download on first Launch.
 
 ### `v0.11.0` highlights
 
@@ -445,7 +447,8 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
-| [`docs/RELEASE-v1.0.0-beta.2.md`](docs/RELEASE-v1.0.0-beta.2.md) | FTB modpack browsing, verified mirror downloads and transactional installation |
+| [`docs/RELEASE-v1.0.0-beta.3.md`](docs/RELEASE-v1.0.0-beta.3.md) | Resource packs, shader packs and expanded Launch Control |
+| [`docs/RELEASE-v1.0.0-beta.2.md`](docs/RELEASE-v1.0.0-beta.2.md) | FTB modpacks and deferred managed-file installation |
 | [`docs/RELEASE-v1.0.0-beta.1.md`](docs/RELEASE-v1.0.0-beta.1.md) | Rich Modrinth/CurseForge project browsing foundation |
 | [`docs/RELEASE-v0.12.0.md`](docs/RELEASE-v0.12.0.md) | Complete v0.12.0 Stable release notes |
 | [`docs/RELEASE-v0.12.0-beta.6.md`](docs/RELEASE-v0.12.0-beta.6.md) | Instance icons and runtime-state badges |
@@ -471,7 +474,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v1.0.0-beta.2 |
+| Component | Status in v1.0.0-beta.3 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |
@@ -488,7 +491,9 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 | Theme schema 1–6 | Available — animation, custom fonts, authoring tools, palette and custom accent support |
 | CurseForge Gateway mods | Available — icon cards, rich project details, Fabric/Quilt/Forge/NeoForge install, required dependencies, transactional apply, public gateway, cache and manual fallback |
 | CurseForge modpacks | Available — Fabric/Quilt/Forge/NeoForge manifest-driven install with universal dependency support |
-| FTB modpacks | Available — project/version browser, primary plus mirror downloads, SHA-1/size verification, optional/client filtering, staging and rollback |
+| FTB modpacks | Available — rich browser, manifest-first instance creation, primary/mirror download and first-launch materialization |
+| Resource packs | Available — Modrinth/CurseForge browser, local ZIP import, pack metadata validation, enable/disable and removal |
+| Shader packs | Available — Modrinth/CurseForge browser, local ZIP import, shader-directory validation, enable/disable and environment warning |
 
 ## Contributing and bug reports
 

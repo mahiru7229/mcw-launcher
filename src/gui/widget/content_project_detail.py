@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSizePol
 
 from mcw_core.api.language.language_manager import tr
 from src.gui.media.remote_image_cache import RemoteImageCache
-from src.gui.media.safe_rich_text import safe_external_url
+from src.gui.media.safe_rich_text import safe_external_url, sanitize_html
 
 
 class SafeTextBrowser(QTextBrowser):
@@ -230,7 +230,7 @@ class ContentProjectDetailPanel(QFrame):
         if normalized == "markdown":
             self.description_browser.setMarkdown(value)
         elif normalized == "html":
-            self.description_browser.setHtml(value)
+            self.description_browser.setHtml(sanitize_html(value))
         else:
             self.description_browser.setPlainText(value)
 
