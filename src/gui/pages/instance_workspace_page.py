@@ -730,7 +730,7 @@ class InstanceWorkspacePage(BasePage):
             self.reset_icon_requested.emit(name)
 
     def _choose_import(self) -> None:
-        path, _selected_filter = QFileDialog.getOpenFileName(self, tr("Import MCW instance"), "", tr("MCW Package (*.mcwpack *.zip)"))
+        path, _selected_filter = QFileDialog.getOpenFileName(self, tr("Import MCW instance"), "", tr("modpack_package.import.universal_filter"))
         if path:
             self.import_requested.emit(Path(path))
 

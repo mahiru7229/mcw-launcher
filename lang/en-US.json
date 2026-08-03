@@ -1580,7 +1580,12 @@
     "portable.manual.required": "{count} modpack file(s) require manual download.",
     "portable.manual.title": "Portable MCWPack manual files",
     "portable.manual.invalid": "The portable manual-download request is invalid.",
-    "portable.manual.installed": "Imported and verified {count} file(s). Press Launch again to continue."
+    "portable.manual.installed": "Imported and verified {count} file(s). Press Launch again to continue.",
+    "navigation.back": "Back",
+    "navigation.forward": "Forward",
+    "navigation.back.description": "Return to the previously viewed launcher page.",
+    "navigation.forward.description": "Go forward to the next launcher page in history.",
+    "modpack_package.import.universal_filter": "MCW / Modpack Package (*.mcwpack *.mrpack *.zip)"
   },
   "aliases": {
     "MCW Launcher": "app.name",

@@ -659,7 +659,7 @@ class InstancesPage(BasePage):
             self.import_modpack_package_requested.emit(Path(path))
 
     def _choose_import(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, tr("Import MCW instance"), "", tr("MCW Package (*.mcwpack *.zip)"))
+        path, _ = QFileDialog.getOpenFileName(self, tr("Import MCW instance"), "", tr("modpack_package.import.universal_filter"))
         if path:
             self.import_requested.emit(Path(path))
 

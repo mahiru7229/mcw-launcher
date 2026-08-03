@@ -244,9 +244,25 @@ class InstanceController(BaseController):
 
     def inspect_package(self, package_path: Path) -> None:
         package_path = Path(package_path)
+
+        def task() -> tuple[str, object]:
+            modpack_error: Exception | None = None
+            try:
+                return "modpack", self._core.instances.inspect_modpack_package(package_path)
+            except Exception as error:
+                modpack_error = error
+            try:
+                return "instance", self._core.instances.inspect_package(package_path)
+            except Exception as instance_error:
+                modpack_message = str(modpack_error or "").strip()
+                instance_message = str(instance_error).strip()
+                if "missing package.json" in instance_message.casefold() and modpack_message:
+                    raise RuntimeError(modpack_message) from instance_error
+                raise
+
         self._task_runner.run(
             self.IMPORT_INSPECT_TASK_ID,
-            lambda: self._core.instances.inspect_package(package_path),
+            task,
             f"Reading '{package_path.name}'...",
         )
 
@@ -336,9 +352,15 @@ class InstanceController(BaseController):
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
         if task_id == self.IMPORT_INSPECT_TASK_ID:
-            self.import_preview_ready.emit(result)
-            self.status_changed.emit(f"Ready to import '{result.name}'")
-            self.log_created.emit(f"Instance package inspected: {result.package_path}")
+            package_kind, preview = result
+            if package_kind == "modpack":
+                self.modpack_import_preview_ready.emit(preview)
+                self.status_changed.emit(f"Ready to import modpack '{preview.name}'")
+                self.log_created.emit(f"Provider modpack package inspected: {preview.package_path}")
+            else:
+                self.import_preview_ready.emit(preview)
+                self.status_changed.emit(f"Ready to import '{preview.name}'")
+                self.log_created.emit(f"Instance package inspected: {preview.package_path}")
             return
 
         if task_id == self.MODPACK_IMPORT_INSPECT_TASK_ID:

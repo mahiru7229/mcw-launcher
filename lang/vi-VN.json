@@ -1580,7 +1580,12 @@
     "portable.manual.required": "Có {count} file modpack cần tải thủ công.",
     "portable.manual.title": "File thủ công của Portable MCWPack",
     "portable.manual.invalid": "Yêu cầu tải thủ công của Portable MCWPack không hợp lệ.",
-    "portable.manual.installed": "Đã nhập và xác minh {count} file. Hãy nhấn Launch lần nữa để tiếp tục."
+    "portable.manual.installed": "Đã nhập và xác minh {count} file. Hãy nhấn Launch lần nữa để tiếp tục.",
+    "navigation.back": "Trở về",
+    "navigation.forward": "Tiến tới",
+    "navigation.back.description": "Trở về trang launcher đã xem trước đó.",
+    "navigation.forward.description": "Tiến tới trang launcher tiếp theo trong lịch sử.",
+    "modpack_package.import.universal_filter": "Gói MCW / modpack (*.mcwpack *.mrpack *.zip)"
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

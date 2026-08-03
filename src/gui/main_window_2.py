@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QCloseEvent, QDesktopServices, QGuiApplication, QScreen
-from PySide6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QPushButton, QStackedWidget, QVBoxLayout, QWidget
 
 from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
 from mcw_core.api.content.content_pack_manager import ContentPackManager
@@ -139,6 +139,8 @@ class MainWindow(QMainWindow):
         self._curseforge_manual_instance_name = ""
         self._curseforge_pending_modpack_install: CurseForgeModpackManualDownloadRequired | None = None
         self._portable_manual_request: object | None = None
+        self._page_history: list[str] = []
+        self._page_history_index = -1
         self.running_instances_timer.setInterval(1000)
 
         self._build_ui()
@@ -205,11 +207,28 @@ class MainWindow(QMainWindow):
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setSpacing(0)
 
+        self.page_navigation = QWidget()
+        self.page_navigation.setObjectName("PageNavigationBar")
+        navigation_layout = QHBoxLayout(self.page_navigation)
+        navigation_layout.setContentsMargins(10, 6, 10, 6)
+        navigation_layout.setSpacing(8)
+        self.page_back_button = QPushButton(chr(0x2190))
+        self.page_back_button.setObjectName("PageBackButton")
+        self.page_back_button.setFixedWidth(44)
+        self.page_forward_button = QPushButton(chr(0x2192))
+        self.page_forward_button.setObjectName("PageForwardButton")
+        self.page_forward_button.setFixedWidth(44)
+        navigation_layout.addWidget(self.page_back_button)
+        navigation_layout.addWidget(self.page_forward_button)
+        navigation_layout.addStretch(1)
+        self._update_page_navigation()
+
         self.content_stack = QStackedWidget()
         self.content_stack.setObjectName("ContentStack")
 
         self.launch_control = LaunchControlWidget(compact=self._display_profile.compact)
 
+        center_layout.addWidget(self.page_navigation)
         center_layout.addWidget(self.content_stack, 1)
         center_layout.addWidget(self.launch_control)
 
@@ -262,6 +281,8 @@ class MainWindow(QMainWindow):
     def _connect_signals(self) -> None:
         self.sidebar.page_requested.connect(self.show_page)
         self.sidebar.collapse_requested.connect(lambda collapsed: self.motion_runtime.set_sidebar_collapsed(self.sidebar, collapsed, self._display_profile.sidebar_width))
+        self.page_back_button.clicked.connect(lambda: self._navigate_page_history(-1))
+        self.page_forward_button.clicked.connect(lambda: self._navigate_page_history(1))
 
         self.home_page.manage_accounts_requested.connect(lambda: self.show_page("accounts"))
         self.home_page.manage_instances_requested.connect(lambda: self.show_page("instances"))
@@ -639,18 +660,59 @@ class MainWindow(QMainWindow):
         self.version_controller.refresh()
         self._set_status("Refreshing launcher data...")
 
-    def show_page(self, page_id: str) -> None:
+    def show_page(self, page_id: str, *, record_history: bool = True) -> bool:
         requested_page = page_id if page_id in self.pages else "instances"
         current_page = self._current_page_id()
         if requested_page != current_page and not self._confirm_unsaved_page(current_page):
             self.sidebar.set_current_page(current_page)
-            return
+            return False
 
         page = self.pages.get(requested_page, self.instances_page)
         self.motion_runtime.switch_page(self.content_stack, page)
         self.sidebar.set_current_page(requested_page)
+        if record_history:
+            self._record_page_history(requested_page)
+        else:
+            self._update_page_navigation()
         if requested_page == "mods" and self.mods_page.selected_provider == "modrinth" and not self.mods_page.has_loaded_search and not self.task_runner.is_task_active(f"{self.mod_catalog_controller.SEARCH_PREFIX}{self.mods_page.selected_loader}"):
             QTimer.singleShot(0, self.mods_page.start_search)
+        return True
+
+    def _record_page_history(self, page_id: str) -> None:
+        normalized = str(page_id or "instances")
+        if self._page_history_index >= 0 and self._page_history[self._page_history_index] == normalized:
+            self._update_page_navigation()
+            return
+        del self._page_history[self._page_history_index + 1:]
+        self._page_history.append(normalized)
+        self._page_history_index = len(self._page_history) - 1
+        self._update_page_navigation()
+
+    def _navigate_page_history(self, offset: int) -> None:
+        target_index = self._page_history_index + int(offset)
+        if target_index < 0 or target_index >= len(self._page_history):
+            self._update_page_navigation()
+            return
+        target_page = self._page_history[target_index]
+        if self.show_page(target_page, record_history=False):
+            self._page_history_index = target_index
+            self._update_page_navigation()
+
+    def _update_page_navigation(self) -> None:
+        back_enabled = self._page_history_index > 0
+        forward_enabled = 0 <= self._page_history_index < len(self._page_history) - 1
+        back = getattr(self, "page_back_button", None)
+        forward = getattr(self, "page_forward_button", None)
+        if back is not None:
+            back.setEnabled(back_enabled)
+            back.setToolTip(tr("navigation.back"))
+            back.setAccessibleName(tr("navigation.back"))
+            back.setAccessibleDescription(tr("navigation.back.description"))
+        if forward is not None:
+            forward.setEnabled(forward_enabled)
+            forward.setToolTip(tr("navigation.forward"))
+            forward.setAccessibleName(tr("navigation.forward"))
+            forward.setAccessibleDescription(tr("navigation.forward.description"))
 
     def _current_page_id(self) -> str:
         current = self.content_stack.currentWidget()
@@ -1948,6 +2010,7 @@ class MainWindow(QMainWindow):
     def _retranslate_ui(self) -> None:
         retranslate_widget_tree(self)
         self.setWindowTitle(tr(LAUNCHER_NAME))
+        self._update_page_navigation()
 
         for widget in (
             self.home_page,

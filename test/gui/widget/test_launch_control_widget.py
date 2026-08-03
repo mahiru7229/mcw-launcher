@@ -127,7 +127,8 @@ def test_completed_operation_sets_terminal_ready_progress(app):
     widget.set_operation_completed("loader.progress.ready", "loader.progress.ready_detail")
 
     assert widget.progress_bar.value() == 100
-    assert widget.progress_bar.format() == "100%"
+    assert widget.progress_bar.format() == ""
+    assert widget.percentage_label.text() == "100%"
     assert widget.stage_label.text() == "READY"
     assert widget.stage_label.property("state") == "success"
     assert widget.status_label.text() == "Mod loader ready"
@@ -146,6 +147,9 @@ def test_idle_launch_fills_controls_and_active_state_splits_pause_cancel(app):
     assert widget.cancel_button.sizePolicy().verticalPolicy() is QSizePolicy.Policy.Expanding
     assert widget.controls_widget.sizePolicy().horizontalPolicy() is QSizePolicy.Policy.Expanding
     assert widget.controls_widget.sizePolicy().verticalPolicy() is QSizePolicy.Policy.Expanding
+    assert widget.controls_widget.width() < widget.width() * 0.4
+    assert widget.progress_bar.format() == ""
+    assert widget.percentage_label.text() == "0%"
     assert widget.launch_button.minimumHeight() >= 74
     assert widget.cancel_button.minimumHeight() >= 74
     assert widget.cancel_button.isVisible() is False
