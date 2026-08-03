@@ -5,7 +5,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QSizePolicy
 
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
 from src.models.instance.instance import Instance
@@ -135,3 +135,12 @@ def test_dialog_distinguishes_searching_and_failed_states(app):
     assert "failed" in dialog.result_count_label.text().lower()
     assert "HTTP 503" in dialog.details_label.text()
     assert not dialog.install_button.isEnabled()
+
+
+def test_modpack_dialog_keeps_version_and_instance_fields_on_separate_rows(app):
+    dialog = ModrinthBrowserDialog("modpack")
+
+    assert dialog.detail_panel.actions_layout.count() == 3
+    assert dialog.version_combo.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
+    assert dialog.instance_name_input.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
+    assert dialog.install_button.minimumWidth() >= 210

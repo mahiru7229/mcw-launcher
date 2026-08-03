@@ -5,7 +5,7 @@ from html import escape
 
 from PySide6.QtCore import QSize, Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QPixmap
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QTextBrowser, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QTextBrowser, QVBoxLayout, QWidget
 
 from mcw_core.api.language.language_manager import tr
 from src.gui.media.remote_image_cache import RemoteImageCache
@@ -25,23 +25,28 @@ class ContentProjectDetailPanel(QFrame):
     """Provider-neutral project details used by content browser dialogs."""
 
     ICON_SIZE = QSize(88, 88)
-    PREVIEW_SIZE = QSize(420, 180)
+    PREVIEW_SIZE = QSize(420, 160)
+    MINIMUM_PANEL_WIDTH = 500
 
     def __init__(self, image_cache: RemoteImageCache, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("ContentProjectDetailPanel")
+        self.setMinimumWidth(self.MINIMUM_PANEL_WIDTH)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._image_cache = image_cache
         self._project_token = ""
         self._web_url = ""
+        self._legacy_action_row: QHBoxLayout | None = None
         self._build_ui()
         self.clear(tr("content.details.select_project"))
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(14, 14, 14, 14)
-        root.setSpacing(10)
+        root.setSpacing(9)
 
         header = QHBoxLayout()
+        header.setSpacing(12)
         self.icon_label = QLabel()
         self.icon_label.setObjectName("ContentProjectIcon")
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -49,59 +54,94 @@ class ContentProjectDetailPanel(QFrame):
         self.icon_label.setText(tr("content.icon.placeholder"))
 
         titles = QVBoxLayout()
+        titles.setSpacing(4)
         self.title_label = QLabel()
         self.title_label.setObjectName("PageTitle")
         self.title_label.setWordWrap(True)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.title_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
         self.provider_label = QLabel()
         self.provider_label.setObjectName("MutedLabel")
         self.provider_label.setWordWrap(True)
-        self.summary_label = QLabel()
-        self.summary_label.setWordWrap(True)
+        self.provider_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         titles.addWidget(self.title_label)
         titles.addWidget(self.provider_label)
-        titles.addWidget(self.summary_label)
+        titles.addStretch()
 
+        header.addWidget(self.icon_label, 0, Qt.AlignmentFlag.AlignTop)
+        header.addLayout(titles, 1)
+        root.addLayout(header)
+
+        summary_row = QHBoxLayout()
+        summary_row.setSpacing(10)
+        self.summary_label = QLabel()
+        self.summary_label.setWordWrap(True)
+        self.summary_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.summary_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
         self.open_web_button = QPushButton()
         self.open_web_button.setEnabled(False)
+        self.open_web_button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
         self.open_web_button.clicked.connect(self._open_web)
-        header.addWidget(self.icon_label)
-        header.addLayout(titles, 1)
-        header.addWidget(self.open_web_button, 0, Qt.AlignmentFlag.AlignTop)
-        root.addLayout(header)
+        summary_row.addWidget(self.summary_label, 1)
+        summary_row.addWidget(self.open_web_button, 0, Qt.AlignmentFlag.AlignTop)
+        root.addLayout(summary_row)
 
         self.metadata_label = QLabel()
         self.metadata_label.setObjectName("MutedLabel")
         self.metadata_label.setWordWrap(True)
         self.metadata_label.setTextFormat(Qt.TextFormat.RichText)
+        self.metadata_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.metadata_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
         root.addWidget(self.metadata_label)
 
         self.preview_label = QLabel()
         self.preview_label.setObjectName("ContentProjectPreview")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setMinimumHeight(120)
+        self.preview_label.setMinimumHeight(100)
         self.preview_label.setMaximumHeight(self.PREVIEW_SIZE.height())
+        self.preview_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.preview_label.hide()
         root.addWidget(self.preview_label)
 
         self.description_browser = SafeTextBrowser()
         self.description_browser.setObjectName("ContentProjectDescription")
         self.description_browser.setOpenExternalLinks(True)
-        self.description_browser.setMinimumHeight(180)
+        self.description_browser.setMinimumHeight(130)
+        self.description_browser.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         root.addWidget(self.description_browser, 1)
 
         self.status_label = QLabel()
         self.status_label.setObjectName("MutedLabel")
         self.status_label.setWordWrap(True)
+        self.status_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.status_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
         root.addWidget(self.status_label)
 
-        self.actions_layout = QHBoxLayout()
+        self.actions_layout = QVBoxLayout()
+        self.actions_layout.setSpacing(8)
         root.addLayout(self.actions_layout)
 
+    def add_action_row(self, *widgets: tuple[QWidget, int]) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        for widget, stretch in widgets:
+            row.addWidget(widget, max(0, int(stretch)))
+        self.actions_layout.addLayout(row)
+        return row
+
     def add_action_widget(self, widget: QWidget, stretch: int = 0) -> None:
-        self.actions_layout.addWidget(widget, stretch)
+        if self._legacy_action_row is None:
+            self._legacy_action_row = QHBoxLayout()
+            self._legacy_action_row.setSpacing(8)
+            self.actions_layout.addLayout(self._legacy_action_row)
+        self._legacy_action_row.addWidget(widget, max(0, int(stretch)))
 
     def add_action_stretch(self) -> None:
-        self.actions_layout.addStretch()
+        if self._legacy_action_row is None:
+            self._legacy_action_row = QHBoxLayout()
+            self._legacy_action_row.setSpacing(8)
+            self.actions_layout.addLayout(self._legacy_action_row)
+        self._legacy_action_row.addStretch()
 
     def set_open_web_text(self, text: str) -> None:
         self.open_web_button.setText(text)
@@ -222,4 +262,5 @@ class ContentProjectDetailPanel(QFrame):
                 value = str(raw_value)
             if value:
                 parts.append(f"<b>{escape(str(label))}:</b> {escape(value)}")
-        return " &nbsp;•&nbsp; ".join(parts)
+        rows = [" &nbsp;•&nbsp; ".join(parts[index : index + 2]) for index in range(0, len(parts), 2)]
+        return "<br>".join(rows)

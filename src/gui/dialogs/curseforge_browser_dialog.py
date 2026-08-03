@@ -6,7 +6,7 @@ import re
 
 from PySide6.QtCore import QSize, QTimer, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QIcon, QPixmap
-from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy, QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
 from mcw_core.api.instance.instance_manager import InstanceManager
@@ -67,7 +67,7 @@ class CurseForgeBrowserDialog(QDialog):
         self.set_cache_info(self._cache_info)
 
     def _build_ui(self) -> None:
-        resize_dialog_to_screen(self, 1120, 720, 900, 560)
+        resize_dialog_to_screen(self, 1180, 760, 960, 620)
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 18, 18, 18)
         root.setSpacing(12)
@@ -180,18 +180,30 @@ class CurseForgeBrowserDialog(QDialog):
         self.install_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.install_button.setObjectName("PrimaryButton")
         self.install_button.setEnabled(False)
+        self.install_button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
         self.install_button.clicked.connect(self._request_install)
-        self.detail_panel.add_action_widget(self.file_combo, 2)
+        self.file_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.file_combo.setMinimumContentsLength(28)
+        self.file_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.instance_name_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.optional_checkbox.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
         if self.project_type == "modpack":
-            self.detail_panel.add_action_widget(self.instance_name_input, 2)
-            self.detail_panel.add_action_widget(self.optional_checkbox)
-        self.detail_panel.add_action_widget(self.install_button)
+            self.install_button.setMinimumWidth(220)
+            self.detail_panel.add_action_row((self.file_combo, 1))
+            self.detail_panel.add_action_row((self.instance_name_input, 1))
+            install_row = self.detail_panel.add_action_row((self.optional_checkbox, 0))
+            install_row.addStretch()
+            install_row.addWidget(self.install_button)
+        else:
+            self.install_button.setMinimumWidth(150)
+            self.detail_panel.add_action_row((self.file_combo, 1), (self.install_button, 0))
 
+        results_panel.setMinimumWidth(420)
         splitter.addWidget(results_panel)
         splitter.addWidget(self.detail_panel)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
-        splitter.setSizes([650, 430])
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([500, 580])
         root.addWidget(splitter, 1)
 
     @property
