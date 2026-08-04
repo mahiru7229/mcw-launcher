@@ -187,3 +187,13 @@ External applications should import only from `mcw_core` or `mcw_core.api.*`.
 - `Launcher Settings` is consistently shown as `Cài đặt launcher` in Vietnamese.
 - `Instance` remains unchanged as a domain term but is now guaranteed to use a translation key in every built-in language pack.
 - Added a language/theme editor contract and release-preflight checks for navigation key coverage.
+
+
+## Pytest collection hotfix
+
+- Enabled `--import-mode=importlib` for the launcher test suite.
+- Prevents duplicate test basenames in separate directories from resolving to the same
+  Python module during pytest collection.
+- The standalone core public-API test is also renamed to
+  `test_core_distribution_public_api.py` in the corrected core source artifact.
+- No launcher runtime behavior or public core API changed.

@@ -410,3 +410,11 @@ Download the latest build from **[GitHub Releases](https://github.com/mahiru7229
 ### Language and theme authoring
 
 Primary navigation and new UI surfaces use semantic translation keys. Changing the launcher language now prompts for a clean restart, preventing partially translated pages and dialogs. The machine-readable contract for future translation/theme tools is documented in `docs/LANGUAGE_THEME_EDITOR_CONTRACT.md`.
+
+
+## Pytest test-module isolation
+
+The launcher test suite uses pytest importlib mode. This prevents `import file mismatch`
+errors when launcher and standalone core tests contain the same filename in different
+directories. Core distribution tests also use a unique basename in the corrected 1.0.1
+source package.
