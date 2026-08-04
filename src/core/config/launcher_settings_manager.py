@@ -16,7 +16,7 @@ from src.core.theme.theme_palette import normalize_hex_color
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 15
+    SCHEMA_VERSION = 16
     UPDATE_CHANNEL_POLICY_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
@@ -45,6 +45,8 @@ class LauncherSettingsManager:
             "live_theme_reload": False,
             "accent_mode": "theme",
             "accent_color": "#8ed35b",
+            "text_color_mode": "theme",
+            "text_color": "#f4f4f4",
         },
         "modrinth": {
             "include_beta": False,
@@ -53,7 +55,7 @@ class LauncherSettingsManager:
         "managed_content": {
             "modrinth_failure_policy": "block",
             "curseforge_failure_policy": "block",
-            "forge_preflight_failure_policy": "block",
+            "forge_preflight_failure_policy": "ask",
         },
         "network": {
             "download_limit_mbps": 0.0,
@@ -212,6 +214,12 @@ class LauncherSettingsManager:
             appearance["accent_color"] = normalize_hex_color(appearance.get("accent_color") or "#8ed35b")
         except ValueError:
             appearance["accent_color"] = "#8ed35b"
+        text_color_mode = str(appearance.get("text_color_mode") or "theme").strip().lower()
+        appearance["text_color_mode"] = text_color_mode if text_color_mode in {"theme", "custom"} else "theme"
+        try:
+            appearance["text_color"] = normalize_hex_color(appearance.get("text_color") or "#f4f4f4")
+        except ValueError:
+            appearance["text_color"] = "#f4f4f4"
 
         modrinth = normalized.setdefault("modrinth", {})
         modrinth["include_beta"] = self._as_bool(modrinth.get("include_beta"), False)
@@ -220,7 +228,7 @@ class LauncherSettingsManager:
         managed_content = normalized.setdefault("managed_content", {})
         managed_content["modrinth_failure_policy"] = ManagedContentPolicy.normalize_global(managed_content.get("modrinth_failure_policy"))
         managed_content["curseforge_failure_policy"] = ManagedContentPolicy.normalize_global(managed_content.get("curseforge_failure_policy"))
-        managed_content["forge_preflight_failure_policy"] = ManagedContentPolicy.normalize_global(managed_content.get("forge_preflight_failure_policy"))
+        managed_content["forge_preflight_failure_policy"] = ManagedContentPolicy.normalize_global(managed_content.get("forge_preflight_failure_policy"), ManagedContentPolicy.ASK)
 
         network = normalized.setdefault("network", {})
         network["download_limit_mbps"] = self._as_download_limit(network.get("download_limit_mbps"))

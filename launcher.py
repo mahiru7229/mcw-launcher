@@ -145,6 +145,21 @@ def main() -> None:
             return GpuPreferenceManager.detect()
 
         gpu_detection = run_startup_task(detect_graphics, update_startup_progress, app.processEvents, timeout_seconds=12.0)
+
+        from mcw_core.api.hardware.first_run_recommendation_service import FirstRunRecommendationService
+
+        first_run_recommendation = FirstRunRecommendationService.fallback()
+        onboarding = settings.get("onboarding", {}) if isinstance(settings, dict) else {}
+        if not bool(onboarding.get("completed", False)):
+            def inspect_first_run_defaults(progress_callback):
+                progress_callback(92, "startup.inspecting_runtime")
+                return FirstRunRecommendationService.inspect()
+
+            try:
+                first_run_recommendation = run_startup_task(inspect_first_run_defaults, update_startup_progress, app.processEvents, timeout_seconds=25.0)
+            except Exception:
+                # Hardware discovery is advisory and must never prevent startup.
+                first_run_recommendation = FirstRunRecommendationService.fallback()
         startup_stage_key = "startup.loading_interface"
         splash.update_progress(93, startup_stage_key)
 
@@ -168,7 +183,7 @@ def main() -> None:
         from src.gui.dialogs.first_run_setup_dialog import FirstRunSetupDialog
 
         if FirstRunSetupDialog.should_show(settings):
-            setup_dialog = FirstRunSetupDialog(settings, gpu_detection, window)
+            setup_dialog = FirstRunSetupDialog(settings, gpu_detection, first_run_recommendation, window)
             if setup_dialog.exec() == QDialog.DialogCode.Accepted:
                 LauncherSettingsManager().save(setup_dialog.selected_settings())
                 window.gui_settings_controller.load()

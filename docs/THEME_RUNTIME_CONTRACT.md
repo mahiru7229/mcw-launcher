@@ -172,3 +172,36 @@ Package v1 fixes ZIP ordering, timestamps, permissions, path separators, and che
 Mọi màu dùng định dạng `#RRGGBB`. `accent_assets` là danh sách opt-in: launcher chỉ nhuộm những PNG hoặc spritesheet được theme chủ động liệt kê. Logo, hình nền và icon không bị đổi màu ngoài ý muốn. Khi người dùng chọn màu tùy chỉnh, nhóm primary/focus/selection/link được tạo từ màu đó; success, warning và error vẫn giữ ý nghĩa màu của theme.
 
 These fields are optional and therefore remain compatible with the frozen schema 6 policy. Themes without `palette` keep their existing QSS and PNG appearance. A user custom accent may still override primary controls, but assets are tinted only when explicitly listed in `accent_assets`.
+
+## v1.0.1 text palette extension
+
+MCW Launcher `v1.0.1` extends the optional schema 6 palette with four backward-compatible text roles:
+
+```json
+{
+  "palette": {
+    "text_primary": "#f4f4f4",
+    "text_muted": "#b8b8b8",
+    "text_disabled": "#777777",
+    "text_inverse": "#111111"
+  }
+}
+```
+
+- `text_primary` is the normal launcher text color.
+- `text_muted` is used for descriptions, hints, and secondary labels.
+- `text_disabled` is used for unavailable controls.
+- `text_inverse` is available for text rendered against a contrasting surface.
+
+Themes that omit these fields receive safe defaults. Launcher Settings may override the primary text family at runtime; success, warning, error, link, selection, and text-on-primary colors remain separate semantic roles. Theme authors should keep primary text readable against the theme background and should test both normal and disabled controls.
+
+### Tiếng Việt
+
+MCW Launcher `v1.0.1` bổ sung bốn vai trò màu chữ tùy chọn, vẫn tương thích với theme schema 6 cũ:
+
+- `text_primary`: màu chữ thông thường.
+- `text_muted`: mô tả, gợi ý và nhãn phụ.
+- `text_disabled`: control đang bị vô hiệu hóa.
+- `text_inverse`: chữ trên bề mặt có độ sáng đối nghịch.
+
+Theme không khai báo các field này sẽ dùng giá trị mặc định an toàn. Màu chữ tùy chỉnh trong Launcher Settings chỉ thay thế nhóm chữ chính; màu success, warning, error, link, selection và chữ trên nút primary vẫn giữ vai trò ngữ nghĩa riêng.

@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Stable-v1.0.0-brightgreen" alt="Stable version">
+    <img src="https://img.shields.io/badge/Stable-v1.0.1-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -45,6 +45,21 @@ Mỗi instance có riêng:
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 
 ---
+
+## Có gì mới trong v1.0.1
+
+**v1.0.1** là bản bảo trì đầu tiên sau mốc stable 1.0.0, tập trung vào độ chính xác của nội dung, trải nghiệm thiết lập ban đầu và tính nhất quán của giao diện:
+
+- Sửa đường dẫn resource pack và shader pack về đúng thư mục gốc của instance, kèm migration an toàn cho dữ liệu được tạo bởi v1.0.0.
+- Cho phép cài thêm resource pack/shader pack khi game đang chạy, nhưng vẫn chặn thao tác thay thế, vô hiệu hóa hoặc xóa nội dung đang có.
+- Sắp xếp phiên bản FTB từ mới nhất đến cũ nhất.
+- Mở rộng First Run Setup với quét Java, chọn runtime mặc định, gợi ý RAM, download concurrency và tóm tắt cấu hình.
+- Thêm chính sách xác nhận lỗi tương thích theo từng instance: Kế thừa, Hỏi, Chặn hoặc Cho phép.
+- Khôi phục icon modpack từ archive hoặc provider theo cơ chế best-effort.
+- Thêm màu chữ tùy chỉnh cho Launcher Settings và theme contract, có preview, reset và kiểm tra độ tương phản.
+- Làm gọn card GPU rời, hoàn thiện bản dịch, dùng file picker native trên Windows và gia cố repaint khi cuộn.
+
+Xem chi tiết tại [`docs/RELEASE-v1.0.1.md`](docs/RELEASE-v1.0.1.md).
 
 ## Tính năng nổi bật
 
@@ -138,8 +153,8 @@ Thông thường release sẽ có:
 
 ```text
 MCW Launcher.exe
-MCW-Launcher-v1.0.0-windows-x64.zip
-MCW-Launcher-v1.0.0-windows-x64.zip.sha256
+MCW-Launcher-v1.0.1-windows-x64.zip
+MCW-Launcher-v1.0.1-windows-x64.zip.sha256
 ```
 
 ### Yêu cầu hệ thống

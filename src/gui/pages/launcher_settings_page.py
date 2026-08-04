@@ -4,16 +4,17 @@ import copy
 from pathlib import Path
 
 from PySide6.QtCore import QSignalBlocker, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QDesktopServices
+from PySide6.QtGui import QColor, QDesktopServices, QPalette
 from PySide6.QtWidgets import QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy
 
+from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
 from mcw_core.api.hardware.gpu_preference_manager import GraphicsDetectionResult
 from mcw_core.api.instance.settings_manager import SettingsManager, default_instance_settings
 from mcw_core.api.java.java_major_policy import JavaMajorPolicy
 from mcw_core.api.language.language_manager import language_manager, tr
 from mcw_core.api.theme.theme_authoring import ThemeAuthoringError, ThemeAuthoringService
 from mcw_core.api.theme.theme_manager import theme_manager
-from mcw_core.api.theme.theme_palette import normalize_hex_color
+from mcw_core.api.theme.theme_palette import contrast_ratio, normalize_hex_color
 from src.gui.config import NAVIGATION_ITEMS, VERSION
 from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
 from src.gui.dialogs.protected_value_reveal_dialog import confirm_reveal_protected_values
@@ -36,6 +37,7 @@ class LauncherSettingsPage(BasePage):
     live_theme_reload_requested = Signal(str)
     motion_mode_changed = Signal(str)
     accent_changed = Signal(str, str)
+    text_color_changed = Signal(str, str)
     preview_toast_requested = Signal()
     scan_java_requested = Signal()
     install_java_requested = Signal(int)
@@ -53,6 +55,7 @@ class LauncherSettingsPage(BasePage):
         self._theme_live_reload.reload_requested.connect(self._handle_live_theme_reload)
         self._instance_defaults = default_instance_settings()
         self._accent_color = "#8ed35b"
+        self._text_color = "#f4f4f4"
         self._tracking_suspended = True
         self._dirty = False
         self._saved_data: dict = {}
@@ -212,6 +215,8 @@ class LauncherSettingsPage(BasePage):
         self._update_java_install_action()
 
         self.gpu_card = CardWidget(tr("gpu.preference.title"), tr("gpu.preference.detail"))
+        self.gpu_card.set_compact_mode(True)
+        self.gpu_card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         self.prefer_dedicated_gpu = QCheckBox(tr("gpu.preference.toggle"))
         self.prefer_dedicated_gpu.setChecked(False)
         self.prefer_dedicated_gpu.setEnabled(False)
@@ -241,18 +246,20 @@ class LauncherSettingsPage(BasePage):
         runtime_section.add_card(self.instance_defaults_card)
         self._update_instance_defaults_summary()
 
-        forge_preflight_card = CardWidget(
+        self.forge_preflight_card = CardWidget(
             tr("forge_preflight.launcher.title"),
             tr("forge_preflight.launcher.detail"),
         )
-        self.allow_forge_preflight_failure = QCheckBox(tr("forge_preflight.launcher.allow"))
-        self.allow_forge_preflight_failure.setChecked(False)
+        self.forge_preflight_policy_label = QLabel(tr("forge_preflight.launcher.policy_label"))
+        self.forge_preflight_policy_combo = QComboBox()
+        self._reload_forge_preflight_policies()
         self.forge_preflight_warning_label = QLabel(tr("forge_preflight.warning"))
         self.forge_preflight_warning_label.setObjectName("MutedLabel")
         self.forge_preflight_warning_label.setWordWrap(True)
-        forge_preflight_card.layout.addWidget(self.allow_forge_preflight_failure)
-        forge_preflight_card.layout.addWidget(self.forge_preflight_warning_label)
-        runtime_section.add_card(forge_preflight_card)
+        self.forge_preflight_card.layout.addWidget(self.forge_preflight_policy_label)
+        self.forge_preflight_card.layout.addWidget(self.forge_preflight_policy_combo)
+        self.forge_preflight_card.layout.addWidget(self.forge_preflight_warning_label)
+        runtime_section.add_card(self.forge_preflight_card)
 
         update_card = CardWidget("Launcher updates", "Stable updates are used by default. Join the tester program only when you want to receive experimental builds.")
         current_version_label = QLabel(f"Current version: {VERSION}")
@@ -340,6 +347,34 @@ class LauncherSettingsPage(BasePage):
         appearance_card.layout.addLayout(accent_row)
         appearance_card.layout.addWidget(self.accent_detail_label)
         self._update_accent_controls()
+
+        self.text_color_mode_label = QLabel(tr("appearance.text.mode.label"))
+        self.text_color_mode_combo = QComboBox()
+        self._reload_text_color_modes()
+        self.text_color_mode_combo.currentIndexChanged.connect(self._text_color_mode_changed)
+        self.text_color_button = QPushButton()
+        self.text_color_button.setMinimumHeight(36)
+        self.text_color_button.clicked.connect(self._choose_text_color)
+        self.text_color_reset_button = QPushButton(tr("appearance.text.reset"))
+        self.text_color_reset_button.clicked.connect(self._reset_text_color)
+        text_color_row = QHBoxLayout()
+        text_color_row.setContentsMargins(0, 0, 0, 0)
+        text_color_row.addWidget(self.text_color_button, 1)
+        text_color_row.addWidget(self.text_color_reset_button)
+        self.text_color_detail_label = QLabel()
+        self.text_color_detail_label.setObjectName("MutedLabel")
+        self.text_color_detail_label.setWordWrap(True)
+        self.text_color_contrast_label = QLabel()
+        self.text_color_contrast_label.setObjectName("WarningLabel")
+        self.text_color_contrast_label.setWordWrap(True)
+        self.text_color_contrast_label.setVisible(False)
+        appearance_card.layout.addWidget(self.text_color_mode_label)
+        appearance_card.layout.addWidget(self.text_color_mode_combo)
+        appearance_card.layout.addLayout(text_color_row)
+        appearance_card.layout.addWidget(self.text_color_detail_label)
+        appearance_card.layout.addWidget(self.text_color_contrast_label)
+        self._update_text_color_controls()
+
         self.motion_mode_label = QLabel(tr("motion.mode.label"))
         self.motion_mode_detail = QLabel(tr("motion.mode.detail"))
         self.motion_mode_detail.setObjectName("MutedLabel")
@@ -434,7 +469,7 @@ class LauncherSettingsPage(BasePage):
         self.modrinth_include_alpha.toggled.connect(self._refresh_dirty_state)
         self.block_modrinth_failure.toggled.connect(self._refresh_dirty_state)
         self.block_curseforge_failure.toggled.connect(self._refresh_dirty_state)
-        self.allow_forge_preflight_failure.toggled.connect(self._refresh_dirty_state)
+        self.forge_preflight_policy_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         for field in self.curseforge_gateway_inputs:
             field.textChanged.connect(self._refresh_dirty_state)
         self.auto_check_updates.toggled.connect(self._refresh_dirty_state)
@@ -443,6 +478,7 @@ class LauncherSettingsPage(BasePage):
         self.theme_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.motion_mode_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.accent_mode_combo.currentIndexChanged.connect(self._refresh_dirty_state)
+        self.text_color_mode_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.show_static_text.toggled.connect(self._refresh_dirty_state)
         self.live_theme_reload.toggled.connect(self._refresh_dirty_state)
 
@@ -617,6 +653,20 @@ class LauncherSettingsPage(BasePage):
         value = str(self.motion_mode_combo.currentData() or "full").strip().lower()
         return value if value in {"full", "reduced", "off"} else "full"
 
+    def _reload_forge_preflight_policies(self) -> None:
+        current = self.forge_preflight_policy_combo.currentData() if hasattr(self, "forge_preflight_policy_combo") else ManagedContentPolicy.ASK
+        self.forge_preflight_policy_combo.blockSignals(True)
+        self.forge_preflight_policy_combo.clear()
+        self.forge_preflight_policy_combo.addItem(tr("forge_preflight.policy.ask"), ManagedContentPolicy.ASK)
+        self.forge_preflight_policy_combo.addItem(tr("forge_preflight.policy.block"), ManagedContentPolicy.BLOCK)
+        self.forge_preflight_policy_combo.addItem(tr("forge_preflight.policy.allow"), ManagedContentPolicy.ALLOW)
+        index = self.forge_preflight_policy_combo.findData(ManagedContentPolicy.normalize_global(current))
+        self.forge_preflight_policy_combo.setCurrentIndex(max(0, index))
+        self.forge_preflight_policy_combo.blockSignals(False)
+
+    def current_forge_preflight_policy(self) -> str:
+        return ManagedContentPolicy.normalize_global(self.forge_preflight_policy_combo.currentData())
+
     def _reload_accent_modes(self) -> None:
         current = self.accent_mode_combo.currentData() if hasattr(self, "accent_mode_combo") else "theme"
         self.accent_mode_combo.blockSignals(True)
@@ -679,6 +729,76 @@ class LauncherSettingsPage(BasePage):
         key = "appearance.accent.detail.custom" if mode == "custom" else "appearance.accent.detail.theme"
         self.accent_detail_label.setText(tr(key, color=color))
 
+    def _reload_text_color_modes(self) -> None:
+        current = self.text_color_mode_combo.currentData() if hasattr(self, "text_color_mode_combo") else "theme"
+        self.text_color_mode_combo.blockSignals(True)
+        self.text_color_mode_combo.clear()
+        self.text_color_mode_combo.addItem(tr("appearance.text.mode.theme"), "theme")
+        self.text_color_mode_combo.addItem(tr("appearance.text.mode.custom"), "custom")
+        index = self.text_color_mode_combo.findData(current or "theme")
+        self.text_color_mode_combo.setCurrentIndex(max(0, index))
+        self.text_color_mode_combo.blockSignals(False)
+
+    def current_text_color_mode(self) -> str:
+        value = str(self.text_color_mode_combo.currentData() or "theme").strip().lower()
+        return value if value in {"theme", "custom"} else "theme"
+
+    def current_text_color(self) -> str:
+        try:
+            return normalize_hex_color(self._text_color)
+        except ValueError:
+            return "#f4f4f4"
+
+    def _theme_text_color(self) -> str:
+        theme = self._selected_theme()
+        return theme.palette.text_primary if theme is not None else "#f4f4f4"
+
+    def _theme_background_color(self) -> str:
+        color = self.palette().color(QPalette.ColorRole.Window)
+        return color.name(QColor.NameFormat.HexRgb).lower() if color.isValid() else "#20231f"
+
+    def _text_color_mode_changed(self, _index: int) -> None:
+        self._update_text_color_controls()
+        self.text_color_changed.emit(self.current_text_color_mode(), self.current_text_color())
+
+    def _choose_text_color(self) -> None:
+        selected = QColorDialog.getColor(QColor(self.current_text_color()), self, tr("appearance.text.choose"))
+        if not selected.isValid():
+            return
+        self._text_color = selected.name(QColor.NameFormat.HexRgb).lower()
+        custom_index = self.text_color_mode_combo.findData("custom")
+        with QSignalBlocker(self.text_color_mode_combo):
+            self.text_color_mode_combo.setCurrentIndex(max(0, custom_index))
+        self._update_text_color_controls()
+        self._refresh_dirty_state()
+        self.text_color_changed.emit("custom", self.current_text_color())
+
+    def _reset_text_color(self) -> None:
+        self._text_color = "#f4f4f4"
+        theme_index = self.text_color_mode_combo.findData("theme")
+        with QSignalBlocker(self.text_color_mode_combo):
+            self.text_color_mode_combo.setCurrentIndex(max(0, theme_index))
+        self._update_text_color_controls()
+        self._refresh_dirty_state()
+        self.text_color_changed.emit("theme", self.current_text_color())
+
+    def _update_text_color_controls(self) -> None:
+        if not hasattr(self, "text_color_button"):
+            return
+        mode = self.current_text_color_mode()
+        color = self.current_text_color() if mode == "custom" else self._theme_text_color()
+        background = self._theme_background_color()
+        self.text_color_button.setEnabled(True)
+        self.text_color_reset_button.setEnabled(mode == "custom")
+        self.text_color_button.setText(tr("appearance.text.color_value", color=color))
+        button_background = "#f4f4f4" if QColor(color).lightnessF() < 0.42 else "#20231f"
+        self.text_color_button.setStyleSheet(f"QPushButton {{ background-color: {button_background}; color: {color}; border: 2px solid {color}; }}")
+        key = "appearance.text.detail.custom" if mode == "custom" else "appearance.text.detail.theme"
+        self.text_color_detail_label.setText(tr(key, color=color))
+        ratio = contrast_ratio(color, background)
+        self.text_color_contrast_label.setVisible(ratio < 4.5)
+        self.text_color_contrast_label.setText(tr("appearance.text.contrast_warning", ratio=f"{ratio:.2f}"))
+
     def _emit_motion_mode_changed(self, _index: int) -> None:
         self.motion_mode_changed.emit(self.current_motion_mode())
 
@@ -705,6 +825,7 @@ class LauncherSettingsPage(BasePage):
             self.reload_theme_requested.emit(str(pending_data.get("theme", "mcw-default")))
             self.motion_mode_changed.emit(str(pending_data.get("motion_mode", "full")))
             self.accent_changed.emit(str(pending_data.get("accent_mode", "theme")), str(pending_data.get("accent_color", "#8ed35b")))
+            self.text_color_changed.emit(str(pending_data.get("text_color_mode", "theme")), str(pending_data.get("text_color", "#f4f4f4")))
 
     def form_data(self) -> dict:
         return {
@@ -723,11 +844,14 @@ class LauncherSettingsPage(BasePage):
             "live_theme_reload": self.live_theme_reload.isChecked(),
             "accent_mode": self.current_accent_mode(),
             "accent_color": self.current_accent_color(),
+            "text_color_mode": self.current_text_color_mode(),
+            "text_color": self.current_text_color(),
             "modrinth_include_beta": self.modrinth_include_beta.isChecked(),
             "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
             "block_launch_on_modrinth_failure": self.block_modrinth_failure.isChecked(),
             "block_launch_on_curseforge_failure": self.block_curseforge_failure.isChecked(),
-            "allow_launch_on_forge_preflight_failure": self.allow_forge_preflight_failure.isChecked(),
+            "forge_preflight_failure_policy": self.current_forge_preflight_policy(),
+            "allow_launch_on_forge_preflight_failure": self.current_forge_preflight_policy() == ManagedContentPolicy.ALLOW,
             "curseforge_gateway_urls": [field.text().strip() for field in self.curseforge_gateway_inputs],
             "download_limit_mbps": self.download_limit_mbps.value() if self.limit_download_speed.isChecked() else 0.0,
             "download_concurrency": int(self.download_concurrency.currentData() or 0),
@@ -755,6 +879,7 @@ class LauncherSettingsPage(BasePage):
         self.reload_theme_requested.emit(str(self._saved_data.get("theme", "mcw-default")))
         self.motion_mode_changed.emit(str(self._saved_data.get("motion_mode", "full")))
         self.accent_changed.emit(str(self._saved_data.get("accent_mode", "theme")), str(self._saved_data.get("accent_color", "#8ed35b")))
+        self.text_color_changed.emit(str(self._saved_data.get("text_color_mode", "theme")), str(self._saved_data.get("text_color", "#f4f4f4")))
 
     def set_update_status(self, message: str) -> None:
         self.update_status_label.setText(message)
@@ -766,6 +891,8 @@ class LauncherSettingsPage(BasePage):
         self.check_updates_button.setEnabled(not busy)
 
     def retranslate_dynamic(self) -> None:
+        self.title_label.setText(tr("launcher_settings.page.title"))
+        self.subtitle_label.setText(tr("launcher_settings.page.subtitle"))
         self.unsaved_label.setText(tr("settings.unsaved.banner"))
         if self.java_card.title_label is not None:
             self.java_card.title_label.setText(tr("launcher_settings.java.title"))
@@ -794,7 +921,12 @@ class LauncherSettingsPage(BasePage):
         self.show_content_descriptions.setText(tr("content.settings.show_descriptions"))
         self.block_modrinth_failure.setText(tr("managed_content.modrinth.block"))
         self.block_curseforge_failure.setText(tr("managed_content.curseforge.block"))
-        self.allow_forge_preflight_failure.setText(tr("forge_preflight.launcher.allow"))
+        if self.forge_preflight_card.title_label is not None:
+            self.forge_preflight_card.title_label.setText(tr("forge_preflight.launcher.title"))
+        if self.forge_preflight_card.subtitle_label is not None:
+            self.forge_preflight_card.subtitle_label.setText(tr("forge_preflight.launcher.detail"))
+        self.forge_preflight_policy_label.setText(tr("forge_preflight.launcher.policy_label"))
+        self._reload_forge_preflight_policies()
         self.forge_preflight_warning_label.setText(tr("forge_preflight.warning"))
         if self.instance_defaults_card.title_label is not None:
             self.instance_defaults_card.title_label.setText(tr("instance_defaults.launcher.title"))
@@ -807,6 +939,10 @@ class LauncherSettingsPage(BasePage):
         self.accent_reset_button.setText(tr("appearance.accent.reset"))
         self._reload_accent_modes()
         self._update_accent_controls()
+        self.text_color_mode_label.setText(tr("appearance.text.mode.label"))
+        self.text_color_reset_button.setText(tr("appearance.text.reset"))
+        self._reload_text_color_modes()
+        self._update_text_color_controls()
         self.reload_theme_button.setText(tr("theme.authoring.reload"))
         self.live_theme_reload.setText(tr("theme.authoring.live_reload"))
         self.live_theme_reload.setToolTip(tr("theme.authoring.live_reload.detail"))
@@ -848,7 +984,7 @@ class LauncherSettingsPage(BasePage):
             self.modrinth_include_alpha,
             self.block_modrinth_failure,
             self.block_curseforge_failure,
-            self.allow_forge_preflight_failure,
+            self.forge_preflight_policy_combo,
             self.limit_download_speed,
             self.download_limit_mbps,
             self.download_concurrency,
@@ -857,6 +993,7 @@ class LauncherSettingsPage(BasePage):
             self.theme_combo,
             self.motion_mode_combo,
             self.accent_mode_combo,
+            self.text_color_mode_combo,
             self.show_static_text,
             self.live_theme_reload,
             *self.curseforge_gateway_inputs,
@@ -874,7 +1011,11 @@ class LauncherSettingsPage(BasePage):
         self.modrinth_include_alpha.setChecked(bool(settings.get("modrinth_include_alpha", False)))
         self.block_modrinth_failure.setChecked(bool(settings.get("block_launch_on_modrinth_failure", True)))
         self.block_curseforge_failure.setChecked(bool(settings.get("block_launch_on_curseforge_failure", True)))
-        self.allow_forge_preflight_failure.setChecked(bool(settings.get("allow_launch_on_forge_preflight_failure", False)))
+        forge_policy = settings.get("forge_preflight_failure_policy")
+        if forge_policy is None:
+            forge_policy = ManagedContentPolicy.ALLOW if bool(settings.get("allow_launch_on_forge_preflight_failure", False)) else ManagedContentPolicy.ASK
+        forge_index = self.forge_preflight_policy_combo.findData(ManagedContentPolicy.normalize_global(forge_policy))
+        self.forge_preflight_policy_combo.setCurrentIndex(max(0, forge_index))
         gateway_urls = list(settings.get("curseforge_gateway_urls", ()) or ())[:5]
         gateway_urls.extend([""] * (5 - len(gateway_urls)))
         for field, value in zip(self.curseforge_gateway_inputs, gateway_urls):
@@ -909,6 +1050,13 @@ class LauncherSettingsPage(BasePage):
         except ValueError:
             self._accent_color = "#8ed35b"
         self._update_accent_controls()
+        text_mode_index = self.text_color_mode_combo.findData(str(settings.get("text_color_mode", "theme")))
+        self.text_color_mode_combo.setCurrentIndex(max(0, text_mode_index))
+        try:
+            self._text_color = normalize_hex_color(settings.get("text_color", "#f4f4f4"))
+        except ValueError:
+            self._text_color = "#f4f4f4"
+        self._update_text_color_controls()
         self.show_static_text.setChecked(bool(settings.get("show_static_text", False)))
         self.live_theme_reload.setChecked(bool(settings.get("live_theme_reload", False)))
         self._set_live_theme_reload(self.live_theme_reload.isChecked())

@@ -7,8 +7,10 @@ from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QCloseEvent, QDesktopServices, QGuiApplication, QScreen
 from PySide6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QPushButton, QStackedWidget, QVBoxLayout, QWidget
 
+from mcw_core import CompatibilityConfirmationRequired
 from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
 from mcw_core.api.content.content_pack_manager import ContentPackManager
+from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
 from mcw_core.api.content.installed_content_library import InstalledContentLibraryManager
 from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
 from mcw_core.api.curseforge.curseforge_errors import CurseForgeManagedFilesRequired, CurseForgeModpackManualDownloadRequired
@@ -151,7 +153,7 @@ class MainWindow(QMainWindow):
         self._connect_signals()
         self.launch_control.set_motion_runtime(self.motion_runtime)
 
-        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(self._startup_settings.get("theme", "mcw-default")), bool(self._startup_settings.get("show_static_text", False)), str(self._startup_settings.get("accent_mode", "theme")), str(self._startup_settings.get("accent_color", "#8ed35b")))
+        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(self._startup_settings.get("theme", "mcw-default")), bool(self._startup_settings.get("show_static_text", False)), str(self._startup_settings.get("accent_mode", "theme")), str(self._startup_settings.get("accent_color", "#8ed35b")), str(self._startup_settings.get("text_color_mode", "theme")), str(self._startup_settings.get("text_color", "#f4f4f4")))
         self.motion_runtime.apply(self._startup_settings.get("motion_mode", "full"))
         self._initialize_data()
 
@@ -380,6 +382,7 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.live_theme_reload_requested.connect(self._reload_theme_silently)
         self.launcher_settings_page.motion_mode_changed.connect(self._preview_motion)
         self.launcher_settings_page.accent_changed.connect(self._preview_accent)
+        self.launcher_settings_page.text_color_changed.connect(self._preview_text_color)
         self.launcher_settings_page.preview_toast_requested.connect(
             lambda: self.toast_manager.show(
                 tr("motion.preview.toast.message"),
@@ -484,6 +487,7 @@ class MainWindow(QMainWindow):
         self.modrinth_controller.modpack_manual_download_required.connect(self._modrinth_modpack_manual_download_required)
         self.modrinth_manual_dialog.files_selected.connect(self._install_manual_modrinth_files)
         self.launch_controller.portable_manual_download_required.connect(self._portable_manual_download_required)
+        self.launch_controller.compatibility_confirmation_required.connect(self._confirm_compatibility_launch)
         self.portable_manual_dialog.files_selected.connect(self._install_portable_manual_files)
         self.instance_controller.portable_manual_files_installed.connect(self._portable_manual_files_installed)
 
@@ -1969,11 +1973,11 @@ class MainWindow(QMainWindow):
         curseforge_available = bool(settings.get("curseforge_gateway_urls", ()))
         self.instances_page.browse_curseforge_modpacks_button.setVisible(curseforge_available)
         self.mod_manager_dialog.curseforge_button.setVisible(curseforge_available)
-        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")), bool(settings.get("show_static_text", False)), str(settings.get("accent_mode", "theme")), str(settings.get("accent_color", "#8ed35b")))
+        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")), bool(settings.get("show_static_text", False)), str(settings.get("accent_mode", "theme")), str(settings.get("accent_color", "#8ed35b")), str(settings.get("text_color_mode", "theme")), str(settings.get("text_color", "#f4f4f4")))
         self.motion_runtime.apply(settings.get("motion_mode", "full"))
 
     def _preview_theme(self, theme_id: str) -> None:
-        selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked(), self.launcher_settings_page.current_accent_mode(), self.launcher_settings_page.current_accent_color())
+        selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked(), self.launcher_settings_page.current_accent_mode(), self.launcher_settings_page.current_accent_color(), self.launcher_settings_page.current_text_color_mode(), self.launcher_settings_page.current_text_color())
         self.motion_runtime.apply(self.launcher_settings_page.current_motion_mode())
         self.logs_page.append(f"Theme preview: {selected}")
         self.toast_manager.show(
@@ -1983,7 +1987,7 @@ class MainWindow(QMainWindow):
         )
 
     def _reload_theme_silently(self, theme_id: str) -> None:
-        selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked(), self.launcher_settings_page.current_accent_mode(), self.launcher_settings_page.current_accent_color())
+        selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked(), self.launcher_settings_page.current_accent_mode(), self.launcher_settings_page.current_accent_color(), self.launcher_settings_page.current_text_color_mode(), self.launcher_settings_page.current_text_color())
         self.motion_runtime.apply(self.launcher_settings_page.current_motion_mode())
         self.logs_page.append(f"Theme live reload: {selected}")
 
@@ -1992,7 +1996,11 @@ class MainWindow(QMainWindow):
 
     def _preview_accent(self, mode: str, color: str) -> None:
         theme_id = str(self.launcher_settings_page.theme_combo.currentData() or "mcw-default")
-        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked(), mode, color)
+        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked(), mode, color, self.launcher_settings_page.current_text_color_mode(), self.launcher_settings_page.current_text_color())
+
+    def _preview_text_color(self, mode: str, color: str) -> None:
+        theme_id = str(self.launcher_settings_page.theme_combo.currentData() or "mcw-default")
+        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked(), self.launcher_settings_page.current_accent_mode(), self.launcher_settings_page.current_accent_color(), mode, color)
 
     def _set_modrinth_channel_preferences(self, include_beta: bool, include_alpha: bool) -> None:
         self.mods_page.set_channel_preferences(include_beta, include_alpha)
@@ -2148,6 +2156,9 @@ class MainWindow(QMainWindow):
         if task_id == "mods.update.check":
             self.mod_manager_dialog.set_update_error(str(error))
         if task_id == self.launch_controller.TASK_ID:
+            if isinstance(error, CompatibilityConfirmationRequired):
+                self.instance_controller.refresh_running(force=True)
+                return
             if is_download_cancelled(error):
                 self._on_launch_cancelled()
                 self.instance_controller.refresh_running(force=True)
@@ -2409,6 +2420,35 @@ class MainWindow(QMainWindow):
             "success",
             tr("modpack_package.export.result.title"),
         )
+
+    def _confirm_compatibility_launch(self, request: CompatibilityConfirmationRequired) -> None:
+        issues = tuple(getattr(request, "issues", ()) or ())
+        details = "\n".join(f"• {getattr(issue, 'message', issue)}" for issue in issues[:8])
+        if len(issues) > 8:
+            details += tr("compatibility.confirmation.more", count=len(issues) - 8)
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle(tr("compatibility.confirmation.title"))
+        box.setText(tr("compatibility.confirmation.message", count=len(issues)))
+        box.setInformativeText(tr("compatibility.confirmation.detail", issues=details))
+        launch_once = box.addButton(tr("compatibility.confirmation.launch_once"), QMessageBox.ButtonRole.AcceptRole)
+        always_allow = box.addButton(tr("compatibility.confirmation.always_allow"), QMessageBox.ButtonRole.ActionRole)
+        cancel = box.addButton(tr("common.cancel"), QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(cancel)
+        box.setEscapeButton(cancel)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is cancel or clicked is None:
+            self.launch_control.set_failed(tr("compatibility.confirmation.cancelled"), tr("compatibility.confirmation.settings_hint"))
+            return
+        instance = self._selected_instance
+        if clicked is always_allow and instance is not None:
+            settings = SettingsManager.load(instance)
+            settings.forge_preflight_failure_policy = ManagedContentPolicy.ALLOW
+            SettingsManager.save(instance, settings)
+            self.instance_settings_page.set_settings(instance.name, settings)
+        if clicked in {launch_once, always_allow}:
+            QTimer.singleShot(0, lambda: self.launch_controller.launch(True))
 
     def _portable_manual_download_required(self, request: object) -> None:
         requirements = tuple(getattr(request, "requirements", ()) or ())

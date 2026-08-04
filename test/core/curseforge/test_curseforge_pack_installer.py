@@ -348,3 +348,33 @@ def test_manual_modpack_archive_is_verified_cached_and_resumed(monkeypatch, tmp_
 
     assert result is sentinel
     assert cache_path.read_bytes() == payload
+
+
+def test_local_curseforge_icon_uses_reliable_project_id_only(tmp_path: Path, monkeypatch) -> None:
+    instance_dir = tmp_path / "instance"
+    instance_dir.mkdir()
+    instance = Instance(instance_id="cf", name="CF", version_id="1.20.1", instance_dir=instance_dir, mod_loader=("forge", "47"))
+    package = tmp_path / "pack.zip"
+    with zipfile.ZipFile(package, "w") as archive:
+        archive.writestr("manifest.json", "{}")
+    calls: list[tuple] = []
+    monkeypatch.setattr(InstanceArtworkManager, "apply_embedded_archive_artwork", classmethod(lambda cls, _instance, _archive: False))
+    monkeypatch.setattr(InstanceArtworkManager, "has_custom_artwork", classmethod(lambda cls, _instance: False))
+    monkeypatch.setattr(InstanceArtworkManager, "apply_provider_artwork", classmethod(lambda cls, *args, **kwargs: calls.append(args) or False))
+    monkeypatch.setattr(InstanceManager, "load", staticmethod(lambda _name: instance))
+    monkeypatch.setattr(CurseForgeClient, "get_project", staticmethod(lambda project_id: SimpleNamespace(logo_url="https://cdn.example/cf.png")))
+
+    with zipfile.ZipFile(package) as archive:
+        CurseForgePackInstaller._apply_local_archive_artwork(instance, archive, 42, None)
+    assert calls and calls[0][1:4] == ("curseforge", 42, "https://cdn.example/cf.png")
+
+    calls.clear()
+    with zipfile.ZipFile(package) as archive:
+        CurseForgePackInstaller._apply_local_archive_artwork(instance, archive, 0, None)
+    assert calls == []
+
+
+def test_manifest_project_id_does_not_guess_from_pack_name() -> None:
+    assert CurseForgePackInstaller._manifest_project_id({"name": "Popular Pack"}) == 0
+    assert CurseForgePackInstaller._manifest_project_id({"projectID": 123}) == 123
+    assert CurseForgePackInstaller._manifest_project_id({"projectId": "456"}) == 456

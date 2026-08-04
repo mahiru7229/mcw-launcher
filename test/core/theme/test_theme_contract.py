@@ -86,7 +86,7 @@ def test_schema_6_declares_known_asset_keys_and_runtime_limits() -> None:
     assert schema["$defs"]["animation"]["properties"]["frame_count"]["maximum"] == ThemeManager.MAX_ANIMATION_FRAMES
     assert "palette" in schema["properties"]
     assert "accent_assets" in schema["properties"]
-    assert set(schema["$defs"]["palette"]["properties"]) == {"primary", "primary_hover", "primary_pressed", "primary_text", "focus", "selection", "selection_text", "link", "success", "warning", "error"}
+    assert set(schema["$defs"]["palette"]["properties"]) == {"primary", "primary_hover", "primary_pressed", "primary_text", "focus", "selection", "selection_text", "link", "success", "warning", "error", "text_primary", "text_muted", "text_disabled", "text_inverse"}
     assert pretty_json_text(schema).endswith("\n")
 
 

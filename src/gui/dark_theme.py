@@ -18,11 +18,10 @@ from src.gui.dark_theme_constants import (
 
 
 def configure_forced_dark_attributes() -> None:
-    """Disable native dialogs before QApplication exists so Qt styling always wins."""
-    for attribute_name in ("AA_DontUseNativeDialogs", "AA_UseStyleSheetPropagationInWidgetStyles"):
-        attribute = getattr(Qt.ApplicationAttribute, attribute_name, None)
-        if attribute is not None:
-            QCoreApplication.setAttribute(attribute, True)
+    """Configure stylesheet propagation without disabling native Windows dialogs."""
+    attribute = getattr(Qt.ApplicationAttribute, "AA_UseStyleSheetPropagationInWidgetStyles", None)
+    if attribute is not None:
+        QCoreApplication.setAttribute(attribute, True)
 
 
 def create_forced_dark_palette(base_palette: QPalette | None = None, selection_color: QColor | None = None, selection_text_color: QColor | None = None, link_color: QColor | None = None) -> QPalette:

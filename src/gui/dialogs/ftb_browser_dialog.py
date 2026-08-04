@@ -268,6 +268,7 @@ class FTBBrowserDialog(QDialog):
         if self._selected_project is None or self._selected_project.project_id != int(project_id):
             return
         self._versions = [version for version in tuple(versions or ()) if isinstance(version, FTBVersionSummary)]
+        self._versions.sort(key=lambda version: (int(version.updated or 0), int(version.version_id or 0)), reverse=True)
         self.version_combo.blockSignals(True)
         self.version_combo.clear()
         for version in self._versions:

@@ -104,7 +104,7 @@ def test_batch_toggle_and_remove_only_change_supported_items(instance: Instance,
     changed = InstalledContentLibraryManager.set_enabled(instance, [local_mod.item_id, pack.item_id], False)
     assert set(changed) == {local_mod.item_id, pack.item_id}
     assert (instance.instance_dir / "mods" / "local.jar.disabled").is_file()
-    assert (instance.instance_dir / "minecraft" / "resourcepacks" / ".disabled" / resource.file_name).is_file()
+    assert (instance.instance_dir / "resourcepacks" / ".disabled" / resource.file_name).is_file()
 
     refreshed = InstalledContentLibraryManager.scan(instance)
     removable_ids = [item.item_id for item in refreshed.items if item.content_type in {"mod", "resourcepack"}]

@@ -47,7 +47,7 @@ def test_launcher_creates_agent_log_before_java_process_starts(monkeypatch, tmp_
     monkeypatch.setattr(VersionManifestManager, "get", lambda: [])
     monkeypatch.setattr(ModLoaderManager, "load", lambda *args, **kwargs: version)
     monkeypatch.setattr(ForgePreflightManager, "scan", lambda *args, **kwargs: preflight)
-    monkeypatch.setattr(ForgePreflightManager, "raise_for_errors", lambda _result: None)
+    monkeypatch.setattr(ForgePreflightManager, "raise_for_errors", lambda _result, *_args, **_kwargs: None)
     monkeypatch.setattr(ForgePreflightManager, "validate_runtime_files", lambda *args, **kwargs: ())
     monkeypatch.setattr(DownloadClientManager, "load", lambda **kwargs: Path("client.jar"))
     monkeypatch.setattr(DownloadLibraryManager, "load", lambda **kwargs: [])

@@ -38,7 +38,7 @@
   "schema_file": "theme.schema.v6.json",
   "sha256": {
     "theme-assets.v1.json": "e5e958cd7de36e39a1506777c3595ed68dfb46f4be9c2d706d635e6b5c1584b9",
-    "theme.schema.v6.json": "4fff77e48768f97eaba40114ea3c301726863a31a39067136f2f4b53b2865dce"
+    "theme.schema.v6.json": "bd54d8776d964cc13a141c2bc62d2fba2492e9c52c79033db64a81819ffb582d"
   },
   "supported_theme_schema_versions": [
     1,

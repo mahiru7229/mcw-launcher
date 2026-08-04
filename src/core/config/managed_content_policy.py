@@ -7,19 +7,20 @@ class ManagedContentPolicy:
     INHERIT = "inherit"
     BLOCK = "block"
     ALLOW = "allow"
+    ASK = "ask"
     PROVIDERS = {"modrinth", "curseforge", "forge_preflight"}
 
     @classmethod
     def normalize_instance(cls, value: object, default: str = INHERIT) -> str:
         normalized = str(value or "").strip().lower()
-        if normalized in {cls.INHERIT, cls.BLOCK, cls.ALLOW}:
+        if normalized in {cls.INHERIT, cls.BLOCK, cls.ALLOW, cls.ASK}:
             return normalized
         return default
 
     @classmethod
     def normalize_global(cls, value: object, default: str = BLOCK) -> str:
         normalized = str(value or "").strip().lower()
-        if normalized in {cls.BLOCK, cls.ALLOW}:
+        if normalized in {cls.BLOCK, cls.ALLOW, cls.ASK}:
             return normalized
         return default
 
@@ -57,6 +58,10 @@ class ManagedContentPolicy:
     @classmethod
     def blocks_launch(cls, instance_settings: object, launcher_settings: dict[str, Any], provider: str) -> bool:
         return cls.resolve(instance_settings, launcher_settings, provider) == cls.BLOCK
+
+    @classmethod
+    def asks_before_launch(cls, instance_settings: object, launcher_settings: dict[str, Any], provider: str) -> bool:
+        return cls.resolve(instance_settings, launcher_settings, provider) == cls.ASK
 
     @staticmethod
     def _as_bool(value: object, default: bool) -> bool:

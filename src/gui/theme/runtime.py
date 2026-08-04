@@ -151,15 +151,19 @@ class ThemeRuntime:
         self._show_static_text = False
         self._accent_mode = "theme"
         self._accent_color = "#8ed35b"
+        self._text_color_mode = "theme"
+        self._text_color = "#f4f4f4"
 
-    def apply(self, root: QWidget, base_stylesheet: str, theme_id: str, show_static_text: bool = False, accent_mode: str = "theme", accent_color: str = "#8ed35b") -> str:
+    def apply(self, root: QWidget, base_stylesheet: str, theme_id: str, show_static_text: bool = False, accent_mode: str = "theme", accent_color: str = "#8ed35b", text_color_mode: str = "theme", text_color: str = "#f4f4f4") -> str:
         self._base_stylesheet = str(base_stylesheet)
         self._show_static_text = bool(show_static_text)
         self.manager.reload()
         selected_theme = self.manager.select(theme_id)
         self._accent_mode = str(accent_mode or "theme")
         self._accent_color = str(accent_color or "#8ed35b")
-        self.accent_runtime.configure(selected_theme, self._accent_mode, self._accent_color)
+        self._text_color_mode = str(text_color_mode or "theme")
+        self._text_color = str(text_color or "#f4f4f4")
+        self.accent_runtime.configure(selected_theme, self._accent_mode, self._accent_color, self._text_color_mode, self._text_color)
         application = QApplication.instance()
         if application is not None:
             self.font_runtime.apply(application, selected_theme)
@@ -170,6 +174,15 @@ class ThemeRuntime:
         else:
             root.setStyleSheet(stylesheet)
         self.apply_assets(root)
+        # A single polish/repaint pass prevents stale backing-store regions after
+        # runtime theme changes and scroll operations on Windows.
+        if application is not None:
+            application.processEvents()
+        for widget in (root, *root.findChildren(QWidget)):
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
+            widget.update()
+        root.update()
         return self.manager.current.theme_id
 
     def reapply_assets(self, root: QWidget) -> None:

@@ -114,10 +114,15 @@ class FTBClient:
     def list_versions(project_id: int | str, release_types: Iterable[str] | None = None, force_refresh: bool = False) -> tuple[FTBVersionSummary, ...]:
         project = FTBClient.get_project(project_id, force_refresh=force_refresh)
         allowed = FTBClient._normalized_release_types(release_types)
-        return tuple(
+        versions = [
             version for version in project.versions
             if version.release_type in allowed and not version.private
-        )
+        ]
+        # FTB feeds are not consistent about version ordering.  Always present
+        # the newest entry first, preferring the provider update timestamp and
+        # using the monotonically increasing version ID as a stable fallback.
+        versions.sort(key=lambda version: (int(version.updated or 0), int(version.version_id or 0)), reverse=True)
+        return tuple(versions)
 
     @staticmethod
     def get_version(project_id: int | str, version_id: int | str, force_refresh: bool = False) -> FTBVersion:

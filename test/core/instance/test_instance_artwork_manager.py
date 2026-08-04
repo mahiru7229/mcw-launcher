@@ -10,6 +10,7 @@ from src.core.fs.paths import Paths
 from src.core.instance.instance_artwork_manager import InstanceArtworkManager
 from src.core.instance.instance_manager import InstanceManager
 from src.core.network.artifact_download_service import artifact_download_service
+from src.models.instance.instance import Instance
 
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\nprovider-artwork"
@@ -75,3 +76,42 @@ def test_manual_icon_overrides_provider_origin_and_reset_restores_default(artwor
     InstanceManager.reset_icon(instance.name)
     metadata = json.loads((instance.instance_dir / "instance.json").read_text(encoding="utf-8"))
     assert metadata["icon_origin"] == {"provider": "default"}
+
+
+def test_embedded_archive_icon_is_validated_and_applied(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from zipfile import ZipFile
+
+    root = tmp_path / "Artwork"
+    root.mkdir()
+    instance = Instance("artwork", "Artwork", "1.21.1", root, ("fabric", "0.16.0"))
+    package = tmp_path / "pack.mrpack"
+    with ZipFile(package, "w") as archive:
+        archive.writestr("mcw/instance-icon.png", PNG_BYTES)
+    calls: list[tuple[str, bytes, dict]] = []
+
+    def set_icon(name: str, source: Path, origin=None):
+        calls.append((name, Path(source).read_bytes(), dict(origin or {})))
+        return instance
+
+    monkeypatch.setattr(InstanceManager, "set_icon", staticmethod(set_icon))
+    with ZipFile(package) as archive:
+        applied = InstanceArtworkManager.apply_embedded_archive_artwork(instance, archive)
+
+    assert applied is True
+    assert calls[0][0] == instance.name
+    assert calls[0][1] == PNG_BYTES
+    assert calls[0][2]["member"] == "mcw/instance-icon.png"
+
+
+def test_embedded_archive_icon_rejects_invalid_image_without_failing_import(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from zipfile import ZipFile
+    root = tmp_path / "Artwork"
+    root.mkdir()
+    instance = Instance("artwork", "Artwork", "1.21.1", root, ("fabric", "0.16.0"))
+    package = tmp_path / "pack.zip"
+    with ZipFile(package, "w") as archive:
+        archive.writestr("mcw/instance-icon.png", b"not-an-image")
+    monkeypatch.setattr(InstanceManager, "set_icon", staticmethod(lambda *_args, **_kwargs: pytest.fail("invalid image must not be applied")))
+
+    with ZipFile(package) as archive:
+        assert InstanceArtworkManager.apply_embedded_archive_artwork(instance, archive) is False

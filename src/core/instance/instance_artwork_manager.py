@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import zipfile
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
 from src.core.network.artifact_download_service import ArtifactDownloadError, artifact_download_service
@@ -13,6 +14,44 @@ from src.models.progress.progress_stage import ProgressStage
 
 class InstanceArtworkManager:
     MAX_ARTWORK_BYTES = InstanceManager.MAX_ICON_BYTES
+    EMBEDDED_ICON_NAMES = frozenset(
+        f"{prefix}{extension}"
+        for prefix in ("mcw/instance-icon", ".mcw/instance-icon", "overrides/.mcw/instance-icon", "overrides/mcw/instance-icon")
+        for extension in InstanceManager.ICON_EXTENSIONS
+    )
+
+    @classmethod
+    def has_custom_artwork(cls, instance: Instance) -> bool:
+        return InstanceManager.resolve_icon_path(instance) is not None
+
+    @classmethod
+    def apply_embedded_archive_artwork(cls, instance: Instance, archive: zipfile.ZipFile) -> bool:
+        """Restore a known embedded instance icon without trusting arbitrary paths."""
+        candidates = []
+        for info in archive.infolist():
+            normalized = info.filename.replace("\\", "/").strip("/").casefold()
+            if normalized not in cls.EMBEDDED_ICON_NAMES or info.is_dir():
+                continue
+            if info.file_size <= 0 or info.file_size > cls.MAX_ARTWORK_BYTES:
+                continue
+            candidates.append((normalized, info))
+        if not candidates:
+            return False
+        _name, info = sorted(candidates, key=lambda item: item[0])[0]
+        try:
+            data = archive.read(info)
+            extension = cls._detect_extension_bytes(data[:16])
+            icon_dir = Path(instance.instance_dir) / InstanceManager.ICON_DIRECTORY
+            icon_dir.mkdir(parents=True, exist_ok=True)
+            source = icon_dir / f".provider-embedded-icon{extension}"
+            source.write_bytes(data)
+            try:
+                InstanceManager.set_icon(instance.name, source, origin={"provider": "embedded", "member": info.filename})
+            finally:
+                source.unlink(missing_ok=True)
+        except (OSError, RuntimeError, ValueError, zipfile.BadZipFile):
+            return False
+        return True
 
     @classmethod
     def apply_provider_artwork(cls, instance: Instance, provider: str, project_id: object, artwork_url: str, reporter: ProgressReporter | None = None) -> bool:
@@ -82,7 +121,10 @@ class InstanceArtworkManager:
 
     @staticmethod
     def _detect_extension(path: Path) -> str:
-        data = path.read_bytes()[:16]
+        return InstanceArtworkManager._detect_extension_bytes(path.read_bytes()[:16])
+
+    @staticmethod
+    def _detect_extension_bytes(data: bytes) -> str:
         if data.startswith(b"\x89PNG\r\n\x1a\n"):
             return ".png"
         if data.startswith(b"\xff\xd8\xff"):

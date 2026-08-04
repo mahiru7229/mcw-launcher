@@ -133,17 +133,17 @@ class StartupSplash(QWidget):
             appearance = settings.get("appearance", {}) if isinstance(settings.get("appearance"), dict) else {}
             theme_manager.reload()
             selected = theme_manager.select(str(appearance.get("theme", "mcw-default")))
-            theme_accent_runtime.configure(selected, str(appearance.get("accent_mode", "theme")), str(appearance.get("accent_color", "#8ed35b")))
+            theme_accent_runtime.configure(selected, str(appearance.get("accent_mode", "theme")), str(appearance.get("accent_color", "#8ed35b")), str(appearance.get("text_color_mode", "theme")), str(appearance.get("text_color", "#f4f4f4")))
         except Exception:
             selected = theme_manager.select(theme_manager.DEFAULT_THEME_ID)
-            theme_accent_runtime.configure(selected, "theme", "#8ed35b")
+            theme_accent_runtime.configure(selected, "theme", "#8ed35b", "theme", "#f4f4f4")
 
     def _apply_palette(self) -> None:
         palette = self.palette()
         palette.setColor(QPalette.ColorRole.Window, QColor("#20231f"))
-        palette.setColor(QPalette.ColorRole.WindowText, QColor("#ffffff"))
-        palette.setColor(QPalette.ColorRole.Text, QColor("#ffffff"))
         colors = theme_accent_runtime.palette
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(colors.text_primary))
+        palette.setColor(QPalette.ColorRole.Text, QColor(colors.text_primary))
         palette.setColor(QPalette.ColorRole.Highlight, QColor(colors.selection))
         palette.setColor(QPalette.ColorRole.HighlightedText, QColor(colors.selection_text))
         self.setPalette(palette)

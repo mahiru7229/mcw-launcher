@@ -14,6 +14,8 @@ from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_downloader import ModrinthDownloader
 from src.core.modrinth.modrinth_pack_installer import ModrinthPackInstaller
+from src.models.instance.instance import Instance
+from src.models.modrinth.install_result import ModrinthModpackInstallResult
 from src.models.modrinth.project import ModrinthProject
 from src.models.modrinth.version import ModrinthFile, ModrinthVersion
 
@@ -226,3 +228,33 @@ def test_inspect_reports_quilt_loader(tmp_path):
     assert details["loader"] == "quilt"
     assert details["quilt_loader"] == "0.27.1"
     assert details["fabric_loader"] == ""
+
+
+def test_local_archive_embedded_icon_takes_priority_over_provider_icon(tmp_path: Path, monkeypatch) -> None:
+    source = make_pack(tmp_path / "embedded.mrpack")
+    instance = Instance(
+        instance_id="embedded", name="Embedded", version_id="1.20.1", instance_dir=tmp_path / "Embedded", mod_loader=("fabric", "0.16.0")
+    )
+    instance.instance_dir.mkdir()
+    result = ModrinthModpackInstallResult(
+        instance=instance, pack_name="Pack", pack_version="1", installed_files=0, skipped_optional_files=0, skipped_server_files=0
+    )
+    calls: list[str] = []
+    monkeypatch.setattr(InstanceArtworkManager, "apply_embedded_archive_artwork", classmethod(lambda cls, _instance, _archive: True))
+    monkeypatch.setattr(InstanceArtworkManager, "apply_provider_artwork", classmethod(lambda cls, *_args, **_kwargs: calls.append("provider") or True))
+    monkeypatch.setattr(InstanceManager, "load", staticmethod(lambda _name: instance))
+
+    refreshed = ModrinthPackInstaller._apply_local_archive_artwork(result, source, SimpleNamespace(project_id="project", icon_url="https://cdn.example/icon.png"), None)
+
+    assert refreshed.instance is instance
+    assert calls == []
+
+
+def test_local_mrpack_provider_lookup_is_best_effort_and_requires_modpack_project(monkeypatch) -> None:
+    version = SimpleNamespace(project_id="project")
+    monkeypatch.setattr(ModrinthClient, "get_version", staticmethod(lambda _value: version))
+    monkeypatch.setattr(ModrinthClient, "get_project", staticmethod(lambda _value: SimpleNamespace(project_type="mod")))
+    assert ModrinthPackInstaller._resolve_local_provider_metadata("version") == (None, None)
+
+    monkeypatch.setattr(ModrinthClient, "get_version", staticmethod(lambda _value: (_ for _ in ()).throw(RuntimeError("offline"))))
+    assert ModrinthPackInstaller._resolve_local_provider_metadata("version") == (None, None)

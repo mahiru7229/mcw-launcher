@@ -190,3 +190,7 @@ Schema 6 hỗ trợ palette màu chủ đạo trực tiếp trong `theme.json`. 
 `accent_assets` là opt-in: launcher chỉ tint những PNG được theme chủ động đánh dấu. Logo, artwork và icon không nằm trong danh sách sẽ giữ nguyên màu gốc. Theme schema 1–5 và theme schema 6 không có palette vẫn dùng fallback tương thích.
 
 Xem [`docs/THEME_RUNTIME_CONTRACT.md`](../docs/THEME_RUNTIME_CONTRACT.md) và [`docs/THEME_CREATION_GUIDE.md`](../docs/THEME_CREATION_GUIDE.md) để biết thứ tự ưu tiên màu, validation code và quy tắc tint asset.
+
+## Text palette (v1.0.1)
+
+Theme manifests may define `text_primary`, `text_muted`, `text_disabled`, and `text_inverse` inside `palette`. All four fields use `#RRGGBB`. They are optional and old themes receive backward-compatible defaults. A user custom text-color override affects only the primary text family; semantic status and selection colors stay independent.

@@ -111,9 +111,10 @@ class ModrinthPackInstaller:
         with zipfile.ZipFile(source, "r") as archive:
             index = ModrinthPackInstaller._read_index(archive)
         version_label = str(index.get("versionId") or index.get("name") or source.stem).strip()
-        project = SimpleNamespace(project_id="", title=str(index.get("name") or source.stem), icon_url="")
-        version = SimpleNamespace(version_id=version_label, version_number=version_label)
-        result = ModrinthPackInstaller._install_archive(project, version, source, normalized_name, install_optional_files, reporter, "", settings_override)
+        provider_project, provider_version = ModrinthPackInstaller._resolve_local_provider_metadata(version_label)
+        project = provider_project or SimpleNamespace(project_id="", title=str(index.get("name") or source.stem), icon_url="")
+        version = provider_version or SimpleNamespace(version_id=version_label, version_number=version_label)
+        result = ModrinthPackInstaller._install_archive(project, version, source, normalized_name, install_optional_files, reporter, "", settings_override, apply_provider_artwork=False)
         try:
             ProviderPackageStore.store_native_package(
                 result.instance,
@@ -121,17 +122,46 @@ class ModrinthPackInstaller:
                 provider="modrinth",
                 package_format="mrpack",
                 origin={
-                    "projectId": "",
-                    "versionId": version_label,
-                    "packName": project.title,
-                    "packVersion": version_label,
+                    "projectId": str(getattr(project, "project_id", "") or ""),
+                    "versionId": str(getattr(version, "version_id", version_label) or version_label),
+                    "packName": str(getattr(project, "title", "") or index.get("name") or source.stem),
+                    "packVersion": str(getattr(version, "version_number", version_label) or version_label),
                     "source": "local_import",
                 },
             )
         except Exception:
             InstanceManager.delete_instance(result.instance.name)
             raise
+        result = ModrinthPackInstaller._apply_local_archive_artwork(result, source, project, reporter)
         return result
+
+    @staticmethod
+    def _resolve_local_provider_metadata(version_id: str) -> tuple[object | None, object | None]:
+        """Resolve a local mrpack only when its version ID maps unambiguously."""
+        candidate = str(version_id or "").strip()
+        if not candidate:
+            return None, None
+        try:
+            version = ModrinthClient.get_version(candidate)
+            project = ModrinthClient.get_project(version.project_id)
+        except Exception:
+            return None, None
+        if str(getattr(project, "project_type", "")).casefold() != "modpack":
+            return None, None
+        return project, version
+
+    @staticmethod
+    def _apply_local_archive_artwork(result: ModrinthModpackInstallResult, source: Path, project: object, reporter: ProgressReporter | None) -> ModrinthModpackInstallResult:
+        instance = result.instance
+        try:
+            with zipfile.ZipFile(source, "r") as archive:
+                embedded = InstanceArtworkManager.apply_embedded_archive_artwork(instance, archive)
+            if not embedded and not InstanceArtworkManager.has_custom_artwork(InstanceManager.load(instance.name)):
+                InstanceArtworkManager.apply_provider_artwork(instance, "modrinth", getattr(project, "project_id", ""), getattr(project, "icon_url", ""), reporter)
+            refreshed = InstanceManager.load(instance.name)
+            return ModrinthModpackInstallResult(instance=refreshed, pack_name=result.pack_name, pack_version=result.pack_version, installed_files=result.installed_files, skipped_optional_files=result.skipped_optional_files, skipped_server_files=result.skipped_server_files)
+        except Exception:
+            return result
 
     @staticmethod
     def install_manual_archive(request: ModrinthModpackManualDownloadRequired, source: Path, reporter: ProgressReporter | None = None) -> ModrinthModpackInstallResult:
@@ -156,7 +186,7 @@ class ModrinthPackInstaller:
         return ModrinthPackInstaller._install_archive(project, version, pack_path, request.instance_name, request.install_optional_files, reporter, request.expected_loader, request.settings_override)
 
     @staticmethod
-    def _install_archive(project, version, pack_path: Path, normalized_name: str, install_optional_files: bool, reporter: ProgressReporter | None, expected_loader: str, settings_override: dict | None = None) -> ModrinthModpackInstallResult:
+    def _install_archive(project, version, pack_path: Path, normalized_name: str, install_optional_files: bool, reporter: ProgressReporter | None, expected_loader: str, settings_override: dict | None = None, apply_provider_artwork: bool = True) -> ModrinthModpackInstallResult:
         staging = Paths.modrinth_staging_root() / uuid4().hex
         staging.mkdir(parents=True, exist_ok=False)
         created_instance = None
@@ -184,7 +214,7 @@ class ModrinthPackInstaller:
             shutil.copytree(staging, created_instance.instance_dir, dirs_exist_ok=True)
             ModrinthPackInstaller._write_metadata(created_instance.instance_dir, project.project_id, version.version_id, project.title, version.version_number, minecraft_version, loader_name, loader_version, list(managed_files.values()), install_optional_files)
             ModProvenanceRegistry.synchronize(created_instance)
-            if InstanceArtworkManager.apply_provider_artwork(created_instance, "modrinth", project.project_id, getattr(project, "icon_url", ""), reporter):
+            if apply_provider_artwork and InstanceArtworkManager.apply_provider_artwork(created_instance, "modrinth", project.project_id, getattr(project, "icon_url", ""), reporter):
                 created_instance = InstanceManager.load(created_instance.name)
             return ModrinthModpackInstallResult(instance=created_instance, pack_name=project.title, pack_version=version.version_number, installed_files=len(selected_files), skipped_optional_files=skipped_optional, skipped_server_files=skipped_server)
         except Exception:

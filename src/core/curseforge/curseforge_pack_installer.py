@@ -68,6 +68,7 @@ class CurseForgePackInstaller:
             minecraft_version, loader_name, loader_version = CurseForgePackInstaller._parse_loader(manifest)
             pack_name = str(manifest.get("name") or source.stem).strip() or source.stem
             version_name = str(manifest.get("version") or manifest.get("versionName") or "Imported").strip() or "Imported"
+            provider_project_id = CurseForgePackInstaller._manifest_project_id(manifest)
             requested = str(instance_name or pack_name).strip()
             name = CurseForgePackInstaller._validated_instance_name(requested)
             if InstanceManager.is_instance_exist(name):
@@ -101,6 +102,7 @@ class CurseForgePackInstaller:
                     provider="curseforge",
                     package_format="curseforge_zip",
                     origin={
+                        "projectId": provider_project_id,
                         "packName": pack_name,
                         "packVersion": version_name,
                         "source": "local_import",
@@ -109,7 +111,34 @@ class CurseForgePackInstaller:
             except Exception:
                 InstanceManager.delete_instance(name)
                 raise
+            instance = CurseForgePackInstaller._apply_local_archive_artwork(instance, archive, provider_project_id, reporter)
         return CurseForgeModpackInstallResult(instance=instance, pack_name=pack_name, pack_version=version_name, managed_files=len(entries), skipped_optional_files=skipped)
+
+    @staticmethod
+    def _manifest_project_id(manifest: dict) -> int:
+        for key in ("projectID", "projectId", "project_id"):
+            try:
+                value = int(manifest.get(key) or 0)
+            except (TypeError, ValueError):
+                continue
+            if value > 0:
+                return value
+        return 0
+
+    @staticmethod
+    def _apply_local_archive_artwork(instance, archive: zipfile.ZipFile, project_id: int, reporter: ProgressReporter | None):
+        try:
+            embedded = InstanceArtworkManager.apply_embedded_archive_artwork(instance, archive)
+            if not embedded and project_id > 0 and not InstanceArtworkManager.has_custom_artwork(InstanceManager.load(instance.name)):
+                try:
+                    project = CurseForgeClient.get_project(project_id)
+                except Exception:
+                    project = None
+                if project is not None:
+                    InstanceArtworkManager.apply_provider_artwork(instance, "curseforge", project_id, getattr(project, "logo_url", ""), reporter)
+            return InstanceManager.load(instance.name)
+        except Exception:
+            return instance
 
     @staticmethod
     def install_manual_archive(request: CurseForgeModpackManualDownloadRequired, source: Path, reporter: ProgressReporter | None = None) -> CurseForgeModpackInstallResult:

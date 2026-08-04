@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QApplication
 
 from mcw_core.api.fs.paths import Paths
 from mcw_core.api.theme.theme_manager import ThemeDefinition, ThemeManager, theme_manager
-from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, ThemePaletteDefinition, derive_custom_accent, normalize_hex_color
+from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, ThemePaletteDefinition, derive_custom_accent, derive_custom_text, normalize_hex_color
 from src.gui.dark_theme import create_forced_dark_palette
 
 
@@ -18,6 +18,8 @@ class ThemeAccentRuntime:
         self._theme = self.manager.current
         self._mode = "theme"
         self._custom_color = DEFAULT_THEME_PALETTE.focus
+        self._text_mode = "theme"
+        self._custom_text_color = DEFAULT_THEME_PALETTE.text_primary
         self._palette = self._theme.palette
 
     @property
@@ -32,7 +34,7 @@ class ThemeAccentRuntime:
     def custom_color(self) -> str:
         return self._custom_color
 
-    def configure(self, theme: ThemeDefinition, mode: str = "theme", custom_color: str = "#8ed35b") -> ThemePaletteDefinition:
+    def configure(self, theme: ThemeDefinition, mode: str = "theme", custom_color: str = "#8ed35b", text_mode: str = "theme", custom_text_color: str = "#f4f4f4") -> ThemePaletteDefinition:
         normalized_mode = str(mode or "theme").strip().lower()
         self._theme = theme
         self._mode = normalized_mode if normalized_mode in {"theme", "custom"} else "theme"
@@ -40,12 +42,20 @@ class ThemeAccentRuntime:
             self._custom_color = normalize_hex_color(custom_color or "#8ed35b")
         except ValueError:
             self._custom_color = "#8ed35b"
-        self._palette = derive_custom_accent(theme.palette, self._custom_color) if self._mode == "custom" else theme.palette
+        self._text_mode = str(text_mode or "theme").strip().lower()
+        if self._text_mode not in {"theme", "custom"}:
+            self._text_mode = "theme"
+        try:
+            self._custom_text_color = normalize_hex_color(custom_text_color or DEFAULT_THEME_PALETTE.text_primary)
+        except ValueError:
+            self._custom_text_color = DEFAULT_THEME_PALETTE.text_primary
+        palette = derive_custom_accent(theme.palette, self._custom_color) if self._mode == "custom" else theme.palette
+        self._palette = derive_custom_text(palette, self._custom_text_color) if self._text_mode == "custom" else palette
         return self._palette
 
     @property
     def enabled(self) -> bool:
-        return self._mode == "custom" or "theme_palette" in self._theme.capabilities
+        return self._mode == "custom" or self._text_mode == "custom" or "theme_palette" in self._theme.capabilities
 
     def apply_application_palette(self, application: QApplication) -> None:
         if not self.enabled:
@@ -62,6 +72,12 @@ class ThemeAccentRuntime:
         palette.setColor(QPalette.ColorGroup.Inactive, QPalette.ColorRole.Highlight, QColor(colors.selection))
         palette.setColor(QPalette.ColorGroup.Active, QPalette.ColorRole.HighlightedText, QColor(colors.selection_text))
         palette.setColor(QPalette.ColorGroup.Inactive, QPalette.ColorRole.HighlightedText, QColor(colors.selection_text))
+        for role in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Text, QPalette.ColorRole.ButtonText):
+            palette.setColor(QPalette.ColorGroup.Active, role, QColor(colors.text_primary))
+            palette.setColor(QPalette.ColorGroup.Inactive, role, QColor(colors.text_primary))
+            palette.setColor(QPalette.ColorGroup.Disabled, role, QColor(colors.text_disabled))
+        palette.setColor(QPalette.ColorGroup.Active, QPalette.ColorRole.PlaceholderText, QColor(colors.text_muted))
+        palette.setColor(QPalette.ColorGroup.Inactive, QPalette.ColorRole.PlaceholderText, QColor(colors.text_muted))
         application.setPalette(palette)
 
     def stylesheet_rule(self) -> str:
@@ -69,6 +85,16 @@ class ThemeAccentRuntime:
             return ""
         colors = self._palette
         return f"""
+QWidget {{
+    color: {colors.text_primary};
+}}
+QLabel#MutedLabel, QLabel#CardSubtitle, QLabel#PageSubtitle, QLabel#SectionSubtitle, QLabel#TinyLabel {{
+    color: {colors.text_muted};
+}}
+QWidget:disabled, QPushButton:disabled, QCheckBox:disabled, QRadioButton:disabled,
+QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {{
+    color: {colors.text_disabled};
+}}
 QPushButton#PrimaryButton {{
     background-color: {colors.primary};
     color: {colors.primary_text};

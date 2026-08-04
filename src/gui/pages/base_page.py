@@ -1,5 +1,5 @@
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QLabel, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtCore import QTimer, Qt
+from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 from src.gui.widget.card_widget import CardWidget
 from src.gui.widget.settings_section import SettingsSection
@@ -68,13 +68,13 @@ class BasePage(QScrollArea):
         self._interaction_locked = False
         self._busy_overlay = _BusyPageOverlay(self)
 
-        title_label = QLabel(title)
-        title_label.setObjectName("PageTitle")
-        subtitle_label = QLabel(subtitle)
-        subtitle_label.setObjectName("PageSubtitle")
-        subtitle_label.setWordWrap(True)
-        self.root_layout.addWidget(title_label)
-        self.root_layout.addWidget(subtitle_label)
+        self.title_label = QLabel(title)
+        self.title_label.setObjectName("PageTitle")
+        self.subtitle_label = QLabel(subtitle)
+        self.subtitle_label.setObjectName("PageSubtitle")
+        self.subtitle_label.setWordWrap(True)
+        self.root_layout.addWidget(self.title_label)
+        self.root_layout.addWidget(self.subtitle_label)
 
     @property
     def interaction_locked(self) -> bool:
@@ -112,3 +112,33 @@ class BasePage(QScrollArea):
             section.set_compact_mode(self._compact)
         for card in self.findChildren(CardWidget):
             card.set_compact_mode(self._compact)
+
+    def scrollContentsBy(self, dx: int, dy: int) -> None:
+        super().scrollContentsBy(dx, dy)
+        self._refresh_scrolled_widgets()
+
+    def wheelEvent(self, event) -> None:
+        super().wheelEvent(event)
+        self._refresh_scrolled_widgets()
+
+    def _refresh_scrolled_widgets(self) -> None:
+        """Invalidate stale child regions after scrolling on Windows.
+
+        Qt's backing store can occasionally leave stylesheet-rendered buttons in
+        an old scroll region until hover triggers a repaint.  Updating the
+        viewport immediately and the buttons once more on the next event-loop
+        tick keeps their normal state visible without rebuilding the page.
+        """
+        self.viewport().update()
+        self.page_viewport.update()
+        buttons = tuple(self.page_viewport.findChildren(QPushButton))
+        for button in buttons:
+            button.update()
+        QTimer.singleShot(0, lambda controls=buttons: self._update_controls(controls))
+
+    @staticmethod
+    def _update_controls(controls: tuple[QPushButton, ...]) -> None:
+        for control in controls:
+            if control is not None:
+                control.update()
+

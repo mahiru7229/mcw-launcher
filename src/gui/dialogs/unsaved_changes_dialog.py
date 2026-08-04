@@ -26,6 +26,15 @@ def prompt_unsaved_changes(parent: QWidget | None, scope: str) -> UnsavedChanges
     )
     box.setDefaultButton(QMessageBox.StandardButton.Save)
     box.setEscapeButton(QMessageBox.StandardButton.Cancel)
+    labels = {
+        QMessageBox.StandardButton.Save: tr("common.save"),
+        QMessageBox.StandardButton.Discard: tr("common.discard"),
+        QMessageBox.StandardButton.Cancel: tr("common.cancel"),
+    }
+    for standard_button, label in labels.items():
+        button = box.button(standard_button)
+        if button is not None:
+            button.setText(label)
 
     result = box.exec()
     if result == QMessageBox.StandardButton.Save:

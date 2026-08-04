@@ -713,6 +713,22 @@
           "pattern": "^#[0-9A-Fa-f]{6}$",
           "type": "string"
         },
+        "text_disabled": {
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "type": "string"
+        },
+        "text_inverse": {
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "type": "string"
+        },
+        "text_muted": {
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "type": "string"
+        },
+        "text_primary": {
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "type": "string"
+        },
         "warning": {
           "pattern": "^#[0-9A-Fa-f]{6}$",
           "type": "string"

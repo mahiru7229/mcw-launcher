@@ -844,6 +844,8 @@ class InstanceWorkspacePage(BasePage):
             self._confirm_delete()
 
     def retranslate_dynamic(self) -> None:
+        self.title_label.setText(tr("workspace.page.title"))
+        self.subtitle_label.setText(tr("workspace.page.subtitle"))
         self.add_button.setText(tr("workspace.toolbar.add"))
         self.import_button.setText(tr("workspace.toolbar.import"))
         self.modrinth_button.setText(tr("workspace.toolbar.modrinth"))

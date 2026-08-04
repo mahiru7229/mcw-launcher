@@ -169,7 +169,7 @@ def test_search_filters_private_projects_and_release_channels(monkeypatch, tmp_p
     versions = FTBClient.list_versions(25, ("release", "beta"), force_refresh=False)
 
     assert [project.project_id for project in result.projects] == [25]
-    assert [version.release_type for version in versions] == ["release", "beta"]
+    assert [version.release_type for version in versions] == ["beta", "release"]
     client.close()
 
 
@@ -190,3 +190,16 @@ def test_stale_cache_is_returned_when_both_official_endpoints_fail(monkeypatch, 
     assert first.project_id == fallback.project_id == 25
     assert FTBClient.cache_status().last_error
     client.close()
+
+
+def test_list_versions_uses_version_id_as_newest_fallback(monkeypatch) -> None:
+    versions = (
+        FTBClient._parse_version_summary({"id": 100, "name": "Old", "type": "release", "updated": 0}),
+        FTBClient._parse_version_summary({"id": 300, "name": "New", "type": "release", "updated": 0}),
+        FTBClient._parse_version_summary({"id": 200, "name": "Middle", "type": "release", "updated": 0}),
+    )
+    monkeypatch.setattr(FTBClient, "get_project", staticmethod(lambda *_args, **_kwargs: type("Project", (), {"versions": versions})()))
+
+    result = FTBClient.list_versions(1, ("release",))
+
+    assert [item.version_id for item in result] == [300, 200, 100]

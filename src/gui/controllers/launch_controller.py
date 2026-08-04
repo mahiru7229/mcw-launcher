@@ -10,7 +10,7 @@ from mcw_core.api.package.portable_content_manager import PortableManualDownload
 from src.gui.controllers.base_controller import BaseController
 from src.gui.presenters.launch_error_presenter import LaunchErrorPresenter
 from src.gui.task_runner import TaskRunner
-from mcw_core import LaunchRequest, ProgressEvent, get_default_core, is_download_cancelled, is_download_paused
+from mcw_core import CompatibilityConfirmationRequired, LaunchRequest, ProgressEvent, get_default_core, is_download_cancelled, is_download_paused
 
 
 class LaunchController(BaseController):
@@ -23,6 +23,7 @@ class LaunchController(BaseController):
     cancel_requested = Signal()
     launch_cancelled = Signal()
     portable_manual_download_required = Signal(object)
+    compatibility_confirmation_required = Signal(object)
 
     TASK_ID = "minecraft.launch"
 
@@ -49,7 +50,7 @@ class LaunchController(BaseController):
     def set_debug_mode(self, enabled: bool) -> None:
         self._debug_mode = enabled
 
-    def launch(self) -> None:
+    def launch(self, allow_compatibility_issues_once: bool = False) -> None:
         if self._task_runner.is_task_active(self.TASK_ID):
             if self._core.operations.state.paused:
                 self.resume()
@@ -79,6 +80,7 @@ class LaunchController(BaseController):
                         debug_mode=debug_mode,
                         on_progress=self._on_progress,
                         on_exit=self._on_game_exit,
+                        allow_compatibility_issues_once=allow_compatibility_issues_once,
                     )
                 )
                 return result.as_dict()
@@ -177,6 +179,12 @@ class LaunchController(BaseController):
             self.launch_paused.emit()
             self.status_changed.emit(tr("launch.paused"))
             self.log_created.emit(tr("launch.paused_log"))
+            return
+
+        if isinstance(error, CompatibilityConfirmationRequired):
+            self.compatibility_confirmation_required.emit(error)
+            self.status_changed.emit(tr("compatibility.confirmation.required"))
+            self.log_created.emit(f"CompatibilityConfirmationRequired: {len(error.issues)} issue(s)")
             return
 
         if isinstance(error, PortableManualDownloadRequired):

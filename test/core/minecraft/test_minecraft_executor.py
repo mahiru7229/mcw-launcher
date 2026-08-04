@@ -19,6 +19,7 @@ from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.minecraft.minecraft_executor import MinecraftExecutor
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManager
+from src.core.modloader.forge.compatibility_confirmation import CompatibilityConfirmationRequired
 from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.runtime.process_supervisor import ProcessSupervisor
@@ -1007,7 +1008,7 @@ def test_run_allows_forge_compatibility_errors_when_instance_policy_allows(monke
     result = MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object())
 
     assert result["minecraftVersion"] == pipeline["version"].id
-    assert "warnings" not in result
+    assert any("missing dependency" in warning for warning in result.get("warnings", ()))
 
 
 def test_run_stops_started_process_when_supervision_registration_fails(monkeypatch: pytest.MonkeyPatch):
@@ -1046,3 +1047,57 @@ def test_run_stops_started_process_when_supervision_registration_fails(monkeypat
     assert process.terminated is True
     assert lock.released is True
     assert aborted and aborted[0][0] == "session-id"
+
+
+def test_run_asks_before_bypassing_forge_compatibility_errors(monkeypatch: pytest.MonkeyPatch):
+    patch_pipeline(monkeypatch)
+    settings = SimpleNamespace(
+        forge_preflight_failure_policy="ask",
+        modrinth_failure_policy="inherit",
+        curseforge_failure_policy="inherit",
+    )
+    issue = SimpleNamespace(severity="error", code="dependency-missing", message="Create requires Flywheel.")
+    report = SimpleNamespace(errors=(issue,), warnings=(), warning_count=0, loader="forge")
+    monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
+    monkeypatch.setattr(ForgePreflightManager, "scan", lambda instance, version, verify_files=False: report)
+
+    with pytest.raises(CompatibilityConfirmationRequired) as raised:
+        MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object())
+
+    assert raised.value.instance_name == "Test Instance"
+    assert raised.value.issues == (issue,)
+
+
+def test_run_can_bypass_compatibility_errors_once_without_changing_policy(monkeypatch: pytest.MonkeyPatch):
+    pipeline = patch_pipeline(monkeypatch)
+    settings = SimpleNamespace(
+        forge_preflight_failure_policy="ask",
+        modrinth_failure_policy="inherit",
+        curseforge_failure_policy="inherit",
+    )
+    issue = SimpleNamespace(severity="error", code="dependency-version", message="A dependency version may be incompatible.")
+    report = SimpleNamespace(errors=(issue,), warnings=(), warning_count=0, loader="forge")
+    monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
+    monkeypatch.setattr(ForgePreflightManager, "scan", lambda instance, version, verify_files=False: report)
+    monkeypatch.setattr(ForgePreflightManager, "validate_runtime_files", lambda instance, version: ())
+
+    result = MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object(), allow_compatibility_issues_once=True)
+
+    assert result["minecraftVersion"] == pipeline["version"].id
+    assert "A dependency version may be incompatible." in result["warnings"]
+
+
+def test_hard_loader_installation_errors_cannot_be_bypassed(monkeypatch: pytest.MonkeyPatch):
+    patch_pipeline(monkeypatch)
+    settings = SimpleNamespace(
+        forge_preflight_failure_policy="allow",
+        modrinth_failure_policy="inherit",
+        curseforge_failure_policy="inherit",
+    )
+    issue = SimpleNamespace(severity="error", code="forge-installation", message="Forge runtime is damaged.")
+    report = SimpleNamespace(errors=(issue,), warnings=(), warning_count=0, loader="forge")
+    monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
+    monkeypatch.setattr(ForgePreflightManager, "scan", lambda instance, version, verify_files=False: report)
+
+    with pytest.raises(RuntimeError, match="Forge runtime is damaged"):
+        MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object(), allow_compatibility_issues_once=True)

@@ -76,7 +76,7 @@ def test_local_resource_pack_lifecycle_persists_metadata(instance: Instance, tmp
 
     assert result.file_name == "pretty.zip"
     assert result.replaced is False
-    assert (instance.instance_dir / "minecraft" / "resourcepacks" / "pretty.zip").is_file()
+    assert (instance.instance_dir / "resourcepacks" / "pretty.zip").is_file()
     assert len(entries) == 1
     entry = entries[0]
     assert entry.provider == "local"
@@ -84,21 +84,21 @@ def test_local_resource_pack_lifecycle_persists_metadata(instance: Instance, tmp
     assert entry.pack_description == "Pretty"
     assert len(entry.sha1) == 40
     assert len(entry.sha512) == 128
-    assert entry.target_path == "minecraft/resourcepacks/pretty.zip"
+    assert entry.target_path == "resourcepacks/pretty.zip"
 
     disabled = ContentPackManager.set_enabled(instance, entry.entry_id, False)
     assert disabled.enabled is False
-    assert (instance.instance_dir / "minecraft" / "resourcepacks" / ".disabled" / "pretty.zip").is_file()
-    assert not (instance.instance_dir / "minecraft" / "resourcepacks" / "pretty.zip").exists()
+    assert (instance.instance_dir / "resourcepacks" / ".disabled" / "pretty.zip").is_file()
+    assert not (instance.instance_dir / "resourcepacks" / "pretty.zip").exists()
 
     enabled = ContentPackManager.set_enabled(instance, entry.entry_id, True)
     assert enabled.enabled is True
-    assert (instance.instance_dir / "minecraft" / "resourcepacks" / "pretty.zip").is_file()
+    assert (instance.instance_dir / "resourcepacks" / "pretty.zip").is_file()
 
     removed = ContentPackManager.remove(instance, entry.entry_id)
     assert removed.entry_id == entry.entry_id
     assert ContentPackManager.list_entries(instance, "resourcepack") == []
-    assert not (instance.instance_dir / "minecraft" / "resourcepacks" / "pretty.zip").exists()
+    assert not (instance.instance_dir / "resourcepacks" / "pretty.zip").exists()
 
 
 def test_same_file_name_never_overwrites_unrelated_local_pack(instance: Instance, tmp_path: Path) -> None:
@@ -124,8 +124,8 @@ def test_provider_project_update_replaces_old_binary(instance: Instance, tmp_pat
 
     assert first_result.replaced is False
     assert second_result.replaced is True
-    assert not (instance.instance_dir / "minecraft" / "resourcepacks" / "project-v1.zip").exists()
-    assert (instance.instance_dir / "minecraft" / "resourcepacks" / "project-v2.zip").is_file()
+    assert not (instance.instance_dir / "resourcepacks" / "project-v1.zip").exists()
+    assert (instance.instance_dir / "resourcepacks" / "project-v2.zip").is_file()
     entries = ContentPackManager.list_entries(instance, "resourcepack")
     assert len(entries) == 1
     assert entries[0].version_id == "version-2"
@@ -136,8 +136,8 @@ def test_toggle_registry_failure_rolls_back_file_move(instance: Instance, tmp_pa
     source = write_resource_pack(tmp_path / "toggle.zip")
     result = ContentPackManager.import_local(instance, "resourcepack", source)
     entry = ContentPackManager.list_entries(instance, "resourcepack")[0]
-    active = instance.instance_dir / "minecraft" / "resourcepacks" / result.file_name
-    disabled = instance.instance_dir / "minecraft" / "resourcepacks" / ".disabled" / result.file_name
+    active = instance.instance_dir / "resourcepacks" / result.file_name
+    disabled = instance.instance_dir / "resourcepacks" / ".disabled" / result.file_name
 
     monkeypatch.setattr(ContentPackRegistry, "upsert", classmethod(lambda cls, _instance, _entry: (_ for _ in ()).throw(OSError("registry failed"))))
 
@@ -152,13 +152,13 @@ def test_toggle_does_not_overwrite_destination_collision(instance: Instance, tmp
     source = write_resource_pack(tmp_path / "collision.zip")
     result = ContentPackManager.import_local(instance, "resourcepack", source)
     entry = ContentPackManager.list_entries(instance, "resourcepack")[0]
-    disabled = instance.instance_dir / "minecraft" / "resourcepacks" / ".disabled" / result.file_name
+    disabled = instance.instance_dir / "resourcepacks" / ".disabled" / result.file_name
     write_resource_pack(disabled, payload=b"unrelated")
 
     with pytest.raises(RuntimeError, match="already exists"):
         ContentPackManager.set_enabled(instance, entry.entry_id, False)
 
-    assert (instance.instance_dir / "minecraft" / "resourcepacks" / result.file_name).is_file()
+    assert (instance.instance_dir / "resourcepacks" / result.file_name).is_file()
     assert disabled.is_file()
 
 
@@ -170,13 +170,13 @@ def test_registry_failure_rolls_back_new_file(instance: Instance, tmp_path: Path
     with pytest.raises(OSError, match="registry failed"):
         ContentPackManager.import_local(instance, "shader", source)
 
-    assert not (instance.instance_dir / "minecraft" / "shaderpacks" / "rollback.zip").exists()
-    assert not list((instance.instance_dir / "minecraft" / "shaderpacks").glob("*.installing.zip"))
+    assert not (instance.instance_dir / "shaderpacks" / "rollback.zip").exists()
+    assert not list((instance.instance_dir / "shaderpacks").glob("*.installing.zip"))
 
 
 def test_existing_content_files_are_discovered_without_reimport(instance: Instance) -> None:
-    active = write_resource_pack(instance.instance_dir / "minecraft" / "resourcepacks" / "manual.zip", pack_format=35)
-    disabled = write_shader_pack(instance.instance_dir / "minecraft" / "shaderpacks" / ".disabled" / "manual-shader.zip")
+    active = write_resource_pack(instance.instance_dir / "resourcepacks" / "manual.zip", pack_format=35)
+    disabled = write_shader_pack(instance.instance_dir / "shaderpacks" / ".disabled" / "manual-shader.zip")
 
     resource_entries = ContentPackManager.list_entries(instance, "resourcepack")
     shader_entries = ContentPackManager.list_entries(instance, "shader")
@@ -204,3 +204,68 @@ def test_content_paths_and_urls_are_sanitized(tmp_path: Path, monkeypatch: pytes
     assert ContentPackManager._safe_https_url("https://cdn.example/file.zip?token=secret#fragment") == "https://cdn.example/file.zip"
     assert ContentPackManager._safe_https_url("https://user:secret@cdn.example/file.zip") == ""
     assert ContentPackManager._safe_https_url("http://cdn.example/file.zip") == ""
+
+
+def test_migrates_v100_content_paths_without_overwriting_conflicts(instance: Instance) -> None:
+    legacy_active = write_resource_pack(instance.instance_dir / "minecraft" / "resourcepacks" / "legacy.zip", payload=b"legacy")
+    legacy_disabled = write_resource_pack(instance.instance_dir / "minecraft" / "resourcepacks" / ".disabled" / "disabled.zip", payload=b"disabled")
+    conflict = write_resource_pack(instance.instance_dir / "resourcepacks" / "conflict.zip", payload=b"new")
+    legacy_conflict = write_resource_pack(instance.instance_dir / "minecraft" / "resourcepacks" / "conflict.zip", payload=b"old")
+
+    result = ContentPackManager.migrate_legacy_location(instance, "resourcepack")
+
+    assert set(result["moved"]) == {"legacy.zip", ".disabled/disabled.zip"}
+    assert result["skipped"] == ("conflict.zip",)
+    assert not legacy_active.exists()
+    assert not legacy_disabled.exists()
+    assert (instance.instance_dir / "resourcepacks" / "legacy.zip").is_file()
+    assert (instance.instance_dir / "resourcepacks" / ".disabled" / "disabled.zip").is_file()
+    assert conflict.read_bytes() != legacy_conflict.read_bytes()
+    assert legacy_conflict.is_file()
+
+
+def test_migration_normalizes_legacy_registry_target(instance: Instance, tmp_path: Path) -> None:
+    source = write_shader_pack(tmp_path / "registry.zip")
+    ContentPackManager.import_local(instance, "shader", source)
+    entry = ContentPackRegistry.entries(instance, "shader")[0]
+    from dataclasses import replace
+
+    ContentPackRegistry.upsert(instance, replace(entry, target_path="minecraft/shaderpacks/registry.zip"))
+
+    result = ContentPackManager.migrate_legacy_location(instance, "shader")
+    updated = ContentPackRegistry.entries(instance, "shader")[0]
+
+    assert result["updatedRegistryEntries"] == 1
+    assert updated.target_path == "shaderpacks/registry.zip"
+
+
+def test_new_pack_can_be_added_while_minecraft_is_running(instance: Instance, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = write_resource_pack(tmp_path / "while-running.zip")
+    monkeypatch.setattr(InstanceRunLock, "is_active", classmethod(lambda cls, _instance: True))
+
+    result = ContentPackManager.import_local(instance, "resourcepack", source)
+
+    assert result.file_name == "while-running.zip"
+    assert (instance.instance_dir / "resourcepacks" / "while-running.zip").is_file()
+
+
+def test_destructive_pack_changes_are_blocked_while_running(instance: Instance, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = write_shader_pack(tmp_path / "active.zip")
+    ContentPackManager.import_local(instance, "shader", source)
+    entry = ContentPackRegistry.entries(instance, "shader")[0]
+    monkeypatch.setattr(InstanceRunLock, "is_active", classmethod(lambda cls, _instance: True))
+
+    with pytest.raises(RuntimeError, match="currently be in use"):
+        ContentPackManager.set_enabled(instance, entry.entry_id, False)
+    with pytest.raises(RuntimeError, match="currently be in use"):
+        ContentPackManager.remove(instance, entry.entry_id)
+
+
+def test_provider_replacement_is_blocked_while_running(instance: Instance, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    first = write_resource_pack(tmp_path / "provider-v1.zip", payload=b"one")
+    second = write_resource_pack(tmp_path / "provider-v2.zip", payload=b"two")
+    ContentPackManager._install_verified_file(instance, "resourcepack", first, "modrinth", "project", "v1", "one", "Pack", "1", "", "", 0, "", "")
+    monkeypatch.setattr(InstanceRunLock, "is_active", classmethod(lambda cls, _instance: True))
+
+    with pytest.raises(RuntimeError, match="cannot be replaced"):
+        ContentPackManager._install_verified_file(instance, "resourcepack", second, "modrinth", "project", "v2", "two", "Pack", "2", "", "", 0, "", "")

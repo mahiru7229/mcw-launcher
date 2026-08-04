@@ -288,7 +288,11 @@
     "link": "#8ed35b",
     "success": "#8ed35b",
     "warning": "#d6a93c",
-    "error": "#c47a7a"
+    "error": "#c47a7a",
+    "text_primary": "#f4f4f4",
+    "text_muted": "#b8b8b8",
+    "text_disabled": "#777777",
+    "text_inverse": "#111111"
   },
   "accent_assets": [
     "button.primary",

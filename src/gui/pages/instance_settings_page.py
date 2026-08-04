@@ -467,6 +467,7 @@ class InstanceSettingsPage(BasePage):
     def _populate_forge_preflight_policy_combo(combo: QComboBox) -> None:
         combo.clear()
         combo.addItem(tr("forge_preflight.policy.inherit"), ManagedContentPolicy.INHERIT)
+        combo.addItem(tr("forge_preflight.policy.ask"), ManagedContentPolicy.ASK)
         combo.addItem(tr("forge_preflight.policy.block"), ManagedContentPolicy.BLOCK)
         combo.addItem(tr("forge_preflight.policy.allow"), ManagedContentPolicy.ALLOW)
 

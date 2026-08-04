@@ -356,3 +356,20 @@ Theme schema 6 có thể khai báo `palette` để Theme Studio và launcher hi�
 ```
 
 Không thêm logo, ảnh nhân vật hoặc background vào danh sách nếu không muốn launcher nhuộm chúng. Trong Launcher Settings, **Dùng màu của theme** sử dụng `palette`; **Dùng màu tùy chỉnh** ghi đè nhóm primary nhưng giữ success/warning/error của theme.
+
+## 16. Màu chữ trong v1.0.1
+
+Theme schema 6 có thể khai báo nhóm màu chữ:
+
+```json
+{
+  "palette": {
+    "text_primary": "#f4f4f4",
+    "text_muted": "#b8b8b8",
+    "text_disabled": "#777777",
+    "text_inverse": "#111111"
+  }
+}
+```
+
+Các field đều không bắt buộc để theme cũ tiếp tục hoạt động. Hãy giữ `text_primary` đủ tương phản với nền chính. Không dùng các field này để thay thế màu `success`, `warning`, `error`, `link`, `selection_text` hoặc `primary_text`, vì những màu đó mang ý nghĩa riêng trong giao diện.

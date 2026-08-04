@@ -21,6 +21,7 @@ from src.core.minecraft.launcher_manager import LauncherManager
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManager
+from src.core.modloader.forge.compatibility_confirmation import CompatibilityConfirmationRequired
 from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
 from src.core.ftb.ftb_content_manager import FTBContentManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
@@ -52,7 +53,7 @@ class MinecraftExecutor:
         return loader(version=version, reporter=reporter)
 
     @staticmethod
-    def run(instance: Instance, authentication: Authentication, account: Account, debug_mode: bool = False, on_progress: ProgressCallback | None = None, on_exit: Callable[[GameExitResult], None] | None = None) -> dict:
+    def run(instance: Instance, authentication: Authentication, account: Account, debug_mode: bool = False, on_progress: ProgressCallback | None = None, on_exit: Callable[[GameExitResult], None] | None = None, allow_compatibility_issues_once: bool = False) -> dict:
         run_lock = InstanceRunLock.acquire(instance)
         process_started = False
         process = None
@@ -77,7 +78,7 @@ class MinecraftExecutor:
             launcher_settings = LauncherSettingsManager().load()
             block_modrinth_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "modrinth")
             block_curseforge_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "curseforge")
-            block_forge_preflight_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "forge_preflight")
+            forge_preflight_policy = ManagedContentPolicy.resolve(settings, launcher_settings, "forge_preflight")
             launch_lock_token = getattr(run_lock, "token", None)
             PortableContentManager.ensure(instance)
             PortableContentManager.prefetch_referenced(instance, reporter)
@@ -95,10 +96,17 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             forge_preflight = ForgePreflightManager.scan(instance, version, verify_files=False)
-            if block_forge_preflight_failure:
-                ForgePreflightManager.raise_for_errors(forge_preflight)
-            else:
-                ForgePreflightManager.raise_for_errors(forge_preflight, False)
+            # Loader/runtime installation failures are never bypassable.
+            ForgePreflightManager.raise_for_errors(forge_preflight, False)
+            compatibility_errors = tuple(
+                issue for issue in getattr(forge_preflight, "errors", ())
+                if issue.code not in {"forge-installation", "neoforge-installation"}
+            )
+            if compatibility_errors:
+                if forge_preflight_policy == ManagedContentPolicy.BLOCK:
+                    ForgePreflightManager.raise_for_errors(forge_preflight, True)
+                if forge_preflight_policy == ManagedContentPolicy.ASK and not allow_compatibility_issues_once:
+                    raise CompatibilityConfirmationRequired(instance.name, forge_preflight)
 
             reporter.status(stage=ProgressStage.DOWNLOADING_CLIENT, message="Checking Minecraft client...")
             MinecraftExecutor._load_with_fast_verification(DownloadClientManager.load, version, reporter, verification_cache)
@@ -167,7 +175,12 @@ class MinecraftExecutor:
                 "minecraftJavaMajorVersion": java_major,
                 "minecraftVersion": version.id,
             }
-            forge_warnings = tuple(issue.message for issue in forge_preflight.warnings)
+            bypassed_compatibility = tuple(
+                issue.message for issue in getattr(forge_preflight, "errors", ())
+                if issue.code not in {"forge-installation", "neoforge-installation"}
+                and (forge_preflight_policy == ManagedContentPolicy.ALLOW or allow_compatibility_issues_once)
+            )
+            forge_warnings = tuple(issue.message for issue in forge_preflight.warnings) + bypassed_compatibility
             warnings = tuple(modrinth_warnings) + tuple(curseforge_warnings) + tuple(ftb_warnings) + forge_warnings
             if warnings:
                 result["warnings"] = warnings

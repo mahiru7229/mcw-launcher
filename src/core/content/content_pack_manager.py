@@ -41,7 +41,6 @@ class ContentPackManager:
     @classmethod
     def install_modrinth(cls, instance: Instance, content_type: str, version_id: str, reporter: ProgressReporter | None = None) -> ContentPackInstallResult:
         kind = cls.normalize_type(content_type)
-        cls._assert_available(instance)
         version = ModrinthClient.get_version(version_id)
         project = ModrinthClient.get_project(version.project_id)
         if project.project_type != kind:
@@ -71,7 +70,6 @@ class ContentPackManager:
     @classmethod
     def install_curseforge(cls, instance: Instance, content_type: str, file: CurseForgeFile, project_name: str = "", project_url: str = "", reporter: ProgressReporter | None = None) -> ContentPackInstallResult:
         kind = cls.normalize_type(content_type)
-        cls._assert_available(instance)
         name = str(project_name).strip() or f"CurseForge project {file.project_id}"
         canonical_url = str(project_url).strip() or cls.curseforge_project_url(kind, file.project_id)
         cache_path = cls._cache_path("curseforge", kind, str(file.project_id), str(file.file_id), file.file_name)
@@ -96,7 +94,6 @@ class ContentPackManager:
     @classmethod
     def import_local(cls, instance: Instance, content_type: str, source: Path) -> ContentPackInstallResult:
         kind = cls.normalize_type(content_type)
-        cls._assert_available(instance)
         path = Path(source)
         if not path.is_file():
             raise RuntimeError(f"Content file does not exist: {path}")
@@ -120,7 +117,7 @@ class ContentPackManager:
 
     @classmethod
     def set_enabled(cls, instance: Instance, entry_id: str, enabled: bool) -> ContentPackEntry:
-        cls._assert_available(instance)
+        cls._assert_destructive_change_allowed(instance)
         entries = {entry.entry_id: entry for entry in ContentPackRegistry.entries(instance)}
         entry = entries.get(str(entry_id).strip())
         if entry is None:
@@ -148,7 +145,7 @@ class ContentPackManager:
 
     @classmethod
     def remove(cls, instance: Instance, entry_id: str) -> ContentPackEntry:
-        cls._assert_available(instance)
+        cls._assert_destructive_change_allowed(instance)
         entry = next((item for item in ContentPackRegistry.entries(instance) if item.entry_id == str(entry_id).strip()), None)
         if entry is None:
             raise RuntimeError("The selected content pack is no longer registered.")
@@ -160,11 +157,79 @@ class ContentPackManager:
 
     @classmethod
     def destination_dir(cls, instance: Instance, content_type: str) -> Path:
+        """Return the canonical Minecraft content directory for an instance.
+
+        Instance directories are already the Minecraft game directory in MCW.  The
+        v1.0.0 implementation accidentally added an extra ``minecraft`` segment.
+        v1.0.1 migrates that legacy location before returning the canonical path.
+        """
         kind = cls.normalize_type(content_type)
-        folder = "resourcepacks" if kind == cls.RESOURCE_PACK else "shaderpacks"
-        path = Path(instance.instance_dir) / "minecraft" / folder
+        cls.migrate_legacy_location(instance, kind)
+        path = cls._destination_path(instance, kind)
         path.mkdir(parents=True, exist_ok=True)
         return path
+
+    @classmethod
+    def migrate_legacy_location(cls, instance: Instance, content_type: str = "") -> dict[str, object]:
+        """Move v1.0.0 content from ``minecraft/<folder>`` to ``<folder>``.
+
+        The migration is idempotent and never overwrites an existing destination.
+        Conflicting files are left in the legacy folder and reported as skipped.
+        Registry paths are normalized even when no files need to be moved.
+        """
+        kinds = (cls.normalize_type(content_type),) if content_type else tuple(sorted(cls.SUPPORTED_TYPES))
+        moved: list[str] = []
+        skipped: list[str] = []
+        updated_entries = 0
+        for kind in kinds:
+            destination = cls._destination_path(instance, kind)
+            legacy = cls._legacy_destination_path(instance, kind)
+            destination.mkdir(parents=True, exist_ok=True)
+            if legacy.is_dir() and legacy.resolve(strict=False) != destination.resolve(strict=False):
+                for source in sorted(legacy.rglob("*"), key=lambda path: (len(path.parts), path.as_posix().casefold())):
+                    if not source.is_file() or source.is_symlink():
+                        continue
+                    relative = source.relative_to(legacy)
+                    target = destination / relative
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    if target.exists():
+                        skipped.append(relative.as_posix())
+                        continue
+                    source.replace(target)
+                    moved.append(relative.as_posix())
+                cls._remove_empty_tree(legacy)
+
+            for entry in ContentPackRegistry.entries(instance, kind):
+                normalized = cls._relative_target(kind, entry.file_name, entry.enabled)
+                if cls._normalized_relative_path(entry.target_path) == cls._normalized_relative_path(normalized):
+                    continue
+                ContentPackRegistry.upsert(instance, replace(entry, target_path=normalized))
+                updated_entries += 1
+        return {"moved": tuple(moved), "skipped": tuple(skipped), "updatedRegistryEntries": updated_entries}
+
+    @classmethod
+    def _destination_path(cls, instance: Instance, content_type: str) -> Path:
+        folder = "resourcepacks" if cls.normalize_type(content_type) == cls.RESOURCE_PACK else "shaderpacks"
+        return Path(instance.instance_dir) / folder
+
+    @classmethod
+    def _legacy_destination_path(cls, instance: Instance, content_type: str) -> Path:
+        folder = "resourcepacks" if cls.normalize_type(content_type) == cls.RESOURCE_PACK else "shaderpacks"
+        return Path(instance.instance_dir) / "minecraft" / folder
+
+    @staticmethod
+    def _remove_empty_tree(root: Path) -> None:
+        if not root.is_dir():
+            return
+        for directory in sorted((path for path in root.rglob("*") if path.is_dir()), key=lambda path: len(path.parts), reverse=True):
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
+        try:
+            root.rmdir()
+        except OSError:
+            pass
 
     @classmethod
     def validate_archive(cls, source: Path, content_type: str) -> dict[str, object]:
@@ -262,6 +327,11 @@ class ContentPackManager:
             source_is_destination = cls._same_path(source_path, destination)
 
         replaced = previous is not None
+        if InstanceRunLock.is_active(instance) and (replaced or destination.exists()):
+            raise RuntimeError(
+                "Minecraft is running. New resource packs and shader packs may be added, "
+                "but an existing pack cannot be replaced until the game is closed."
+            )
         staging = destination.with_name(f".{destination.stem}.{uuid4().hex}.installing.zip")
         backup = destination.with_name(f".{destination.stem}.{uuid4().hex}.backup.zip")
         staging.unlink(missing_ok=True)
@@ -380,9 +450,12 @@ class ContentPackManager:
         return str(value).replace("\\", "/").strip("/").casefold()
 
     @staticmethod
-    def _assert_available(instance: Instance) -> None:
+    def _assert_destructive_change_allowed(instance: Instance) -> None:
         if InstanceRunLock.is_active(instance):
-            raise RuntimeError("Close Minecraft before changing resource packs or shader packs.")
+            raise RuntimeError(
+                "Close Minecraft before disabling, enabling, removing, or replacing a resource pack or shader pack. "
+                "The selected content may currently be in use."
+            )
 
     @staticmethod
     def _hashes(path: Path) -> tuple[str, str, int]:
@@ -492,8 +565,8 @@ class ContentPackManager:
     def _relative_target(content_type: str, file_name: str, enabled: bool) -> str:
         folder = "resourcepacks" if content_type == ContentPackManager.RESOURCE_PACK else "shaderpacks"
         if enabled:
-            return f"minecraft/{folder}/{file_name}"
-        return f"minecraft/{folder}/.disabled/{file_name}"
+            return f"{folder}/{file_name}"
+        return f"{folder}/.disabled/{file_name}"
 
     @classmethod
     def _cache_path(cls, provider: str, content_type: str, project_id: str, version_id: str, file_name: str) -> Path:
