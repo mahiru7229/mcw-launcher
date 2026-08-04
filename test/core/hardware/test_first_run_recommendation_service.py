@@ -29,7 +29,7 @@ def test_inspect_returns_conservative_ram_and_prefers_java_21(monkeypatch) -> No
     assert result.recommended_min_memory_mb == 1024
     assert result.recommended_max_memory_mb == 6144
     assert result.java_majors == (8, 17, 21)
-    assert result.recommended_java_path.endswith("Java21/bin/javaw.exe")
+    assert Path(result.recommended_java_path).as_posix().endswith("Java21/bin/javaw.exe")
 
 
 def test_ram_recommendation_respects_available_and_physical_limits() -> None:

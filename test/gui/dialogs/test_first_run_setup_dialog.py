@@ -28,7 +28,7 @@ def test_first_run_setup_only_enables_gpu_option_when_dgpu_is_detected(gui_app) 
     dialog.prefer_dedicated_gpu.setChecked(True)
     selected = dialog.selected_settings()
     assert selected["launch"]["prefer_dedicated_gpu"] is True
-    assert selected["onboarding"] == {"completed": True, "version": 1}
+    assert selected["onboarding"] == {"completed": True, "version": FirstRunSetupDialog.SETUP_VERSION}
 
 
 def test_first_run_setup_disables_gpu_option_without_dgpu(gui_app) -> None:

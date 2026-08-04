@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from src.config import VERSION_TAG
+import tools.release_preflight as release_preflight
 from tools.release_preflight import audit_language_packs, audit_private_gateway_bundling, audit_theme_contract, find_merge_markers
 
 
@@ -69,26 +70,32 @@ def test_private_gateway_audit_rejects_unexpected_or_secret_configuration(tmp_pa
 
     errors = audit_private_gateway_bundling(tmp_path)
 
-    assert any("legacy private gateway constants" in error for error in errors)
-    assert "src/config.py contains an unexpected CurseForge default gateway URL" in errors
+    assert any("Legacy CurseForge gateway constants" in error for error in errors)
+    assert "src/config.py must not bundle a default CurseForge gateway URL" in errors
     assert "CurseForge API credentials must not be bundled in src/config.py" in errors
-    assert "config/curseforge.example.json must document the public default gateway URL" in errors
-    assert "config/curseforge.example.json must not contain additional bundled gateway URLs" in errors
+    assert "config/curseforge.example.json must not document a bundled default gateway URL" in errors
+    assert "config/curseforge.example.json must not contain bundled gateway URLs" in errors
     assert ".gitignore must exclude config/private/" in errors
 
 
-def test_private_gateway_audit_accepts_public_default(tmp_path: Path) -> None:
+def test_private_gateway_audit_accepts_no_bundled_default(tmp_path: Path, monkeypatch) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "config.py").write_text(
-        'CURSEFORGE_DEFAULT_GATEWAY_URL = "https://mcw-curseforge-gateway.vercel.app/api/curseforge"\n',
+        'CURSEFORGE_DEFAULT_GATEWAY_URL = ""\n',
         encoding="utf-8",
     )
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "curseforge.example.json").write_text(
-        json.dumps({"default_gateway_url": "https://mcw-curseforge-gateway.vercel.app/api/curseforge"}),
+        json.dumps({"default_gateway_url": "", "bundled_gateway_urls": []}),
         encoding="utf-8",
     )
     (tmp_path / ".gitignore").write_text("config/private/\n", encoding="utf-8")
+
+    # The audit also validates the already-imported release configuration.
+    # Isolate that process-level value so this temporary-project fixture is
+    # deterministic even when another test or local checkout imported an older
+    # src.config module earlier in the pytest session.
+    monkeypatch.setattr(release_preflight, "CURSEFORGE_DEFAULT_GATEWAY_URL", "")
 
     assert audit_private_gateway_bundling(tmp_path) == []
 
