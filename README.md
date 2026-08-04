@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Stable-v1.0.1-brightgreen" alt="Stable version">
+    <img src="https://img.shields.io/badge/Stable-v1.0.2-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -45,6 +45,19 @@ Mỗi instance có riêng:
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 
 ---
+
+## Có gì mới trong v1.0.2
+
+**v1.0.2** là hotfix dành cho cơ chế khởi động lại launcher sau khi đổi ngôn ngữ. Bản EXE one-file giờ tạo một tiến trình PyInstaller độc lập thay vì tái sử dụng thư mục giải nén tạm của tiến trình cũ. Điều này ngăn lỗi khởi động lại thiếu module PySide6 sau khi launcher hiện thông báo đổi ngôn ngữ.
+
+- Khởi động lại đúng chính file `MCW Launcher.exe` ở bản đóng gói.
+- Thiết lập `PYINSTALLER_RESET_ENVIRONMENT=1` chỉ cho tiến trình thay thế.
+- Không làm thay đổi môi trường của launcher đang chạy.
+- Chạy source vẫn dùng Python hiện tại cùng `launcher.py`.
+- Có regression test cho frozen mode, command, environment và lỗi spawn.
+- Không thay đổi dữ liệu instance, tài khoản, theme, language pack hoặc provider.
+
+Xem chi tiết tại [`docs/RELEASE-v1.0.2.md`](docs/RELEASE-v1.0.2.md).
 
 ## Có gì mới trong v1.0.1
 
