@@ -38,7 +38,6 @@ class FirstRunSetupDialog(QDialog):
         self.setModal(True)
         self.setObjectName("FirstRunSetupDialog")
         self._settings = settings if isinstance(settings, dict) else {}
-        self._initial_locale = language_manager.current_locale
         self._gpu_detection = gpu_detection
         self._recommendation = recommendation or FirstRunRecommendationService.fallback()
         self._page_index = 0
@@ -127,6 +126,9 @@ class FirstRunSetupDialog(QDialog):
         self.language_label = QLabel()
         self.language_combo = QComboBox()
         self.language_combo.currentIndexChanged.connect(self._language_changed)
+        self.language_restart_hint = QLabel()
+        self.language_restart_hint.setObjectName("MutedLabel")
+        self.language_restart_hint.setWordWrap(True)
         self.auto_check_updates = QCheckBox()
         self.download_concurrency_label = QLabel()
         self.download_concurrency = QComboBox()
@@ -135,6 +137,7 @@ class FirstRunSetupDialog(QDialog):
         layout.addSpacing(8)
         layout.addWidget(self.language_label)
         layout.addWidget(self.language_combo)
+        layout.addWidget(self.language_restart_hint)
         layout.addWidget(self.auto_check_updates)
         layout.addWidget(self.download_concurrency_label)
         layout.addWidget(self.download_concurrency)
@@ -315,10 +318,10 @@ class FirstRunSetupDialog(QDialog):
             ))
 
     def _language_changed(self, _index: int) -> None:
-        locale = str(self.language_combo.currentData() or "en-US")
-        language_manager.set_language(locale)
-        retranslate_widget_tree(self)
-        self.retranslate_dynamic()
+        # The selected locale is persisted when the wizard finishes. Applying it
+        # to the running process caused a partially translated launcher, so the
+        # whole application now changes language only after a clean restart.
+        self._update_page()
 
     def _back(self) -> None:
         self._page_index = max(0, self._page_index - 1)
@@ -332,7 +335,6 @@ class FirstRunSetupDialog(QDialog):
         self.accept()
 
     def reject(self) -> None:
-        language_manager.set_language(self._initial_locale)
         super().reject()
 
     def _skip(self) -> None:
@@ -348,6 +350,7 @@ class FirstRunSetupDialog(QDialog):
         self.welcome_heading.setText(tr("first_run.welcome.title"))
         self.welcome_detail.setText(tr("first_run.welcome.detail.extended"))
         self.language_label.setText(tr("first_run.language.label"))
+        self.language_restart_hint.setText(tr("first_run.language.restart_hint"))
         self.auto_check_updates.setText(tr("first_run.updates.toggle"))
         self.download_concurrency_label.setText(tr("network.concurrency.label"))
         self._populate_download_concurrency()

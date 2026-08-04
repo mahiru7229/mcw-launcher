@@ -43,9 +43,10 @@ class LauncherSettingsPage(BasePage):
     install_java_requested = Signal(int)
     open_java_requested = Signal(object)
     dirty_changed = Signal(bool)
+    first_run_setup_requested = Signal()
 
     def __init__(self) -> None:
-        super().__init__("Launcher Settings", "Preferences here belong to the GUI, not to an individual Minecraft instance.", "launcher_settings")
+        super().__init__(tr("launcher_settings.page.title"), tr("launcher_settings.page.subtitle"), "launcher_settings")
         self._java_installations: list[object] = []
         self._latest_java_major: int | None = None
         self._latest_java_lookup_error = ""
@@ -60,6 +61,7 @@ class LauncherSettingsPage(BasePage):
         self._dirty = False
         self._saved_data: dict = {}
         self._force_replace_on_next_settings = True
+        self._update_status_source = "Update status: Not checked"
         self._theme_preview_timer = QTimer(self)
         self._theme_preview_timer.setSingleShot(True)
         self._theme_preview_timer.setInterval(25)
@@ -89,8 +91,8 @@ class LauncherSettingsPage(BasePage):
 
         behavior_card = CardWidget("Startup and behavior")
         self.start_page_combo = QComboBox()
-        for page_id, label in NAVIGATION_ITEMS:
-            self.start_page_combo.addItem(label, page_id)
+        for page_id, text_key in NAVIGATION_ITEMS:
+            self.start_page_combo.addItem(tr(text_key), page_id)
         self.show_snapshots = QCheckBox("Show non-release versions by default")
         self.remember_window_size = QCheckBox("Remember window size and position")
         self.debug_mode = QCheckBox("Enable debug launch information")
@@ -121,16 +123,26 @@ class LauncherSettingsPage(BasePage):
         bandwidth_card.layout.addWidget(self.download_concurrency)
         downloads_section.add_card(bandwidth_card)
 
-        language_card = CardWidget("Language", "Add another language by placing a compatible JSON file in the lang folder.")
+        self.language_card = CardWidget(tr("launcher_settings.language.title"), tr("launcher_settings.language.detail"))
         self.language_combo = QComboBox()
         self.reload_languages()
-        self.language_combo.currentIndexChanged.connect(self._emit_language_changed)
-        reload_languages_button = set_theme_icon(QPushButton("Reload language packs"), "icon.action.language")
-        reload_languages_button.clicked.connect(self.reload_languages)
-        language_card.layout.addWidget(QLabel("Launcher language"))
-        language_card.layout.addWidget(self.language_combo)
-        language_card.layout.addWidget(reload_languages_button)
-        general_section.add_card(language_card)
+        self.language_label = QLabel(tr("launcher_settings.language.label"))
+        self.language_restart_hint = QLabel(tr("launcher_settings.language.restart_hint"))
+        self.language_restart_hint.setObjectName("MutedLabel")
+        self.language_restart_hint.setWordWrap(True)
+        self.reload_languages_button = set_theme_icon(QPushButton(tr("launcher_settings.language.reload")), "icon.action.language")
+        self.reload_languages_button.clicked.connect(self.reload_languages)
+        self.language_card.layout.addWidget(self.language_label)
+        self.language_card.layout.addWidget(self.language_combo)
+        self.language_card.layout.addWidget(self.language_restart_hint)
+        self.language_card.layout.addWidget(self.reload_languages_button)
+        general_section.add_card(self.language_card)
+
+        self.first_run_card = CardWidget(tr("launcher_settings.first_run.title"), tr("launcher_settings.first_run.detail"))
+        self.first_run_setup_button = set_theme_icon(QPushButton(tr("launcher_settings.first_run.button")), "icon.action.settings")
+        self.first_run_setup_button.clicked.connect(self.first_run_setup_requested.emit)
+        self.first_run_card.layout.addWidget(self.first_run_setup_button)
+        general_section.add_card(self.first_run_card)
 
         self.content_browser_card = CardWidget(tr("content.settings.title"), tr("content.settings.detail"))
         self.show_content_descriptions = QCheckBox(tr("content.settings.show_descriptions"))
@@ -262,8 +274,8 @@ class LauncherSettingsPage(BasePage):
         runtime_section.add_card(self.forge_preflight_card)
 
         update_card = CardWidget("Launcher updates", "Stable updates are used by default. Join the tester program only when you want to receive experimental builds.")
-        current_version_label = QLabel(f"Current version: {VERSION}")
-        current_version_label.setObjectName("ValueLabel")
+        self.current_version_label = QLabel(tr("launcher_settings.update.current_version", version=VERSION))
+        self.current_version_label.setObjectName("ValueLabel")
         self.auto_check_updates = QCheckBox("Automatically check for updates when the launcher starts")
         self.join_tester_program = QCheckBox("Join tester program and receive experimental updates")
         self.tester_warning_label = QLabel("Experimental updates may contain unfinished features, bugs, crashes, or compatibility issues. Back up important instances and worlds before joining.")
@@ -276,7 +288,7 @@ class LauncherSettingsPage(BasePage):
         self.update_status_label.setWordWrap(True)
         self.check_updates_button = set_theme_icon(QPushButton("Check for updates"), "icon.action.update")
         self.check_updates_button.clicked.connect(self.check_updates_requested.emit)
-        update_card.layout.addWidget(current_version_label)
+        update_card.layout.addWidget(self.current_version_label)
         update_card.layout.addWidget(self.auto_check_updates)
         update_card.layout.addWidget(self.join_tester_program)
         update_card.layout.addWidget(self.tester_warning_label)
@@ -882,7 +894,8 @@ class LauncherSettingsPage(BasePage):
         self.text_color_changed.emit(str(self._saved_data.get("text_color_mode", "theme")), str(self._saved_data.get("text_color", "#f4f4f4")))
 
     def set_update_status(self, message: str) -> None:
-        self.update_status_label.setText(message)
+        self._update_status_source = str(message or "Update status: Not checked")
+        self.update_status_label.setText(tr(self._update_status_source))
 
     def set_busy(self, busy: bool) -> None:
         self.set_interaction_locked(busy)
@@ -893,7 +906,23 @@ class LauncherSettingsPage(BasePage):
     def retranslate_dynamic(self) -> None:
         self.title_label.setText(tr("launcher_settings.page.title"))
         self.subtitle_label.setText(tr("launcher_settings.page.subtitle"))
+        for index, (_page_id, text_key) in enumerate(NAVIGATION_ITEMS):
+            self.start_page_combo.setItemText(index, tr(text_key))
+        if self.language_card.title_label is not None:
+            self.language_card.title_label.setText(tr("launcher_settings.language.title"))
+        if self.language_card.subtitle_label is not None:
+            self.language_card.subtitle_label.setText(tr("launcher_settings.language.detail"))
+        self.language_label.setText(tr("launcher_settings.language.label"))
+        self.language_restart_hint.setText(tr("launcher_settings.language.restart_hint"))
+        self.reload_languages_button.setText(tr("launcher_settings.language.reload"))
         self.unsaved_label.setText(tr("settings.unsaved.banner"))
+        if self.first_run_card.title_label is not None:
+            self.first_run_card.title_label.setText(tr("launcher_settings.first_run.title"))
+        if self.first_run_card.subtitle_label is not None:
+            self.first_run_card.subtitle_label.setText(tr("launcher_settings.first_run.detail"))
+        self.first_run_setup_button.setText(tr("launcher_settings.first_run.button"))
+        self.current_version_label.setText(tr("launcher_settings.update.current_version", version=VERSION))
+        self.update_status_label.setText(tr(self._update_status_source))
         if self.java_card.title_label is not None:
             self.java_card.title_label.setText(tr("launcher_settings.java.title"))
         if self.java_card.subtitle_label is not None:

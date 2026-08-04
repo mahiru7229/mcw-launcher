@@ -38,8 +38,9 @@ def test_primary_navigation_is_instance_centered() -> None:
             break
 
     assert navigation is not None
-    assert navigation[0][0] == "instances"
-    assert {page_id for page_id, _label in navigation} == {"instances", "accounts", "launcher_settings", "logs", "about"}
+    assert navigation[0] == ("instances", "navigation.instances")
+    assert {page_id for page_id, _text_key in navigation} == {"instances", "accounts", "launcher_settings", "logs", "about"}
+    assert all(text_key.startswith("navigation.") for _page_id, text_key in navigation)
 
 
 def test_instance_workspace_supports_icons_and_runtime_badges() -> None:

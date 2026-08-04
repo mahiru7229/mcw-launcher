@@ -29,6 +29,7 @@ from mcw_core.api.runtime.game_runtime_manager import GameRuntimeManager
 from mcw_core.api.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
 from src.gui.application import create_application
 from src.gui.animation.motion_runtime import MotionRuntime
+from src.gui.app_restart import start_restarted_process
 from src.gui.config import LAUNCHER_NAME, VERSION_ID
 from src.gui.controllers.account_controller import AccountController
 from src.gui.controllers.curseforge_controller import CurseForgeController
@@ -119,10 +120,14 @@ class MainWindow(QMainWindow):
         self.instance_settings_controller = InstanceSettingsController()
         self.gui_settings_controller = GuiSettingsController()
         self._startup_settings = self.gui_settings_controller.load()
+        self._session_locale = str(self._startup_settings.get("language", "en-US"))
+        self._pending_restart_locale = ""
+        self._dismissed_restart_locale = ""
+        self._language_restart_prompt_scheduled = False
         self.theme_runtime = ThemeRuntime()
         self.motion_runtime = MotionRuntime(parent=self)
         language_manager.reload()
-        language_manager.set_language(self._startup_settings.get("language", "en-US"), notify=False)
+        language_manager.set_language(self._session_locale, notify=False)
         self.launch_controller = LaunchController(self.task_runner)
         self.lan_hosting_controller = LanHostingController(self.task_runner)
         self.update_controller = UpdateController(self.task_runner, channel=self._startup_settings.get("update_channel", "stable"))
@@ -376,7 +381,7 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.save_requested.connect(self.gui_settings_controller.save)
         self.launcher_settings_page.dirty_changed.connect(lambda dirty: self.sidebar.set_page_dirty("launcher_settings", dirty))
         self.launcher_settings_page.reset_requested.connect(self.gui_settings_controller.reset)
-        self.launcher_settings_page.language_changed.connect(self._preview_language)
+        self.launcher_settings_page.first_run_setup_requested.connect(self._run_first_run_setup)
         self.launcher_settings_page.check_updates_requested.connect(lambda: self.update_controller.check(manual=True))
         self.launcher_settings_page.reload_theme_requested.connect(self._preview_theme)
         self.launcher_settings_page.live_theme_reload_requested.connect(self._reload_theme_silently)
@@ -1941,11 +1946,11 @@ class MainWindow(QMainWindow):
 
     def _apply_gui_settings(self, settings: dict) -> None:
         requested_locale = str(settings.get("language", "en-US"))
-        previous_locale = language_manager.current_locale
         language_manager.reload()
-        language_manager.set_language(requested_locale, notify=False)
-        if language_manager.current_locale != previous_locale:
-            self._retranslate_ui()
+        # Language changes are committed to settings but applied only after a
+        # clean process restart. Keeping the active session locale unchanged
+        # prevents a partially translated widget tree and mixed-language dialogs.
+        language_manager.set_language(self._session_locale, notify=False)
         self.launcher_settings_page.set_settings(settings, preserve_unsaved=self.launcher_settings_page.is_dirty)
         self.instances_page.set_show_snapshots(bool(settings.get("show_snapshots", False)))
         self.launch_controller.set_debug_mode(bool(settings.get("debug_mode", False)))
@@ -1975,6 +1980,13 @@ class MainWindow(QMainWindow):
         self.mod_manager_dialog.curseforge_button.setVisible(curseforge_available)
         self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")), bool(settings.get("show_static_text", False)), str(settings.get("accent_mode", "theme")), str(settings.get("accent_color", "#8ed35b")), str(settings.get("text_color_mode", "theme")), str(settings.get("text_color", "#f4f4f4")))
         self.motion_runtime.apply(settings.get("motion_mode", "full"))
+        self._retranslate_ui()
+
+        if requested_locale == self._session_locale:
+            self._pending_restart_locale = ""
+            self._dismissed_restart_locale = ""
+        else:
+            self._schedule_language_restart_prompt(requested_locale)
 
     def _preview_theme(self, theme_id: str) -> None:
         selected = self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, theme_id, self.launcher_settings_page.show_static_text.isChecked(), self.launcher_settings_page.current_accent_mode(), self.launcher_settings_page.current_accent_color(), self.launcher_settings_page.current_text_color_mode(), self.launcher_settings_page.current_text_color())
@@ -2014,9 +2026,92 @@ class MainWindow(QMainWindow):
         self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
         self.gui_settings_controller.set_modrinth_channels(include_beta, include_alpha)
 
-    def _preview_language(self, locale: str) -> None:
-        if language_manager.set_language(locale, notify=False):
-            self._retranslate_ui()
+    def _run_first_run_setup(self) -> None:
+        if self.launcher_settings_page.is_dirty:
+            decision = prompt_unsaved_changes(self, tr("launcher_settings.page.title"))
+            if decision is UnsavedChangesDecision.CANCEL:
+                return
+            if decision is UnsavedChangesDecision.DISCARD:
+                self.launcher_settings_page.discard_changes()
+            else:
+                self.launcher_settings_page.request_save()
+                if self.launcher_settings_page.is_dirty:
+                    return
+
+        from mcw_core.api.config.launcher_settings_manager import LauncherSettingsManager
+        from mcw_core.api.hardware.first_run_recommendation_service import FirstRunRecommendationService
+        from src.gui.dialogs.first_run_setup_dialog import FirstRunSetupDialog
+
+        self.launcher_settings_page.first_run_setup_button.setEnabled(False)
+        try:
+            try:
+                recommendation = FirstRunRecommendationService.inspect()
+            except Exception:
+                recommendation = FirstRunRecommendationService.fallback()
+            manager = LauncherSettingsManager()
+            dialog = FirstRunSetupDialog(manager.load(), self._gpu_detection, recommendation, self)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                self._retranslate_ui()
+                self.toast_manager.show(tr("launcher_settings.first_run.cancelled"), "warning", tr("launcher_settings.first_run.title"))
+                return
+            manager.save(dialog.selected_settings())
+            self.gui_settings_controller.load()
+            self.launcher_settings_page.set_gpu_detection(self._gpu_detection)
+            self.toast_manager.show(tr("launcher_settings.first_run.completed"), "success", tr("launcher_settings.first_run.title"))
+        except Exception as error:
+            QMessageBox.warning(self, tr("launcher_settings.first_run.title"), tr("launcher_settings.first_run.failed", error=error))
+        finally:
+            self.launcher_settings_page.first_run_setup_button.setEnabled(True)
+
+    def _schedule_language_restart_prompt(self, locale: str) -> None:
+        requested = str(locale or "en-US")
+        if requested == self._session_locale or requested == self._dismissed_restart_locale:
+            return
+        self._pending_restart_locale = requested
+        if self._language_restart_prompt_scheduled:
+            return
+        self._language_restart_prompt_scheduled = True
+        QTimer.singleShot(0, self._prompt_language_restart)
+
+    def _prompt_language_restart(self) -> None:
+        self._language_restart_prompt_scheduled = False
+        locale = self._pending_restart_locale
+        if not locale or locale == self._session_locale:
+            return
+
+        message_box = QMessageBox(self)
+        message_box.setIcon(QMessageBox.Icon.Information)
+        message_box.setWindowTitle(tr("language.restart.title"))
+        message_box.setText(tr("language.restart.message"))
+        message_box.setInformativeText(tr("language.restart.detail"))
+        restart_button = message_box.addButton(tr("language.restart.now"), QMessageBox.ButtonRole.AcceptRole)
+        later_button = message_box.addButton(tr("language.restart.later"), QMessageBox.ButtonRole.RejectRole)
+        message_box.setDefaultButton(restart_button)
+        message_box.setEscapeButton(later_button)
+        message_box.exec()
+
+        if message_box.clickedButton() is restart_button:
+            self._restart_for_language_change()
+            return
+
+        self._dismissed_restart_locale = locale
+        self.toast_manager.show(tr("language.restart.saved_for_later"), "warning", tr("language.restart.title"))
+
+    def _restart_for_language_change(self) -> None:
+        if self.task_runner.has_active_tasks:
+            QMessageBox.information(self, tr("language.restart.title"), tr("language.restart.active_task"))
+            return
+        if not self._confirm_all_unsaved_settings():
+            return
+        if self.gui_settings_controller.current.get("remember_window_size", True):
+            self.gui_settings_controller.save_geometry(self.saveGeometry())
+        if not start_restarted_process():
+            QMessageBox.critical(self, tr("language.restart.title"), tr("language.restart.failed"))
+            return
+        self.task_runner.close()
+        application = QGuiApplication.instance()
+        if application is not None:
+            application.quit()
 
     def _retranslate_ui(self) -> None:
         retranslate_widget_tree(self)
@@ -2024,6 +2119,7 @@ class MainWindow(QMainWindow):
         self._update_page_navigation()
 
         for widget in (
+            self.sidebar,
             self.home_page,
             self.account_page,
             self.instances_page,

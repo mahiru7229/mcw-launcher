@@ -84,7 +84,7 @@ class InstanceWorkspacePage(BasePage):
     ITEM_NAME_ROLE = Qt.ItemDataRole.UserRole
 
     def __init__(self) -> None:
-        super().__init__("Instances", "Choose an instance, then launch or edit it from one workspace.", "instances")
+        super().__init__(tr("workspace.page.title"), tr("workspace.page.subtitle"), "instances")
         self._instances: dict[str, object] = {}
         self._versions: list[object] = []
         self._selected_name = ""

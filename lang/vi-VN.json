@@ -1714,7 +1714,19 @@
         "progress.package.imported_files": "Đã nhập xong các file trong gói.",
         "progress.package.exporting_metadata": "Đang xuất metadata của gói...",
         "progress.package.exporting_portable": "Đang xuất modpack portable...",
-        "progress.package.importing_portable": "Đang nhập {name}..."
+        "progress.package.importing_portable": "Đang nhập {name}...",
+        "launcher_settings.language.title": "Ngôn ngữ",
+        "launcher_settings.language.detail": "Chọn ngôn ngữ hiển thị của launcher hoặc tải lại các gói ngôn ngữ JSON tương thích trong thư mục lang.",
+        "launcher_settings.language.restart_hint": "Thay đổi ngôn ngữ sẽ được lưu ngay nhưng cần khởi động lại MCW Launcher để toàn bộ giao diện được cập nhật đồng nhất.",
+        "first_run.language.restart_hint": "Ngôn ngữ đã chọn sẽ được áp dụng sau khi MCW Launcher khởi động lại khi hoàn tất thiết lập.",
+        "language.restart.title": "Cần khởi động lại",
+        "language.restart.message": "Ngôn ngữ của launcher đã được thay đổi.",
+        "language.restart.detail": "Khởi động lại MCW Launcher ngay để áp dụng ngôn ngữ mới đồng nhất cho mọi trang, hộp thoại, tiến trình và nhãn điều hướng.",
+        "language.restart.now": "Khởi động lại ngay",
+        "language.restart.later": "Để sau",
+        "language.restart.saved_for_later": "Thay đổi ngôn ngữ đã được lưu và sẽ được áp dụng ở lần mở MCW Launcher tiếp theo.",
+        "language.restart.active_task": "Launcher vẫn đang chạy một tác vụ. Hãy chờ tác vụ hoàn tất rồi khởi động lại MCW Launcher để áp dụng ngôn ngữ.",
+        "language.restart.failed": "MCW Launcher không thể mở tiến trình thay thế. Hãy đóng và mở lại launcher theo cách thủ công để áp dụng ngôn ngữ."
     },
     "aliases": {
         "Show static text over themed controls": "launcher_settings.theme.show_static_text",

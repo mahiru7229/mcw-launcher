@@ -21,7 +21,7 @@ class SidebarWidget(QFrame):
         self._collapsed = False
         self.setProperty("compactLayout", self._compact)
         self._buttons: dict[str, QPushButton] = {}
-        self._button_labels: dict[str, str] = {}
+        self._button_keys: dict[str, str] = {}
         self._dirty_pages: set[str] = set()
         self._decorative_widgets: list[QFrame] = []
         self._build_ui()
@@ -60,21 +60,21 @@ class SidebarWidget(QFrame):
         layout.addWidget(main_separator)
         layout.addSpacing(4 if self._compact else 8)
 
-        for page_id, label in NAVIGATION_ITEMS:
+        for page_id, text_key in NAVIGATION_ITEMS:
             if page_id in {"instances", "launcher_settings", "about"}:
                 layout.addSpacing(2)
                 separator = Separator("#2f352a", 2)
                 self._decorative_widgets.append(separator)
                 layout.addWidget(separator)
                 layout.addSpacing(2)
-            button = set_theme_icon(QPushButton(label), f"icon.nav.{page_id}", 22 if self._compact else 28)
+            button = set_theme_icon(QPushButton(tr(text_key)), f"icon.nav.{page_id}", 22 if self._compact else 28)
             button.setObjectName("NavButton")
             button.setProperty("compactLayout", self._compact)
             button.setCheckable(True)
             button.setFixedHeight(38 if self._compact else 46)
             button.clicked.connect(lambda _checked=False, current_page=page_id: self.page_requested.emit(current_page))
             self._buttons[page_id] = button
-            self._button_labels[page_id] = label
+            self._button_keys[page_id] = text_key
             layout.addWidget(button)
 
         layout.addStretch()
@@ -120,7 +120,7 @@ class SidebarWidget(QFrame):
                 widget.setVisible(show_details)
         for page_id, button in self._buttons.items():
             button.setText(self._button_text(page_id))
-            button.setToolTip(self._button_labels.get(page_id, "") if self._collapsed else "")
+            button.setToolTip(tr(self._button_keys.get(page_id, "")) if self._collapsed else "")
         label = tr("sidebar.toggle.show" if self._collapsed else "sidebar.toggle.hide")
         self._toggle_button.setIcon(QIcon())
         self._toggle_button.setText("☰" if self._collapsed else f"☰  {label}")
@@ -134,7 +134,7 @@ class SidebarWidget(QFrame):
     def _button_text(self, page_id: str) -> str:
         if self._collapsed:
             return ""
-        label = self._button_labels.get(page_id, "")
+        label = tr(self._button_keys.get(page_id, ""))
         return f"● {label}" if page_id in self._dirty_pages else label
 
     def _get_animated_width(self) -> int:

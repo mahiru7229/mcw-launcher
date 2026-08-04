@@ -97,12 +97,71 @@ def audit_language_packs(project_root: Path) -> list[str]:
 
 
 
-def audit_private_gateway_bundling(project_root: Path) -> list[str]:
-    """Ensure the bundled gateway is public configuration, never a secret.
 
-    The launcher may ship the public MCW gateway URL, but it must not contain a
-    CurseForge API key, embedded URL credentials, or an unexpected private
-    endpoint. Custom endpoints remain stored outside the release package.
+def audit_navigation_translation_keys(project_root: Path) -> list[str]:
+    """Require primary navigation labels to use semantic translation keys.
+
+    This keeps the sidebar and startup-page selector compatible with external
+    translation editors and prevents raw English labels from bypassing the
+    selected language pack.
+    """
+
+    import ast
+
+    errors: list[str] = []
+    config_path = project_root / "src" / "gui" / "config.py"
+    try:
+        tree = ast.parse(config_path.read_text(encoding="utf-8"), filename=str(config_path))
+    except (OSError, SyntaxError) as error:
+        return [f"Navigation configuration error: {error}"]
+
+    navigation = None
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "NAVIGATION_ITEMS" for target in node.targets):
+            try:
+                navigation = ast.literal_eval(node.value)
+            except (ValueError, TypeError, SyntaxError) as error:
+                errors.append(f"NAVIGATION_ITEMS must be a literal tuple: {error}")
+            break
+    if navigation is None:
+        return errors + ["src/gui/config.py is missing NAVIGATION_ITEMS"]
+
+    packs: dict[str, dict] = {}
+    for locale in ("en-US", "vi-VN"):
+        try:
+            packs[locale] = load_language_pack(project_root / "lang" / f"{locale}.json")["translations"]
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            errors.append(f"Unable to inspect {locale} navigation translations: {error}")
+
+    seen_pages: set[str] = set()
+    for item in navigation:
+        if not isinstance(item, (list, tuple)) or len(item) != 2:
+            errors.append(f"Invalid navigation item: {item!r}")
+            continue
+        page_id, text_key = str(item[0]), str(item[1])
+        if page_id in seen_pages:
+            errors.append(f"Duplicate navigation page id: {page_id}")
+        seen_pages.add(page_id)
+        if not text_key.startswith("navigation."):
+            errors.append(f"Navigation item {page_id} must use a navigation.* translation key, got {text_key!r}")
+        for locale, translations in packs.items():
+            if text_key not in translations:
+                errors.append(f"{locale} is missing navigation key {text_key} for page {page_id}")
+
+    if packs:
+        if packs.get("vi-VN", {}).get("navigation.launcher_settings") != "Cài đặt launcher":
+            errors.append("vi-VN navigation.launcher_settings must be 'Cài đặt launcher'")
+        for locale in ("en-US", "vi-VN"):
+            if packs.get(locale, {}).get("navigation.instances") != "Instance":
+                errors.append(f"{locale} navigation.instances must preserve the product term 'Instance'")
+    return errors
+
+def audit_private_gateway_bundling(project_root: Path) -> list[str]:
+    """Ensure no CurseForge endpoint or credential is bundled by default.
+
+    CurseForge support remains available, but users and deployments must provide
+    their own HTTPS gateway through local protected settings or environment
+    variables. Release packages must not contain a default endpoint or API key.
     """
 
     errors: list[str] = []
@@ -112,15 +171,18 @@ def audit_private_gateway_bundling(project_root: Path) -> list[str]:
     except OSError as error:
         return [f"Unable to inspect src/config.py: {error}"]
 
-    legacy_match = re.search(r'^CURSEFORGE_GATEWAY_URL\s*=\s*[\'"]([^\'"]+)', config_text, flags=re.MULTILINE)
+    legacy_match = re.search(r'^CURSEFORGE_GATEWAY_URL\s*=\s*[\'"]([^\'"]*)', config_text, flags=re.MULTILINE)
     if legacy_match is not None:
-        errors.append("Use CURSEFORGE_DEFAULT_GATEWAY_URL for the public gateway; legacy private gateway constants are not allowed")
+        errors.append("Legacy CurseForge gateway constants are not allowed")
 
-    default_match = re.search(r'^CURSEFORGE_DEFAULT_GATEWAY_URL\s*=\s*[\'"]([^\'"]+)', config_text, flags=re.MULTILINE)
+    default_match = re.search(r'^CURSEFORGE_DEFAULT_GATEWAY_URL\s*=\s*[\'"]([^\'"]*)', config_text, flags=re.MULTILINE)
     if default_match is None:
-        errors.append("src/config.py must define the public CurseForge default gateway")
-    elif default_match.group(1).rstrip("/") != CURSEFORGE_DEFAULT_GATEWAY_URL.rstrip("/"):
-        errors.append("src/config.py contains an unexpected CurseForge default gateway URL")
+        errors.append("src/config.py must explicitly define an empty CURSEFORGE_DEFAULT_GATEWAY_URL")
+    elif default_match.group(1).strip():
+        errors.append("src/config.py must not bundle a default CurseForge gateway URL")
+
+    if str(CURSEFORGE_DEFAULT_GATEWAY_URL or "").strip():
+        errors.append("The imported CurseForge default gateway must be empty")
 
     secret_patterns = (
         r'^CURSEFORGE_API_KEY\s*=',
@@ -136,12 +198,12 @@ def audit_private_gateway_bundling(project_root: Path) -> list[str]:
     except (OSError, json.JSONDecodeError) as error:
         errors.append(f"CurseForge config template error: {error}")
     else:
-        default_url = str(example.get("default_gateway_url") or "").rstrip("/") if isinstance(example, dict) else ""
-        if default_url != CURSEFORGE_DEFAULT_GATEWAY_URL.rstrip("/"):
-            errors.append("config/curseforge.example.json must document the public default gateway URL")
+        default_url = str(example.get("default_gateway_url") or "").strip() if isinstance(example, dict) else ""
+        if default_url:
+            errors.append("config/curseforge.example.json must not document a bundled default gateway URL")
         bundled = example.get("bundled_gateway_urls") if isinstance(example, dict) else None
         if bundled is not None and bundled != [] and bundled != ():
-            errors.append("config/curseforge.example.json must not contain additional bundled gateway URLs")
+            errors.append("config/curseforge.example.json must not contain bundled gateway URLs")
 
     gitignore_path = project_root / ".gitignore"
     try:
@@ -274,6 +336,7 @@ def run_preflight(project_root: Path = PROJECT_ROOT) -> list[str]:
     errors.extend(audit_lan_agent(project_root))
     errors.extend(find_merge_markers(project_root))
     errors.extend(audit_language_packs(project_root))
+    errors.extend(audit_navigation_translation_keys(project_root))
     return errors
 
 

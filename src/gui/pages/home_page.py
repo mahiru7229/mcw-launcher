@@ -75,7 +75,7 @@ class HomePage(BasePage):
         self.manifest_value.setObjectName("ValueLabel")
         self.last_status = QLabel("Ready")
         self.last_status.setObjectName("MutedLabel")
-        settings_button = set_theme_icon(QPushButton("Launcher Settings"), "icon.action.settings")
+        settings_button = set_theme_icon(QPushButton(tr("navigation.launcher_settings")), "icon.action.settings")
         settings_button.clicked.connect(self.open_settings_requested.emit)
         core_card.layout.addWidget(self.manifest_value)
         core_card.layout.addWidget(self.last_status)
