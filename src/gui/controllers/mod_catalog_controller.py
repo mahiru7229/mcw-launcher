@@ -28,20 +28,22 @@ class ModCatalogController(BaseController):
     def search(self, query: str, index: str, offset: int, loader: str = ModLoaderManager.FABRIC) -> None:
         normalized_loader = self._normalize_loader(loader)
         task_id = f"{self.SEARCH_PREFIX}{normalized_loader}"
-        self._task_runner.run(
-            task_id,
-            lambda: (
-                normalized_loader,
-                ModrinthClient.search_projects(
-                    project_type="mod",
-                    query=query,
-                    loader=normalized_loader,
-                    index=index,
-                    offset=offset,
-                    limit=25,
-                    force_refresh=True,
-                ),
+        task = lambda: (
+            normalized_loader,
+            ModrinthClient.search_projects(
+                project_type="mod",
+                query=query,
+                loader=normalized_loader,
+                index=index,
+                offset=offset,
+                limit=25,
+                force_refresh=True,
             ),
+        )
+        self._run_network_task(
+            self._task_runner,
+            task_id,
+            task,
             tr("task.mod_catalog.search", loader=normalized_loader.title()),
             blocking=False,
         )
@@ -49,17 +51,19 @@ class ModCatalogController(BaseController):
     def load_versions(self, project_id: str, loader: str = ModLoaderManager.FABRIC) -> None:
         normalized_loader = self._normalize_loader(loader)
         task_id = f"{self.VERSIONS_PREFIX}{normalized_loader}.{project_id}"
-        self._task_runner.run(
-            task_id,
-            lambda: (
+        task = lambda: (
+            project_id,
+            normalized_loader,
+            ModrinthClient.list_project_versions(
                 project_id,
-                normalized_loader,
-                ModrinthClient.list_project_versions(
-                    project_id,
-                    loader=normalized_loader,
-                    version_types=("release", "beta", "alpha"),
-                ),
+                loader=normalized_loader,
+                version_types=("release", "beta", "alpha"),
             ),
+        )
+        self._run_network_task(
+            self._task_runner,
+            task_id,
+            task,
             tr("task.mod_catalog.load_versions", loader=normalized_loader.title()),
             blocking=False,
         )
@@ -84,15 +88,18 @@ class ModCatalogController(BaseController):
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         message = str(error) or "Modrinth request failed."
+        title = tr("Modrinth mod catalog")
         if task_id.startswith(self.SEARCH_PREFIX):
             loader = task_id.removeprefix(self.SEARCH_PREFIX).split(".", 1)[0]
             self.search_failed.emit(loader, message)
+            self._offer_network_retry(task_id, title, error)
             return
 
         if task_id.startswith(self.VERSIONS_PREFIX):
             remainder = task_id.removeprefix(self.VERSIONS_PREFIX)
             loader, _, project_id = remainder.partition(".")
             self.versions_failed.emit(project_id, loader, message)
+            self._offer_network_retry(task_id, title, error)
 
     @staticmethod
     def _normalize_loader(loader: str) -> str:

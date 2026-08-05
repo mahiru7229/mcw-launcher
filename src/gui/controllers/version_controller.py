@@ -22,7 +22,7 @@ class VersionController(BaseController):
         self._task_runner.task_failed.connect(self._on_task_failed)
 
     def refresh(self) -> None:
-        self._task_runner.run(self.TASK_ID, self._load_versions, tr("Loading Minecraft version manifest..."), blocking=False)
+        self._run_network_task(self._task_runner, self.TASK_ID, self._load_versions, tr("Loading Minecraft version manifest..."), blocking=False)
 
     @staticmethod
     def _load_versions() -> list[Any]:
@@ -44,4 +44,6 @@ class VersionController(BaseController):
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if task_id == self.TASK_ID:
+            if self._offer_network_retry(task_id, tr("Version manifest"), error):
+                return
             self._emit_error(tr("Version manifest"), error)

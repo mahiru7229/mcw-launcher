@@ -1856,7 +1856,20 @@
         "Unsupported Java selection mode.": "Chế độ chọn Java không được hỗ trợ.",
         "Choose a Java executable or switch Java selection to Automatic.": "Hãy chọn file thực thi Java hoặc chuyển chế độ chọn Java sang Tự động.",
         "java.recovery.warning_custom": "Java đã cấu hình gặp lỗi. MCW đã khởi chạy bằng {path} và chuyển instance này về chế độ Tự động. Lý do: {reason}",
-        "java.recovery.warning_auto": "Java được chọn ban đầu gặp lỗi. MCW đã tự động thử lại và khởi chạy bằng {path}. Lý do: {reason}"
+        "java.recovery.warning_auto": "Java được chọn ban đầu gặp lỗi. MCW đã tự động thử lại và khởi chạy bằng {path}. Lý do: {reason}",
+        "network.retry.auto": "Lỗi mạng tạm thời. Đang thử lại yêu cầu {attempt}/{max_attempts}...",
+        "network.retry.log": "Thử lại mạng cho {task}: lần {attempt}/{max_attempts} sau {delay} giây. Lỗi gần nhất: {error}",
+        "network.retry.manual.title": "Yêu cầu mạng thất bại",
+        "network.retry.manual.message": "Yêu cầu vẫn thất bại sau {attempts} lần thử tự động. Hãy kiểm tra kết nối mạng rồi thử lại đúng yêu cầu này.",
+        "network.retry.manual.button": "Thử lại",
+        "network.retry.manual.expired": "Không thể thử lại yêu cầu này nữa. Hãy thực hiện lại từ trang hiện tại.",
+        "network.retry.manual.already_running": "Yêu cầu này đang được thực hiện.",
+        "network.retry.manual.starting": "Đang thử lại yêu cầu mạng...",
+        "network.retry.manual.log": "Đã bắt đầu thử lại thủ công tác vụ mạng {task}.",
+        "network.retry.manual.available": "Yêu cầu mạng thất bại. Bạn có thể thử lại thủ công.",
+        "network.retry.manual.available_log": "Đã dùng hết số lần thử mạng tự động cho {task}. Lỗi gần nhất: {error}",
+        "network.retry.manual.cancelled": "Đã hủy thử lại yêu cầu mạng.",
+        "network.retry.manual.could_not_start": "Không thể khởi động lại yêu cầu. Hãy chờ tác vụ hiện tại hoàn tất rồi thử lại."
     },
     "aliases": {
         "Show static text over themed controls": "launcher_settings.theme.show_static_text",

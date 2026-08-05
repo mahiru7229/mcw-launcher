@@ -639,6 +639,9 @@ class MainWindow(QMainWindow):
             controller.status_changed.connect(self._set_status)
             controller.log_created.connect(self.logs_page.append)
             controller.error_created.connect(self._show_error)
+            controller.network_retry_available.connect(
+                lambda task_id, title, message, owner=controller: self._show_network_retry(owner, task_id, title, message)
+            )
 
     def _initialize_data(self) -> None:
         settings = dict(self._startup_settings)
@@ -2452,6 +2455,33 @@ class MainWindow(QMainWindow):
 
     def _show_error(self, title: str, message: str) -> None:
         QMessageBox.critical(self, title, message)
+
+    def _show_network_retry(self, controller: object, task_id: str, title: str, message: str) -> None:
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle(title or tr("network.retry.manual.title"))
+        box.setText(tr("network.retry.manual.message", attempts=3))
+        box.setInformativeText(message)
+        box.setStandardButtons(QMessageBox.StandardButton.Retry | QMessageBox.StandardButton.Cancel)
+        box.setDefaultButton(QMessageBox.StandardButton.Retry)
+        box.setEscapeButton(QMessageBox.StandardButton.Cancel)
+
+        retry_button = box.button(QMessageBox.StandardButton.Retry)
+        cancel_button = box.button(QMessageBox.StandardButton.Cancel)
+        if retry_button is not None:
+            retry_button.setText(tr("network.retry.manual.button"))
+        if cancel_button is not None:
+            cancel_button.setText(tr("common.cancel"))
+
+        result = box.exec()
+        retry_value = int(QMessageBox.StandardButton.Retry.value)
+        if result != retry_value:
+            self._set_status(tr("network.retry.manual.cancelled"))
+            return
+
+        retry = getattr(controller, "retry_network_task", None)
+        if not callable(retry) or not retry(task_id):
+            self._show_error(tr("network.retry.manual.title"), tr("network.retry.manual.could_not_start"))
 
     def _show_export_finished(self, path: Path) -> None:
         self.toast_manager.show(tr("Saved to:\n{path}", path=path), "success", tr("Export complete"))

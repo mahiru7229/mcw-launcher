@@ -1,24 +1,28 @@
-# MCW Launcher v1.1.0-beta.3 — Finalization patch
+# MCW Launcher v1.1.0-beta.4 launcher diff
 
-Apply this patch **after**:
+Apply this patch on top of the completed **v1.1.0-beta.3** launcher tree.
 
-1. `v1.1.0-beta.3-responsive-step1`
-2. `v1.1.0-beta.3-step2-remove-create-instance`
+## Included
 
-This final step only:
+- Bounded automatic retry for temporary metadata/network failures.
+- A manual **Retry / Cancel** dialog after all three automatic attempts fail.
+- Exact task resubmission with the original parameters, task ID, blocking mode, and progress message.
+- Duplicate-task protection, bounded remembered retry registrations, sensitive-data redaction, translations, tests, version metadata, README, and release notes.
 
-- bumps launcher runtime metadata to `v1.1.0-beta.3`;
-- adds the Beta 3 release notes and README entry;
-- updates launcher metadata regression tests;
-- keeps the MCW Core implementation and wheel unchanged (`1.1.0b2`).
+## Not included
 
-No `mcw_core/` or `src/core/` implementation file is included.
+- No implementation files from `src/core/`.
+- No implementation files from `mcw_core/`.
+- No wheel or full source archive.
+- No Forge legacy `--gameDir` fix.
+- No account-protection progress fix.
+
+## Apply
+
+Extract this ZIP into the repository root and allow files to be replaced.
 
 ## Validation
 
-- 1292 passed
-- 79 skipped
-- 2 warnings
-- compileall passed
-
-Extract over the launcher repository root and replace existing files.
+- `PYTHONPATH=. pytest -q`: **1299 passed, 81 skipped, 2 warnings**.
+- `python -m compileall -q src launcher.py test`: passed.
+- GUI retry tests are included but skipped in this environment because PySide6 is unavailable; smoke-test Retry/Cancel on Windows.

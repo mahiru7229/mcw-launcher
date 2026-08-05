@@ -43,7 +43,8 @@ class ModLoaderController(BaseController):
         task_id = f"{loader}.versions:{game_version}"
         if self._task_runner.is_task_active(task_id):
             return
-        self._task_runner.run(task_id, lambda: (game_version, resolver(game_version)), tr("task.mod_loader.load_versions", loader=title, version=game_version), blocking=False)
+        task = lambda: (game_version, resolver(game_version))
+        self._run_network_task(self._task_runner, task_id, task, tr("task.mod_loader.load_versions", loader=title, version=game_version), blocking=False)
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
@@ -80,5 +81,7 @@ class ModLoaderController(BaseController):
             self.neoforge_versions_changed.emit(game_version, [])
             title = "NeoForge"
         else:
+            return
+        if self._offer_network_retry(task_id, title, error):
             return
         self._emit_error(title, error)

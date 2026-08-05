@@ -1856,7 +1856,20 @@
         "Unsupported Java selection mode.": "Unsupported Java selection mode.",
         "Choose a Java executable or switch Java selection to Automatic.": "Choose a Java executable or switch Java selection to Automatic.",
         "java.recovery.warning_custom": "The configured Java runtime failed. MCW launched with {path} and switched this instance back to Automatic. Reason: {reason}",
-        "java.recovery.warning_auto": "The initially selected Java runtime failed. MCW automatically retried and launched with {path}. Reason: {reason}"
+        "java.recovery.warning_auto": "The initially selected Java runtime failed. MCW automatically retried and launched with {path}. Reason: {reason}",
+        "network.retry.auto": "Temporary network error. Retrying request {attempt}/{max_attempts}...",
+        "network.retry.log": "Network retry for {task}: attempt {attempt}/{max_attempts} in {delay}s. Last error: {error}",
+        "network.retry.manual.title": "Network request failed",
+        "network.retry.manual.message": "The request still failed after {attempts} automatic attempts. Check your connection, then try the same request again.",
+        "network.retry.manual.button": "Retry",
+        "network.retry.manual.expired": "This request can no longer be retried. Start it again from the page.",
+        "network.retry.manual.already_running": "This request is already running.",
+        "network.retry.manual.starting": "Retrying the network request...",
+        "network.retry.manual.log": "Manual network retry started for {task}.",
+        "network.retry.manual.available": "Network request failed. Manual retry is available.",
+        "network.retry.manual.available_log": "Automatic network retries exhausted for {task}. Last error: {error}",
+        "network.retry.manual.cancelled": "Network retry cancelled.",
+        "network.retry.manual.could_not_start": "The request could not be restarted. Wait for the current task to finish and try again."
     },
     "aliases": {
         "MCW Launcher": "app.name",

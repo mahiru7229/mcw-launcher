@@ -39,7 +39,7 @@ class ContentPackController(BaseController):
             task = lambda: (source, kind, ModrinthClient.search_projects(kind, query=query, game_version=game_version, loader="", index=sort, offset=offset, limit=25, force_refresh=True))
         else:
             task = lambda: (source, kind, CurseForgeClient.search_projects(kind, query=query, game_version=game_version, loader="", sort=sort, index=offset, page_size=25, force_refresh=True))
-        return self._task_runner.run(task_id, task, tr("task.content.search", provider=source.title(), content_type=ContentPackManager.display_name(kind)), blocking=False)
+        return self._run_network_task(self._task_runner, task_id, task, tr("task.content.search", provider=source.title(), content_type=ContentPackManager.display_name(kind)), blocking=False)
 
     def load_project_details(self, provider: str, content_type: str, project_id: str) -> bool:
         source = self._provider(provider)
@@ -49,7 +49,7 @@ class ContentPackController(BaseController):
             task = lambda: (source, kind, str(project_id), ModrinthClient.get_project(str(project_id)))
         else:
             task = lambda: (source, kind, str(project_id), CurseForgeClient.get_project_details(int(project_id)))
-        return self._task_runner.run(task_id, task, tr("task.content.load_project_details"), blocking=False)
+        return self._run_network_task(self._task_runner, task_id, task, tr("task.content.load_project_details"), blocking=False)
 
     def load_versions(self, provider: str, content_type: str, project_id: str, game_version: str = "", release_types: tuple[str, ...] = ("release", "beta", "alpha")) -> bool:
         source = self._provider(provider)
@@ -59,7 +59,7 @@ class ContentPackController(BaseController):
             task = lambda: (source, kind, str(project_id), ModrinthClient.list_project_versions(str(project_id), loader="", game_version=game_version, version_types=release_types))
         else:
             task = lambda: (source, kind, int(project_id), CurseForgeClient.list_files(int(project_id), game_version=game_version, loader="", release_types=release_types))
-        return self._task_runner.run(task_id, task, tr("task.content.load_compatible_versions"), blocking=False)
+        return self._run_network_task(self._task_runner, task_id, task, tr("task.content.load_compatible_versions"), blocking=False)
 
     def install_modrinth(self, instance_name: str, content_type: str, version_id: str) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
@@ -123,16 +123,24 @@ class ContentPackController(BaseController):
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if not task_id.startswith("content."):
             return
+
+        title = tr("content.manager.title")
         if task_id.startswith("content.search."):
             parts = task_id.split(".")
             provider = parts[2] if len(parts) > 2 else "modrinth"
             kind = parts[3] if len(parts) > 3 else "resourcepack"
             self.search_failed.emit(provider, kind, str(error) or "Content search failed.")
+            self._offer_network_retry(task_id, title, error)
             return
+
         if task_id.startswith("content.details."):
             self.log_created.emit(f"Could not load content project details: {error}")
+            self._offer_network_retry(task_id, title, error)
             return
-        self._emit_error("Content packs", error)
+
+        if self._offer_network_retry(task_id, title, error):
+            return
+        self._emit_error(title, error)
 
     @staticmethod
     def _provider(value: str) -> str:

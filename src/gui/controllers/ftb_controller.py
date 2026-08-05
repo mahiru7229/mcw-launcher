@@ -27,33 +27,45 @@ class FTBController(BaseController):
         self._task_runner.task_failed.connect(self._on_task_failed)
 
     def search(self, query: str, sort: str, index: int, force_refresh: bool = False) -> bool:
-        return self._task_runner.run(
-            "ftb.search",
-            lambda: FTBClient.search_projects(query=query, index=index, page_size=25, sort=sort, force_refresh=force_refresh),
+        task_id = "ftb.search"
+        task = lambda: FTBClient.search_projects(query=query, index=index, page_size=25, sort=sort, force_refresh=force_refresh)
+        return self._run_network_task(
+            self._task_runner,
+            task_id,
+            task,
             tr("task.ftb.search"),
             blocking=False,
         )
 
     def load_project_details(self, project_id: int) -> bool:
-        return self._task_runner.run(
-            f"ftb.details.{int(project_id)}",
-            lambda: (int(project_id), FTBClient.get_project_details(project_id)),
+        task_id = f"ftb.details.{int(project_id)}"
+        task = lambda: (int(project_id), FTBClient.get_project_details(project_id))
+        return self._run_network_task(
+            self._task_runner,
+            task_id,
+            task,
             tr("task.ftb.load_details"),
             blocking=False,
         )
 
     def load_versions(self, project_id: int, allowed_release_types: tuple[str, ...]) -> bool:
-        return self._task_runner.run(
-            f"ftb.versions.{int(project_id)}",
-            lambda: (int(project_id), FTBClient.list_versions(project_id, allowed_release_types)),
+        task_id = f"ftb.versions.{int(project_id)}"
+        task = lambda: (int(project_id), FTBClient.list_versions(project_id, allowed_release_types))
+        return self._run_network_task(
+            self._task_runner,
+            task_id,
+            task,
             tr("task.ftb.load_versions"),
             blocking=False,
         )
 
     def load_version_details(self, project_id: int, version_id: int) -> bool:
-        return self._task_runner.run(
-            f"ftb.version.{int(project_id)}.{int(version_id)}",
-            lambda: (int(project_id), int(version_id), FTBClient.get_version(project_id, version_id)),
+        task_id = f"ftb.version.{int(project_id)}.{int(version_id)}"
+        task = lambda: (int(project_id), int(version_id), FTBClient.get_version(project_id, version_id))
+        return self._run_network_task(
+            self._task_runner,
+            task_id,
+            task,
             tr("task.ftb.load_version_metadata"),
             blocking=False,
         )
@@ -109,5 +121,7 @@ class FTBController(BaseController):
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if not task_id.startswith("ftb."):
             return
-        title = "Install FTB modpack" if task_id == "ftb.install.modpack" else "FTB"
+        title = tr("ftb.modpack.install") if task_id == "ftb.install.modpack" else tr("content.library.provider.ftb")
+        if self._offer_network_retry(task_id, title, error):
+            return
         self._emit_error(title, error)

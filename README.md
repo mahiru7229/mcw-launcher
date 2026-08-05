@@ -51,6 +51,21 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.0.2 hỗ trợ nâng cấp
 
 ---
 
+## Có gì mới trong v1.1.0-beta.4
+
+**v1.1.0-beta.4** hoàn thiện cơ chế retry metadata khi mạng hoặc máy chủ gặp lỗi tạm thời:
+
+- Tự động thử tối đa 3 lần với khoảng chờ 0,5 giây và 1 giây.
+- Chỉ retry timeout, lỗi kết nối/DNS tạm thời, rate limit và các lỗi máy chủ có khả năng phục hồi.
+- Không retry lỗi validation, loader không hỗ trợ, xác thực hoặc các HTTP client error vĩnh viễn.
+- Sau khi ba lần tự động thất bại, hiển thị hộp thoại **Thử lại/Hủy**.
+- Nút Thử lại chạy lại đúng tác vụ và tham số trước đó, bắt đầu một vòng retry giới hạn mới.
+- Ngăn task trùng, giới hạn số task được ghi nhớ và lọc dữ liệu nhạy cảm khỏi lỗi hiển thị/log.
+- Áp dụng cho Minecraft manifest, metadata mod loader, Modrinth, CurseForge, FTB, resource pack và shader pack.
+- Không thay đổi triển khai MCW Core và không phát hành wheel mới; distribution dùng để build vẫn là `1.1.0b2`.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.4.md`](docs/RELEASE-v1.1.0-beta.4.md).
+
 ## Có gì mới trong v1.1.0-beta.3
 
 **v1.1.0-beta.3** hoàn thiện luồng quản lý mod loader và dọn lại cửa sổ quản lý instance nâng cao:

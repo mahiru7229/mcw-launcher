@@ -49,24 +49,26 @@ class CurseForgeController(BaseController):
         normalized_context = self._normalize_context(context)
         normalized_loader = CurseForgeClient.normalize_loader(loader) or "forge"
         task_id = f"curseforge.search.{normalized_context}.{project_type}.{normalized_loader}"
-        return self._task_runner.run(
-            task_id,
-            lambda: (
-                normalized_context,
-                project_type,
-                normalized_loader,
-                CurseForgeClient.search_projects(
-                    project_type=project_type,
-                    query=query,
-                    game_version=game_version,
-                    loader=normalized_loader,
-                    index=index,
-                    page_size=25,
-                    sort=sort,
-                    force_refresh=force_refresh,
-                    manual_refresh=manual_refresh,
-                ),
+        task = lambda: (
+            normalized_context,
+            project_type,
+            normalized_loader,
+            CurseForgeClient.search_projects(
+                project_type=project_type,
+                query=query,
+                game_version=game_version,
+                loader=normalized_loader,
+                index=index,
+                page_size=25,
+                sort=sort,
+                force_refresh=force_refresh,
+                manual_refresh=manual_refresh,
             ),
+        )
+        return self._run_network_task(
+            self._task_runner,
+            task_id,
+            task,
             tr("task.curseforge.search", project_type=project_type),
             blocking=False,
         )
@@ -74,9 +76,11 @@ class CurseForgeController(BaseController):
     def load_project_details(self, project_type: str, project_id: int, loader: str = "forge") -> bool:
         normalized_loader = CurseForgeClient.normalize_loader(loader) or "forge"
         task_id = f"curseforge.details.{project_type}.{project_id}.{normalized_loader}"
-        return self._task_runner.run(
+        task = lambda: (project_type, int(project_id), normalized_loader, CurseForgeClient.get_project_details(project_id))
+        return self._run_network_task(
+            self._task_runner,
             task_id,
-            lambda: (project_type, int(project_id), normalized_loader, CurseForgeClient.get_project_details(project_id)),
+            task,
             tr("task.curseforge.load_project_details"),
             blocking=False,
         )
@@ -85,23 +89,25 @@ class CurseForgeController(BaseController):
         normalized_context = self._normalize_context(context)
         normalized_loader = CurseForgeClient.normalize_loader(loader) or "forge"
         task_id = f"curseforge.files.{normalized_context}.{project_type}.{project_id}.{normalized_loader}"
-        return self._task_runner.run(
-            task_id,
-            lambda: (
-                normalized_context,
-                project_type,
-                int(project_id),
-                normalized_loader,
-                CurseForgeClient.list_files_result(
-                    project_id,
-                    game_version=game_version,
-                    loader=normalized_loader,
-                    release_types=allowed_release_types,
-                    page_size=50,
-                    force_refresh=force_refresh,
-                    manual_refresh=manual_refresh,
-                ),
+        task = lambda: (
+            normalized_context,
+            project_type,
+            int(project_id),
+            normalized_loader,
+            CurseForgeClient.list_files_result(
+                project_id,
+                game_version=game_version,
+                loader=normalized_loader,
+                release_types=allowed_release_types,
+                page_size=50,
+                force_refresh=force_refresh,
+                manual_refresh=manual_refresh,
             ),
+        )
+        return self._run_network_task(
+            self._task_runner,
+            task_id,
+            task,
             tr("task.curseforge.load_compatible_files"),
             blocking=False,
         )
@@ -264,35 +270,49 @@ class CurseForgeController(BaseController):
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if not task_id.startswith("curseforge."):
             return
+
+        if task_id == "curseforge.install.mod":
+            title = tr("curseforge.mod.install")
+        elif task_id.startswith("curseforge.install.manual."):
+            title = tr("curseforge.manual.title")
+        elif task_id in {"curseforge.install.modpack", "curseforge.install.modpack.manual"}:
+            title = tr("curseforge.modpack.install")
+        else:
+            title = tr("curseforge.title")
+
         if task_id.startswith("curseforge.details."):
             self.log_created.emit(f"Could not load CurseForge project details: {error}")
+            self._offer_network_retry(task_id, title, error)
             return
+
         if task_id.startswith("curseforge.search.catalog."):
             loader = task_id.rsplit(".", 1)[-1]
             self.catalog_request_failed.emit("search", loader, str(error) or "CurseForge search failed.")
+            if self._offer_network_retry(task_id, title, error):
+                return
             return
+
         if task_id.startswith("curseforge.files.catalog."):
             parts = task_id.split(".")
             project_id = parts[-2] if len(parts) >= 2 else "0"
             loader = parts[-1] if parts else ""
             self.catalog_request_failed.emit(f"files:{project_id}", loader, str(error) or "CurseForge files request failed.")
+            if self._offer_network_retry(task_id, title, error):
+                return
             return
+
         if task_id.startswith("curseforge.cache.clear.catalog"):
             self.catalog_request_failed.emit("cache", "", str(error) or "Could not clear CurseForge cache.")
             return
+
         if task_id == "curseforge.install.modpack" and isinstance(error, CurseForgeModpackManualDownloadRequired):
             self.status_changed.emit(tr("status.curseforge.manual_download_required"))
             self.log_created.emit(str(error))
             self.modpack_manual_download_required.emit(error)
             return
-        if task_id == "curseforge.install.mod":
-            title = "Install CurseForge mod"
-        elif task_id.startswith("curseforge.install.manual."):
-            title = "Import CurseForge file"
-        elif task_id in {"curseforge.install.modpack", "curseforge.install.modpack.manual"}:
-            title = "Install CurseForge modpack"
-        else:
-            title = "CurseForge"
+
+        if self._offer_network_retry(task_id, title, error):
+            return
         self._emit_error(title, error)
 
     @classmethod
