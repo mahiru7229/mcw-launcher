@@ -224,7 +224,7 @@ class ForgeVersionManager:
             if not isinstance(raw, dict):
                 continue
             item = deepcopy(raw)
-            if item.get("clientreq") is False:
+            if item.get("clientreq") is False or not LibraryRuleManager.is_allowed(item):
                 output.append(item)
                 continue
             coordinate = str(item.get("name") or "").strip()
@@ -425,7 +425,7 @@ class ForgeVersionManager:
     def _windows_native_cache_is_complete(data: dict) -> bool:
         libraries = data.get("libraries") if isinstance(data.get("libraries"), list) else []
         for item in libraries:
-            if not isinstance(item, dict):
+            if not isinstance(item, dict) or not LibraryRuleManager.is_allowed(item):
                 continue
             natives = item.get("natives") if isinstance(item.get("natives"), dict) else {}
             classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()

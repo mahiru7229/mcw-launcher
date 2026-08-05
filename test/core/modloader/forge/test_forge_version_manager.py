@@ -220,6 +220,54 @@ def test_normalize_legacy_platform_infers_windows_native_when_mapping_is_missing
     assert library["downloads"]["classifiers"]["natives-windows"]["path"] == "net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5-natives-windows.jar"
 
 
+def test_normalize_skips_osx_only_nightly_native_on_windows(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: tmp_path / "libraries"))
+    monkeypatch.setattr(
+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_os",
+        staticmethod(lambda: "windows"),
+    )
+    monkeypatch.setattr(
+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_arch",
+        staticmethod(lambda: "x64"),
+    )
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
+        staticmethod(lambda **kwargs: (_ for _ in ()).throw(AssertionError("A disallowed OS library must not be downloaded"))),
+    )
+    library = {
+        "name": "org.lwjgl.lwjgl:lwjgl-platform:2.9.1-nightly-20130708-debug3",
+        "natives": {"linux": "natives-linux", "osx": "natives-osx", "windows": "natives-windows"},
+        "rules": [{"action": "allow", "os": {"name": "osx", "version": "^10\\.5\\.\\d$"}}],
+        "extract": {"exclude": ["META-INF/"]},
+    }
+
+    normalized = ForgeVersionManager._normalize_libraries({"libraries": [library]})
+
+    assert normalized["libraries"] == [library]
+    assert "downloads" not in normalized["libraries"][0]
+
+
+def test_windows_native_cache_ignores_osx_only_nightly_library(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_os",
+        staticmethod(lambda: "windows"),
+    )
+    monkeypatch.setattr(
+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_arch",
+        staticmethod(lambda: "x64"),
+    )
+    cache = tmp_path / "forge.json"
+    cache.write_text(
+        '{"id":"forge-1.6.4-9.11.1.1345","mainClass":"net.minecraft.launchwrapper.Launch","libraries":['
+        '{"name":"net.minecraft:launchwrapper:1.8","downloads":{"artifact":{"path":"net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","url":"https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","sha1":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":100}}},'
+        '{"name":"org.lwjgl.lwjgl:lwjgl-platform:2.9.0","natives":{"windows":"natives-windows"},"downloads":{"classifiers":{"natives-windows":{"path":"org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar","url":"https://libraries.minecraft.net/org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar","sha1":"cccccccccccccccccccccccccccccccccccccccc","size":609967}}}},'
+        '{"name":"org.lwjgl.lwjgl:lwjgl-platform:2.9.1-nightly-20130708-debug3","natives":{"linux":"natives-linux","osx":"natives-osx","windows":"natives-windows"},"rules":[{"action":"allow","os":{"name":"osx","version":"^10\\\\.5\\\\.\\\\d$"}}]}],"forge":{"schemaVersion":1,"gameVersion":"1.6.4","loaderVersion":"9.11.1.1345"}}',
+        encoding="utf-8",
+    )
+
+    assert ForgeVersionManager._load_cached(cache, "1.6.4", "9.11.1.1345") is not None
+
+
 def test_normalize_legacy_native_library_preserves_existing_artifact(monkeypatch, tmp_path: Path) -> None:
     root = tmp_path / "libraries"
     monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))

@@ -1,25 +1,23 @@
-# MCW Launcher v1.1.0-beta.6 — legacy native classifier hotfix
+# MCW Launcher v1.1.0-beta.6 — Forge 1.6.4 OS-rule native hotfix
 
-Apply this patch after the earlier **v1.1.0-beta.6 LaunchWrapper hotfix**.
+Apply this patch after the previous Beta 6 native-classifier hotfix.
 
-## What it fixes
+## Fix
 
-Forge 1.6.4 can declare native-only Maven platform libraries such as:
+Older Minecraft metadata can contain an LWJGL nightly native entry that is only allowed on macOS 10.5. The previous compatibility normalizer inspected every `*-platform` entry before evaluating its operating-system rules, so Windows attempted to resolve a nonexistent `natives-windows` classifier.
 
-- `org.lwjgl.lwjgl:lwjgl-platform:2.9.0`
-- `net.java.jinput:jinput-platform:2.0.5`
+This patch:
 
-These coordinates do not have a normal unclassified JAR. They provide platform classifier JARs such as `natives-windows`. The launcher now creates `downloads.classifiers` and downloads the correct Windows native JAR instead of trying to resolve a nonexistent `*-platform-<version>.jar`.
+- skips metadata normalization and downloads for libraries disallowed on the current OS;
+- ignores disallowed libraries when validating whether the Windows native cache is complete;
+- preserves those library entries unchanged for metadata compatibility;
+- adds regression coverage for `org.lwjgl.lwjgl:lwjgl-platform:2.9.1-nightly-20130708-debug3`.
 
 ## Apply
 
-1. Close MCW Launcher.
-2. Extract this ZIP into the repository root.
-3. Allow files to be replaced.
-4. Launch the Forge 1.6.4 instance again.
+Extract the ZIP over the launcher repository root.
 
-The incomplete legacy Forge cache is invalidated automatically. You do not need to delete the instance.
+## Validation
 
-## Scope
-
-Launcher diff only. No standalone MCW Core source or wheel is included.
+- Forge/native/classpath tests: `62 passed`
+- Python compile check: passed
