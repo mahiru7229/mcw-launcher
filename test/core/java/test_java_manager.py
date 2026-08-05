@@ -941,3 +941,15 @@ def test_remove_duplicates_documents_current_source_priority():
             JavaSource.PROGRAM_FILES,
         )
     ]
+
+def test_find_installation_candidates_keeps_multiple_same_major_paths(monkeypatch: pytest.MonkeyPatch):
+    java_home = JavaInstallation(version=17, executable=Path("C:/JavaA/bin/javaw.exe"), source=JavaSource.JAVA_HOME)
+    managed = JavaInstallation(version=17, executable=Path("C:/JavaB/bin/javaw.exe"), source=JavaSource.MINECRAFT_RUNTIME)
+    monkeypatch.setattr(JavaManager, "_scan_java_home", lambda: [java_home])
+    monkeypatch.setattr(JavaManager, "_scan_path", lambda: [])
+    monkeypatch.setattr(JavaManager, "_scan_program_files", lambda: [])
+    monkeypatch.setattr(JavaManager, "_scan_registry", lambda: [])
+    monkeypatch.setattr(JavaManager, "_scan_managed_runtimes", lambda: [managed])
+
+    assert JavaManager.find_installation_candidates() == [java_home, managed]
+    assert JavaManager.find_installation() == [managed]

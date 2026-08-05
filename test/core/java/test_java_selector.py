@@ -160,3 +160,13 @@ def test_select_java_does_not_promote_java_17_to_java_25_by_default(monkeypatch:
 
     with pytest.raises(RuntimeError, match="Java 17 was not found"):
         JavaSelector.select_java(17)
+
+
+def test_select_java_excluding_uses_another_same_major_runtime(monkeypatch: pytest.MonkeyPatch):
+    first = make_java(17, "java-a/javaw.exe")
+    second = JavaInstallation(version=17, executable=Path("java-b/javaw.exe"), source=JavaSource.MINECRAFT_RUNTIME)
+    monkeypatch.setattr(JavaManager, "find_installation_candidates", lambda: [first, second])
+
+    selected = JavaSelector.select_java_excluding(17, {first.executable})
+
+    assert selected == second.executable

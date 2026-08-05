@@ -39,7 +39,10 @@ class InstanceSettingsController(BaseController):
             max_memory = int(data["max_memory"])
             width = int(data["width"])
             height = int(data["height"])
-            java_path = str(data["java_path"]).strip()
+            java_mode = str(data.get("java_mode", "custom" if str(data.get("java_path", "")).strip() else "auto") or "auto").strip().lower()
+            if java_mode not in {"auto", "custom"}:
+                raise ValueError(tr("Unsupported Java selection mode."))
+            java_path = str(data.get("java_path", "")).strip() if java_mode == "custom" else ""
             if min_memory < MemoryAllocationPolicy.MIN_MEMORY_MB or max_memory < min_memory:
                 raise ValueError(tr("Maximum memory must be greater than or equal to minimum memory."))
             physical_limit = MemoryAllocationPolicy.physical_limit_mb()
@@ -47,7 +50,9 @@ class InstanceSettingsController(BaseController):
                 raise ValueError(tr("Maximum memory cannot exceed detected physical memory ({memory}).", memory=MemoryAllocationPolicy.format_mb(physical_limit)))
             if width <= 0 or height <= 0:
                 raise ValueError(tr("Window dimensions must be positive."))
-            if java_path and not Path(java_path).exists():
+            if java_mode == "custom" and not java_path:
+                raise ValueError(tr("Choose a Java executable or switch Java selection to Automatic."))
+            if java_path and not Path(java_path).is_file():
                 raise FileNotFoundError(tr("Java path does not exist: {path}", path=java_path))
 
             instance = InstanceManager.load(instance_name)

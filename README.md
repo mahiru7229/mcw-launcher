@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Beta-v1.1.0--beta.1-orange" alt="Beta version">
+    <img src="https://img.shields.io/badge/Beta-v1.1.0--beta.2-orange" alt="Beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.0.2">
     <img src="https://img.shields.io/badge/Stable-v1.0.2-brightgreen" alt="Stable version">
@@ -51,17 +51,20 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.0.2 hỗ trợ nâng cấp
 
 ---
 
-## Có gì mới trong v1.1.0-beta.1
+## Có gì mới trong v1.1.0-beta.2
 
-**v1.1.0-beta.1** là beta đầu tiên của nhánh 1.1.0 và chỉ xử lý các phần còn chưa dịch:
+**v1.1.0-beta.2** chỉ tập trung vào lựa chọn và tự phục hồi Java cho từng instance:
 
-- Dịch đầy đủ cửa sổ Quản lý instance nâng cao.
-- Dịch progress chuẩn bị thư viện/assets Minecraft.
-- Dịch progress kiểm tra file CurseForge, kể cả thông báo theo lượt kiểm tra lại.
-- Bổ sung regression test cho giao diện và progress tiếng Việt.
-- Chưa bao gồm Java selector, retry mạng, responsive mod loader, Forge legacy hoặc progress bảo vệ tài khoản; các mục này sẽ được tách sang beta sau.
+- Thêm chế độ chọn Java rõ ràng: **Tự động** hoặc **Đường dẫn file thực thi tùy chọn**.
+- Áp dụng cùng một lựa chọn cho trang Instance Settings và trình chỉnh sửa thiết lập mặc định của instance.
+- Kiểm tra đường dẫn Java tùy chọn trước khi lưu và trước khi launch.
+- Nếu Java tùy chọn bị thiếu hoặc không tương thích, launcher tự chọn Java phù hợp và chuyển instance về chế độ Tự động sau khi phục hồi thành công.
+- Nếu Java đã chọn thoát ngay với dấu hiệu lỗi runtime/phiên bản, launcher thử lại một lần bằng Java tương thích khác hoặc Java do launcher quản lý.
+- Nếu không thể tìm hoặc cài Java thay thế, launcher dừng an toàn và hiển thị lỗi rõ ràng thay vì tiếp tục với runtime sai.
+- Giữ lại log của lần launch Java thất bại khi retry xảy ra trong cùng một giây.
+- Các mục responsive cài mod loader, retry mạng, Forge legacy và progress bảo vệ tài khoản vẫn dành cho các beta sau.
 
-Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.1.md`](docs/RELEASE-v1.1.0-beta.1.md).
+Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.2.md`](docs/RELEASE-v1.1.0-beta.2.md).
 
 ## Có gì mới trong v1.0.2
 

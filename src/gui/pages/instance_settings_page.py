@@ -58,10 +58,16 @@ class InstanceSettingsPage(BasePage):
         target_section.add_card(selector_card, span=2)
 
         java_card = CardWidget("Java and memory")
+        self.java_mode_combo = QComboBox()
+        self._populate_java_mode_combo(self.java_mode_combo)
         self.java_path_input = QLineEdit()
-        self.java_path_input.setPlaceholderText("Leave empty for automatic Java selection")
-        browse_button = set_theme_icon(QPushButton("Browse Java executable"), "icon.action.folder")
-        browse_button.clicked.connect(self._browse_java)
+        self.java_path_input.setPlaceholderText(tr("java.selection.path_placeholder"))
+        self.java_browse_button = set_theme_icon(QPushButton(tr("java.selection.browse")), "icon.action.folder")
+        self.java_browse_button.clicked.connect(self._browse_java)
+        self.java_recovery_label = QLabel(tr("java.selection.recovery_hint"))
+        self.java_recovery_label.setObjectName("CardSubtitle")
+        self.java_recovery_label.setWordWrap(True)
+        self.java_mode_combo.currentIndexChanged.connect(self._update_java_mode)
         self.memory_info_label = QLabel()
         self.memory_info_label.setObjectName("CardSubtitle")
         self.memory_info_label.setWordWrap(True)
@@ -99,9 +105,17 @@ class InstanceSettingsPage(BasePage):
         memory_grid.addWidget(self.max_memory_value, 3, 1, alignment=Qt.AlignmentFlag.AlignRight)
         memory_grid.addWidget(self.max_memory_input, 3, 2)
         memory_grid.addWidget(self.max_memory, 4, 0, 1, 3)
-        java_card.layout.addWidget(self.java_path_input)
-        java_card.layout.addWidget(browse_button)
+        java_card.layout.addWidget(QLabel(tr("java.selection.mode_label")))
+        java_card.layout.addWidget(self.java_mode_combo)
+        java_path_row = QHBoxLayout()
+        java_path_row.setContentsMargins(0, 0, 0, 0)
+        java_path_row.setSpacing(8)
+        java_path_row.addWidget(self.java_path_input, 1)
+        java_path_row.addWidget(self.java_browse_button)
+        java_card.layout.addLayout(java_path_row)
+        java_card.layout.addWidget(self.java_recovery_label)
         java_card.layout.addLayout(memory_grid)
+        self._update_java_mode()
         runtime_section.add_card(java_card)
         self._apply_memory_values(MemoryAllocationPolicy.DEFAULT_MIN_MEMORY_MB, MemoryAllocationPolicy.DEFAULT_MAX_MEMORY_MB)
 
@@ -270,6 +284,7 @@ class InstanceSettingsPage(BasePage):
                 if instance_name and self.instance_combo.currentText() != instance_name:
                     self.select_instance(instance_name)
                 self._apply_form_data({
+                    "java_mode": "custom" if str(getattr(settings, "java_path", "") or "").strip() else "auto",
                     "java_path": str(getattr(settings, "java_path", "") or ""),
                     "min_memory": getattr(settings, "min_memory", 1024),
                     "max_memory": getattr(settings, "max_memory", 2048),
@@ -290,8 +305,10 @@ class InstanceSettingsPage(BasePage):
         self._set_dirty(False)
 
     def form_data(self) -> dict:
+        java_mode = str(self.java_mode_combo.currentData() or "auto")
         return {
-            "java_path": self.java_path_input.text(),
+            "java_mode": java_mode,
+            "java_path": self.java_path_input.text() if java_mode == "custom" else "",
             "min_memory": self.min_memory_input.value(),
             "max_memory": self.max_memory_input.value(),
             "width": self.window_width.value(),
@@ -343,6 +360,8 @@ class InstanceSettingsPage(BasePage):
         self.modrinth_failure_policy.setEnabled(enabled)
         self.curseforge_failure_policy.setEnabled(enabled)
         self.forge_preflight_failure_policy.setEnabled(enabled)
+        self.java_mode_combo.setEnabled(enabled)
+        self._update_java_mode(enabled=enabled)
         self.save_button.setEnabled(enabled)
         self.lan_prepare_button.setEnabled(enabled)
         self.lan_agent_log_button.setEnabled(enabled)
@@ -359,8 +378,13 @@ class InstanceSettingsPage(BasePage):
         self._retranslate_failure_policy_combo(self.modrinth_failure_policy)
         self._retranslate_failure_policy_combo(self.curseforge_failure_policy)
         self._retranslate_forge_preflight_policy_combo(self.forge_preflight_failure_policy)
+        self._retranslate_java_mode_combo(self.java_mode_combo)
+        self.java_path_input.setPlaceholderText(tr("java.selection.path_placeholder"))
+        self.java_browse_button.setText(tr("java.selection.browse"))
+        self.java_recovery_label.setText(tr("java.selection.recovery_hint"))
 
     def _connect_dirty_tracking(self) -> None:
+        self.java_mode_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.java_path_input.textChanged.connect(self._refresh_dirty_state)
         self.min_memory.valueChanged.connect(self._refresh_dirty_state)
         self.max_memory.valueChanged.connect(self._refresh_dirty_state)
@@ -400,12 +424,15 @@ class InstanceSettingsPage(BasePage):
         self.save_button.setText(f"● {label}" if self._dirty else label)
 
     def _browse_java(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Choose Java executable", "", "Java executable (java.exe javaw.exe);;All files (*)")
+        path, _ = QFileDialog.getOpenFileName(self, tr("java.selection.choose"), self.java_path_input.text().strip(), tr("java.selection.filter"))
         if path:
+            self._set_combo_data(self.java_mode_combo, "custom")
             self.java_path_input.setText(path)
+            self._update_java_mode()
 
     def _clear_form(self) -> None:
         self._apply_form_data({
+            "java_mode": "auto",
             "java_path": "",
             "min_memory": MemoryAllocationPolicy.DEFAULT_MIN_MEMORY_MB,
             "max_memory": MemoryAllocationPolicy.DEFAULT_MAX_MEMORY_MB,
@@ -422,7 +449,11 @@ class InstanceSettingsPage(BasePage):
         })
 
     def _apply_form_data(self, data: dict) -> None:
-        self.java_path_input.setText(str(data.get("java_path", "") or ""))
+        java_path = str(data.get("java_path", "") or "")
+        java_mode = str(data.get("java_mode", "custom" if java_path.strip() else "auto") or "auto").strip().lower()
+        self._set_combo_data(self.java_mode_combo, "custom" if java_mode == "custom" else "auto")
+        self.java_path_input.setText(java_path)
+        self._update_java_mode()
         self._apply_memory_values(data.get("min_memory", 1024), data.get("max_memory", 2048))
         self.window_width.setValue(int(data.get("width", 1280)))
         self.window_height.setValue(int(data.get("height", 720)))
@@ -435,6 +466,26 @@ class InstanceSettingsPage(BasePage):
         self._update_lan_help()
         self.jvm_arguments.setPlainText("\n".join(data.get("jvm_arguments", [])))
         self.game_arguments.setPlainText("\n".join(data.get("game_arguments", [])))
+
+    def _update_java_mode(self, *_args, enabled: bool | None = None) -> None:
+        custom = str(self.java_mode_combo.currentData() or "auto") == "custom"
+        available = self.java_mode_combo.isEnabled() if enabled is None else bool(enabled)
+        self.java_path_input.setEnabled(custom and available)
+        self.java_browse_button.setEnabled(custom and available)
+
+    @staticmethod
+    def _populate_java_mode_combo(combo: QComboBox) -> None:
+        combo.clear()
+        combo.addItem(tr("java.selection.mode.auto"), "auto")
+        combo.addItem(tr("java.selection.mode.custom"), "custom")
+
+    @staticmethod
+    def _retranslate_java_mode_combo(combo: QComboBox) -> None:
+        current = str(combo.currentData() or "auto")
+        with QSignalBlocker(combo):
+            InstanceSettingsPage._populate_java_mode_combo(combo)
+            index = combo.findData(current)
+            combo.setCurrentIndex(max(0, index))
 
     @staticmethod
     def _settings_failure_policy(settings: object, provider: str) -> str:
