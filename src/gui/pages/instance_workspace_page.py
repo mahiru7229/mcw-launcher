@@ -270,13 +270,11 @@ class InstanceWorkspacePage(BasePage):
     def _forward_advanced_signals(self) -> None:
         signal_names = (
             "refresh_requested",
-            "create_requested",
             "rename_requested",
             "clone_requested",
             "delete_requested",
             "import_requested",
             "export_requested",
-            "import_modpack_package_requested",
             "export_modpack_requested",
             "fabric_versions_requested",
             "quilt_versions_requested",
@@ -289,9 +287,6 @@ class InstanceWorkspacePage(BasePage):
             "export_forge_diagnostics_requested",
             "repair_instance_requested",
             "manage_mods_requested",
-            "browse_modpacks_requested",
-            "browse_curseforge_modpacks_requested",
-            "browse_ftb_modpacks_requested",
             "backup_requested",
             "restore_backup_requested",
             "open_backups_requested",
@@ -314,7 +309,6 @@ class InstanceWorkspacePage(BasePage):
 
     def set_versions(self, versions: list[object]) -> None:
         self._versions = list(versions)
-        self.advanced_page.set_versions(versions)
         self.create_dialog.set_versions(versions)
 
     def set_fabric_versions(self, game_version: str, versions: list[object]) -> None:
@@ -348,7 +342,6 @@ class InstanceWorkspacePage(BasePage):
 
     def set_show_snapshots(self, enabled: bool) -> None:
         self._show_snapshots = bool(enabled)
-        self.advanced_page.set_show_snapshots(enabled)
         self.create_dialog.set_show_snapshots(enabled)
 
     def set_account(self, account: object | None) -> None:

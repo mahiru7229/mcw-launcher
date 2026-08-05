@@ -86,6 +86,8 @@ def test_workspace_create_dialog_emits_public_create_contract(gui_app):
     page.create_dialog._request_create()
 
     assert emitted == [("New Quilt", "1.21.1", "quilt")]
+    assert not hasattr(page.advanced_page, "create_name_input")
+    assert not hasattr(page.advanced_page, "create_requested")
 
 
 def test_workspace_exposes_content_pack_management_for_selected_instance(gui_app):

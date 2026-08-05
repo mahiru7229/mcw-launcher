@@ -17,6 +17,7 @@
         "accounts.subtitle": "Quản lý tài khoản Offline. Luồng đăng nhập Microsoft đã được chuẩn bị nhưng vẫn bị khóa cho đến khi ứng dụng được chấp thuận.",
         "instances.subtitle": "Tạo và quản lý các instance Minecraft độc lập, bao gồm Fabric Loader và mod riêng cho từng instance.",
         "instances.subtitle.modloaders": "Tạo và quản lý các instance Minecraft độc lập với Vanilla, Fabric, Quilt, Forge hoặc NeoForge.",
+        "instances.advanced.subtitle": "Quản lý instance Minecraft đã chọn, mod loader, công cụ bảo trì, bản sao lưu và trạng thái modpack được quản lý.",
         "instance_settings.subtitle": "Cài đặt được tải và lưu thông qua API SettingsManager công khai.",
         "launcher_settings.subtitle": "Các tùy chọn tại đây thuộc về giao diện launcher, không thuộc một instance Minecraft riêng lẻ.",
         "logs.subtitle": "Hoạt động giao diện và các sự kiện tiến trình có cấu trúc sẽ xuất hiện tại đây.",

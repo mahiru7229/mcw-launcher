@@ -1,36 +1,27 @@
-# MCW Launcher v1.1.0-beta.3 — Step 1: Responsive mod-loader UI
+# MCW Launcher v1.1.0-beta.3 — Step 2
 
-Incremental launcher-only patch for **v1.1.0-beta.2**.
+Patch này **chỉ chứa launcher diff** của bước 2 và phải được áp dụng sau patch:
 
-## Apply
+- `v1.1.0-beta.3-responsive-step1`
 
-Extract this ZIP over the launcher repository root and replace existing files.
+## Nội dung
 
-## Scope
+- Xóa toàn bộ khu vực **Create instance** khỏi cửa sổ **Advanced Instance Management**.
+- Loại bỏ các signal, bộ lọc manifest và handler tạo/import modpack không còn thuộc cửa sổ nâng cao.
+- Giữ luồng tạo instance duy nhất tại nút **Add Instance** và `CreateInstanceDialog`.
+- Ngừng chuyển manifest/snapshot settings sang trang nâng cao.
+- Đổi mô tả trang nâng cao để chỉ nói về quản lý instance hiện tại.
+- Thêm regression tests bảo đảm phần tạo instance không quay trở lại cửa sổ nâng cao.
 
-This step only fixes the responsive layout of **Advanced Instance Management**:
+## Áp dụng
 
-- The advanced dialog is freely resizable instead of being locked to its initial size.
-- Minimum supported dialog size is `520 × 420`.
-- Mod-loader and loader-version fields are side by side on wide layouts and stacked on narrower layouts.
-- Loader action buttons reflow between 3, 2, and 1 columns.
-- The remaining instance action buttons use the same reflow behavior so the management card does not overflow.
-- Long loader-version values no longer force unnecessary horizontal expansion.
-- Compact margins and spacing are enabled automatically on narrow layouts.
+Giải nén ZIP vào thư mục gốc repository launcher và cho phép ghi đè file.
 
-The duplicated **Create instance** section is intentionally still present. Its removal is the next Beta 3 step.
+## Xác thực đã chạy
 
-This patch does not change MCW Core, package metadata, version metadata, language files, or release documentation.
+- `compileall`/AST parse: đạt.
+- JSON ngôn ngữ: hợp lệ và có key mới ở cả `en-US`/`vi-VN`.
+- `test/test_language_runtime.py` + `test/test_public_api.py`: **8 passed**.
+- GUI tests được cập nhật nhưng không thể thực thi trong môi trường đóng gói vì không có PySide6; pytest xác nhận **3 module skipped**.
 
-## Changed files
-
-- `src/gui/dialogs/instance_management_dialog.py`
-- `src/gui/pages/instances_page.py`
-- `test/gui/dialogs/test_instance_management_dialog.py`
-- `test/gui/pages/test_instances_page.py`
-
-## Validation performed
-
-- Modified Python files compile successfully.
-- Existing version/public-API smoke tests: `5 passed`.
-- Responsive GUI tests were added, but could not be executed in the packaging environment because PySide6 is unavailable there; run them on the normal launcher development environment.
+MCW Core không thay đổi và không nằm trong patch này.

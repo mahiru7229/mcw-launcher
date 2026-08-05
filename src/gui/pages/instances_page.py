@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QTimer, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy, QWidget
 
-from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
 from mcw_core.api.language.language_manager import tr
 from src.gui.localization import retranslate_widget_tree
 from src.gui.pages.base_page import BasePage
@@ -16,13 +15,11 @@ from src.gui.theme.runtime import set_theme_icon
 class InstancesPage(BasePage):
     refresh_requested = Signal()
     selected_instance_changed = Signal(str)
-    create_requested = Signal(str, str, str)
     rename_requested = Signal(str, str)
     clone_requested = Signal(str, str, bool)
     delete_requested = Signal(str)
     import_requested = Signal(object)
     export_requested = Signal(str, object, bool)
-    import_modpack_package_requested = Signal(object)
     export_modpack_requested = Signal(str)
     fabric_versions_requested = Signal(str)
     quilt_versions_requested = Signal(str)
@@ -35,9 +32,6 @@ class InstancesPage(BasePage):
     export_forge_diagnostics_requested = Signal(str)
     repair_instance_requested = Signal(str)
     manage_mods_requested = Signal(str)
-    browse_modpacks_requested = Signal()
-    browse_curseforge_modpacks_requested = Signal()
-    browse_ftb_modpacks_requested = Signal()
     backup_requested = Signal(str, str)
     restore_backup_requested = Signal(str, object)
     open_backups_requested = Signal(str)
@@ -48,9 +42,8 @@ class InstancesPage(BasePage):
     apply_modpack_update_requested = Signal(str)
 
     def __init__(self) -> None:
-        super().__init__("Instances", "Create and manage isolated Minecraft instances with Vanilla, Fabric, Quilt, Forge, or NeoForge.", "instances")
+        super().__init__("Instances", "Manage the selected Minecraft instance, its mod loader, maintenance tools, backups, and managed modpack state.", "instances")
         self._instances: dict[str, object] = {}
-        self._versions: list[object] = []
         self._fabric_versions: dict[str, list[object]] = {}
         self._quilt_versions: dict[str, list[object]] = {}
         self._forge_versions: dict[str, list[object]] = {}
@@ -60,10 +53,6 @@ class InstancesPage(BasePage):
         self._modpack_update_info: object | None = None
         self._modpack_managed = False
         self._responsive_signature: tuple[bool, int] | None = None
-        self._version_filter_timer = QTimer(self)
-        self._version_filter_timer.setSingleShot(True)
-        self._version_filter_timer.setInterval(25)
-        self._version_filter_timer.timeout.connect(self._apply_version_filter)
         self._build_ui()
         self.retranslate_dynamic()
 
@@ -86,48 +75,6 @@ class InstancesPage(BasePage):
         selected_card.layout.addWidget(self.instance_info)
         selected_card.layout.addLayout(selected_actions)
         self.root_layout.addWidget(selected_card)
-
-        create_card = CardWidget("Create instance", "Choose Vanilla, Fabric, Quilt, Forge, or NeoForge. Automatic mode selects a compatible loader version.")
-        self.create_name_input = QLineEdit()
-        self.create_name_input.setPlaceholderText("New instance name")
-        self.version_combo = QComboBox()
-        self.snapshot_checkbox = QCheckBox("Show snapshots, old alpha, and old beta")
-        self.snapshot_checkbox.toggled.connect(self._queue_version_filter)
-        self.create_loader_combo = QComboBox()
-        self.create_loader_combo.addItem("Vanilla", "vanilla")
-        self.create_loader_combo.addItem("Fabric", "fabric")
-        self.create_loader_combo.addItem("Quilt", "quilt")
-        self.create_loader_combo.addItem("Forge", "forge")
-        self.create_loader_combo.addItem("NeoForge", "neoforge")
-        self.create_loader_status = QLabel("Fabric, Quilt, Forge, and NeoForge versions can be changed later under Manage selected instance.")
-        self.create_loader_status.setObjectName("MutedLabel")
-        self.create_loader_status.setWordWrap(True)
-        create_button = set_theme_icon(QPushButton("Create instance"), "icon.action.add")
-        create_button.setObjectName("PrimaryButton")
-        create_button.clicked.connect(self._request_create)
-        self.browse_modpacks_button = set_theme_icon(QPushButton("Browse Modrinth modpacks"), "icon.action.modrinth")
-        self.browse_modpacks_button.clicked.connect(self.browse_modpacks_requested.emit)
-        self.browse_curseforge_modpacks_button = set_theme_icon(QPushButton("Browse CurseForge modpacks"), "icon.action.download")
-        self.browse_curseforge_modpacks_button.setVisible(CurseForgeConfigManager.is_configured())
-        self.browse_curseforge_modpacks_button.clicked.connect(self.browse_curseforge_modpacks_requested.emit)
-        self.browse_ftb_modpacks_button = set_theme_icon(QPushButton(tr("ftb.modpack.browse")), "icon.action.download")
-        self.browse_ftb_modpacks_button.clicked.connect(self.browse_ftb_modpacks_requested.emit)
-        self.import_modpack_package_button = set_theme_icon(QPushButton(tr("modpack_package.import.local_button")), "icon.action.import")
-        self.import_modpack_package_button.clicked.connect(self._choose_modpack_import)
-        create_card.layout.addWidget(QLabel("Name"))
-        create_card.layout.addWidget(self.create_name_input)
-        create_card.layout.addWidget(QLabel("Minecraft version"))
-        create_card.layout.addWidget(self.version_combo)
-        create_card.layout.addWidget(self.snapshot_checkbox)
-        create_card.layout.addWidget(QLabel("Mod loader"))
-        create_card.layout.addWidget(self.create_loader_combo)
-        create_card.layout.addWidget(self.create_loader_status)
-        create_card.layout.addWidget(create_button)
-        create_card.layout.addWidget(self.browse_modpacks_button)
-        create_card.layout.addWidget(self.browse_curseforge_modpacks_button)
-        create_card.layout.addWidget(self.browse_ftb_modpacks_button)
-        create_card.layout.addWidget(self.import_modpack_package_button)
-        self.root_layout.addWidget(create_card)
 
         self.manage_card = CardWidget("Manage selected instance", "Change the selected instance's Fabric, Quilt, Forge, or NeoForge version without recreating it.")
         self.manage_card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
@@ -332,10 +279,6 @@ class InstancesPage(BasePage):
             trailing_row = (len(buttons) + column_count - 1) // column_count
             layout.addWidget(trailing_button, trailing_row, 0, 1, column_count)
 
-    def set_versions(self, versions: list) -> None:
-        self._versions = list(versions)
-        self._apply_version_filter()
-
     def set_fabric_versions(self, game_version: str, versions: list) -> None:
         self._fabric_versions[game_version] = list(versions)
         instance = self._instances.get(self.current_instance_name())
@@ -380,9 +323,6 @@ class InstancesPage(BasePage):
         self._synchronizing = False
         self._render_instance(self.instance_combo.currentText())
 
-    def set_show_snapshots(self, enabled: bool) -> None:
-        self.snapshot_checkbox.setChecked(enabled)
-
     def current_instance_name(self) -> str:
         return self.instance_combo.currentText().strip()
 
@@ -397,9 +337,6 @@ class InstancesPage(BasePage):
         finally:
             self._synchronizing = previous
 
-    def selected_create_loader(self) -> str:
-        return str(self.create_loader_combo.currentData() or "vanilla")
-
     def selected_manage_loader(self) -> tuple[str, str]:
         loader_name = str(self.manage_loader_combo.currentData() or "vanilla")
         loader_version = str(self.manage_loader_version_combo.currentData() or "").strip() if loader_name in {"fabric", "quilt", "forge", "neoforge"} else "-1"
@@ -412,18 +349,6 @@ class InstancesPage(BasePage):
         self.set_interaction_locked(busy)
         if not busy:
             self._render_instance(self.current_instance_name())
-
-    def _queue_version_filter(self, _checked: bool) -> None:
-        self._version_filter_timer.start()
-
-    def _apply_version_filter(self) -> None:
-        selected = self.version_combo.currentText()
-        include_all = self.snapshot_checkbox.isChecked()
-        version_ids = [version.id for version in self._versions if include_all or getattr(version, "type", "") == "release"]
-        self.version_combo.clear()
-        self.version_combo.addItems(version_ids)
-        if selected in version_ids:
-            self.version_combo.setCurrentText(selected)
 
     def _instance_selected(self, name: str) -> None:
         self._render_instance(name)
@@ -691,9 +616,6 @@ class InstancesPage(BasePage):
         if answer == QMessageBox.StandardButton.Yes:
             self.repair_modpack_requested.emit(name)
 
-    def _request_create(self) -> None:
-        self.create_requested.emit(self.create_name_input.text(), self.version_combo.currentText(), self.selected_create_loader())
-
     def _request_loader_change(self) -> None:
         name = self.current_instance_name()
         if not name:
@@ -743,11 +665,6 @@ class InstancesPage(BasePage):
         if answer == QMessageBox.StandardButton.Yes:
             self.delete_requested.emit(name)
 
-    def _choose_modpack_import(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, tr("modpack_package.import.file_title"), "", tr("modpack_package.import.file_filter"))
-        if path:
-            self.import_modpack_package_requested.emit(Path(path))
-
     def _choose_import(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, tr("Import MCW instance"), "", tr("modpack_package.import.universal_filter"))
         if path:
@@ -761,13 +678,9 @@ class InstancesPage(BasePage):
     def retranslate_dynamic(self) -> None:
         retranslate_widget_tree(self)
         self.title_label.setText(tr("navigation.instances"))
-        self.subtitle_label.setText(tr("instances.subtitle.modloaders"))
+        self.subtitle_label.setText(tr("instances.advanced.subtitle"))
         self.open_instance_folder_button.setText(tr("instances.open_folder"))
         self.refresh_instances_button.setText(tr("instances.refresh"))
-        self.browse_modpacks_button.setText(tr("modrinth.modpack.browse"))
-        self.browse_curseforge_modpacks_button.setText(tr("curseforge.modpack.browse"))
-        self.browse_ftb_modpacks_button.setText(tr("ftb.modpack.browse"))
-        self.import_modpack_package_button.setText(tr("modpack_package.import.local_button"))
         self.restore_forge_button.setText(tr("forge.restore_previous"))
         self.restore_forge_button.setToolTip(tr("forge.restore.tooltip"))
         self.open_forge_logs_button.setText(tr("forge.open_logs"))

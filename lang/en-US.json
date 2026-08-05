@@ -17,6 +17,7 @@
         "accounts.subtitle": "Manage offline accounts. Microsoft sign-in is prepared but remains locked until application approval is granted.",
         "instances.subtitle": "Create and manage isolated Minecraft instances, including Fabric Loader and per-instance mods.",
         "instances.subtitle.modloaders": "Create and manage isolated Minecraft instances with Vanilla, Fabric, Quilt, Forge, or NeoForge.",
+        "instances.advanced.subtitle": "Manage the selected Minecraft instance, its mod loader, maintenance tools, backups, and managed modpack state.",
         "instance_settings.subtitle": "Settings are loaded and saved through the public SettingsManager API.",
         "launcher_settings.subtitle": "Preferences here belong to the GUI, not to an individual Minecraft instance.",
         "logs.subtitle": "Frontend activity and structured progress events appear here.",
