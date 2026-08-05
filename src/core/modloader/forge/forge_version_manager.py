@@ -227,15 +227,23 @@ class ForgeVersionManager:
             if item.get("clientreq") is False:
                 output.append(item)
                 continue
-            downloads = item.get("downloads") if isinstance(item.get("downloads"), dict) else {}
+            coordinate = str(item.get("name") or "").strip()
+            repository = ForgeVersionManager._library_repository(item, coordinate)
+            downloads = deepcopy(item.get("downloads")) if isinstance(item.get("downloads"), dict) else {}
+            ForgeVersionManager._normalize_windows_native(item, coordinate, repository, downloads, reporter)
+
             artifact = downloads.get("artifact") if isinstance(downloads.get("artifact"), dict) else None
-            if artifact is not None and artifact.get("path") and artifact.get("url") and artifact.get("sha1"):
+            if ForgeVersionManager._download_entry_is_complete(artifact):
+                item["downloads"] = downloads
                 output.append(item)
                 continue
-            coordinate = str(item.get("name") or "").strip()
+            if ForgeVersionManager._is_legacy_native_only_library(item, coordinate):
+                item["downloads"] = downloads
+                output.append(item)
+                continue
+
             path = ForgeVersionManager._maven_path(coordinate)
             local = Paths.libraries() / path
-            repository = ForgeVersionManager._library_repository(item, coordinate)
             url = repository + path.as_posix()
             sha1 = ForgeVersionManager._sha1(local) if local.is_file() else ForgeVersionManager._legacy_library_sha1(item)
             size = local.stat().st_size if local.is_file() else max(0, int(item.get("size") or 0))
@@ -252,13 +260,66 @@ class ForgeVersionManager:
                     )
                 except Exception as error:
                     raise RuntimeError(f"Could not resolve legacy Forge library '{coordinate}'.") from error
-            item["downloads"] = {"artifact": {"path": path.as_posix(), "url": url, "sha1": sha1, "size": size}}
+            downloads["artifact"] = {"path": path.as_posix(), "url": url, "sha1": sha1, "size": size}
+            item["downloads"] = downloads
             output.append(item)
         normalized["libraries"] = output
         return normalized
 
     @staticmethod
-    def _maven_path(coordinate: str) -> Path:
+    def _normalize_windows_native(item: dict, coordinate: str, repository: str, downloads: dict, reporter: ProgressReporter | None) -> None:
+        natives = deepcopy(item.get("natives")) if isinstance(item.get("natives"), dict) else {}
+        classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
+        if not classifier and ForgeVersionManager._is_legacy_native_platform_coordinate(coordinate):
+            classifier = "natives-windows"
+            natives["windows"] = classifier
+            item["natives"] = natives
+        if not classifier:
+            return
+        classifiers = deepcopy(downloads.get("classifiers")) if isinstance(downloads.get("classifiers"), dict) else {}
+        current = classifiers.get(classifier) if isinstance(classifiers.get(classifier), dict) else None
+        if ForgeVersionManager._download_entry_is_complete(current):
+            downloads["classifiers"] = classifiers
+            return
+
+        path = ForgeVersionManager._maven_path(coordinate, classifier=classifier)
+        local = Paths.libraries() / path
+        url = repository + path.as_posix()
+        sha1 = ForgeVersionManager._sha1(local) if local.is_file() else ""
+        size = local.stat().st_size if local.is_file() else 0
+        if not sha1:
+            try:
+                _, sha1, size = HttpDownloader.download_and_hash(
+                    url=url,
+                    path=local,
+                    max_retry=3,
+                    timeout=30.0,
+                    reporter=reporter,
+                    progress_stage=ProgressStage.INSTALLING_MOD_LOADER,
+                    progress_message=f"Downloading Forge native library {path.name}...",
+                )
+            except Exception as error:
+                raise RuntimeError(f"Could not resolve legacy Forge native library '{coordinate}' ({classifier}).") from error
+        classifiers[classifier] = {"path": path.as_posix(), "url": url, "sha1": sha1, "size": size}
+        downloads["classifiers"] = classifiers
+
+    @staticmethod
+    def _download_entry_is_complete(entry: dict | None) -> bool:
+        return bool(entry and entry.get("path") and entry.get("url") and entry.get("sha1"))
+
+    @staticmethod
+    def _is_legacy_native_only_library(item: dict, coordinate: str) -> bool:
+        natives = item.get("natives") if isinstance(item.get("natives"), dict) else {}
+        return bool(natives.get("windows") and ForgeVersionManager._is_legacy_native_platform_coordinate(coordinate))
+
+    @staticmethod
+    def _is_legacy_native_platform_coordinate(coordinate: str) -> bool:
+        parts = str(coordinate).split(":")
+        artifact = parts[1].strip().casefold() if len(parts) >= 2 else ""
+        return artifact.endswith("-platform")
+
+    @staticmethod
+    def _maven_path(coordinate: str, classifier: str | None = None) -> Path:
         raw = str(coordinate).strip()
         extension = "jar"
         if "@" in raw:
@@ -268,8 +329,8 @@ class ForgeVersionManager:
         if len(parts) < 3:
             raise RuntimeError(f"Invalid Forge library coordinate: {coordinate}")
         group, artifact, version = parts[:3]
-        classifier = parts[3] if len(parts) > 3 and parts[3] else ""
-        filename = f"{artifact}-{version}{'-' + classifier if classifier else ''}.{extension}"
+        selected_classifier = classifier if classifier is not None else (parts[3] if len(parts) > 3 and parts[3] else "")
+        filename = f"{artifact}-{version}{'-' + selected_classifier if selected_classifier else ''}.{extension}"
         return Path(*group.split("."), artifact, version, filename)
 
     @staticmethod
@@ -343,6 +404,8 @@ class ForgeVersionManager:
             return None
         if not ForgeVersionManager._legacy_launchwrapper_cache_is_complete(data):
             return None
+        if not ForgeVersionManager._windows_native_cache_is_complete(data):
+            return None
         return data
 
     @staticmethod
@@ -357,6 +420,25 @@ class ForgeVersionManager:
             artifact = downloads.get("artifact") if isinstance(downloads.get("artifact"), dict) else {}
             return bool(artifact.get("path") and artifact.get("url") and artifact.get("sha1"))
         return False
+
+    @staticmethod
+    def _windows_native_cache_is_complete(data: dict) -> bool:
+        libraries = data.get("libraries") if isinstance(data.get("libraries"), list) else []
+        for item in libraries:
+            if not isinstance(item, dict):
+                continue
+            natives = item.get("natives") if isinstance(item.get("natives"), dict) else {}
+            classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
+            if not classifier and ForgeVersionManager._is_legacy_native_platform_coordinate(str(item.get("name") or "")):
+                classifier = "natives-windows"
+            if not classifier:
+                continue
+            downloads = item.get("downloads") if isinstance(item.get("downloads"), dict) else {}
+            classifiers = downloads.get("classifiers") if isinstance(downloads.get("classifiers"), dict) else {}
+            entry = classifiers.get(classifier) if isinstance(classifiers.get(classifier), dict) else None
+            if not ForgeVersionManager._download_entry_is_complete(entry):
+                return False
+        return True
 
     @staticmethod
     def validate_installation(version: Version, game_version: str, forge_version: str, verify_files: bool = True) -> list[str]:

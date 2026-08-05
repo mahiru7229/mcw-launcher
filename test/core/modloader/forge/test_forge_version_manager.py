@@ -156,6 +156,131 @@ def test_normalize_hashless_legacy_library_downloads_and_records_sha1(monkeypatc
     }
 
 
+def test_normalize_legacy_native_only_library_builds_windows_classifier(monkeypatch, tmp_path: Path) -> None:
+    root = tmp_path / "libraries"
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))
+    calls = []
+
+    def fake_download_and_hash(**kwargs):
+        calls.append(kwargs)
+        target = kwargs["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"native-library")
+        return target, "c" * 40, len(b"native-library")
+
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
+        staticmethod(fake_download_and_hash),
+    )
+    profile = {
+        "libraries": [
+            {
+                "name": "org.lwjgl.lwjgl:lwjgl-platform:2.9.0",
+                "natives": {"windows": "natives-windows"},
+                "extract": {"exclude": ["META-INF/"]},
+            }
+        ]
+    }
+
+    normalized = ForgeVersionManager._normalize_libraries(profile)
+    library = normalized["libraries"][0]
+    classifiers = library["downloads"]["classifiers"]
+
+    assert "artifact" not in library["downloads"]
+    assert calls[0]["url"] == "https://libraries.minecraft.net/org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar"
+    assert classifiers["natives-windows"] == {
+        "path": "org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar",
+        "url": "https://libraries.minecraft.net/org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar",
+        "sha1": "c" * 40,
+        "size": len(b"native-library"),
+    }
+
+
+def test_normalize_legacy_platform_infers_windows_native_when_mapping_is_missing(monkeypatch, tmp_path: Path) -> None:
+    root = tmp_path / "libraries"
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))
+
+    def fake_download_and_hash(**kwargs):
+        target = kwargs["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"native-library")
+        return target, "f" * 40, len(b"native-library")
+
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
+        staticmethod(fake_download_and_hash),
+    )
+    profile = {"libraries": [{"name": "net.java.jinput:jinput-platform:2.0.5"}]}
+
+    normalized = ForgeVersionManager._normalize_libraries(profile)
+    library = normalized["libraries"][0]
+
+    assert library["natives"] == {"windows": "natives-windows"}
+    assert "artifact" not in library["downloads"]
+    assert library["downloads"]["classifiers"]["natives-windows"]["path"] == "net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5-natives-windows.jar"
+
+
+def test_normalize_legacy_native_library_preserves_existing_artifact(monkeypatch, tmp_path: Path) -> None:
+    root = tmp_path / "libraries"
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))
+    calls = []
+
+    def fake_download_and_hash(**kwargs):
+        calls.append(kwargs)
+        target = kwargs["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"native")
+        return target, "d" * 40, len(b"native")
+
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
+        staticmethod(fake_download_and_hash),
+    )
+    artifact = {
+        "path": "com/example/hybrid/1.0/hybrid-1.0.jar",
+        "url": "https://repo.example/com/example/hybrid/1.0/hybrid-1.0.jar",
+        "sha1": "e" * 40,
+        "size": 10,
+    }
+    profile = {
+        "libraries": [
+            {
+                "name": "com.example:hybrid:1.0",
+                "url": "https://repo.example/",
+                "natives": {"windows": "natives-windows-${arch}"},
+                "downloads": {"artifact": artifact},
+            }
+        ]
+    }
+
+    normalized = ForgeVersionManager._normalize_libraries(profile)
+    downloads = normalized["libraries"][0]["downloads"]
+
+    assert downloads["artifact"] == artifact
+    assert calls[0]["path"].name == "hybrid-1.0-natives-windows-64.jar"
+    assert "natives-windows-64" in downloads["classifiers"]
+
+
+def test_incomplete_windows_native_cache_is_invalidated(tmp_path: Path) -> None:
+    cache = tmp_path / "forge.json"
+    cache.write_text(
+        '{"id":"forge-1.6.4-9.11.1.1345","mainClass":"net.minecraft.launchwrapper.Launch","libraries":[{"name":"net.minecraft:launchwrapper:1.8","downloads":{"artifact":{"path":"net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","url":"https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","sha1":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":100}}},{"name":"org.lwjgl.lwjgl:lwjgl-platform:2.9.0","natives":{"windows":"natives-windows"},"downloads":{}}],"forge":{"schemaVersion":1,"gameVersion":"1.6.4","loaderVersion":"9.11.1.1345"}}',
+        encoding="utf-8",
+    )
+
+    assert ForgeVersionManager._load_cached(cache, "1.6.4", "9.11.1.1345") is None
+
+
+def test_complete_windows_native_cache_is_reused(tmp_path: Path) -> None:
+    cache = tmp_path / "forge.json"
+    cache.write_text(
+        '{"id":"forge-1.6.4-9.11.1.1345","mainClass":"net.minecraft.launchwrapper.Launch","libraries":[{"name":"net.minecraft:launchwrapper:1.8","downloads":{"artifact":{"path":"net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","url":"https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","sha1":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":100}}},{"name":"org.lwjgl.lwjgl:lwjgl-platform:2.9.0","natives":{"windows":"natives-windows"},"downloads":{"classifiers":{"natives-windows":{"path":"org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar","url":"https://libraries.minecraft.net/org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar","sha1":"cccccccccccccccccccccccccccccccccccccccc","size":609967}}}}],"forge":{"schemaVersion":1,"gameVersion":"1.6.4","loaderVersion":"9.11.1.1345"}}',
+        encoding="utf-8",
+    )
+
+    assert ForgeVersionManager._load_cached(cache, "1.6.4", "9.11.1.1345") is not None
+
+
 def test_incomplete_legacy_launchwrapper_cache_is_invalidated(tmp_path: Path) -> None:
     cache = tmp_path / "forge.json"
     cache.write_text(

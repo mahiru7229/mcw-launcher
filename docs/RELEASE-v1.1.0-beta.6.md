@@ -58,6 +58,19 @@ Hotfix này:
 - Vẫn ghép classpath bằng `os.pathsep`, tương ứng dấu `;` trên Windows.
 - Tự vô hiệu hóa riêng cache LaunchWrapper legacy chưa đầy đủ để profile được dựng lại, không bắt các instance Forge hiện đại cài lại.
 
+### Hotfix thư viện native-only của Forge 1.6.4
+
+Một số dependency cũ như `org.lwjgl.lwjgl:lwjgl-platform:2.9.0` và `net.java.jinput:jinput-platform:2.0.5` không có file JAR artifact thông thường; chúng chỉ phát hành các JAR classifier native như `natives-windows`. Launcher trước đó cố tải file `*-platform-<version>.jar`, nên dừng với lỗi `Could not resolve legacy Forge library`.
+
+Hotfix này:
+
+- Nhận diện các Maven coordinate `*-platform` legacy là thư viện native-only.
+- Tạo `downloads.classifiers` cho `natives-windows` thay vì ép tạo `downloads.artifact`.
+- Tự suy ra mapping `natives-windows` nếu profile Forge cũ không khai báo trường `natives`.
+- Tải, tính SHA-1 và lưu kích thước của native JAR để pipeline tải và giải nén hiện tại sử dụng bình thường.
+- Vô hiệu hóa cache Forge cũ nếu metadata native Windows chưa đầy đủ.
+- Giữ nguyên artifact thường đối với các thư viện thực sự có cả JAR Java và native classifier.
+
 ### Phiên bản
 
 - Launcher runtime: `v1.1.0-beta.6`
@@ -72,7 +85,7 @@ Hotfix này:
 - Regression test cho việc truyền Java tùy chọn qua load/prepare/repair.
 - Regression test cho progress profile của bảo vệ tài khoản.
 - Toàn bộ source và test qua `compileall`.
-- Toàn bộ test suite: **1316 passed, 82 skipped, 2 warnings**.
+- Toàn bộ test suite: **1321 passed, 82 skipped, 2 warnings**.
 
 ### Smoke test Windows đề xuất
 
@@ -133,6 +146,19 @@ This hotfix:
 - Keeps platform-correct classpath joining through `os.pathsep` (`;` on Windows).
 - Invalidates only incomplete legacy LaunchWrapper caches so modern Forge instances are not reinstalled unnecessarily.
 
+### Forge 1.6.4 native-only platform-library hotfix
+
+Some legacy dependencies, including `org.lwjgl.lwjgl:lwjgl-platform:2.9.0` and `net.java.jinput:jinput-platform:2.0.5`, do not publish a normal artifact JAR. They publish only native classifier JARs such as `natives-windows`. The launcher previously tried to resolve `*-platform-<version>.jar` and stopped with `Could not resolve legacy Forge library`.
+
+This hotfix:
+
+- Recognizes legacy `*-platform` Maven coordinates as native-only libraries.
+- Builds `downloads.classifiers` for `natives-windows` instead of forcing `downloads.artifact`.
+- Infers the Windows native mapping when an old Forge profile omits the `natives` field.
+- Downloads, hashes, and records the native JAR for the existing download and extraction pipeline.
+- Invalidates legacy Forge caches whose Windows-native metadata is incomplete.
+- Preserves normal artifacts for libraries that genuinely provide both Java and native components.
+
 ### Versioning
 
 - Launcher runtime: `v1.1.0-beta.6`
@@ -142,7 +168,7 @@ This hotfix:
 
 ### Validation
 
-- Full test suite: **1316 passed, 82 skipped, 2 warnings**.
+- Full test suite: **1321 passed, 82 skipped, 2 warnings**.
 - Source and tests pass `compileall`.
 - Regression coverage includes Forge 1.6.4 `minecraftforge` runtime detection, mod-loader Java recovery, preferred-Java forwarding, and account-protection progress completion.
 

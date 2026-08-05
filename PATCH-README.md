@@ -1,20 +1,25 @@
-# MCW Launcher v1.1.0-beta.6 — Forge 1.6.4 LaunchWrapper hotfix
+# MCW Launcher v1.1.0-beta.6 — legacy native classifier hotfix
 
-Áp dụng patch này lên **v1.1.0-beta.6** đã cài trước đó.
+Apply this patch after the earlier **v1.1.0-beta.6 LaunchWrapper hotfix**.
 
-## Cách áp dụng
+## What it fixes
 
-1. Đóng MCW Launcher.
-2. Giải nén ZIP vào thư mục gốc repository launcher.
-3. Cho phép ghi đè các file trùng tên.
-4. Chạy lại launcher rồi Launch instance Forge 1.6.4.
+Forge 1.6.4 can declare native-only Maven platform libraries such as:
 
-Launcher sẽ tự bỏ cache Forge legacy chưa đầy đủ và dựng lại profile. Không cần xóa instance hoặc xóa toàn bộ cache thủ công.
+- `org.lwjgl.lwjgl:lwjgl-platform:2.9.0`
+- `net.java.jinput:jinput-platform:2.0.5`
 
-## Phạm vi
+These coordinates do not have a normal unclassified JAR. They provide platform classifier JARs such as `natives-windows`. The launcher now creates `downloads.classifiers` and downloads the correct Windows native JAR instead of trying to resolve a nonexistent `*-platform-<version>.jar`.
 
-- Tải và tạo metadata SHA-1 cho dependency Forge legacy thiếu `downloads.artifact`.
-- Đưa `net.minecraft:launchwrapper:1.8` vào classpath.
-- Dùng `os.pathsep` để giữ dấu phân cách classpath đúng nền tảng (`;` trên Windows).
-- Chỉ vô hiệu hóa cache LaunchWrapper legacy chưa đầy đủ; Forge hiện đại không bị cài lại.
-- Không chứa package `mcw_core/`, wheel hoặc Core source archive.
+## Apply
+
+1. Close MCW Launcher.
+2. Extract this ZIP into the repository root.
+3. Allow files to be replaced.
+4. Launch the Forge 1.6.4 instance again.
+
+The incomplete legacy Forge cache is invalidated automatically. You do not need to delete the instance.
+
+## Scope
+
+Launcher diff only. No standalone MCW Core source or wheel is included.
