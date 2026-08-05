@@ -1,21 +1,23 @@
-# MCW Launcher v1.1.0-beta.4 launcher diff
+# MCW Launcher v1.1.0-beta.5 launcher diff
 
-Apply this patch on top of the completed **v1.1.0-beta.3** launcher tree.
+Apply this patch on top of the completed **v1.1.0-beta.4** launcher tree.
 
 ## Included
 
-- Bounded automatic retry for temporary metadata/network failures.
-- A manual **Retry / Cancel** dialog after all three automatic attempts fail.
-- Exact task resubmission with the original parameters, task ID, blocking mode, and progress message.
-- Duplicate-task protection, bounded remembered retry registrations, sensitive-data redaction, translations, tests, version metadata, README, and release notes.
+- Normalizes reserved single-value game options before the final Java launch command is created.
+- Fixes legacy Forge/LaunchWrapper profiles that contain duplicate `--gameDir` values, including Forge 1.12.2-style inherited `minecraftArguments`.
+- Handles both `--option value` and `--option=value` forms.
+- Uses canonical launch-context values for launcher-controlled paths and version fields.
+- Preserves repeatable Forge options such as `--tweakClass`.
+- Rejects malformed single-value options before Java is spawned.
+- Includes version metadata, README/release notes, and regression tests.
 
-## Not included
+## Delivery boundary
 
-- No implementation files from `src/core/`.
-- No implementation files from `mcw_core/`.
-- No wheel or full source archive.
-- No Forge legacy `--gameDir` fix.
-- No account-protection progress fix.
+- This is a launcher-repository changed-files patch only.
+- No `mcw_core/` implementation files, wheel, or separate MCW Core source archive are included.
+- `src/core/minecraft/` is the implementation bundled inside the launcher repository; it is included because the launch-command fix lives there.
+- The standalone MCW Core distribution remains `1.1.0b2` until the final v1.1.0 release.
 
 ## Apply
 
@@ -23,6 +25,6 @@ Extract this ZIP into the repository root and allow files to be replaced.
 
 ## Validation
 
-- `PYTHONPATH=. pytest -q`: **1299 passed, 81 skipped, 2 warnings**.
-- `python -m compileall -q src launcher.py test`: passed.
-- GUI retry tests are included but skipped in this environment because PySide6 is unavailable; smoke-test Retry/Cancel on Windows.
+- `PYTHONPATH=. pytest -q`: **1304 passed, 81 skipped, 2 warnings**.
+- `python -m compileall -q src mcw_core test launcher.py`: passed.
+- Perform a Windows smoke test with a real Forge 1.12.2 instance to confirm LaunchWrapper no longer reports multiple values for `gameDir`.

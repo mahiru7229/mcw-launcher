@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Beta-v1.1.0--beta.2-orange" alt="Beta version">
+    <img src="https://img.shields.io/badge/Beta-v1.1.0--beta.5-orange" alt="Beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.0.2">
     <img src="https://img.shields.io/badge/Stable-v1.0.2-brightgreen" alt="Stable version">
@@ -50,6 +50,20 @@ Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh b
 Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.0.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.1.0-beta.5
+
+**v1.1.0-beta.5** sửa lỗi Forge legacy không thể khởi động do các tùy chọn đơn trị bị lặp, đặc biệt là `--gameDir` trên các profile LaunchWrapper như Forge 1.12.2:
+
+- Chuẩn hóa game arguments ngay trước khi ghép lệnh Java cuối cùng.
+- Nhận diện cả dạng `--option value` và `--option=value`.
+- Chỉ giữ một giá trị cho các tùy chọn đơn trị; với đường dẫn/thông tin do launcher quản lý, giá trị canonical từ launch context luôn được ưu tiên.
+- Không gộp nhầm các tùy chọn có thể lặp hợp lệ như `--tweakClass`.
+- Từ chối lệnh launch có tùy chọn đơn trị bị thiếu giá trị trước khi tạo tiến trình Java.
+- Thêm regression test cho profile Forge legacy kế thừa, `minecraftArguments` bị ghép lặp và xung đột từ custom game arguments.
+- Không phát hành MCW Core wheel mới; distribution dùng để build vẫn là `1.1.0b2`.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.5.md`](docs/RELEASE-v1.1.0-beta.5.md).
 
 ## Có gì mới trong v1.1.0-beta.4
 

@@ -1,78 +1,77 @@
 --- a/README.md
 +++ b/README.md
-@@ -51,6 +51,21 @@
+@@ -7,7 +7,7 @@
+ 
+ <p align="center">
+   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
+-    <img src="https://img.shields.io/badge/Beta-v1.1.0--beta.2-orange" alt="Beta version">
++    <img src="https://img.shields.io/badge/Beta-v1.1.0--beta.5-orange" alt="Beta version">
+   </a>
+   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.0.2">
+     <img src="https://img.shields.io/badge/Stable-v1.0.2-brightgreen" alt="Stable version">
+@@ -51,6 +51,20 @@
  
  ---
  
-+## Có gì mới trong v1.1.0-beta.4
++## Có gì mới trong v1.1.0-beta.5
 +
-+**v1.1.0-beta.4** hoàn thiện cơ chế retry metadata khi mạng hoặc máy chủ gặp lỗi tạm thời:
++**v1.1.0-beta.5** sửa lỗi Forge legacy không thể khởi động do các tùy chọn đơn trị bị lặp, đặc biệt là `--gameDir` trên các profile LaunchWrapper như Forge 1.12.2:
 +
-+- Tự động thử tối đa 3 lần với khoảng chờ 0,5 giây và 1 giây.
-+- Chỉ retry timeout, lỗi kết nối/DNS tạm thời, rate limit và các lỗi máy chủ có khả năng phục hồi.
-+- Không retry lỗi validation, loader không hỗ trợ, xác thực hoặc các HTTP client error vĩnh viễn.
-+- Sau khi ba lần tự động thất bại, hiển thị hộp thoại **Thử lại/Hủy**.
-+- Nút Thử lại chạy lại đúng tác vụ và tham số trước đó, bắt đầu một vòng retry giới hạn mới.
-+- Ngăn task trùng, giới hạn số task được ghi nhớ và lọc dữ liệu nhạy cảm khỏi lỗi hiển thị/log.
-+- Áp dụng cho Minecraft manifest, metadata mod loader, Modrinth, CurseForge, FTB, resource pack và shader pack.
-+- Không thay đổi triển khai MCW Core và không phát hành wheel mới; distribution dùng để build vẫn là `1.1.0b2`.
++- Chuẩn hóa game arguments ngay trước khi ghép lệnh Java cuối cùng.
++- Nhận diện cả dạng `--option value` và `--option=value`.
++- Chỉ giữ một giá trị cho các tùy chọn đơn trị; với đường dẫn/thông tin do launcher quản lý, giá trị canonical từ launch context luôn được ưu tiên.
++- Không gộp nhầm các tùy chọn có thể lặp hợp lệ như `--tweakClass`.
++- Từ chối lệnh launch có tùy chọn đơn trị bị thiếu giá trị trước khi tạo tiến trình Java.
++- Thêm regression test cho profile Forge legacy kế thừa, `minecraftArguments` bị ghép lặp và xung đột từ custom game arguments.
++- Không phát hành MCW Core wheel mới; distribution dùng để build vẫn là `1.1.0b2`.
 +
-+Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.4.md`](docs/RELEASE-v1.1.0-beta.4.md).
++Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.5.md`](docs/RELEASE-v1.1.0-beta.5.md).
 +
- ## Có gì mới trong v1.1.0-beta.3
+ ## Có gì mới trong v1.1.0-beta.4
  
- **v1.1.0-beta.3** hoàn thiện luồng quản lý mod loader và dọn lại cửa sổ quản lý instance nâng cao:
---- a/docs/RELEASE-v1.1.0-beta.4.md
-+++ b/docs/RELEASE-v1.1.0-beta.4.md
-@@ -0,0 +1,99 @@
-+# MCW Launcher v1.1.0-beta.4
+ **v1.1.0-beta.4** hoàn thiện cơ chế retry metadata khi mạng hoặc máy chủ gặp lỗi tạm thời:
+--- /dev/null
++++ b/docs/RELEASE-v1.1.0-beta.5.md
+@@ -0,0 +1,81 @@
++# MCW Launcher v1.1.0-beta.5
 +
 +## Tiếng Việt
 +
 +### Phạm vi
 +
-+Beta 4 hoàn thiện cơ chế phục hồi các yêu cầu metadata khi mạng hoặc máy chủ gặp lỗi tạm thời. Launcher tự thử lại có giới hạn trước, sau đó cung cấp nút **Thử lại** để người dùng chạy lại đúng yêu cầu vừa thất bại mà không cần đóng cửa sổ hoặc thực hiện lại toàn bộ luồng.
++Beta 5 sửa lỗi Forge legacy thoát ngay trong LaunchWrapper với `joptsimple.MultipleArgumentsForOptionException`, thường gặp ở Forge 1.12.2 khi `--gameDir` xuất hiện nhiều lần. Nguyên nhân là profile Forge legacy có thể ghép `minecraftArguments` của phiên bản Minecraft gốc với một chuỗi Forge đầy đủ, trong khi custom game arguments cũng có thể thêm lại cùng tùy chọn.
 +
 +### Thay đổi
 +
-+- Tự động thử tối đa **3 lần** cho các yêu cầu metadata đã đăng ký.
-+- Chờ lần lượt **0,5 giây** và **1 giây** trước lần thử thứ hai và thứ ba.
-+- Chỉ thử lại các lỗi có khả năng phục hồi, gồm timeout, DNS/kết nối tạm thời, reset kết nối và HTTP `408`, `425`, `429`, `500`, `502`, `503`, `504`.
-+- Không thử lại các lỗi cố định như metadata sai định dạng, loader không hỗ trợ, xác thực thất bại hoặc HTTP `400`, `401`, `403`, `404` và các lỗi client vĩnh viễn khác.
-+- Sau khi ba lần tự động đều thất bại, hiển thị hộp thoại có nút **Thử lại** và **Hủy**.
-+- Nút **Thử lại** chạy lại chính xác tác vụ, tham số, trạng thái blocking và thông báo tiến trình của yêu cầu trước đó.
-+- Mỗi lần thử thủ công bắt đầu một vòng tự động mới có giới hạn; không tạo vòng lặp retry vô hạn.
-+- Không cho chạy trùng cùng một task ID khi yêu cầu cũ vẫn còn hoạt động.
-+- Giới hạn số tác vụ mạng được ghi nhớ để không giữ vô hạn các closure truy vấn cũ.
-+- Mọi lỗi đưa vào log hoặc hộp thoại retry đều được lọc qua `SensitiveDataRedactor`.
-+- Trạng thái và log phân biệt rõ retry tự động, retry thủ công, hủy retry và trường hợp task không thể khởi động lại.
-+- Áp dụng cho metadata của:
-+  - Minecraft version manifest.
-+  - Fabric, Quilt, Forge và NeoForge.
-+  - Modrinth mod/modpack và mod catalog.
-+  - CurseForge project/file catalog.
-+  - FTB project/version metadata.
-+  - Resource pack và shader pack từ Modrinth/CurseForge.
-+- Bổ sung bản dịch tiếng Anh và tiếng Việt cho toàn bộ giao diện retry.
-+- Bổ sung regression test cho phân loại lỗi mạng, giới hạn ba lần, đăng ký lại đúng task và hành vi nút Retry/Cancel.
++- Thêm bước chuẩn hóa game arguments trong pipeline tạo launch command, sau khi metadata và custom arguments đã được hợp nhất nhưng trước khi Java được khởi chạy.
++- Nhận diện tùy chọn đơn trị ở cả hai dạng `--option value` và `--option=value`.
++- Loại các lần xuất hiện cũ và chỉ giữ lần hợp lệ cuối cùng của mỗi tùy chọn đơn trị.
++- Với các tùy chọn launcher kiểm soát như `--gameDir`, `--assetsDir`, `--assetIndex`, `--version` và `--versionType`, luôn dùng giá trị canonical từ launch context.
++- Giữ nguyên các tùy chọn được phép lặp như `--tweakClass`; không áp dụng dedup mù cho toàn bộ tham số Forge.
++- Kiểm tra mọi tùy chọn đơn trị còn lại có đúng một giá trị không rỗng; nếu lệnh bị hỏng, launcher dừng trước khi tạo tiến trình Java và trả về lỗi rõ ràng.
++- Bổ sung regression test mô phỏng Forge 1.12.2/LaunchWrapper với:
++  - `minecraftArguments` kế thừa bị ghép lặp `--gameDir`.
++  - Xung đột `--gameDir` từ custom game arguments.
++  - Dạng inline `--gameDir=...`.
++  - Tùy chọn đơn trị thiếu giá trị.
++  - `--tweakClass` vẫn được giữ nguyên.
 +
 +### Phiên bản
 +
-+- Launcher runtime: `v1.1.0-beta.4`
++- Launcher runtime: `v1.1.0-beta.5`
 +- Update channel: `beta`
-+- Không thay đổi triển khai trong `src/core/` hoặc `mcw_core/`.
-+- Không phát hành wheel mới; distribution dùng để build vẫn là `mcw-core 1.1.0b2`.
++- Không phát hành MCW Core wheel mới; distribution dùng để build vẫn là `mcw-core 1.1.0b2`.
++- Patch bàn giao chỉ chứa launcher diff. File triển khai dưới `src/core/` là phần core được bundle trong launcher và chưa được đóng gói thành source/wheel MCW Core riêng.
 +
 +### Xác thực
 +
-+- `1299 passed, 81 skipped, 2 warnings` với `PYTHONPATH=.`.
++- `1304 passed, 81 skipped, 2 warnings` với `PYTHONPATH=.`.
++- Regression test mới cho Forge legacy và game-argument normalization đã chạy thành công.
 +- Toàn bộ source và test đã qua `compileall`.
-+- Kiểm tra translation coverage đạt: không có literal `tr(...)` mới bị thiếu key.
-+- Hai test GUI mới cho cơ chế retry được thu thập nhưng bị skip trong môi trường hiện tại vì PySide6 không được cài đặt; cần smoke test hộp thoại Retry/Cancel trực tiếp trên Windows.
++- Cần smoke test cuối trên Windows với Forge 1.12.2 thực tế để xác nhận LaunchWrapper không còn báo nhiều giá trị cho `gameDir`.
 +
-+### Không nằm trong Beta 4
++### Không nằm trong Beta 5
 +
-+- Sửa Forge legacy trùng singleton argument như `--gameDir`.
 +- Sửa progress của kiểm tra bảo vệ tài khoản.
 +
 +---
@@ -81,1231 +80,381 @@
 +
 +### Scope
 +
-+Beta 4 completes recovery for metadata requests affected by temporary network or provider failures. The launcher first performs bounded automatic retries, then offers a **Retry** button that restarts the exact failed request without requiring the user to close the window or repeat the whole workflow.
++Beta 5 fixes legacy Forge exiting inside LaunchWrapper with `joptsimple.MultipleArgumentsForOptionException`, most commonly on Forge 1.12.2 when `--gameDir` appears more than once. Legacy Forge profiles can concatenate the inherited Minecraft `minecraftArguments` string with another complete Forge argument string, while custom game arguments may introduce the same option again.
 +
 +### Changes
 +
-+- Automatically makes up to **3 attempts** for registered metadata requests.
-+- Waits **0.5 seconds** and **1 second** before the second and third attempts.
-+- Retries only recoverable failures, including timeouts, temporary DNS/connectivity failures, connection resets, and HTTP `408`, `425`, `429`, `500`, `502`, `503`, and `504`.
-+- Does not retry permanent failures such as invalid metadata, unsupported loaders, authentication failures, HTTP `400`, `401`, `403`, `404`, and other permanent client errors.
-+- Shows a dialog with **Retry** and **Cancel** after all three automatic attempts fail.
-+- **Retry** reruns the exact task, parameters, blocking mode, and progress message from the failed request.
-+- Each manual retry starts a fresh bounded automatic round; it cannot create an infinite retry loop.
-+- Prevents duplicate execution of the same task ID while the previous request is still active.
-+- Caps remembered network-task registrations so old query closures are not retained indefinitely.
-+- Redacts every error shown in retry logs and dialogs through `SensitiveDataRedactor`.
-+- Provides distinct status/log messages for automatic retry, manual retry, cancellation, and failure to restart a task.
-+- Covers metadata for:
-+  - The Minecraft version manifest.
-+  - Fabric, Quilt, Forge, and NeoForge.
-+  - Modrinth mods/modpacks and the mod catalog.
-+  - CurseForge project/file catalogs.
-+  - FTB project/version metadata.
-+  - Modrinth/CurseForge resource packs and shader packs.
-+- Adds English and Vietnamese translations for the complete retry flow.
-+- Adds regression coverage for network-error classification, the three-attempt bound, exact task resubmission, and Retry/Cancel behavior.
++- Adds a game-argument normalization step after metadata/custom arguments are merged and before the final Java command is spawned.
++- Recognizes single-value options in both `--option value` and `--option=value` forms.
++- Removes older occurrences and keeps one valid value for every protected single-value option.
++- Uses canonical launch-context values for launcher-controlled options such as `--gameDir`, `--assetsDir`, `--assetIndex`, `--version`, and `--versionType`.
++- Preserves legitimately repeatable options such as `--tweakClass`; the fix does not blindly deduplicate every Forge argument.
++- Validates that each remaining single-value option has exactly one non-empty value. A malformed command fails clearly before a Java process is created.
++- Adds regression coverage for Forge 1.12.2/LaunchWrapper scenarios involving:
++  - Inherited `minecraftArguments` with duplicate `--gameDir`.
++  - Conflicting custom `--gameDir` values.
++  - Inline `--gameDir=...` syntax.
++  - Missing single-option values.
++  - Preserved `--tweakClass` behavior.
 +
 +### Versioning
 +
-+- Launcher runtime: `v1.1.0-beta.4`
++- Launcher runtime: `v1.1.0-beta.5`
 +- Update channel: `beta`
-+- No implementation changes under `src/core/` or `mcw_core/`.
-+- No new wheel is published; the build distribution remains `mcw-core 1.1.0b2`.
++- No new MCW Core wheel is published; the build distribution remains `mcw-core 1.1.0b2`.
++- The delivery contains launcher diff files only. The implementation under `src/core/` is the core bundled with the launcher and is not delivered as a separate MCW Core source/wheel package yet.
 +
 +### Validation
 +
-+- `1299 passed, 81 skipped, 2 warnings` with `PYTHONPATH=.`.
++- `1304 passed, 81 skipped, 2 warnings` with `PYTHONPATH=.`.
++- The new Forge legacy and argument-normalization regression tests pass.
 +- All source and test files pass `compileall`.
-+- Translation coverage passes with no newly unresolved literal `tr(...)` calls.
-+- The two new GUI tests for the retry flow are collected but skipped in the current environment because PySide6 is not installed; perform a Windows smoke test for the Retry/Cancel dialog.
++- Perform a final Windows smoke test with a real Forge 1.12.2 instance to confirm LaunchWrapper no longer reports multiple values for `gameDir`.
 +
-+### Not included in Beta 4
++### Not included in Beta 5
 +
-+- Forge legacy singleton-argument deduplication such as duplicate `--gameDir`.
 +- Account-protection progress reset fixes.
---- a/lang/en-US.json
-+++ b/lang/en-US.json
-@@ -1856,7 +1856,20 @@
-         "Unsupported Java selection mode.": "Unsupported Java selection mode.",
-         "Choose a Java executable or switch Java selection to Automatic.": "Choose a Java executable or switch Java selection to Automatic.",
-         "java.recovery.warning_custom": "The configured Java runtime failed. MCW launched with {path} and switched this instance back to Automatic. Reason: {reason}",
--        "java.recovery.warning_auto": "The initially selected Java runtime failed. MCW automatically retried and launched with {path}. Reason: {reason}"
-+        "java.recovery.warning_auto": "The initially selected Java runtime failed. MCW automatically retried and launched with {path}. Reason: {reason}",
-+        "network.retry.auto": "Temporary network error. Retrying request {attempt}/{max_attempts}...",
-+        "network.retry.log": "Network retry for {task}: attempt {attempt}/{max_attempts} in {delay}s. Last error: {error}",
-+        "network.retry.manual.title": "Network request failed",
-+        "network.retry.manual.message": "The request still failed after {attempts} automatic attempts. Check your connection, then try the same request again.",
-+        "network.retry.manual.button": "Retry",
-+        "network.retry.manual.expired": "This request can no longer be retried. Start it again from the page.",
-+        "network.retry.manual.already_running": "This request is already running.",
-+        "network.retry.manual.starting": "Retrying the network request...",
-+        "network.retry.manual.log": "Manual network retry started for {task}.",
-+        "network.retry.manual.available": "Network request failed. Manual retry is available.",
-+        "network.retry.manual.available_log": "Automatic network retries exhausted for {task}. Last error: {error}",
-+        "network.retry.manual.cancelled": "Network retry cancelled.",
-+        "network.retry.manual.could_not_start": "The request could not be restarted. Wait for the current task to finish and try again."
-     },
-     "aliases": {
-         "MCW Launcher": "app.name",
---- a/lang/vi-VN.json
-+++ b/lang/vi-VN.json
-@@ -1856,7 +1856,20 @@
-         "Unsupported Java selection mode.": "Chế độ chọn Java không được hỗ trợ.",
-         "Choose a Java executable or switch Java selection to Automatic.": "Hãy chọn file thực thi Java hoặc chuyển chế độ chọn Java sang Tự động.",
-         "java.recovery.warning_custom": "Java đã cấu hình gặp lỗi. MCW đã khởi chạy bằng {path} và chuyển instance này về chế độ Tự động. Lý do: {reason}",
--        "java.recovery.warning_auto": "Java được chọn ban đầu gặp lỗi. MCW đã tự động thử lại và khởi chạy bằng {path}. Lý do: {reason}"
-+        "java.recovery.warning_auto": "Java được chọn ban đầu gặp lỗi. MCW đã tự động thử lại và khởi chạy bằng {path}. Lý do: {reason}",
-+        "network.retry.auto": "Lỗi mạng tạm thời. Đang thử lại yêu cầu {attempt}/{max_attempts}...",
-+        "network.retry.log": "Thử lại mạng cho {task}: lần {attempt}/{max_attempts} sau {delay} giây. Lỗi gần nhất: {error}",
-+        "network.retry.manual.title": "Yêu cầu mạng thất bại",
-+        "network.retry.manual.message": "Yêu cầu vẫn thất bại sau {attempts} lần thử tự động. Hãy kiểm tra kết nối mạng rồi thử lại đúng yêu cầu này.",
-+        "network.retry.manual.button": "Thử lại",
-+        "network.retry.manual.expired": "Không thể thử lại yêu cầu này nữa. Hãy thực hiện lại từ trang hiện tại.",
-+        "network.retry.manual.already_running": "Yêu cầu này đang được thực hiện.",
-+        "network.retry.manual.starting": "Đang thử lại yêu cầu mạng...",
-+        "network.retry.manual.log": "Đã bắt đầu thử lại thủ công tác vụ mạng {task}.",
-+        "network.retry.manual.available": "Yêu cầu mạng thất bại. Bạn có thể thử lại thủ công.",
-+        "network.retry.manual.available_log": "Đã dùng hết số lần thử mạng tự động cho {task}. Lỗi gần nhất: {error}",
-+        "network.retry.manual.cancelled": "Đã hủy thử lại yêu cầu mạng.",
-+        "network.retry.manual.could_not_start": "Không thể khởi động lại yêu cầu. Hãy chờ tác vụ hiện tại hoàn tất rồi thử lại."
-     },
-     "aliases": {
-         "Show static text over themed controls": "launcher_settings.theme.show_static_text",
 --- a/src/config.py
 +++ b/src/config.py
 @@ -1,7 +1,7 @@
  from __future__ import annotations
  
--VERSION = "v1.1.0-beta.3"
--VERSION_ID = "1.1.0-beta.3"
-+VERSION = "v1.1.0-beta.4"
-+VERSION_ID = "1.1.0-beta.4"
+-VERSION = "v1.1.0-beta.4"
+-VERSION_ID = "1.1.0-beta.4"
++VERSION = "v1.1.0-beta.5"
++VERSION_ID = "1.1.0-beta.5"
  VERSION_TAG = f"v{VERSION_ID}"
  UPDATE_CHANNEL = "beta"
  GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
---- a/src/gui/controllers/base_controller.py
-+++ b/src/gui/controllers/base_controller.py
-@@ -1,12 +1,127 @@
+--- /dev/null
++++ b/src/core/minecraft/game_argument_normalizer.py
+@@ -0,0 +1,139 @@
 +from __future__ import annotations
 +
-+from collections import OrderedDict
-+from collections.abc import Callable
-+from dataclasses import dataclass
-+from typing import Any
 +
- from PySide6.QtCore import QObject, Signal
- 
-+from mcw_core.api.language.language_manager import tr
- from mcw_core.api.security.sensitive_data_redactor import SensitiveDataRedactor
-+from src.gui.network_retry import NetworkRetryPolicy, is_retryable_network_error, run_with_network_retries
-+from src.gui.task_runner import TaskRunner
++class GameArgumentNormalizer:
++    """Normalize game arguments before Java starts Minecraft.
 +
++    Legacy Forge profiles can merge the inherited Minecraft ``minecraftArguments``
++    string with another complete Forge argument string. That can leave singleton
++    jopt-simple options such as ``--gameDir`` in the command more than once. The
++    LaunchWrapper parser rejects those duplicates before Minecraft can start.
++    """
 +
-+@dataclass(frozen=True, slots=True)
-+class _NetworkTaskRegistration:
-+    task_runner: TaskRunner
-+    task: Callable[[], Any]
-+    message: str
-+    blocking: bool
- 
- 
- class BaseController(QObject):
-     status_changed = Signal(str)
-     log_created = Signal(str)
-     error_created = Signal(str, str)
-+    network_retry_available = Signal(str, str, str)
-+
-+    NETWORK_RETRY_POLICY = NetworkRetryPolicy()
-+    MAX_REMEMBERED_NETWORK_TASKS = 64
-+
-+    def __init__(self) -> None:
-+        super().__init__()
-+        self._network_tasks: OrderedDict[str, _NetworkTaskRegistration] = OrderedDict()
-+
-+    def _run_network_task(
-+        self,
-+        task_runner: TaskRunner,
-+        task_id: str,
-+        task: Callable[[], Any],
-+        message: str,
-+        *,
-+        blocking: bool = False,
-+    ) -> bool:
-+        normalized_id = str(task_id).strip()
-+        if not normalized_id:
-+            raise ValueError("A network task id is required.")
-+
-+        self._network_tasks[normalized_id] = _NetworkTaskRegistration(
-+            task_runner=task_runner,
-+            task=task,
-+            message=str(message),
-+            blocking=bool(blocking),
-+        )
-+        self._network_tasks.move_to_end(normalized_id)
-+        while len(self._network_tasks) > self.MAX_REMEMBERED_NETWORK_TASKS:
-+            self._network_tasks.popitem(last=False)
-+
-+        return task_runner.run(
-+            normalized_id,
-+            self._network_task(normalized_id, task),
-+            str(message),
-+            blocking=blocking,
-+        )
-+
-+    def retry_network_task(self, task_id: str) -> bool:
-+        normalized_id = str(task_id).strip()
-+        registration = self._network_tasks.get(normalized_id)
-+        if registration is None:
-+            self._emit_error(tr("network.retry.manual.title"), tr("network.retry.manual.expired"))
-+            return False
-+        if registration.task_runner.is_task_active(normalized_id):
-+            self.status_changed.emit(tr("network.retry.manual.already_running"))
-+            return False
-+
-+        self.status_changed.emit(tr("network.retry.manual.starting"))
-+        self.log_created.emit(tr("network.retry.manual.log", task=normalized_id))
-+        return registration.task_runner.run(
-+            normalized_id,
-+            self._network_task(normalized_id, registration.task),
-+            registration.message,
-+            blocking=registration.blocking,
-+        )
-+
-+    def _network_task(self, task_id: str, task: Callable[[], Any]) -> Callable[[], Any]:
-+        def on_retry(next_attempt: int, max_attempts: int, error: Exception, delay: float) -> None:
-+            message = tr("network.retry.auto", attempt=next_attempt, max_attempts=max_attempts)
-+            self.status_changed.emit(message)
-+            raw_error = SensitiveDataRedactor.redact_text(str(error) or type(error).__name__)
-+            self.log_created.emit(
-+                tr(
-+                    "network.retry.log",
-+                    task=task_id,
-+                    attempt=next_attempt,
-+                    max_attempts=max_attempts,
-+                    delay=f"{delay:.1f}",
-+                    error=raw_error,
-+                )
-+            )
-+
-+        return lambda: run_with_network_retries(
-+            task,
-+            policy=self.NETWORK_RETRY_POLICY,
-+            on_retry=on_retry,
-+        )
-+
-+    def _offer_network_retry(self, task_id: str, title: str, error: Exception) -> bool:
-+        normalized_id = str(task_id).strip()
-+        if normalized_id not in self._network_tasks or not is_retryable_network_error(error):
-+            return False
-+
-+        raw_message = str(error) or type(error).__name__
-+        message = SensitiveDataRedactor.redact_text(raw_message)
-+        self.status_changed.emit(tr("network.retry.manual.available"))
-+        self.log_created.emit(
-+            tr(
-+                "network.retry.manual.available_log",
-+                task=normalized_id,
-+                error=message,
-+            )
-+        )
-+        self.network_retry_available.emit(normalized_id, str(title), message)
-+        return True
- 
-     def _emit_error(self, title: str, error: Exception | str) -> None:
-         raw_message = str(error) if isinstance(error, str) else f"{type(error).__name__}: {error}"
---- a/src/gui/controllers/content_pack_controller.py
-+++ b/src/gui/controllers/content_pack_controller.py
-@@ -39,7 +39,7 @@
-             task = lambda: (source, kind, ModrinthClient.search_projects(kind, query=query, game_version=game_version, loader="", index=sort, offset=offset, limit=25, force_refresh=True))
-         else:
-             task = lambda: (source, kind, CurseForgeClient.search_projects(kind, query=query, game_version=game_version, loader="", sort=sort, index=offset, page_size=25, force_refresh=True))
--        return self._task_runner.run(task_id, task, tr("task.content.search", provider=source.title(), content_type=ContentPackManager.display_name(kind)), blocking=False)
-+        return self._run_network_task(self._task_runner, task_id, task, tr("task.content.search", provider=source.title(), content_type=ContentPackManager.display_name(kind)), blocking=False)
- 
-     def load_project_details(self, provider: str, content_type: str, project_id: str) -> bool:
-         source = self._provider(provider)
-@@ -49,7 +49,7 @@
-             task = lambda: (source, kind, str(project_id), ModrinthClient.get_project(str(project_id)))
-         else:
-             task = lambda: (source, kind, str(project_id), CurseForgeClient.get_project_details(int(project_id)))
--        return self._task_runner.run(task_id, task, tr("task.content.load_project_details"), blocking=False)
-+        return self._run_network_task(self._task_runner, task_id, task, tr("task.content.load_project_details"), blocking=False)
- 
-     def load_versions(self, provider: str, content_type: str, project_id: str, game_version: str = "", release_types: tuple[str, ...] = ("release", "beta", "alpha")) -> bool:
-         source = self._provider(provider)
-@@ -59,7 +59,7 @@
-             task = lambda: (source, kind, str(project_id), ModrinthClient.list_project_versions(str(project_id), loader="", game_version=game_version, version_types=release_types))
-         else:
-             task = lambda: (source, kind, int(project_id), CurseForgeClient.list_files(int(project_id), game_version=game_version, loader="", release_types=release_types))
--        return self._task_runner.run(task_id, task, tr("task.content.load_compatible_versions"), blocking=False)
-+        return self._run_network_task(self._task_runner, task_id, task, tr("task.content.load_compatible_versions"), blocking=False)
- 
-     def install_modrinth(self, instance_name: str, content_type: str, version_id: str) -> bool:
-         reporter = ProgressReporter(self.progress_received.emit)
-@@ -123,16 +123,24 @@
-     def _on_task_failed(self, task_id: str, error: Exception) -> None:
-         if not task_id.startswith("content."):
-             return
-+
-+        title = tr("content.manager.title")
-         if task_id.startswith("content.search."):
-             parts = task_id.split(".")
-             provider = parts[2] if len(parts) > 2 else "modrinth"
-             kind = parts[3] if len(parts) > 3 else "resourcepack"
-             self.search_failed.emit(provider, kind, str(error) or "Content search failed.")
-+            self._offer_network_retry(task_id, title, error)
-             return
-+
-         if task_id.startswith("content.details."):
-             self.log_created.emit(f"Could not load content project details: {error}")
-+            self._offer_network_retry(task_id, title, error)
-             return
--        self._emit_error("Content packs", error)
-+
-+        if self._offer_network_retry(task_id, title, error):
-+            return
-+        self._emit_error(title, error)
- 
-     @staticmethod
-     def _provider(value: str) -> str:
---- a/src/gui/controllers/curseforge_controller.py
-+++ b/src/gui/controllers/curseforge_controller.py
-@@ -49,24 +49,26 @@
-         normalized_context = self._normalize_context(context)
-         normalized_loader = CurseForgeClient.normalize_loader(loader) or "forge"
-         task_id = f"curseforge.search.{normalized_context}.{project_type}.{normalized_loader}"
--        return self._task_runner.run(
--            task_id,
--            lambda: (
--                normalized_context,
--                project_type,
--                normalized_loader,
--                CurseForgeClient.search_projects(
--                    project_type=project_type,
--                    query=query,
--                    game_version=game_version,
--                    loader=normalized_loader,
--                    index=index,
--                    page_size=25,
--                    sort=sort,
--                    force_refresh=force_refresh,
--                    manual_refresh=manual_refresh,
--                ),
--            ),
-+        task = lambda: (
-+            normalized_context,
-+            project_type,
-+            normalized_loader,
-+            CurseForgeClient.search_projects(
-+                project_type=project_type,
-+                query=query,
-+                game_version=game_version,
-+                loader=normalized_loader,
-+                index=index,
-+                page_size=25,
-+                sort=sort,
-+                force_refresh=force_refresh,
-+                manual_refresh=manual_refresh,
-+            ),
-+        )
-+        return self._run_network_task(
-+            self._task_runner,
-+            task_id,
-+            task,
-             tr("task.curseforge.search", project_type=project_type),
-             blocking=False,
-         )
-@@ -74,9 +76,11 @@
-     def load_project_details(self, project_type: str, project_id: int, loader: str = "forge") -> bool:
-         normalized_loader = CurseForgeClient.normalize_loader(loader) or "forge"
-         task_id = f"curseforge.details.{project_type}.{project_id}.{normalized_loader}"
--        return self._task_runner.run(
--            task_id,
--            lambda: (project_type, int(project_id), normalized_loader, CurseForgeClient.get_project_details(project_id)),
-+        task = lambda: (project_type, int(project_id), normalized_loader, CurseForgeClient.get_project_details(project_id))
-+        return self._run_network_task(
-+            self._task_runner,
-+            task_id,
-+            task,
-             tr("task.curseforge.load_project_details"),
-             blocking=False,
-         )
-@@ -85,23 +89,25 @@
-         normalized_context = self._normalize_context(context)
-         normalized_loader = CurseForgeClient.normalize_loader(loader) or "forge"
-         task_id = f"curseforge.files.{normalized_context}.{project_type}.{project_id}.{normalized_loader}"
--        return self._task_runner.run(
--            task_id,
--            lambda: (
--                normalized_context,
--                project_type,
--                int(project_id),
--                normalized_loader,
--                CurseForgeClient.list_files_result(
--                    project_id,
--                    game_version=game_version,
--                    loader=normalized_loader,
--                    release_types=allowed_release_types,
--                    page_size=50,
--                    force_refresh=force_refresh,
--                    manual_refresh=manual_refresh,
--                ),
--            ),
-+        task = lambda: (
-+            normalized_context,
-+            project_type,
-+            int(project_id),
-+            normalized_loader,
-+            CurseForgeClient.list_files_result(
-+                project_id,
-+                game_version=game_version,
-+                loader=normalized_loader,
-+                release_types=allowed_release_types,
-+                page_size=50,
-+                force_refresh=force_refresh,
-+                manual_refresh=manual_refresh,
-+            ),
-+        )
-+        return self._run_network_task(
-+            self._task_runner,
-+            task_id,
-+            task,
-             tr("task.curseforge.load_compatible_files"),
-             blocking=False,
-         )
-@@ -264,35 +270,49 @@
-     def _on_task_failed(self, task_id: str, error: Exception) -> None:
-         if not task_id.startswith("curseforge."):
-             return
-+
-+        if task_id == "curseforge.install.mod":
-+            title = tr("curseforge.mod.install")
-+        elif task_id.startswith("curseforge.install.manual."):
-+            title = tr("curseforge.manual.title")
-+        elif task_id in {"curseforge.install.modpack", "curseforge.install.modpack.manual"}:
-+            title = tr("curseforge.modpack.install")
-+        else:
-+            title = tr("curseforge.title")
-+
-         if task_id.startswith("curseforge.details."):
-             self.log_created.emit(f"Could not load CurseForge project details: {error}")
--            return
-+            self._offer_network_retry(task_id, title, error)
-+            return
-+
-         if task_id.startswith("curseforge.search.catalog."):
-             loader = task_id.rsplit(".", 1)[-1]
-             self.catalog_request_failed.emit("search", loader, str(error) or "CurseForge search failed.")
--            return
-+            if self._offer_network_retry(task_id, title, error):
-+                return
-+            return
-+
-         if task_id.startswith("curseforge.files.catalog."):
-             parts = task_id.split(".")
-             project_id = parts[-2] if len(parts) >= 2 else "0"
-             loader = parts[-1] if parts else ""
-             self.catalog_request_failed.emit(f"files:{project_id}", loader, str(error) or "CurseForge files request failed.")
--            return
-+            if self._offer_network_retry(task_id, title, error):
-+                return
-+            return
-+
-         if task_id.startswith("curseforge.cache.clear.catalog"):
-             self.catalog_request_failed.emit("cache", "", str(error) or "Could not clear CurseForge cache.")
-             return
-+
-         if task_id == "curseforge.install.modpack" and isinstance(error, CurseForgeModpackManualDownloadRequired):
-             self.status_changed.emit(tr("status.curseforge.manual_download_required"))
-             self.log_created.emit(str(error))
-             self.modpack_manual_download_required.emit(error)
-             return
--        if task_id == "curseforge.install.mod":
--            title = "Install CurseForge mod"
--        elif task_id.startswith("curseforge.install.manual."):
--            title = "Import CurseForge file"
--        elif task_id in {"curseforge.install.modpack", "curseforge.install.modpack.manual"}:
--            title = "Install CurseForge modpack"
--        else:
--            title = "CurseForge"
-+
-+        if self._offer_network_retry(task_id, title, error):
-+            return
-         self._emit_error(title, error)
- 
-     @classmethod
---- a/src/gui/controllers/ftb_controller.py
-+++ b/src/gui/controllers/ftb_controller.py
-@@ -27,33 +27,45 @@
-         self._task_runner.task_failed.connect(self._on_task_failed)
- 
-     def search(self, query: str, sort: str, index: int, force_refresh: bool = False) -> bool:
--        return self._task_runner.run(
--            "ftb.search",
--            lambda: FTBClient.search_projects(query=query, index=index, page_size=25, sort=sort, force_refresh=force_refresh),
-+        task_id = "ftb.search"
-+        task = lambda: FTBClient.search_projects(query=query, index=index, page_size=25, sort=sort, force_refresh=force_refresh)
-+        return self._run_network_task(
-+            self._task_runner,
-+            task_id,
-+            task,
-             tr("task.ftb.search"),
-             blocking=False,
-         )
- 
-     def load_project_details(self, project_id: int) -> bool:
--        return self._task_runner.run(
--            f"ftb.details.{int(project_id)}",
--            lambda: (int(project_id), FTBClient.get_project_details(project_id)),
-+        task_id = f"ftb.details.{int(project_id)}"
-+        task = lambda: (int(project_id), FTBClient.get_project_details(project_id))
-+        return self._run_network_task(
-+            self._task_runner,
-+            task_id,
-+            task,
-             tr("task.ftb.load_details"),
-             blocking=False,
-         )
- 
-     def load_versions(self, project_id: int, allowed_release_types: tuple[str, ...]) -> bool:
--        return self._task_runner.run(
--            f"ftb.versions.{int(project_id)}",
--            lambda: (int(project_id), FTBClient.list_versions(project_id, allowed_release_types)),
-+        task_id = f"ftb.versions.{int(project_id)}"
-+        task = lambda: (int(project_id), FTBClient.list_versions(project_id, allowed_release_types))
-+        return self._run_network_task(
-+            self._task_runner,
-+            task_id,
-+            task,
-             tr("task.ftb.load_versions"),
-             blocking=False,
-         )
- 
-     def load_version_details(self, project_id: int, version_id: int) -> bool:
--        return self._task_runner.run(
--            f"ftb.version.{int(project_id)}.{int(version_id)}",
--            lambda: (int(project_id), int(version_id), FTBClient.get_version(project_id, version_id)),
-+        task_id = f"ftb.version.{int(project_id)}.{int(version_id)}"
-+        task = lambda: (int(project_id), int(version_id), FTBClient.get_version(project_id, version_id))
-+        return self._run_network_task(
-+            self._task_runner,
-+            task_id,
-+            task,
-             tr("task.ftb.load_version_metadata"),
-             blocking=False,
-         )
-@@ -109,5 +121,7 @@
-     def _on_task_failed(self, task_id: str, error: Exception) -> None:
-         if not task_id.startswith("ftb."):
-             return
--        title = "Install FTB modpack" if task_id == "ftb.install.modpack" else "FTB"
-+        title = tr("ftb.modpack.install") if task_id == "ftb.install.modpack" else tr("content.library.provider.ftb")
-+        if self._offer_network_retry(task_id, title, error):
-+            return
-         self._emit_error(title, error)
---- a/src/gui/controllers/mod_catalog_controller.py
-+++ b/src/gui/controllers/mod_catalog_controller.py
-@@ -28,20 +28,22 @@
-     def search(self, query: str, index: str, offset: int, loader: str = ModLoaderManager.FABRIC) -> None:
-         normalized_loader = self._normalize_loader(loader)
-         task_id = f"{self.SEARCH_PREFIX}{normalized_loader}"
--        self._task_runner.run(
-+        task = lambda: (
-+            normalized_loader,
-+            ModrinthClient.search_projects(
-+                project_type="mod",
-+                query=query,
-+                loader=normalized_loader,
-+                index=index,
-+                offset=offset,
-+                limit=25,
-+                force_refresh=True,
-+            ),
-+        )
-+        self._run_network_task(
-+            self._task_runner,
-             task_id,
--            lambda: (
--                normalized_loader,
--                ModrinthClient.search_projects(
--                    project_type="mod",
--                    query=query,
--                    loader=normalized_loader,
--                    index=index,
--                    offset=offset,
--                    limit=25,
--                    force_refresh=True,
--                ),
--            ),
-+            task,
-             tr("task.mod_catalog.search", loader=normalized_loader.title()),
-             blocking=False,
-         )
-@@ -49,17 +51,19 @@
-     def load_versions(self, project_id: str, loader: str = ModLoaderManager.FABRIC) -> None:
-         normalized_loader = self._normalize_loader(loader)
-         task_id = f"{self.VERSIONS_PREFIX}{normalized_loader}.{project_id}"
--        self._task_runner.run(
-+        task = lambda: (
-+            project_id,
-+            normalized_loader,
-+            ModrinthClient.list_project_versions(
-+                project_id,
-+                loader=normalized_loader,
-+                version_types=("release", "beta", "alpha"),
-+            ),
-+        )
-+        self._run_network_task(
-+            self._task_runner,
-             task_id,
--            lambda: (
--                project_id,
--                normalized_loader,
--                ModrinthClient.list_project_versions(
--                    project_id,
--                    loader=normalized_loader,
--                    version_types=("release", "beta", "alpha"),
--                ),
--            ),
-+            task,
-             tr("task.mod_catalog.load_versions", loader=normalized_loader.title()),
-             blocking=False,
-         )
-@@ -84,15 +88,18 @@
-     @Slot(str, object)
-     def _on_task_failed(self, task_id: str, error: Exception) -> None:
-         message = str(error) or "Modrinth request failed."
-+        title = tr("Modrinth mod catalog")
-         if task_id.startswith(self.SEARCH_PREFIX):
-             loader = task_id.removeprefix(self.SEARCH_PREFIX).split(".", 1)[0]
-             self.search_failed.emit(loader, message)
-+            self._offer_network_retry(task_id, title, error)
-             return
- 
-         if task_id.startswith(self.VERSIONS_PREFIX):
-             remainder = task_id.removeprefix(self.VERSIONS_PREFIX)
-             loader, _, project_id = remainder.partition(".")
-             self.versions_failed.emit(project_id, loader, message)
-+            self._offer_network_retry(task_id, title, error)
- 
-     @staticmethod
-     def _normalize_loader(loader: str) -> str:
---- a/src/gui/controllers/mod_loader_controller.py
-+++ b/src/gui/controllers/mod_loader_controller.py
-@@ -43,7 +43,8 @@
-         task_id = f"{loader}.versions:{game_version}"
-         if self._task_runner.is_task_active(task_id):
-             return
--        self._task_runner.run(task_id, lambda: (game_version, resolver(game_version)), tr("task.mod_loader.load_versions", loader=title, version=game_version), blocking=False)
-+        task = lambda: (game_version, resolver(game_version))
-+        self._run_network_task(self._task_runner, task_id, task, tr("task.mod_loader.load_versions", loader=title, version=game_version), blocking=False)
- 
-     @Slot(str, object)
-     def _on_task_succeeded(self, task_id: str, result: object) -> None:
-@@ -81,4 +82,6 @@
-             title = "NeoForge"
-         else:
-             return
-+        if self._offer_network_retry(task_id, title, error):
-+            return
-         self._emit_error(title, error)
---- a/src/gui/controllers/modrinth_controller.py
-+++ b/src/gui/controllers/modrinth_controller.py
-@@ -38,17 +38,20 @@
-     def search(self, project_type: str, query: str, index: str, offset: int, game_version: str = "", loader: str = ModLoaderManager.FABRIC) -> None:
-         normalized_loader = self._normalize_loader(loader)
-         task_id = f"modrinth.search.{project_type}.{normalized_loader}"
--        self._task_runner.run(task_id, lambda: (project_type, normalized_loader, ModrinthClient.search_projects(project_type=project_type, query=query, game_version=game_version, loader=normalized_loader, index=index, offset=offset, limit=25, force_refresh=True)), tr("task.modrinth.search", project_type=project_type, loader=normalized_loader.title()), blocking=False)
-+        task = lambda: (project_type, normalized_loader, ModrinthClient.search_projects(project_type=project_type, query=query, game_version=game_version, loader=normalized_loader, index=index, offset=offset, limit=25, force_refresh=True))
-+        self._run_network_task(self._task_runner, task_id, task, tr("task.modrinth.search", project_type=project_type, loader=normalized_loader.title()), blocking=False)
- 
-     def load_versions(self, project_type: str, project_id: str, game_version: str = "", loader: str = ModLoaderManager.FABRIC) -> None:
-         normalized_loader = self._normalize_loader(loader)
-         task_id = f"modrinth.versions.{project_type}.{normalized_loader}.{project_id}"
--        self._task_runner.run(task_id, lambda: (project_type, project_id, normalized_loader, ModrinthClient.list_project_versions(project_id, loader=normalized_loader, game_version=game_version, version_types=("release", "beta", "alpha"))), tr("task.modrinth.load_versions", loader=normalized_loader.title()), blocking=False)
-+        task = lambda: (project_type, project_id, normalized_loader, ModrinthClient.list_project_versions(project_id, loader=normalized_loader, game_version=game_version, version_types=("release", "beta", "alpha")))
-+        self._run_network_task(self._task_runner, task_id, task, tr("task.modrinth.load_versions", loader=normalized_loader.title()), blocking=False)
- 
-     def load_project_details(self, project_type: str, project_id: str, loader: str = ModLoaderManager.FABRIC) -> None:
-         normalized_loader = self._normalize_loader(loader)
-         task_id = f"modrinth.details.{project_type}.{normalized_loader}.{project_id}"
--        self._task_runner.run(task_id, lambda: (project_type, project_id, normalized_loader, ModrinthClient.get_project(project_id)), tr("task.modrinth.load_project_details"), blocking=False)
-+        task = lambda: (project_type, project_id, normalized_loader, ModrinthClient.get_project(project_id))
-+        self._run_network_task(self._task_runner, task_id, task, tr("task.modrinth.load_project_details"), blocking=False)
- 
-     def install_mod(self, instance_name: str, version_id: str, allowed_version_types: tuple[str, ...] = ("release",)) -> bool:
-         reporter = ProgressReporter(self.progress_received.emit)
-@@ -127,24 +130,34 @@
-     def _on_task_failed(self, task_id: str, error: Exception) -> None:
-         if not task_id.startswith("modrinth."):
-             return
-+
-+        if task_id == "modrinth.install.mod":
-+            title = tr("modrinth.mod.install")
-+        elif task_id == "modrinth.install.modpack":
-+            title = tr("modrinth.modpack.install")
-+        else:
-+            title = tr("modrinth.title")
-+
-         if task_id.startswith("modrinth.details."):
-             self.log_created.emit(f"Could not load Modrinth project details: {error}")
-+            self._offer_network_retry(task_id, title, error)
-             return
-+
-         if task_id.startswith("modrinth.search."):
-             parts = task_id.split(".")
-             project_type = parts[2] if len(parts) > 2 else "modpack"
-             loader = parts[3] if len(parts) > 3 else ModLoaderManager.FABRIC
-             message = str(error) or "Modrinth search failed."
-             self.search_failed.emit(project_type, loader, message)
-+            if self._offer_network_retry(task_id, title, error):
-+                return
-+
-         if isinstance(error, ModrinthModpackManualDownloadRequired):
-             self.modpack_manual_download_required.emit(error)
-             return
--        if task_id == "modrinth.install.mod":
--            title = "Install Modrinth mod"
--        elif task_id == "modrinth.install.modpack":
--            title = "Install Modrinth modpack"
--        else:
--            title = "Modrinth"
-+
-+        if self._offer_network_retry(task_id, title, error):
-+            return
-         self._emit_error(title, error)
- 
-     @staticmethod
---- a/src/gui/controllers/version_controller.py
-+++ b/src/gui/controllers/version_controller.py
-@@ -22,7 +22,7 @@
-         self._task_runner.task_failed.connect(self._on_task_failed)
- 
-     def refresh(self) -> None:
--        self._task_runner.run(self.TASK_ID, self._load_versions, tr("Loading Minecraft version manifest..."), blocking=False)
-+        self._run_network_task(self._task_runner, self.TASK_ID, self._load_versions, tr("Loading Minecraft version manifest..."), blocking=False)
- 
-     @staticmethod
-     def _load_versions() -> list[Any]:
-@@ -44,4 +44,6 @@
-     @Slot(str, object)
-     def _on_task_failed(self, task_id: str, error: Exception) -> None:
-         if task_id == self.TASK_ID:
-+            if self._offer_network_retry(task_id, tr("Version manifest"), error):
-+                return
-             self._emit_error(tr("Version manifest"), error)
---- a/src/gui/main_window_2.py
-+++ b/src/gui/main_window_2.py
-@@ -639,6 +639,9 @@
-             controller.status_changed.connect(self._set_status)
-             controller.log_created.connect(self.logs_page.append)
-             controller.error_created.connect(self._show_error)
-+            controller.network_retry_available.connect(
-+                lambda task_id, title, message, owner=controller: self._show_network_retry(owner, task_id, title, message)
-+            )
- 
-     def _initialize_data(self) -> None:
-         settings = dict(self._startup_settings)
-@@ -2453,6 +2456,33 @@
-     def _show_error(self, title: str, message: str) -> None:
-         QMessageBox.critical(self, title, message)
- 
-+    def _show_network_retry(self, controller: object, task_id: str, title: str, message: str) -> None:
-+        box = QMessageBox(self)
-+        box.setIcon(QMessageBox.Icon.Warning)
-+        box.setWindowTitle(title or tr("network.retry.manual.title"))
-+        box.setText(tr("network.retry.manual.message", attempts=3))
-+        box.setInformativeText(message)
-+        box.setStandardButtons(QMessageBox.StandardButton.Retry | QMessageBox.StandardButton.Cancel)
-+        box.setDefaultButton(QMessageBox.StandardButton.Retry)
-+        box.setEscapeButton(QMessageBox.StandardButton.Cancel)
-+
-+        retry_button = box.button(QMessageBox.StandardButton.Retry)
-+        cancel_button = box.button(QMessageBox.StandardButton.Cancel)
-+        if retry_button is not None:
-+            retry_button.setText(tr("network.retry.manual.button"))
-+        if cancel_button is not None:
-+            cancel_button.setText(tr("common.cancel"))
-+
-+        result = box.exec()
-+        retry_value = int(QMessageBox.StandardButton.Retry.value)
-+        if result != retry_value:
-+            self._set_status(tr("network.retry.manual.cancelled"))
-+            return
-+
-+        retry = getattr(controller, "retry_network_task", None)
-+        if not callable(retry) or not retry(task_id):
-+            self._show_error(tr("network.retry.manual.title"), tr("network.retry.manual.could_not_start"))
-+
-     def _show_export_finished(self, path: Path) -> None:
-         self.toast_manager.show(tr("Saved to:\n{path}", path=path), "success", tr("Export complete"))
- 
---- a/src/gui/network_retry.py
-+++ b/src/gui/network_retry.py
-@@ -0,0 +1,179 @@
-+from __future__ import annotations
-+
-+from collections.abc import Callable
-+from dataclasses import dataclass
-+import errno
-+import re
-+import time
-+from typing import Any, TypeVar
-+
-+try:
-+    import httpx
-+except ImportError:  # pragma: no cover - launcher runtime depends on httpx
-+    httpx = None
-+
-+T = TypeVar("T")
-+
-+
-+@dataclass(frozen=True, slots=True)
-+class NetworkRetryPolicy:
-+    max_attempts: int = 3
-+    initial_delay_seconds: float = 0.5
-+    backoff_multiplier: float = 2.0
-+    max_delay_seconds: float = 2.0
-+
-+    def delay_before(self, next_attempt: int) -> float:
-+        exponent = max(0, int(next_attempt) - 2)
-+        delay = self.initial_delay_seconds * (self.backoff_multiplier ** exponent)
-+        return min(self.max_delay_seconds, max(0.0, float(delay)))
-+
-+
-+RetryCallback = Callable[[int, int, Exception, float], None]
-+
-+_RETRYABLE_ERRNOS = {
-+    errno.ECONNABORTED,
-+    errno.ECONNREFUSED,
-+    errno.ECONNRESET,
-+    errno.EHOSTUNREACH,
-+    errno.ENETDOWN,
-+    errno.ENETRESET,
-+    errno.ENETUNREACH,
-+    errno.EPIPE,
-+    errno.ETIMEDOUT,
-+    10051,  # WSAENETUNREACH
-+    10052,  # WSAENETRESET
-+    10053,  # WSAECONNABORTED
-+    10054,  # WSAECONNRESET
-+    10060,  # WSAETIMEDOUT
-+    10061,  # WSAECONNREFUSED
-+    10065,  # WSAEHOSTUNREACH
-+}
-+_RETRYABLE_HTTP_STATUS = {408, 425, 429, 500, 502, 503, 504}
-+_PERMANENT_HTTP_STATUS_PATTERN = re.compile(r"\b(?:400|401|403|404|405|409|410|412|413|415|422)\b")
-+_RETRYABLE_TEXT = (
-+    "timed out",
-+    "timeout",
-+    "connection reset",
-+    "connection refused",
-+    "connection aborted",
-+    "connection closed",
-+    "server disconnected",
-+    "remote protocol",
-+    "network is unreachable",
-+    "host is unreachable",
-+    "name or service not known",
-+    "temporary failure in name resolution",
-+    "dns lookup",
-+    "could not connect",
-+    "could not contact",
-+    "unable to contact",
-+    "network unavailable",
-+    "network error",
-+    "manifest is unavailable",
-+    "temporarily unavailable",
-+    "service unavailable",
-+    "bad gateway",
-+    "gateway timeout",
-+    "too many requests",
-+    "rate limit",
-+)
-+_PERMANENT_TEXT = (
-+    "invalid url",
-+    "unsupported protocol",
-+    "unsupported loader",
-+    "not available for minecraft",
-+    "does not contain any versions",
-+    "invalid metadata",
-+    "invalid response payload",
-+    "authentication failed",
-+    "unauthorized",
-+    "forbidden",
-+)
-+
-+
-+def run_with_network_retries(
-+    task: Callable[[], T],
-+    *,
-+    policy: NetworkRetryPolicy | None = None,
-+    on_retry: RetryCallback | None = None,
-+    sleep: Callable[[float], Any] = time.sleep,
-+) -> T:
-+    active_policy = policy or NetworkRetryPolicy()
-+    max_attempts = max(1, int(active_policy.max_attempts))
-+
-+    for attempt in range(1, max_attempts + 1):
-+        try:
-+            return task()
-+        except Exception as error:
-+            if attempt >= max_attempts or not is_retryable_network_error(error):
-+                raise
-+            next_attempt = attempt + 1
-+            delay = active_policy.delay_before(next_attempt)
-+            if on_retry is not None:
-+                on_retry(next_attempt, max_attempts, error, delay)
-+            if delay > 0:
-+                sleep(delay)
-+
-+    raise RuntimeError("Network retry loop ended unexpectedly.")
-+
-+
-+def is_retryable_network_error(error: BaseException) -> bool:
-+    chain = tuple(_exception_chain(error))
-+
-+    for current in chain:
-+        if _is_permanent_http_error(current):
-+            return False
-+
-+    for current in chain:
-+        if isinstance(current, (TimeoutError, ConnectionError)):
-+            return True
-+        if isinstance(current, OSError) and getattr(current, "errno", None) in _RETRYABLE_ERRNOS:
-+            return True
-+        if _is_retryable_http_error(current):
-+            return True
-+
-+    combined = " | ".join(str(item).strip().casefold() for item in chain if str(item).strip())
-+    if not combined:
-+        return False
-+    if any(text in combined for text in _PERMANENT_TEXT):
-+        return False
-+    if _PERMANENT_HTTP_STATUS_PATTERN.search(combined):
-+        return False
-+    return any(text in combined for text in _RETRYABLE_TEXT) or any(str(code) in combined for code in _RETRYABLE_HTTP_STATUS)
-+
-+
-+def _exception_chain(error: BaseException):
-+    current: BaseException | None = error
-+    seen: set[int] = set()
-+    while current is not None and id(current) not in seen:
-+        seen.add(id(current))
-+        yield current
-+        current = current.__cause__ or current.__context__
-+
-+
-+def _is_retryable_http_error(error: BaseException) -> bool:
-+    if httpx is None:
-+        return False
-+    if isinstance(error, httpx.HTTPStatusError):
-+        response = getattr(error, "response", None)
-+        return int(getattr(response, "status_code", 0) or 0) in _RETRYABLE_HTTP_STATUS
-+    permanent_request_types = tuple(
-+        error_type
-+        for error_type in (
-+            getattr(httpx, "InvalidURL", None),
-+            getattr(httpx, "UnsupportedProtocol", None),
-+        )
-+        if isinstance(error_type, type)
++    SINGLE_VALUE_OPTIONS = frozenset(
++        {
++            "--accessToken",
++            "--assetIndex",
++            "--assetsDir",
++            "--clientId",
++            "--gameDir",
++            "--height",
++            "--launchTarget",
++            "--quickPlayMultiplayer",
++            "--quickPlayPath",
++            "--quickPlayRealms",
++            "--quickPlaySingleplayer",
++            "--userProperties",
++            "--userType",
++            "--username",
++            "--uuid",
++            "--version",
++            "--versionType",
++            "--width",
++            "--xuid",
++        }
 +    )
-+    if permanent_request_types and isinstance(error, permanent_request_types):
-+        return False
-+    request_error = getattr(httpx, "RequestError", None)
-+    return isinstance(request_error, type) and isinstance(error, request_error)
++    CONTEXT_CONTROLLED_OPTIONS = {
++        "--assetIndex": "assets_index_name",
++        "--assetsDir": "assets_root",
++        "--gameDir": "game_directory",
++        "--version": "version_name",
++        "--versionType": "version_type",
++    }
 +
++    @classmethod
++    def normalize(cls, arguments: list[str], context: dict) -> list[str]:
++        entries = cls._parse(arguments)
++        last_occurrence: dict[str, int] = {}
++        for position, entry in enumerate(entries):
++            option = entry[0]
++            if option is not None:
++                last_occurrence[option] = position
 +
-+def _is_permanent_http_error(error: BaseException) -> bool:
-+    if httpx is None or not isinstance(error, getattr(httpx, "HTTPStatusError", ())):
-+        return False
-+    response = getattr(error, "response", None)
-+    status = int(getattr(response, "status_code", 0) or 0)
-+    return bool(status) and status not in _RETRYABLE_HTTP_STATUS
++        normalized: list[str] = []
++        for position, (option, value, raw) in enumerate(entries):
++            if option is None:
++                normalized.extend(raw)
++                continue
++            if last_occurrence[option] != position:
++                continue
++
++            canonical_value = cls._context_value(option, context)
++            selected_value = canonical_value if canonical_value is not None else value
++            if selected_value is None or not str(selected_value).strip():
++                raise RuntimeError(f"Launch option {option} requires exactly one non-empty value.")
++            normalized.extend((option, str(selected_value)))
++
++        cls.validate(normalized)
++        return normalized
++
++    @classmethod
++    def validate(cls, arguments: list[str]) -> None:
++        counts: dict[str, int] = {}
++        entries = cls._parse(arguments)
++        for option, value, _raw in entries:
++            if option is None:
++                continue
++            counts[option] = counts.get(option, 0) + 1
++            if value is None or not str(value).strip():
++                raise RuntimeError(f"Launch option {option} requires exactly one non-empty value.")
++
++        duplicates = sorted(option for option, count in counts.items() if count > 1)
++        if duplicates:
++            joined = ", ".join(duplicates)
++            raise RuntimeError(f"Launch command contains duplicate single-value options: {joined}.")
++
++    @classmethod
++    def _parse(cls, arguments: list[str]) -> list[tuple[str | None, str | None, list[str]]]:
++        values = [str(argument) for argument in arguments]
++        entries: list[tuple[str | None, str | None, list[str]]] = []
++        index = 0
++        while index < len(values):
++            token = values[index]
++            option, inline_value = cls._match_option(token)
++            if option is None:
++                entries.append((None, None, [token]))
++                index += 1
++                continue
++
++            if inline_value is not None:
++                entries.append((option, inline_value, [token]))
++                index += 1
++                continue
++
++            value: str | None = None
++            if index + 1 < len(values) and not cls._looks_like_option(values[index + 1]):
++                value = values[index + 1]
++                index += 2
++            else:
++                index += 1
++            entries.append((option, value, [token] if value is None else [token, value]))
++        return entries
++
++    @classmethod
++    def _match_option(cls, token: str) -> tuple[str | None, str | None]:
++        if token in cls.SINGLE_VALUE_OPTIONS:
++            return token, None
++        if "=" not in token:
++            return None, None
++        option, value = token.split("=", 1)
++        if option in cls.SINGLE_VALUE_OPTIONS:
++            return option, value
++        return None, None
++
++    @classmethod
++    def _looks_like_option(cls, token: str) -> bool:
++        if token in cls.SINGLE_VALUE_OPTIONS:
++            return True
++        option = token.split("=", 1)[0]
++        return option in cls.SINGLE_VALUE_OPTIONS or token.startswith("--")
++
++    @classmethod
++    def _context_value(cls, option: str, context: dict) -> str | None:
++        key = cls.CONTEXT_CONTROLLED_OPTIONS.get(option)
++        if key is None or key not in context:
++            return None
++        value = context.get(key)
++        if value is None or not str(value).strip():
++            return None
++        return str(value)
+--- a/src/core/minecraft/launcher_manager.py
++++ b/src/core/minecraft/launcher_manager.py
+@@ -1,5 +1,6 @@
+ from src.core.minecraft.classpath_builder import ClasspathBuilder
+ from src.core.minecraft.argument_builder import ArgumentBuilder
++from src.core.minecraft.game_argument_normalizer import GameArgumentNormalizer
+ from src.core.modloader.forge.forge_launch_command_manager import ForgeLaunchCommandManager
+ from src.models.minecraft.version import Version
+ from src.core.fs.paths import Paths
+@@ -19,6 +20,7 @@
+         )
+ 
+         jvm_args, game_args = ArgumentBuilder.build(version, context, settings, account)
++        game_args = GameArgumentNormalizer.normalize(game_args, context)
+         jvm_args = ForgeLaunchCommandManager.prepare(version, jvm_args, client_path=Paths.client(version), library_directory=Paths.libraries())
+         if runtime_jvm_arguments:
+             jvm_args.extend(str(argument) for argument in runtime_jvm_arguments)
 --- a/test/core/config/test_version_metadata.py
 +++ b/test/core/config/test_version_metadata.py
 @@ -6,9 +6,9 @@
  
  
  def test_launcher_version_metadata_has_one_source_of_truth() -> None:
--    assert VERSION == "v1.1.0-beta.3"
--    assert VERSION_ID == "1.1.0-beta.3"
--    assert VERSION_TAG == "v1.1.0-beta.3"
-+    assert VERSION == "v1.1.0-beta.4"
-+    assert VERSION_ID == "1.1.0-beta.4"
-+    assert VERSION_TAG == "v1.1.0-beta.4"
+-    assert VERSION == "v1.1.0-beta.4"
+-    assert VERSION_ID == "1.1.0-beta.4"
+-    assert VERSION_TAG == "v1.1.0-beta.4"
++    assert VERSION == "v1.1.0-beta.5"
++    assert VERSION_ID == "1.1.0-beta.5"
++    assert VERSION_TAG == "v1.1.0-beta.5"
      assert UPDATE_CHANNEL == "beta"
      assert GUI_VERSION == VERSION
      assert GUI_VERSION_ID == VERSION_ID
---- a/test/core_library/test_network_retry.py
-+++ b/test/core_library/test_network_retry.py
-@@ -0,0 +1,87 @@
+--- /dev/null
++++ b/test/core/minecraft/test_game_argument_normalizer.py
+@@ -0,0 +1,142 @@
 +from __future__ import annotations
 +
-+import pytest
-+
-+from src.gui.network_retry import NetworkRetryPolicy, is_retryable_network_error, run_with_network_retries
-+
-+
-+def test_network_task_retries_twice_then_succeeds() -> None:
-+    calls = 0
-+    sleeps: list[float] = []
-+    retries: list[tuple[int, int, str, float]] = []
-+
-+    def task() -> str:
-+        nonlocal calls
-+        calls += 1
-+        if calls < 3:
-+            raise TimeoutError("metadata request timed out")
-+        return "ok"
-+
-+    result = run_with_network_retries(
-+        task,
-+        policy=NetworkRetryPolicy(max_attempts=3, initial_delay_seconds=0.25, backoff_multiplier=2.0),
-+        on_retry=lambda attempt, maximum, error, delay: retries.append((attempt, maximum, str(error), delay)),
-+        sleep=sleeps.append,
-+    )
-+
-+    assert result == "ok"
-+    assert calls == 3
-+    assert sleeps == [0.25, 0.5]
-+    assert retries == [
-+        (2, 3, "metadata request timed out", 0.25),
-+        (3, 3, "metadata request timed out", 0.5),
-+    ]
-+
-+
-+def test_network_task_stops_after_bounded_attempts() -> None:
-+    calls = 0
-+
-+    def task() -> None:
-+        nonlocal calls
-+        calls += 1
-+        raise ConnectionError("connection reset")
-+
-+    with pytest.raises(ConnectionError, match="connection reset"):
-+        run_with_network_retries(task, policy=NetworkRetryPolicy(max_attempts=3, initial_delay_seconds=0), sleep=lambda _delay: None)
-+
-+    assert calls == 3
-+
-+
-+def test_validation_error_is_not_retried() -> None:
-+    calls = 0
-+
-+    def task() -> None:
-+        nonlocal calls
-+        calls += 1
-+        raise RuntimeError("Forge Maven metadata does not contain any versions.")
-+
-+    with pytest.raises(RuntimeError, match="does not contain"):
-+        run_with_network_retries(task, policy=NetworkRetryPolicy(max_attempts=3, initial_delay_seconds=0), sleep=lambda _delay: None)
-+
-+    assert calls == 1
-+
-+
-+def test_wrapped_network_error_is_retryable() -> None:
-+    try:
-+        raise TimeoutError("socket timed out")
-+    except TimeoutError as cause:
-+        error = RuntimeError("Could not load Minecraft Forge versions")
-+        error.__cause__ = cause
-+
-+    assert is_retryable_network_error(error) is True
-+
-+
-+def test_ftb_contact_failure_without_cause_is_retryable() -> None:
-+    error = RuntimeError("Could not contact the FTB modpack service: 503 from endpoint")
-+
-+    assert is_retryable_network_error(error) is True
-+
-+
-+def test_permanent_http_status_text_is_not_retryable() -> None:
-+    error = RuntimeError("Could not contact provider: 404 Not Found")
-+
-+    assert is_retryable_network_error(error) is False
-+
-+
-+def test_missing_manifest_without_cache_is_retryable() -> None:
-+    assert is_retryable_network_error(RuntimeError("Minecraft version manifest is unavailable.")) is True
---- a/test/gui/controllers/test_network_manual_retry.py
-+++ b/test/gui/controllers/test_network_manual_retry.py
-@@ -0,0 +1,67 @@
-+from __future__ import annotations
-+
-+import os
-+
-+import pytest
-+
-+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-+pytest.importorskip("PySide6")
-+
-+from PySide6.QtCore import QObject, Signal
-+
-+from src.gui.controllers.base_controller import BaseController
-+
-+
-+class _Runner(QObject):
-+    task_succeeded = Signal(str, object)
-+    task_failed = Signal(str, object)
-+
-+    def __init__(self) -> None:
-+        super().__init__()
-+        self.calls: list[tuple[str, object, str, bool]] = []
-+        self.active = False
-+
-+    def run(self, task_id, task, message, blocking=False):
-+        self.calls.append((task_id, task, message, blocking))
-+        return True
-+
-+    def is_task_active(self, _task_id: str) -> bool:
-+        return self.active
-+
-+
-+def test_retryable_failure_offers_and_restarts_same_network_task(gui_app) -> None:
-+    controller = BaseController()
-+    runner = _Runner()
-+    offered: list[tuple[str, str, str]] = []
-+    controller.network_retry_available.connect(lambda *args: offered.append(args))
-+
-+    controller._run_network_task(runner, "metadata.load", lambda: "ok", "Loading metadata", blocking=False)
-+
-+    assert controller._offer_network_retry("metadata.load", "Metadata", TimeoutError("request timed out")) is True
-+    assert offered == [("metadata.load", "Metadata", "request timed out")]
-+    assert controller.retry_network_task("metadata.load") is True
-+    assert len(runner.calls) == 2
-+    assert runner.calls[-1][0] == "metadata.load"
-+    assert runner.calls[-1][2:] == ("Loading metadata", False)
-+    assert runner.calls[-1][1]() == "ok"
-+
-+
-+def test_permanent_failure_does_not_offer_manual_retry(gui_app) -> None:
-+    controller = BaseController()
-+    runner = _Runner()
-+    offered: list[tuple[str, str, str]] = []
-+    controller.network_retry_available.connect(lambda *args: offered.append(args))
-+    controller._run_network_task(runner, "metadata.load", lambda: None, "Loading metadata", blocking=False)
-+
-+    assert controller._offer_network_retry("metadata.load", "Metadata", RuntimeError("404 Not Found")) is False
-+    assert offered == []
-+
-+
-+def test_manual_retry_refuses_duplicate_active_task(gui_app) -> None:
-+    controller = BaseController()
-+    runner = _Runner()
-+    controller._run_network_task(runner, "metadata.load", lambda: None, "Loading metadata", blocking=False)
-+    runner.active = True
-+
-+    assert controller.retry_network_task("metadata.load") is False
-+    assert len(runner.calls) == 1
---- a/test/gui/test_network_retry_dialog.py
-+++ b/test/gui/test_network_retry_dialog.py
-@@ -0,0 +1,95 @@
-+from __future__ import annotations
-+
-+import os
-+from enum import IntFlag
++from pathlib import Path
 +from types import SimpleNamespace
 +
 +import pytest
 +
-+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-+pytest.importorskip("PySide6")
-+
-+import src.gui.main_window_2 as main_window_module
-+from src.gui.main_window_2 import MainWindow
-+
-+
-+class _Button:
-+    def __init__(self) -> None:
-+        self.text = ""
-+
-+    def setText(self, text: str) -> None:
-+        self.text = text
++from src.core.fs.paths import Paths
++from src.core.minecraft.classpath_builder import ClasspathBuilder
++from src.core.minecraft.game_argument_normalizer import GameArgumentNormalizer
++from src.core.minecraft.launcher_manager import LauncherManager
++from src.models.account.account_source import AccountSource
++from src.models.instance.settings import InstanceSettings
 +
 +
-+class _FakeMessageBox:
-+    class Icon:
-+        Warning = 1
++def test_normalize_keeps_only_one_canonical_game_directory() -> None:
++    arguments = [
++        "--username",
++        "Steve",
++        "--gameDir",
++        "D:/custom-instance",
++        "--gameDir=C:/inherited-instance",
++        "--assetsDir",
++        "C:/assets",
++    ]
 +
-+    class StandardButton(IntFlag):
-+        Retry = 1
-+        Cancel = 2
++    normalized = GameArgumentNormalizer.normalize(
++        arguments,
++        {"game_directory": "C:/MCW/instances/Forge 1.12.2"},
++    )
 +
-+    next_result = StandardButton.Retry.value
-+
-+    def __init__(self, _parent=None) -> None:
-+        self.buttons = {
-+            self.StandardButton.Retry: _Button(),
-+            self.StandardButton.Cancel: _Button(),
-+        }
-+
-+    def setIcon(self, _icon) -> None:
-+        pass
-+
-+    def setWindowTitle(self, _title: str) -> None:
-+        pass
-+
-+    def setText(self, _text: str) -> None:
-+        pass
-+
-+    def setInformativeText(self, _text: str) -> None:
-+        pass
-+
-+    def setStandardButtons(self, _buttons) -> None:
-+        pass
-+
-+    def setDefaultButton(self, _button) -> None:
-+        pass
-+
-+    def setEscapeButton(self, _button) -> None:
-+        pass
-+
-+    def button(self, button):
-+        return self.buttons.get(button)
-+
-+    def exec(self) -> int:
-+        return int(self.next_result)
++    assert normalized.count("--gameDir") == 1
++    assert not any(value.startswith("--gameDir=") for value in normalized)
++    index = normalized.index("--gameDir")
++    assert normalized[index + 1] == "C:/MCW/instances/Forge 1.12.2"
++    assert normalized[:2] == ["--username", "Steve"]
 +
 +
-+def _window_stub():
-+    return SimpleNamespace(statuses=[], errors=[], _set_status=lambda message: None, _show_error=lambda title, message: None)
++def test_normalize_uses_last_value_for_non_context_singletons() -> None:
++    normalized = GameArgumentNormalizer.normalize(
++        ["--width", "854", "--width=1280", "--height", "720"],
++        {},
++    )
++
++    assert normalized == ["--width", "1280", "--height", "720"]
 +
 +
-+def test_retry_dialog_restarts_registered_task(monkeypatch) -> None:
-+    monkeypatch.setattr(main_window_module, "QMessageBox", _FakeMessageBox)
-+    retried: list[str] = []
-+    controller = SimpleNamespace(retry_network_task=lambda task_id: retried.append(task_id) or True)
-+    window = _window_stub()
-+    _FakeMessageBox.next_result = _FakeMessageBox.StandardButton.Retry.value
-+
-+    MainWindow._show_network_retry(window, controller, "metadata.load", "Metadata", "timed out")
-+
-+    assert retried == ["metadata.load"]
++def test_normalize_rejects_single_value_option_without_a_value() -> None:
++    with pytest.raises(RuntimeError, match=r"--gameDir requires exactly one non-empty value"):
++        GameArgumentNormalizer.normalize(["--gameDir"], {})
 +
 +
-+def test_retry_dialog_cancel_does_not_restart_task(monkeypatch) -> None:
-+    monkeypatch.setattr(main_window_module, "QMessageBox", _FakeMessageBox)
-+    retried: list[str] = []
-+    statuses: list[str] = []
-+    controller = SimpleNamespace(retry_network_task=lambda task_id: retried.append(task_id) or True)
-+    window = SimpleNamespace(_set_status=statuses.append, _show_error=lambda _title, _message: None)
-+    _FakeMessageBox.next_result = _FakeMessageBox.StandardButton.Cancel.value
++def test_launcher_build_normalizes_inherited_forge_legacy_game_dir_and_custom_conflict(
++    monkeypatch: pytest.MonkeyPatch,
++    tmp_path: Path,
++) -> None:
++    version = SimpleNamespace(
++        id="forge-1.12.2-14.23.5.2860",
++        main_class="net.minecraft.launchwrapper.Launch",
++        raw_json={
++            "inheritsFrom": "1.12.2",
++            "forge": {"loaderVersion": "14.23.5.2860"},
++        },
++        arguments=None,
++        minecraft_arguments=(
++            "--username ${auth_player_name} "
++            "--version ${version_name} "
++            "--gameDir ${game_directory} "
++            "--assetsDir ${assets_root} "
++            "--assetIndex ${assets_index_name} "
++            "--uuid ${auth_uuid} "
++            "--accessToken ${auth_access_token} "
++            "--userType ${user_type} "
++            "--versionType ${version_type} "
++            "--gameDir D:/forge-profile-duplicate "
++            "--tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker"
++        ),
++    )
++    settings = InstanceSettings(
++        java_path=Path("javaw.exe"),
++        min_memory=1024,
++        max_memory=4096,
++        jvm_arguments=[],
++        game_arguments=["--gameDir=D:/custom-override"],
++        offline_multiplayer_enabled=False,
++        width=1280,
++        height=720,
++        fullscreen=False,
++    )
++    account = SimpleNamespace(account_type=AccountSource.MICROSOFT)
++    context = {
++        "auth_player_name": "Steve",
++        "version_name": version.id,
++        "game_directory": str(tmp_path / "instances" / "Forge 1.12.2"),
++        "assets_root": str(tmp_path / "assets"),
++        "assets_index_name": "1.12",
++        "auth_uuid": "premium-uuid",
++        "auth_access_token": "premium-token",
++        "user_type": "msa",
++        "version_type": "release",
++        "natives_directory": str(tmp_path / "natives"),
++        "launcher_name": "mcw-launcher",
++        "launcher_version": "1.1.0-beta.5",
++    }
 +
-+    MainWindow._show_network_retry(window, controller, "metadata.load", "Metadata", "timed out")
++    monkeypatch.setattr(Paths, "client", lambda _version: tmp_path / "1.12.2.jar")
++    monkeypatch.setattr(Paths, "libraries", lambda: tmp_path / "libraries")
++    monkeypatch.setattr(ClasspathBuilder, "build", lambda *_args: "legacy-classpath")
 +
-+    assert retried == []
-+    assert statuses
++    command = LauncherManager.build(version, context, settings, account)
++    main_index = command.index("net.minecraft.launchwrapper.Launch")
++    game_arguments = command[main_index + 1 :]
++
++    assert game_arguments.count("--gameDir") == 1
++    assert not any(value.startswith("--gameDir=") for value in game_arguments)
++    game_dir_index = game_arguments.index("--gameDir")
++    assert game_arguments[game_dir_index + 1] == context["game_directory"]
++    assert game_arguments.count("--tweakClass") == 1
++
++
++def test_launcher_build_validates_reserved_single_value_arguments_before_spawn(
++    monkeypatch: pytest.MonkeyPatch,
++    tmp_path: Path,
++) -> None:
++    version = SimpleNamespace(
++        id="forge-1.12.2",
++        main_class="net.minecraft.launchwrapper.Launch",
++        raw_json={},
++    )
++    settings = SimpleNamespace(offline_multiplayer_enabled=False)
++    account = SimpleNamespace(account_type=AccountSource.MICROSOFT)
++
++    monkeypatch.setattr(Paths, "client", lambda _version: tmp_path / "client.jar")
++    monkeypatch.setattr(Paths, "libraries", lambda: tmp_path / "libraries")
++    monkeypatch.setattr(ClasspathBuilder, "build", lambda *_args: "legacy-classpath")
++    monkeypatch.setattr(
++        "src.core.minecraft.launcher_manager.ArgumentBuilder.build",
++        lambda *_args: ([], ["--gameDir"]),
++    )
++
++    with pytest.raises(RuntimeError, match=r"--gameDir requires exactly one non-empty value"):
++        LauncherManager.build(version, {}, settings, account)
 --- a/test/test_public_api.py
 +++ b/test/test_public_api.py
 @@ -7,8 +7,8 @@
  from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, derive_custom_text, is_readable_text
  
  
--def test_bundled_core_runtime_version_follows_launcher_beta_3() -> None:
--    assert mcw_core.__version__ == "1.1.0-beta.3"
-+def test_bundled_core_runtime_version_follows_launcher_beta_4() -> None:
-+    assert mcw_core.__version__ == "1.1.0-beta.4"
+-def test_bundled_core_runtime_version_follows_launcher_beta_4() -> None:
+-    assert mcw_core.__version__ == "1.1.0-beta.4"
++def test_bundled_core_runtime_version_follows_launcher_beta_5() -> None:
++    assert mcw_core.__version__ == "1.1.0-beta.5"
  
  
  def test_distribution_version_when_installed() -> None:
