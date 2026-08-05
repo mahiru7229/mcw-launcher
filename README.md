@@ -51,6 +51,21 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.0.2 hỗ trợ nâng cấp
 
 ---
 
+## Có gì mới trong v1.1.0-beta.3
+
+**v1.1.0-beta.3** hoàn thiện luồng quản lý mod loader và dọn lại cửa sổ quản lý instance nâng cao:
+
+- Cửa sổ quản lý nâng cao có thể thay đổi kích thước và phù hợp hơn với màn hình nhỏ hoặc Windows display scaling.
+- Hai trường Mod loader và Loader version tự chuyển từ bố cục ngang sang dọc khi chiều rộng bị thu hẹp.
+- Các nút thao tác tự sắp xếp thành 3, 2 hoặc 1 cột để tránh tràn giao diện.
+- Combo box phiên bản loader có thể co lại khi tên phiên bản dài.
+- Xóa toàn bộ form tạo instance khỏi khu vực quản lý nâng cao; việc tạo instance chỉ còn ở luồng Add Instance chính.
+- Giữ nguyên luồng tạo instance và cài modpack hiện có trong Create Instance Dialog.
+- Thêm regression test cho responsive layout và ranh giới giữa Create Instance với Manage selected instance.
+- Không có thay đổi triển khai MCW Core và không phát hành wheel mới; distribution dùng để build vẫn là `1.1.0b2`. Runtime `mcw_core.__version__` tiếp tục theo metadata launcher dùng chung.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.3.md`](docs/RELEASE-v1.1.0-beta.3.md).
+
 ## Có gì mới trong v1.1.0-beta.2
 
 **v1.1.0-beta.2** chỉ tập trung vào lựa chọn và tự phục hồi Java cho từng instance:

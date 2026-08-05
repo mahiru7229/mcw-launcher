@@ -7,8 +7,8 @@ from mcw_core.api.hardware.first_run_recommendation_service import FirstRunRecom
 from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, derive_custom_text, is_readable_text
 
 
-def test_runtime_version_is_stable_1_0_1() -> None:
-    assert mcw_core.__version__ == "1.1.0-beta.2"
+def test_bundled_core_runtime_version_follows_launcher_beta_3() -> None:
+    assert mcw_core.__version__ == "1.1.0-beta.3"
 
 
 def test_distribution_version_when_installed() -> None:

@@ -1,27 +1,24 @@
-# MCW Launcher v1.1.0-beta.3 — Step 2
+# MCW Launcher v1.1.0-beta.3 — Finalization patch
 
-Patch này **chỉ chứa launcher diff** của bước 2 và phải được áp dụng sau patch:
+Apply this patch **after**:
 
-- `v1.1.0-beta.3-responsive-step1`
+1. `v1.1.0-beta.3-responsive-step1`
+2. `v1.1.0-beta.3-step2-remove-create-instance`
 
-## Nội dung
+This final step only:
 
-- Xóa toàn bộ khu vực **Create instance** khỏi cửa sổ **Advanced Instance Management**.
-- Loại bỏ các signal, bộ lọc manifest và handler tạo/import modpack không còn thuộc cửa sổ nâng cao.
-- Giữ luồng tạo instance duy nhất tại nút **Add Instance** và `CreateInstanceDialog`.
-- Ngừng chuyển manifest/snapshot settings sang trang nâng cao.
-- Đổi mô tả trang nâng cao để chỉ nói về quản lý instance hiện tại.
-- Thêm regression tests bảo đảm phần tạo instance không quay trở lại cửa sổ nâng cao.
+- bumps launcher runtime metadata to `v1.1.0-beta.3`;
+- adds the Beta 3 release notes and README entry;
+- updates launcher metadata regression tests;
+- keeps the MCW Core implementation and wheel unchanged (`1.1.0b2`).
 
-## Áp dụng
+No `mcw_core/` or `src/core/` implementation file is included.
 
-Giải nén ZIP vào thư mục gốc repository launcher và cho phép ghi đè file.
+## Validation
 
-## Xác thực đã chạy
+- 1292 passed
+- 79 skipped
+- 2 warnings
+- compileall passed
 
-- `compileall`/AST parse: đạt.
-- JSON ngôn ngữ: hợp lệ và có key mới ở cả `en-US`/`vi-VN`.
-- `test/test_language_runtime.py` + `test/test_public_api.py`: **8 passed**.
-- GUI tests được cập nhật nhưng không thể thực thi trong môi trường đóng gói vì không có PySide6; pytest xác nhận **3 module skipped**.
-
-MCW Core không thay đổi và không nằm trong patch này.
+Extract over the launcher repository root and replace existing files.

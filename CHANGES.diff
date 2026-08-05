@@ -1,0 +1,144 @@
+--- a/README.md
++++ b/README.md
+@@ -51,6 +51,21 @@
+ 
+ ---
+ 
++## Có gì mới trong v1.1.0-beta.3
++
++**v1.1.0-beta.3** hoàn thiện luồng quản lý mod loader và dọn lại cửa sổ quản lý instance nâng cao:
++
++- Cửa sổ quản lý nâng cao có thể thay đổi kích thước và phù hợp hơn với màn hình nhỏ hoặc Windows display scaling.
++- Hai trường Mod loader và Loader version tự chuyển từ bố cục ngang sang dọc khi chiều rộng bị thu hẹp.
++- Các nút thao tác tự sắp xếp thành 3, 2 hoặc 1 cột để tránh tràn giao diện.
++- Combo box phiên bản loader có thể co lại khi tên phiên bản dài.
++- Xóa toàn bộ form tạo instance khỏi khu vực quản lý nâng cao; việc tạo instance chỉ còn ở luồng Add Instance chính.
++- Giữ nguyên luồng tạo instance và cài modpack hiện có trong Create Instance Dialog.
++- Thêm regression test cho responsive layout và ranh giới giữa Create Instance với Manage selected instance.
++- Không có thay đổi triển khai MCW Core và không phát hành wheel mới; distribution dùng để build vẫn là `1.1.0b2`. Runtime `mcw_core.__version__` tiếp tục theo metadata launcher dùng chung.
++
++Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.3.md`](docs/RELEASE-v1.1.0-beta.3.md).
++
+ ## Có gì mới trong v1.1.0-beta.2
+ 
+ **v1.1.0-beta.2** chỉ tập trung vào lựa chọn và tự phục hồi Java cho từng instance:
+--- /dev/null
++++ b/docs/RELEASE-v1.1.0-beta.3.md
+@@ -0,0 +1,77 @@
++# MCW Launcher v1.1.0-beta.3
++
++## Tiếng Việt
++
++### Phạm vi
++
++Beta 3 chỉ hoàn thiện giao diện quản lý mod loader và tách rõ luồng tạo instance khỏi khu vực quản lý instance nâng cao. Bản này không thay đổi MCW Core.
++
++### Thay đổi
++
++- Cho phép cửa sổ **Quản lý instance nâng cao** thay đổi kích thước tự do với kích thước tối thiểu phù hợp cho màn hình nhỏ.
++- Khu vực chọn **Mod loader** và **Loader version** tự chuyển giữa bố cục ngang và dọc theo chiều rộng khả dụng.
++- Các nút áp dụng, sửa chữa, khôi phục và chẩn đoán loader tự sắp xếp thành 3, 2 hoặc 1 cột.
++- Các thao tác rename, clone, delete, import, export và repair instance dùng cùng cơ chế reflow responsive.
++- Combo box loader/version dùng kích thước nội dung tối thiểu và chính sách co giãn để tránh tạo thanh cuộn ngang.
++- Giảm margin và khoảng cách trong chế độ hẹp.
++- Xóa form tạo instance, chọn Minecraft version, snapshot và lựa chọn mod loader khi tạo mới khỏi trang quản lý nâng cao.
++- Giữ luồng tạo instance tại nút **Add Instance** và `CreateInstanceDialog`.
++- Cập nhật bản dịch mô tả để trang nâng cao chỉ nói về instance đang được chọn.
++- Thêm regression test cho bố cục rộng, trung bình và hẹp; kiểm tra form tạo instance không quay lại trang quản lý nâng cao.
++
++### Phiên bản
++
++- Launcher runtime: `v1.1.0-beta.3`
++- Update channel: `beta`
++- MCW Core implementation/wheel: không thay đổi; distribution dùng để build vẫn là `1.1.0b2` (runtime version theo metadata launcher dùng chung)
++
++### Xác thực
++
++- `1292 passed, 79 skipped, 2 warnings`.
++- Toàn bộ source và test đã qua `compileall`.
++- Các GUI regression test mới được thu thập nhưng bị skip trong môi trường đóng gói hiện tại vì không cài PySide6; cần smoke test trực tiếp trên Windows cho resize/display scaling.
++
++### Không nằm trong Beta 3
++
++- Retry metadata/download khi lỗi mạng.
++- Sửa Forge legacy trùng singleton argument như `--gameDir`.
++- Sửa progress của kiểm tra bảo vệ tài khoản.
++
++---
++
++## English
++
++### Scope
++
++Beta 3 only finalizes the mod-loader management interface and separates instance creation from advanced instance management. This release does not change MCW Core.
++
++### Changes
++
++- Makes the **Advanced Instance Management** window freely resizable with a compact minimum size.
++- Reflows the **Mod loader** and **Loader version** fields between horizontal and vertical layouts based on available width.
++- Reflows loader action buttons into three, two, or one column.
++- Applies the same responsive action grid to rename, clone, delete, import, export, and instance repair actions.
++- Lets loader/version combo boxes shrink without forcing horizontal overflow.
++- Reduces margins and spacing in compact mode.
++- Removes the instance-name, Minecraft-version, snapshot, and new-instance loader controls from the advanced management page.
++- Keeps instance creation in the main **Add Instance** flow and `CreateInstanceDialog`.
++- Updates descriptions so the advanced page only refers to the currently selected instance.
++- Adds regression coverage for wide, medium, and narrow layouts and for the create/manage boundary.
++
++### Versioning
++
++- Launcher runtime: `v1.1.0-beta.3`
++- Update channel: `beta`
++- MCW Core implementation/wheel is unchanged; the build distribution remains `1.1.0b2` (runtime version follows the shared launcher metadata)
++
++### Validation
++
++- `1292 passed, 79 skipped, 2 warnings`.
++- All source and test files pass `compileall`.
++- The new GUI regression tests are collected but skipped in the current packaging environment because PySide6 is not installed; perform a Windows smoke test for resize/display scaling.
++
++### Not included in Beta 3
++
++- Network retry for metadata/download failures.
++- Forge legacy singleton-argument deduplication such as duplicate `--gameDir`.
++- Account-protection progress reset fixes.
+--- a/src/config.py
++++ b/src/config.py
+@@ -1,7 +1,7 @@
+ from __future__ import annotations
+ 
+-VERSION = "v1.1.0-beta.2"
+-VERSION_ID = "1.1.0-beta.2"
++VERSION = "v1.1.0-beta.3"
++VERSION_ID = "1.1.0-beta.3"
+ VERSION_TAG = f"v{VERSION_ID}"
+ UPDATE_CHANNEL = "beta"
+ GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
+--- a/test/core/config/test_version_metadata.py
++++ b/test/core/config/test_version_metadata.py
+@@ -6,9 +6,9 @@
+ 
+ 
+ def test_launcher_version_metadata_has_one_source_of_truth() -> None:
+-    assert VERSION == "v1.1.0-beta.2"
+-    assert VERSION_ID == "1.1.0-beta.2"
+-    assert VERSION_TAG == "v1.1.0-beta.2"
++    assert VERSION == "v1.1.0-beta.3"
++    assert VERSION_ID == "1.1.0-beta.3"
++    assert VERSION_TAG == "v1.1.0-beta.3"
+     assert UPDATE_CHANNEL == "beta"
+     assert GUI_VERSION == VERSION
+     assert GUI_VERSION_ID == VERSION_ID
+--- a/test/test_public_api.py
++++ b/test/test_public_api.py
+@@ -7,8 +7,8 @@
+ from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, derive_custom_text, is_readable_text
+ 
+ 
+-def test_runtime_version_is_stable_1_0_1() -> None:
+-    assert mcw_core.__version__ == "1.1.0-beta.2"
++def test_bundled_core_runtime_version_follows_launcher_beta_3() -> None:
++    assert mcw_core.__version__ == "1.1.0-beta.3"
+ 
+ 
+ def test_distribution_version_when_installed() -> None:
