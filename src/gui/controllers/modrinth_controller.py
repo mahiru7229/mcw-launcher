@@ -4,6 +4,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Signal, Slot
 
+from mcw_core.api.language.language_manager import tr
+
 from mcw_core.api.instance.instance_manager import InstanceManager
 from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from mcw_core.api.modrinth.modrinth_client import ModrinthClient
@@ -36,17 +38,17 @@ class ModrinthController(BaseController):
     def search(self, project_type: str, query: str, index: str, offset: int, game_version: str = "", loader: str = ModLoaderManager.FABRIC) -> None:
         normalized_loader = self._normalize_loader(loader)
         task_id = f"modrinth.search.{project_type}.{normalized_loader}"
-        self._task_runner.run(task_id, lambda: (project_type, normalized_loader, ModrinthClient.search_projects(project_type=project_type, query=query, game_version=game_version, loader=normalized_loader, index=index, offset=offset, limit=25, force_refresh=True)), f"Searching Modrinth {project_type}s for {normalized_loader.title()}...", blocking=False)
+        self._task_runner.run(task_id, lambda: (project_type, normalized_loader, ModrinthClient.search_projects(project_type=project_type, query=query, game_version=game_version, loader=normalized_loader, index=index, offset=offset, limit=25, force_refresh=True)), tr("task.modrinth.search", project_type=project_type, loader=normalized_loader.title()), blocking=False)
 
     def load_versions(self, project_type: str, project_id: str, game_version: str = "", loader: str = ModLoaderManager.FABRIC) -> None:
         normalized_loader = self._normalize_loader(loader)
         task_id = f"modrinth.versions.{project_type}.{normalized_loader}.{project_id}"
-        self._task_runner.run(task_id, lambda: (project_type, project_id, normalized_loader, ModrinthClient.list_project_versions(project_id, loader=normalized_loader, game_version=game_version, version_types=("release", "beta", "alpha"))), f"Loading compatible Modrinth {normalized_loader.title()} versions...", blocking=False)
+        self._task_runner.run(task_id, lambda: (project_type, project_id, normalized_loader, ModrinthClient.list_project_versions(project_id, loader=normalized_loader, game_version=game_version, version_types=("release", "beta", "alpha"))), tr("task.modrinth.load_versions", loader=normalized_loader.title()), blocking=False)
 
     def load_project_details(self, project_type: str, project_id: str, loader: str = ModLoaderManager.FABRIC) -> None:
         normalized_loader = self._normalize_loader(loader)
         task_id = f"modrinth.details.{project_type}.{normalized_loader}.{project_id}"
-        self._task_runner.run(task_id, lambda: (project_type, project_id, normalized_loader, ModrinthClient.get_project(project_id)), "Loading Modrinth project details...", blocking=False)
+        self._task_runner.run(task_id, lambda: (project_type, project_id, normalized_loader, ModrinthClient.get_project(project_id)), tr("task.modrinth.load_project_details"), blocking=False)
 
     def install_mod(self, instance_name: str, version_id: str, allowed_version_types: tuple[str, ...] = ("release",)) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
@@ -55,12 +57,12 @@ class ModrinthController(BaseController):
             instance = InstanceManager.load(instance_name)
             return ModrinthModInstaller.install(instance, version_id, install_dependencies=True, allowed_version_types=allowed_version_types, reporter=reporter)
 
-        return self._task_runner.run("modrinth.install.mod", task, f"Installing Modrinth mod into '{instance_name}'...")
+        return self._task_runner.run("modrinth.install.mod", task, tr("task.modrinth.install_mod", instance=instance_name))
 
     def install_modpack(self, project_id: str, version_id: str, instance_name: str, install_optional_files: bool, allowed_version_types: tuple[str, ...] = ("release",), loader: str = ModLoaderManager.FABRIC, settings_override: dict | None = None) -> None:
         reporter = ProgressReporter(self.progress_received.emit)
         normalized_loader = self._normalize_loader(loader)
-        self._task_runner.run("modrinth.install.modpack", lambda: ModrinthPackInstaller.install(project_id, version_id, instance_name, install_optional_files, allowed_version_types, reporter, expected_loader=normalized_loader, settings_override=settings_override), f"Installing Modrinth {normalized_loader.title()} modpack '{instance_name}'...")
+        self._task_runner.run("modrinth.install.modpack", lambda: ModrinthPackInstaller.install(project_id, version_id, instance_name, install_optional_files, allowed_version_types, reporter, expected_loader=normalized_loader, settings_override=settings_override), tr("task.modrinth.install_modpack", loader=normalized_loader.title(), instance=instance_name))
 
     def install_manual_files(self, instance_name: str, requirements: tuple[object, ...] | list[object], sources: tuple[Path, ...] | list[Path]) -> bool:
         normalized_sources = [Path(source) for source in sources]
@@ -69,7 +71,7 @@ class ModrinthController(BaseController):
         return self._task_runner.run(
             "modrinth.install.manual.batch",
             lambda: (instance_name, ModrinthManualInstaller.install_many(InstanceManager.load(instance_name), requirements, normalized_sources)),
-            f"Adding {len(normalized_sources)} downloaded Modrinth file(s) to '{instance_name}'...",
+            tr("task.modrinth.add_downloaded_files", count=len(normalized_sources), instance=instance_name),
         )
 
     def install_manual_modpack(self, request: ModrinthModpackManualDownloadRequired, source: Path) -> bool:
@@ -77,7 +79,7 @@ class ModrinthController(BaseController):
         return self._task_runner.run(
             "modrinth.install.modpack.manual",
             lambda: ModrinthPackInstaller.install_manual_archive(request, Path(source), reporter=reporter),
-            f"Installing downloaded Modrinth modpack '{request.instance_name}'...",
+            tr("task.modrinth.install_downloaded_modpack", instance=request.instance_name),
         )
 
     @Slot(str, object)
@@ -104,12 +106,12 @@ class ModrinthController(BaseController):
             self.project_details_changed.emit(str(project_type), str(project_id), str(loader), project)
             return
         if task_id == "modrinth.install.mod":
-            self.status_changed.emit("Modrinth mod installed")
+            self.status_changed.emit(tr("status.modrinth.mod_installed"))
             self.log_created.emit("Installed Modrinth mod and required dependencies")
             self.mod_installed.emit(result)
             return
         if task_id == "modrinth.install.modpack":
-            self.status_changed.emit("Modrinth modpack installed")
+            self.status_changed.emit(tr("status.modrinth.modpack_installed"))
             self.log_created.emit("Created instance from Modrinth modpack")
             self.modpack_installed.emit(result)
             return
@@ -118,7 +120,7 @@ class ModrinthController(BaseController):
             self.manual_files_installed.emit(str(instance_name), import_result)
             return
         if task_id == "modrinth.install.modpack.manual":
-            self.status_changed.emit("Modrinth modpack installed")
+            self.status_changed.emit(tr("status.modrinth.modpack_installed"))
             self.modpack_installed.emit(result)
 
     @Slot(str, object)

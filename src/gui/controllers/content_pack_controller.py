@@ -4,6 +4,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Signal, Slot
 
+from mcw_core.api.language.language_manager import tr
+
 from mcw_core.api.content.content_pack_manager import ContentPackManager
 from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
 from mcw_core.api.instance.instance_manager import InstanceManager
@@ -37,7 +39,7 @@ class ContentPackController(BaseController):
             task = lambda: (source, kind, ModrinthClient.search_projects(kind, query=query, game_version=game_version, loader="", index=sort, offset=offset, limit=25, force_refresh=True))
         else:
             task = lambda: (source, kind, CurseForgeClient.search_projects(kind, query=query, game_version=game_version, loader="", sort=sort, index=offset, page_size=25, force_refresh=True))
-        return self._task_runner.run(task_id, task, f"Searching {source.title()} {ContentPackManager.display_name(kind)}s...", blocking=False)
+        return self._task_runner.run(task_id, task, tr("task.content.search", provider=source.title(), content_type=ContentPackManager.display_name(kind)), blocking=False)
 
     def load_project_details(self, provider: str, content_type: str, project_id: str) -> bool:
         source = self._provider(provider)
@@ -47,7 +49,7 @@ class ContentPackController(BaseController):
             task = lambda: (source, kind, str(project_id), ModrinthClient.get_project(str(project_id)))
         else:
             task = lambda: (source, kind, str(project_id), CurseForgeClient.get_project_details(int(project_id)))
-        return self._task_runner.run(task_id, task, "Loading project details...", blocking=False)
+        return self._task_runner.run(task_id, task, tr("task.content.load_project_details"), blocking=False)
 
     def load_versions(self, provider: str, content_type: str, project_id: str, game_version: str = "", release_types: tuple[str, ...] = ("release", "beta", "alpha")) -> bool:
         source = self._provider(provider)
@@ -57,33 +59,33 @@ class ContentPackController(BaseController):
             task = lambda: (source, kind, str(project_id), ModrinthClient.list_project_versions(str(project_id), loader="", game_version=game_version, version_types=release_types))
         else:
             task = lambda: (source, kind, int(project_id), CurseForgeClient.list_files(int(project_id), game_version=game_version, loader="", release_types=release_types))
-        return self._task_runner.run(task_id, task, "Loading compatible content versions...", blocking=False)
+        return self._task_runner.run(task_id, task, tr("task.content.load_compatible_versions"), blocking=False)
 
     def install_modrinth(self, instance_name: str, content_type: str, version_id: str) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
         kind = ContentPackManager.normalize_type(content_type)
-        return self._task_runner.run("content.install.modrinth", lambda: ContentPackManager.install_modrinth(InstanceManager.load(instance_name), kind, version_id, reporter), f"Installing {ContentPackManager.display_name(kind)}...")
+        return self._task_runner.run("content.install.modrinth", lambda: ContentPackManager.install_modrinth(InstanceManager.load(instance_name), kind, version_id, reporter), tr("task.content.install", content_type=ContentPackManager.display_name(kind)))
 
     def install_curseforge(self, instance_name: str, content_type: str, project_name: str, project_url: str, file: object) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
         kind = ContentPackManager.normalize_type(content_type)
-        return self._task_runner.run("content.install.curseforge", lambda: ContentPackManager.install_curseforge(InstanceManager.load(instance_name), kind, file, project_name, project_url, reporter), f"Installing {ContentPackManager.display_name(kind)}...")
+        return self._task_runner.run("content.install.curseforge", lambda: ContentPackManager.install_curseforge(InstanceManager.load(instance_name), kind, file, project_name, project_url, reporter), tr("task.content.install", content_type=ContentPackManager.display_name(kind)))
 
     def import_local(self, instance_name: str, content_type: str, source: Path) -> bool:
         kind = ContentPackManager.normalize_type(content_type)
-        return self._task_runner.run("content.install.local", lambda: ContentPackManager.import_local(InstanceManager.load(instance_name), kind, Path(source)), f"Importing {ContentPackManager.display_name(kind)}...")
+        return self._task_runner.run("content.install.local", lambda: ContentPackManager.import_local(InstanceManager.load(instance_name), kind, Path(source)), tr("task.content.import", content_type=ContentPackManager.display_name(kind)))
 
     def refresh_entries(self, instance_name: str, content_type: str) -> bool:
         kind = ContentPackManager.normalize_type(content_type)
-        return self._task_runner.run(f"content.entries.{kind}", lambda: (instance_name, kind, ContentPackManager.list_entries(InstanceManager.load(instance_name), kind)), "Loading installed content...", blocking=False)
+        return self._task_runner.run(f"content.entries.{kind}", lambda: (instance_name, kind, ContentPackManager.list_entries(InstanceManager.load(instance_name), kind)), tr("task.content.load_installed"), blocking=False)
 
     def set_enabled(self, instance_name: str, content_type: str, entry_id: str, enabled: bool) -> bool:
         kind = ContentPackManager.normalize_type(content_type)
-        return self._task_runner.run("content.toggle", lambda: (instance_name, kind, ContentPackManager.set_enabled(InstanceManager.load(instance_name), entry_id, enabled)), "Updating content pack state...")
+        return self._task_runner.run("content.toggle", lambda: (instance_name, kind, ContentPackManager.set_enabled(InstanceManager.load(instance_name), entry_id, enabled)), tr("task.content.update_state"))
 
     def remove(self, instance_name: str, content_type: str, entry_id: str) -> bool:
         kind = ContentPackManager.normalize_type(content_type)
-        return self._task_runner.run("content.remove", lambda: (instance_name, kind, ContentPackManager.remove(InstanceManager.load(instance_name), entry_id)), "Removing content pack...")
+        return self._task_runner.run("content.remove", lambda: (instance_name, kind, ContentPackManager.remove(InstanceManager.load(instance_name), entry_id)), tr("task.content.remove"))
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
@@ -104,7 +106,7 @@ class ContentPackController(BaseController):
             return
         if task_id.startswith("content.install."):
             self.installed.emit(result)
-            self.status_changed.emit("Content pack installed")
+            self.status_changed.emit(tr("content.task.install.completed"))
             self.log_created.emit(f"Installed {getattr(result, 'content_type', 'content pack')}: {getattr(result, 'file_name', '')}")
             return
         if task_id.startswith("content.entries."):

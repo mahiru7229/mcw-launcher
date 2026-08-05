@@ -1,32 +1,10 @@
-# MCW Launcher v1.1.0-beta.1 — Launcher patch
+# v1.1.0-beta.1 Translation Audit Hotfix
 
-Extract this archive over the repository root.
-Only files added or changed for v1.1.0-beta.1 are included.
+Giải nén ZIP này đè vào thư mục gốc của **MCW Launcher v1.1.0-beta.1**.
 
-Scope: missing translations only. This patch localizes the advanced instance page and remaining dynamic progress messages.
+Đây là patch bổ sung sau Beta 1, không phải Beta 2. MCW Core và wheel không thay đổi.
 
-Validation:
-- Launcher suite: 1281 passed, 79 skipped.
-- Core suite: 18 passed.
-- Wheel import smoke test: passed.
-
-Added files:
-+ docs/RELEASE-v1.1.0-beta.1.md
-
-Changed files:
-* README.md
-* lang/en-US.json
-* lang/vi-VN.json
-* pyproject.toml
-* src/config.py
-* src/gui/dialogs/instance_management_dialog.py
-* src/gui/pages/instance_workspace_page.py
-* src/gui/pages/instances_page.py
-* test/core/config/test_version_metadata.py
-* test/gui/pages/test_instance_workspace_page.py
-* test/gui/pages/test_instances_page.py
-* test/test_language_runtime.py
-* test/test_public_api.py
-
-Removed files:
-(none)
+Sửa chính:
+- `Loading compatible CurseForge files...` được dịch đúng.
+- Toàn bộ task/status runtime đã rà soát được gọi qua khóa dịch ngữ nghĩa.
+- Bổ sung kiểm thử chống tái phát chuỗi controller chưa dịch.

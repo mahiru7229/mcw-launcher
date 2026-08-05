@@ -135,3 +135,80 @@ def test_builtin_language_packs_have_matching_non_empty_translations_and_valid_a
         assert all(isinstance(value, str) and value.strip() for value in translations.values()), f"{locale} contains empty translations"
         invalid_aliases = {source: key for source, key in data.get("aliases", {}).items() if key not in translations}
         assert invalid_aliases == {}, f"{locale} aliases point to missing keys: {invalid_aliases}"
+
+
+def _runtime_text_template(argument: ast.AST) -> str | None:
+    if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+        return argument.value
+    if not isinstance(argument, ast.JoinedStr):
+        return None
+
+    parts: list[str] = []
+    for value in argument.values:
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            parts.append(value.value)
+        elif isinstance(value, ast.FormattedValue):
+            parts.append("{}")
+        else:
+            return None
+    return "".join(parts)
+
+
+def _normalize_runtime_template(text: str) -> str:
+    import re
+
+    return re.sub(r"\{[^{}]+\}", "{}", text)
+
+
+def test_controller_task_and_status_text_has_runtime_translation() -> None:
+    language_data = json.loads(_LANGUAGE_PATH.read_text(encoding="utf-8"))
+    translated_templates = {
+        _normalize_runtime_template(value)
+        for value in language_data["translations"].values()
+    }
+    unresolved: list[str] = []
+
+    for path in sorted((_GUI_ROOT / "controllers").rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+                continue
+
+            candidate: ast.AST | None = None
+            label = ""
+            if node.func.attr == "run" and "task_runner" in ast.unparse(node.func.value):
+                if len(node.args) >= 3:
+                    candidate = node.args[2]
+                else:
+                    candidate = next((item.value for item in node.keywords if item.arg == "message"), None)
+                label = "TaskRunner.run"
+            elif node.func.attr == "emit" and isinstance(node.func.value, ast.Attribute):
+                signal_name = node.func.value.attr
+                if signal_name in {"status_changed", "task_rejected"} and node.args:
+                    candidate = node.args[0]
+                    label = f"{signal_name}.emit"
+
+            if candidate is None:
+                continue
+            template = _runtime_text_template(candidate)
+            if not template:
+                continue
+            if _normalize_runtime_template(template) not in translated_templates:
+                relative = path.relative_to(_REPO_ROOT)
+                unresolved.append(f"{relative}:{node.lineno} [{label}] {template!r}")
+
+    task_runner_path = _GUI_ROOT / "task_runner.py"
+    task_runner_tree = ast.parse(task_runner_path.read_text(encoding="utf-8"), filename=str(task_runner_path))
+    for node in ast.walk(task_runner_tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr != "emit" or not isinstance(node.func.value, ast.Attribute):
+            continue
+        if node.func.value.attr != "task_rejected" or not node.args:
+            continue
+        template = _runtime_text_template(node.args[0])
+        if template and _normalize_runtime_template(template) not in translated_templates:
+            relative = task_runner_path.relative_to(_REPO_ROOT)
+            unresolved.append(f"{relative}:{node.lineno} [task_rejected.emit] {template!r}")
+
+    assert unresolved == [], "Untranslated controller runtime text:\n" + "\n".join(unresolved)

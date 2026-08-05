@@ -7,6 +7,8 @@ from typing import Any
 
 from PySide6.QtCore import Signal, Slot
 
+from mcw_core.api.language.language_manager import tr
+
 from mcw_core import InstanceCreateRequest, InstanceDeletionError, LoaderService, get_default_core
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
@@ -124,7 +126,7 @@ class InstanceController(BaseController):
                 )
             )
 
-        return self._task_runner.run(self.CREATE_TASK_ID, task, f"Creating instance '{name}'...")
+        return self._task_runner.run(self.CREATE_TASK_ID, task, tr("task.instance.create", name=name))
 
     def change_loader(self, name: str, loader_name: str, loader_version: str) -> None:
         name = name.strip()
@@ -138,7 +140,7 @@ class InstanceController(BaseController):
         def task() -> Any:
             return self._core.instances.change_loader(name, loader_name, loader_version, self._on_loader_progress)
 
-        self._task_runner.run(self.LOADER_CHANGE_TASK_ID, task, f"Applying {loader_name.title()} to '{name}'...")
+        self._task_runner.run(self.LOADER_CHANGE_TASK_ID, task, tr("task.instance.apply_loader", loader=loader_name.title(), name=name))
 
     def repair_loader(self, name: str) -> None:
         name = name.strip()
@@ -148,7 +150,7 @@ class InstanceController(BaseController):
         def task() -> Any:
             return self._core.instances.repair_loader(name, self._on_loader_progress)
 
-        self._task_runner.run(self.LOADER_REPAIR_TASK_ID, task, f"Repairing mod loader for '{name}'...")
+        self._task_runner.run(self.LOADER_REPAIR_TASK_ID, task, tr("task.instance.repair_loader", name=name))
 
     def restore_previous_forge(self, name: str) -> None:
         name = name.strip()
@@ -158,7 +160,7 @@ class InstanceController(BaseController):
         def task() -> Any:
             return self._core.instances.restore_previous_loader(name, self._on_loader_progress)
 
-        self._task_runner.run(self.FORGE_RESTORE_TASK_ID, task, f"Restoring previous mod-loader installation for '{name}'...")
+        self._task_runner.run(self.FORGE_RESTORE_TASK_ID, task, tr("task.instance.restore_loader", name=name))
 
     def export_forge_diagnostics(self, name: str, output_path: Path) -> None:
         name = name.strip()
@@ -168,7 +170,7 @@ class InstanceController(BaseController):
         def task() -> Path:
             return self._core.instances.export_loader_diagnostics(name, output_path)
 
-        self._task_runner.run(self.FORGE_DIAGNOSTICS_TASK_ID, task, f"Exporting mod-loader diagnostics for '{name}'...", blocking=False)
+        self._task_runner.run(self.FORGE_DIAGNOSTICS_TASK_ID, task, tr("task.instance.export_loader_diagnostics", name=name), blocking=False)
 
 
     def repair_instance(self, name: str) -> None:
@@ -179,7 +181,7 @@ class InstanceController(BaseController):
         def task() -> Any:
             return self._core.instances.repair(name, self._on_repair_progress)
 
-        self._task_runner.run(self.REPAIR_TASK_ID, task, f"Repairing '{name}'...")
+        self._task_runner.run(self.REPAIR_TASK_ID, task, tr("task.instance.repair", name=name))
 
     def scan_repair_center(self, name: str, mode: str) -> None:
         name = name.strip()
@@ -189,7 +191,7 @@ class InstanceController(BaseController):
         def task() -> Any:
             return self._core.instances.scan_repair(name, mode, self._on_repair_progress)
 
-        self._task_runner.run(self.REPAIR_SCAN_TASK_ID, task, f"Checking instance '{name}'...")
+        self._task_runner.run(self.REPAIR_SCAN_TASK_ID, task, tr("task.instance.check", name=name))
 
     def execute_repair_plan(self, name: str, plan: object) -> None:
         name = name.strip()
@@ -199,7 +201,7 @@ class InstanceController(BaseController):
         def task() -> Any:
             return self._core.instances.execute_repair(name, plan, self._on_repair_progress)
 
-        self._task_runner.run(self.REPAIR_EXECUTE_TASK_ID, task, f"Repairing selected components for '{name}'...")
+        self._task_runner.run(self.REPAIR_EXECUTE_TASK_ID, task, tr("task.instance.repair_components", name=name))
 
     def _on_repair_progress(self, event: object) -> None:
         self.repair_progress.emit(event)
@@ -223,7 +225,7 @@ class InstanceController(BaseController):
             self._core.instances.rename(source_name, target_name)
             return {"source": source_name, "target": target_name}
 
-        self._task_runner.run("instance.rename", task, f"Renaming '{source_name}'...")
+        self._task_runner.run("instance.rename", task, tr("task.instance.rename", name=source_name))
 
     def clone(self, source_name: str, target_name: str, include_saves: bool) -> None:
         source_name = source_name.strip()
@@ -234,13 +236,13 @@ class InstanceController(BaseController):
         def task() -> Any:
             return self._core.instances.clone(source_name, target_name, include_saves)
 
-        self._task_runner.run("instance.clone", task, f"Cloning '{source_name}'...")
+        self._task_runner.run("instance.clone", task, tr("task.instance.clone", name=source_name))
 
     def delete(self, name: str) -> None:
         name = name.strip()
         if not name:
             return
-        self._task_runner.run("instance.delete", lambda: {"name": name, "deleted": self._core.instances.delete(name)}, f"Deleting '{name}'...")
+        self._task_runner.run("instance.delete", lambda: {"name": name, "deleted": self._core.instances.delete(name)}, tr("task.instance.delete", name=name))
 
     def inspect_package(self, package_path: Path) -> None:
         package_path = Path(package_path)
@@ -263,7 +265,7 @@ class InstanceController(BaseController):
         self._task_runner.run(
             self.IMPORT_INSPECT_TASK_ID,
             task,
-            f"Reading '{package_path.name}'...",
+            tr("task.instance.read_package", file=package_path.name),
         )
 
     def import_package(self, package_path: Path, settings_override: dict | None = None) -> None:
@@ -276,7 +278,7 @@ class InstanceController(BaseController):
                 self._on_package_progress,
                 settings_override=normalized_override,
             ),
-            f"Importing '{package_path.name}'...",
+            tr("task.instance.import_package", file=package_path.name),
         )
 
     def inspect_modpack_package(self, package_path: Path) -> None:
@@ -284,7 +286,7 @@ class InstanceController(BaseController):
         self._task_runner.run(
             self.MODPACK_IMPORT_INSPECT_TASK_ID,
             lambda: self._core.instances.inspect_modpack_package(path),
-            f"Reading modpack package '{path.name}'...",
+            tr("task.instance.read_modpack_package", file=path.name),
         )
 
     def import_modpack_package(self, package_path: Path, settings_override: dict | None = None, install_optional_files: bool = True, instance_name: str = "") -> None:
@@ -299,7 +301,7 @@ class InstanceController(BaseController):
                 install_optional_files=install_optional_files,
                 instance_name=instance_name,
             ),
-            f"Importing modpack package '{path.name}'...",
+            tr("task.instance.import_modpack_package", file=path.name),
         )
 
     def export_modpack(self, name: str, output_path: Path, mode: str, portable_mode: str = "smart", include_saves: bool = False) -> None:
@@ -309,7 +311,7 @@ class InstanceController(BaseController):
         self._task_runner.run(
             self.MODPACK_EXPORT_TASK_ID,
             lambda: self._core.instances.export_modpack(name, output_path, mode, portable_mode, include_saves, self._on_package_progress),
-            f"Exporting modpack profile for '{name}'...",
+            tr("task.instance.export_modpack_profile", name=name),
         )
 
     def install_portable_manual_files(self, name: str, requirements: object, sources: object) -> None:
@@ -321,7 +323,7 @@ class InstanceController(BaseController):
         self._task_runner.run(
             self.PORTABLE_MANUAL_TASK_ID,
             lambda: self._core.instances.install_portable_manual_files(normalized_name, requirement_values, source_values),
-            f"Importing manually downloaded files for '{normalized_name}'...",
+            tr("task.instance.import_manual_modpack_files", name=normalized_name),
         )
 
     def change_icon(self, name: str, source_path: Path) -> None:
@@ -329,19 +331,19 @@ class InstanceController(BaseController):
         if not name:
             return
         path = Path(source_path)
-        self._task_runner.run(self.ICON_CHANGE_TASK_ID, lambda: self._core.instances.set_icon(name, path), f"Changing icon for '{name}'...")
+        self._task_runner.run(self.ICON_CHANGE_TASK_ID, lambda: self._core.instances.set_icon(name, path), tr("task.instance.change_icon", name=name))
 
     def reset_icon(self, name: str) -> None:
         name = name.strip()
         if not name:
             return
-        self._task_runner.run(self.ICON_RESET_TASK_ID, lambda: self._core.instances.reset_icon(name), f"Resetting icon for '{name}'...")
+        self._task_runner.run(self.ICON_RESET_TASK_ID, lambda: self._core.instances.reset_icon(name), tr("task.instance.reset_icon", name=name))
 
     def export_package(self, name: str, output_path: Path, include_saves: bool) -> None:
         name = name.strip()
         if not name:
             return
-        self._task_runner.run("instance.export", lambda: self._core.instances.export_package(name, output_path, include_saves, self._on_package_progress), f"Exporting '{name}'...")
+        self._task_runner.run("instance.export", lambda: self._core.instances.export_package(name, output_path, include_saves, self._on_package_progress), tr("task.instance.export", name=name))
 
     def _on_package_progress(self, event: object) -> None:
         self.package_progress.emit(event)
@@ -355,17 +357,17 @@ class InstanceController(BaseController):
             package_kind, preview = result
             if package_kind == "modpack":
                 self.modpack_import_preview_ready.emit(preview)
-                self.status_changed.emit(f"Ready to import modpack '{preview.name}'")
+                self.status_changed.emit(tr("status.instance.ready_import_modpack", name=preview.name))
                 self.log_created.emit(f"Provider modpack package inspected: {preview.package_path}")
             else:
                 self.import_preview_ready.emit(preview)
-                self.status_changed.emit(f"Ready to import '{preview.name}'")
+                self.status_changed.emit(tr("status.instance.ready_import_package", name=preview.name))
                 self.log_created.emit(f"Instance package inspected: {preview.package_path}")
             return
 
         if task_id == self.MODPACK_IMPORT_INSPECT_TASK_ID:
             self.modpack_import_preview_ready.emit(result)
-            self.status_changed.emit(f"Ready to import modpack '{result.name}'")
+            self.status_changed.emit(tr("status.instance.ready_import_modpack", name=result.name))
             self.log_created.emit(f"Provider modpack package inspected: {result.package_path}")
             return
 
@@ -373,73 +375,73 @@ class InstanceController(BaseController):
         if task_id == self.CREATE_TASK_ID:
             selected_name = result.name
             self.instance_created.emit(result)
-            self.status_changed.emit(f"Created '{selected_name}'")
+            self.status_changed.emit(tr("status.instance.created", name=selected_name))
         elif task_id == "instance.rename":
             selected_name = result["target"]
-            self.status_changed.emit(f"Renamed '{result['source']}' to '{selected_name}'")
+            self.status_changed.emit(tr("status.instance.renamed", source=result["source"], name=selected_name))
         elif task_id == "instance.clone":
             selected_name = result.name
-            self.status_changed.emit(f"Cloned instance as '{selected_name}'")
+            self.status_changed.emit(tr("status.instance.cloned", name=selected_name))
         elif task_id == "instance.delete":
             if not result["deleted"]:
                 self._emit_error("Delete instance", "Instance was not found.")
                 return
             selected_name = ""
-            self.status_changed.emit(f"Deleted '{result['name']}'")
+            self.status_changed.emit(tr("status.instance.deleted", name=result["name"]))
         elif task_id == self.IMPORT_TASK_ID:
             selected_name = result.name
-            self.status_changed.emit(f"Imported '{selected_name}'")
+            self.status_changed.emit(tr("status.instance.imported", name=selected_name))
         elif task_id == self.MODPACK_IMPORT_TASK_ID:
             selected_name = result.name
-            self.status_changed.emit(f"Imported modpack '{selected_name}'")
+            self.status_changed.emit(tr("status.instance.modpack_imported", name=selected_name))
         elif task_id == self.MODPACK_EXPORT_TASK_ID:
             self.modpack_export_finished.emit(result)
-            self.status_changed.emit(f"Exported modpack package to '{result.output_path}'")
+            self.status_changed.emit(tr("status.instance.modpack_exported", path=result.output_path))
             return
         elif task_id == self.PORTABLE_MANUAL_TASK_ID:
             self.portable_manual_files_installed.emit(result)
-            self.status_changed.emit(f"Imported {len(result.get('installed', ())) or 0} manual modpack file(s)")
+            self.status_changed.emit(tr("status.instance.manual_files_imported", count=len(result.get("installed", ())) or 0))
             return
         elif task_id == self.LOADER_CHANGE_TASK_ID:
             selected_name = result.name
             loader_name, loader_version = self._core.loaders.normalize(result.mod_loader)
             loader_text = loader_name if loader_name == "vanilla" else f"{loader_name} {loader_version}"
-            self.status_changed.emit(f"Applied {loader_text} to '{selected_name}'")
+            self.status_changed.emit(tr("status.instance.loader_applied", loader=loader_text, name=selected_name))
         elif task_id == self.LOADER_REPAIR_TASK_ID:
             selected_name = result.name
             loader_name, _ = self._core.loaders.normalize(result.mod_loader)
-            self.status_changed.emit(f"Repaired {loader_name.title()} for '{selected_name}'")
+            self.status_changed.emit(tr("status.instance.loader_repaired", loader=loader_name.title(), name=selected_name))
         elif task_id == self.FORGE_RESTORE_TASK_ID:
             selected_name = result.name
             loader_name, loader_version = self._core.loaders.normalize(result.mod_loader)
             loader_text = loader_name.title() if loader_name == LoaderService.VANILLA else f"{loader_name.title()} {loader_version}"
-            self.status_changed.emit(f"Restored {loader_text} for '{selected_name}'")
+            self.status_changed.emit(tr("status.instance.loader_restored", loader=loader_text, name=selected_name))
         elif task_id == self.FORGE_DIAGNOSTICS_TASK_ID:
             self.forge_diagnostics_finished.emit(result)
-            self.status_changed.emit("Mod-loader diagnostics export completed")
+            self.status_changed.emit(tr("status.instance.loader_diagnostics_completed"))
             self.log_created.emit(f"Mod-loader diagnostics exported to: {result}")
             return
         elif task_id == self.ICON_CHANGE_TASK_ID:
             selected_name = result.name
-            self.status_changed.emit(f"Changed icon for '{selected_name}'")
+            self.status_changed.emit(tr("status.instance.icon_changed", name=selected_name))
         elif task_id == self.ICON_RESET_TASK_ID:
             selected_name = result.name
-            self.status_changed.emit(f"Reset icon for '{selected_name}'")
+            self.status_changed.emit(tr("status.instance.icon_reset", name=selected_name))
         elif task_id == self.REPAIR_TASK_ID:
             selected_name = result.instance_name
             self.repair_finished.emit(result)
-            self.status_changed.emit(f"Repaired instance '{selected_name}'")
+            self.status_changed.emit(tr("status.instance.repaired", name=selected_name))
         elif task_id == self.REPAIR_SCAN_TASK_ID:
             selected_name = result.instance_name
             self.repair_scan_finished.emit(result)
-            self.status_changed.emit(f"Checked instance '{selected_name}'")
+            self.status_changed.emit(tr("status.instance.checked", name=selected_name))
         elif task_id == self.REPAIR_EXECUTE_TASK_ID:
             selected_name = result.instance_name
             self.repair_execution_finished.emit(result)
-            self.status_changed.emit(f"Repair completed for '{selected_name}'")
+            self.status_changed.emit(tr("status.instance.repair_completed", name=selected_name))
         elif task_id == "instance.export":
             self.export_finished.emit(result)
-            self.status_changed.emit("Instance export completed")
+            self.status_changed.emit(tr("instance.export.completed"))
             self.log_created.emit(f"Instance exported to: {result}")
             return
         else:
@@ -452,12 +454,12 @@ class InstanceController(BaseController):
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if task_id == "instance.delete" and isinstance(error, InstanceDeletionError):
             if error.scheduled:
-                self.status_changed.emit(f"Deletion queued for '{error.instance_name}'")
+                self.status_changed.emit(tr("status.instance.deletion_queued", name=error.instance_name))
             self._emit_error("Delete instance", error)
             return
         if task_id in {self.REPAIR_SCAN_TASK_ID, self.REPAIR_EXECUTE_TASK_ID}:
             self.repair_center_failed.emit(error)
-            self.status_changed.emit("Repair Center task failed")
+            self.status_changed.emit(tr("status.instance.repair_center_failed"))
             self.log_created.emit(f"Repair Center failed: {error}")
             return
         if task_id.startswith("instance."):

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal, Slot
 
+from mcw_core.api.language.language_manager import tr
+
 from mcw_core.api.content.installed_content_library import InstalledContentLibraryManager
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
@@ -43,7 +45,7 @@ class ContentLibraryController(BaseController):
             self._refresh_pending = True
             return False
         instance_id = instance.instance_id
-        return self._task_runner.run("content.library.scan", lambda: (instance_id, InstalledContentLibraryManager.scan(instance)), f"Scanning installed content for '{instance.name}'...", blocking=False)
+        return self._task_runner.run("content.library.scan", lambda: (instance_id, InstalledContentLibraryManager.scan(instance)), tr("task.content_library.scan", instance=instance.name), blocking=False)
 
     def set_enabled(self, item_ids: list[str], enabled: bool) -> bool:
         instance = self._instance
@@ -51,28 +53,28 @@ class ContentLibraryController(BaseController):
             return False
         instance_id = instance.instance_id
         action = "Enabling" if enabled else "Disabling"
-        return self._task_runner.run("content.library.toggle", lambda: (instance_id, InstalledContentLibraryManager.set_enabled(instance, item_ids, enabled)), f"{action} {len(item_ids)} content item(s)...")
+        return self._task_runner.run("content.library.toggle", lambda: (instance_id, InstalledContentLibraryManager.set_enabled(instance, item_ids, enabled)), tr("task.content_library.change_state", action=action, count=len(item_ids)))
 
     def remove(self, item_ids: list[str]) -> bool:
         instance = self._instance
         if instance is None or not item_ids:
             return False
         instance_id = instance.instance_id
-        return self._task_runner.run("content.library.remove", lambda: (instance_id, InstalledContentLibraryManager.remove(instance, item_ids)), f"Removing {len(item_ids)} content item(s)...")
+        return self._task_runner.run("content.library.remove", lambda: (instance_id, InstalledContentLibraryManager.remove(instance, item_ids)), tr("task.content_library.remove", count=len(item_ids)))
 
     def set_pinned(self, item_ids: list[str], pinned: bool) -> bool:
         instance = self._instance
         if instance is None or not item_ids:
             return False
         instance_id = instance.instance_id
-        return self._task_runner.run("content.library.pin", lambda: (instance_id, InstalledContentLibraryManager.set_pinned(instance, item_ids, pinned)), "Updating content pins...", blocking=False)
+        return self._task_runner.run("content.library.pin", lambda: (instance_id, InstalledContentLibraryManager.set_pinned(instance, item_ids, pinned)), tr("task.content_library.update_pins"), blocking=False)
 
     def set_ignored_update(self, item_ids: list[str], ignored: bool) -> bool:
         instance = self._instance
         if instance is None or not item_ids:
             return False
         instance_id = instance.instance_id
-        return self._task_runner.run("content.library.ignore", lambda: (instance_id, InstalledContentLibraryManager.set_ignored_update(instance, item_ids, ignored)), "Updating content update preferences...", blocking=False)
+        return self._task_runner.run("content.library.ignore", lambda: (instance_id, InstalledContentLibraryManager.set_ignored_update(instance, item_ids, ignored)), tr("task.content_library.update_preferences"), blocking=False)
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
@@ -85,7 +87,7 @@ class ContentLibraryController(BaseController):
         if task_id in {"content.library.toggle", "content.library.remove", "content.library.pin", "content.library.ignore"}:
             instance_id, changed = result
             if self._matches_instance(instance_id):
-                self.status_changed.emit(f"Updated {len(changed)} content item(s)")
+                self.status_changed.emit(tr("status.content.updated_items", count=len(changed)))
                 self.refresh()
 
     @Slot(str, object)

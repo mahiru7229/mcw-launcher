@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal, Slot
 
+from mcw_core.api.language.language_manager import tr
+
 from mcw_core.api.modloader.fabric.fabric_meta_client import FabricMetaClient
 from mcw_core.api.modloader.forge.forge_metadata_client import ForgeMetadataClient
 from mcw_core.api.modloader.neoforge.neoforge_metadata_client import NeoForgeMetadataClient
@@ -41,7 +43,7 @@ class ModLoaderController(BaseController):
         task_id = f"{loader}.versions:{game_version}"
         if self._task_runner.is_task_active(task_id):
             return
-        self._task_runner.run(task_id, lambda: (game_version, resolver(game_version)), f"Loading {title} versions for Minecraft {game_version}...", blocking=False)
+        self._task_runner.run(task_id, lambda: (game_version, resolver(game_version)), tr("task.mod_loader.load_versions", loader=title, version=game_version), blocking=False)
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:

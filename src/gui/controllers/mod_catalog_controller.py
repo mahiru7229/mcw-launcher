@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal, Slot
 
+from mcw_core.api.language.language_manager import tr
+
 from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from mcw_core.api.modrinth.modrinth_client import ModrinthClient
 from src.gui.controllers.base_controller import BaseController
@@ -40,7 +42,7 @@ class ModCatalogController(BaseController):
                     force_refresh=True,
                 ),
             ),
-            f"Searching Modrinth mods for {normalized_loader.title()}...",
+            tr("task.mod_catalog.search", loader=normalized_loader.title()),
             blocking=False,
         )
 
@@ -58,7 +60,7 @@ class ModCatalogController(BaseController):
                     version_types=("release", "beta", "alpha"),
                 ),
             ),
-            f"Loading {normalized_loader.title()} mod versions...",
+            tr("task.mod_catalog.load_versions", loader=normalized_loader.title()),
             blocking=False,
         )
 
