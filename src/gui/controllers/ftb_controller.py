@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal, Slot
 
+from mcw_core.api.language.language_manager import tr
+
 from mcw_core.api.ftb.ftb_client import FTBClient
 from mcw_core.api.ftb.ftb_pack_installer import FTBPackInstaller
 from mcw_core.api.progress.progress_reporter import ProgressReporter
@@ -25,34 +27,46 @@ class FTBController(BaseController):
         self._task_runner.task_failed.connect(self._on_task_failed)
 
     def search(self, query: str, sort: str, index: int, force_refresh: bool = False) -> bool:
-        return self._task_runner.run(
-            "ftb.search",
-            lambda: FTBClient.search_projects(query=query, index=index, page_size=25, sort=sort, force_refresh=force_refresh),
-            "Searching FTB modpacks...",
+        task_id = "ftb.search"
+        task = lambda: FTBClient.search_projects(query=query, index=index, page_size=25, sort=sort, force_refresh=force_refresh)
+        return self._run_network_task(
+            self._task_runner,
+            task_id,
+            task,
+            tr("task.ftb.search"),
             blocking=False,
         )
 
     def load_project_details(self, project_id: int) -> bool:
-        return self._task_runner.run(
-            f"ftb.details.{int(project_id)}",
-            lambda: (int(project_id), FTBClient.get_project_details(project_id)),
-            "Loading FTB modpack details...",
+        task_id = f"ftb.details.{int(project_id)}"
+        task = lambda: (int(project_id), FTBClient.get_project_details(project_id))
+        return self._run_network_task(
+            self._task_runner,
+            task_id,
+            task,
+            tr("task.ftb.load_details"),
             blocking=False,
         )
 
     def load_versions(self, project_id: int, allowed_release_types: tuple[str, ...]) -> bool:
-        return self._task_runner.run(
-            f"ftb.versions.{int(project_id)}",
-            lambda: (int(project_id), FTBClient.list_versions(project_id, allowed_release_types)),
-            "Loading FTB modpack versions...",
+        task_id = f"ftb.versions.{int(project_id)}"
+        task = lambda: (int(project_id), FTBClient.list_versions(project_id, allowed_release_types))
+        return self._run_network_task(
+            self._task_runner,
+            task_id,
+            task,
+            tr("task.ftb.load_versions"),
             blocking=False,
         )
 
     def load_version_details(self, project_id: int, version_id: int) -> bool:
-        return self._task_runner.run(
-            f"ftb.version.{int(project_id)}.{int(version_id)}",
-            lambda: (int(project_id), int(version_id), FTBClient.get_version(project_id, version_id)),
-            "Loading FTB version metadata...",
+        task_id = f"ftb.version.{int(project_id)}.{int(version_id)}"
+        task = lambda: (int(project_id), int(version_id), FTBClient.get_version(project_id, version_id))
+        return self._run_network_task(
+            self._task_runner,
+            task_id,
+            task,
+            tr("task.ftb.load_version_metadata"),
             blocking=False,
         )
 
@@ -69,14 +83,14 @@ class FTBController(BaseController):
                 reporter=reporter,
                 settings_override=settings_override,
             ),
-            f"Installing FTB modpack '{instance_name}'...",
+            tr("task.ftb.install_modpack", instance=instance_name),
         )
 
     def clear_cache(self) -> bool:
         return self._task_runner.run(
             "ftb.cache.clear",
             lambda: (FTBClient.clear_cache(), FTBClient.cache_status())[1],
-            "Clearing FTB cache...",
+            tr("task.ftb.clear_cache"),
             blocking=False,
         )
 
@@ -95,17 +109,19 @@ class FTBController(BaseController):
             self.version_details_changed.emit(int(result[0]), int(result[1]), result[2])
             return
         if task_id == "ftb.install.modpack":
-            self.status_changed.emit("FTB modpack installed")
+            self.status_changed.emit(tr("status.ftb.modpack_installed"))
             self.log_created.emit("Created an instance from an FTB modpack")
             self.modpack_installed.emit(result)
             return
         if task_id == "ftb.cache.clear":
-            self.status_changed.emit("FTB cache cleared")
+            self.status_changed.emit(tr("status.ftb.cache_cleared"))
             self.cache_cleared.emit(result)
 
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if not task_id.startswith("ftb."):
             return
-        title = "Install FTB modpack" if task_id == "ftb.install.modpack" else "FTB"
+        title = tr("ftb.modpack.install") if task_id == "ftb.install.modpack" else tr("content.library.provider.ftb")
+        if self._offer_network_retry(task_id, title, error):
+            return
         self._emit_error(title, error)

@@ -116,3 +116,25 @@ def test_gateway_failure_uses_exact_modrinth_sha1_mirror(monkeypatch, tmp_path: 
         "sha1": "a" * 40,
         "destination": destination,
     }
+
+
+def test_project_url_resolution_replaces_numeric_placeholder(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.core.curseforge.curseforge_downloader.CurseForgeClient.get_project",
+        staticmethod(lambda project_id: SimpleNamespace(project_url="https://www.curseforge.com/minecraft/mc-mods/example-mod")),
+    )
+
+    resolved = CurseForgeDownloader._resolve_project_url(1234, "https://www.curseforge.com/minecraft/mc-mods/1234")
+
+    assert resolved == "https://www.curseforge.com/minecraft/mc-mods/example-mod"
+
+
+def test_project_url_resolution_uses_search_page_when_metadata_is_unavailable(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.core.curseforge.curseforge_downloader.CurseForgeClient.get_project",
+        staticmethod(lambda project_id: (_ for _ in ()).throw(RuntimeError("offline"))),
+    )
+
+    resolved = CurseForgeDownloader._resolve_project_url(1234)
+
+    assert resolved == "https://www.curseforge.com/minecraft/search?search=1234"

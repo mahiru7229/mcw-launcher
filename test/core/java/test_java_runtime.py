@@ -610,3 +610,34 @@ def test_run_applies_saved_dedicated_gpu_preference(
     JavaRuntime.run(java=java, command=[], instance=instance)
 
     assert received == {"java": java, "enabled": True}
+
+
+def test_java_runtime_failure_classifier_only_accepts_strong_java_signatures():
+    assert JavaRuntime.is_java_runtime_failure(
+        "java.lang.UnsupportedClassVersionError: compiled by a more recent version of the Java Runtime"
+    ) is True
+    assert JavaRuntime.is_java_runtime_failure("Exception in thread main: missing Minecraft library") is False
+
+
+def test_probe_startup_reads_early_java_failure_log(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    process = type("Process", (), {"pid": 77, "poll": lambda self: 1})()
+    log_path = tmp_path / "minecraft.log"
+    log_path.write_text("Error: Could not create the Java Virtual Machine.", encoding="utf-8")
+    monkeypatch.setattr(JavaRuntime, "log_path", classmethod(lambda cls, received: log_path))
+
+    probe = JavaRuntime.probe_startup(process)
+
+    assert probe is not None
+    assert probe.exit_code == 1
+    assert probe.java_runtime_failure is True
+    assert probe.log_path == log_path
+
+
+def test_unique_log_path_preserves_existing_log(tmp_path: Path):
+    existing = tmp_path / "minecraft-2026-08-05_18-00-00.log"
+    existing.write_text("first attempt", encoding="utf-8")
+
+    selected = JavaRuntime._unique_log_path(tmp_path, "2026-08-05_18-00-00")
+
+    assert selected == tmp_path / "minecraft-2026-08-05_18-00-00-1.log"
+    assert existing.read_text(encoding="utf-8") == "first attempt"

@@ -9,7 +9,8 @@ from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.instance.settings_manager import SettingsManager
 from src.core.lan.lan_agent_manager import LanAgentManager
 from src.core.lan.lan_hosting_manager import LanHostingManager
-from src.core.java.java_runtime import JavaRuntime
+from src.core.java.java_resolver import JavaResolution, JavaResolver
+from src.core.java.java_runtime import JavaRuntime, JavaStartupProbe
 from src.core.java.java_selector import JavaSelector
 from src.core.minecraft.asset_manager import AssetManager
 from src.core.minecraft.context_builder import ContextBuilder
@@ -28,6 +29,7 @@ from src.core.minecraft.version_manifest_manager import (
     VersionManifestManager,
 )
 from src.models.progress.progress_stage import ProgressStage
+from src.core.progress.progress_reporter import ProgressReporter
 
 
 class FakeRunLock:
@@ -169,6 +171,55 @@ def patch_pipeline(
         "command": command,
     }
 
+
+
+def test_load_client_forces_full_hash_for_legacy_forge(monkeypatch: pytest.MonkeyPatch) -> None:
+    version = SimpleNamespace(
+        main_class="net.minecraft.launchwrapper.Launch",
+        raw_json={"forge": {"gameVersion": "1.6.4", "loaderVersion": "9.11.1.1345"}},
+    )
+    reporter = object()
+    verification_cache = object()
+    received = {}
+
+    def fake_load(**kwargs):
+        received.update(kwargs)
+        return Path("1.6.4.jar")
+
+    monkeypatch.setattr(DownloadClientManager, "load", fake_load)
+
+    result = MinecraftExecutor._load_client(version, reporter, verification_cache)
+
+    assert result == Path("1.6.4.jar")
+    assert received == {
+        "version": version,
+        "reporter": reporter,
+        "verification_cache": verification_cache,
+        "fast_verify": False,
+    }
+
+
+def test_load_client_keeps_fast_verification_for_non_legacy_profiles(monkeypatch: pytest.MonkeyPatch) -> None:
+    version = SimpleNamespace(main_class="net.minecraft.client.main.Main", raw_json={})
+    reporter = object()
+    verification_cache = object()
+    received = {}
+
+    def fake_load(**kwargs):
+        received.update(kwargs)
+        return Path("client.jar")
+
+    monkeypatch.setattr(DownloadClientManager, "load", fake_load)
+
+    result = MinecraftExecutor._load_client(version, reporter, verification_cache)
+
+    assert result == Path("client.jar")
+    assert received == {
+        "version": version,
+        "reporter": reporter,
+        "verification_cache": verification_cache,
+        "fast_verify": True,
+    }
 
 def test_run_returns_launch_information(
     monkeypatch: pytest.MonkeyPatch,
@@ -1101,3 +1152,48 @@ def test_hard_loader_installation_errors_cannot_be_bypassed(monkeypatch: pytest.
 
     with pytest.raises(RuntimeError, match="Forge runtime is damaged"):
         MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object(), allow_compatibility_issues_once=True)
+
+
+def test_start_with_java_recovery_retries_and_resets_custom_path(monkeypatch: pytest.MonkeyPatch):
+    instance = make_instance()
+    preferred = Path("C:/BrokenJava/bin/javaw.exe")
+    recovered = Path("C:/ManagedJava/bin/javaw.exe")
+    first_process = SimpleNamespace(pid=11)
+    second_process = SimpleNamespace(pid=12)
+    launched = []
+    updated_paths = []
+
+    monkeypatch.setattr(
+        JavaResolver,
+        "resolve_with_recovery",
+        lambda required, reporter=None, preferred_path=None: JavaResolution(preferred, automatic=False),
+    )
+    monkeypatch.setattr(JavaResolver, "resolve_alternative", lambda required, excluded, reporter=None: recovered)
+    monkeypatch.setattr(
+        JavaRuntime,
+        "run",
+        lambda java, command, received_instance: launched.append(java) or (first_process if len(launched) == 1 else second_process),
+    )
+    probes = iter([
+        JavaStartupProbe(1, None, "UnsupportedClassVersionError: class file version 65", True),
+        None,
+    ])
+    monkeypatch.setattr(JavaRuntime, "probe_startup", lambda process: next(probes))
+    monkeypatch.setattr(JavaRuntime, "close_process_log", lambda process: None)
+    monkeypatch.setattr(SettingsManager, "update_java_path", lambda received_instance, path: updated_paths.append(path))
+    monkeypatch.setattr(LanAgentManager, "append_log_path", lambda path, message: None)
+
+    process, java, warnings = MinecraftExecutor._start_with_java_recovery(
+        instance,
+        ["example.Main"],
+        17,
+        ProgressReporter(None),
+        str(preferred),
+        None,
+    )
+
+    assert process is second_process
+    assert java == recovered
+    assert launched == [preferred, recovered]
+    assert updated_paths == [""]
+    assert warnings and "switched this instance back to Automatic" in warnings[0]

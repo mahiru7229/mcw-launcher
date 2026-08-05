@@ -4,6 +4,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Signal, Slot
 
+from mcw_core.api.language.language_manager import tr
+
 from mcw_core.api.curseforge.curseforge_registry import CurseForgeRegistry
 from mcw_core.api.mod.mod_compatibility_manager import ModCompatibilityManager
 from mcw_core.api.mod.mod_manager import ModManager
@@ -69,7 +71,7 @@ class ModController(BaseController):
             mods = ModManager.list_mods(instance)
             return instance_id, mods, ModCompatibilityManager.scan(instance, mods)
 
-        started = self._task_runner.run("mods.scan", scan, f"Scanning mods for '{instance.name}'...", blocking=False)
+        started = self._task_runner.run("mods.scan", scan, tr("task.mods.scan", instance=instance.name), blocking=False)
         if not started:
             self._scan_pending = True
 
@@ -84,7 +86,7 @@ class ModController(BaseController):
             CurseForgeRegistry.remove_by_filenames(instance, filenames)
             return added
 
-        self._task_runner.run("mods.add", add, f"Adding {len(paths)} mod file(s)...")
+        self._task_runner.run("mods.add", add, tr("task.mods.add_files", count=len(paths)))
 
     def remove(self, paths: list[Path]) -> None:
         instance = self._require_instance()
@@ -96,14 +98,14 @@ class ModController(BaseController):
             ModrinthRegistry.remove_by_filenames(instance, filenames)
             CurseForgeRegistry.remove_by_filenames(instance, filenames)
 
-        self._task_runner.run("mods.remove", remove, f"Removing {len(paths)} mod file(s)...")
+        self._task_runner.run("mods.remove", remove, tr("task.mods.remove_files", count=len(paths)))
 
     def set_enabled(self, paths: list[Path], enabled: bool) -> None:
         instance = self._require_instance()
         if instance is None or not paths:
             return
         action = "Enabling" if enabled else "Disabling"
-        self._task_runner.run("mods.toggle", lambda: ModManager.set_enabled(instance, paths, enabled), f"{action} {len(paths)} mod file(s)...")
+        self._task_runner.run("mods.toggle", lambda: ModManager.set_enabled(instance, paths, enabled), tr("task.mods.change_state", action=action, count=len(paths)))
 
     def check_updates(self, allowed_version_types: tuple[str, ...], force_refresh: bool = True) -> None:
         instance = self._require_instance()
@@ -116,7 +118,7 @@ class ModController(BaseController):
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
         reporter = ProgressReporter(self.progress_received.emit)
-        self._task_runner.run("mods.update.check", lambda: (instance_id, ModrinthModUpdateManager.check(instance, allowed_version_types, force_refresh=force_refresh, reporter=reporter)), "Checking Modrinth mod updates...", blocking=False)
+        self._task_runner.run("mods.update.check", lambda: (instance_id, ModrinthModUpdateManager.check(instance, allowed_version_types, force_refresh=force_refresh, reporter=reporter)), tr("task.mods.check_updates"), blocking=False)
 
     def update_projects(self, project_ids: list[str], allowed_version_types: tuple[str, ...]) -> None:
         instance = self._require_instance()
@@ -128,7 +130,7 @@ class ModController(BaseController):
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
         reporter = ProgressReporter(self.progress_received.emit)
-        self._task_runner.run("mods.update.apply", lambda: (instance_id, allowed_version_types, ModrinthModUpdateManager.update(instance, project_ids, allowed_version_types, reporter)), f"Updating {len(project_ids)} Modrinth mod(s)...")
+        self._task_runner.run("mods.update.apply", lambda: (instance_id, allowed_version_types, ModrinthModUpdateManager.update(instance, project_ids, allowed_version_types, reporter)), tr("task.mods.update_selected", count=len(project_ids)))
 
     def update_all(self, allowed_version_types: tuple[str, ...]) -> None:
         instance = self._require_instance()
@@ -140,21 +142,21 @@ class ModController(BaseController):
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
         reporter = ProgressReporter(self.progress_received.emit)
-        self._task_runner.run("mods.update.apply", lambda: (instance_id, allowed_version_types, ModrinthModUpdateManager.update_all(instance, allowed_version_types, reporter)), "Updating all unlocked Modrinth mods...")
+        self._task_runner.run("mods.update.apply", lambda: (instance_id, allowed_version_types, ModrinthModUpdateManager.update_all(instance, allowed_version_types, reporter)), tr("task.mods.update_all"))
 
     def set_locked(self, project_ids: list[str], locked: bool) -> None:
         instance = self._require_instance()
         if instance is None or not project_ids:
             return
         instance_id = instance.instance_id
-        self._task_runner.run("mods.lock", lambda: (instance_id, ModrinthModUpdateManager.set_locked(instance, project_ids, locked)), "Updating mod version locks...", blocking=False)
+        self._task_runner.run("mods.lock", lambda: (instance_id, ModrinthModUpdateManager.set_locked(instance, project_ids, locked)), tr("task.mods.update_locks"), blocking=False)
 
     def analyze(self) -> None:
         instance = self._require_instance()
         if instance is None:
             return
         instance_id = instance.instance_id
-        self._task_runner.run("mods.health", lambda: (instance_id, ModCompatibilityManager.scan(instance)), "Analyzing mod compatibility...", blocking=False)
+        self._task_runner.run("mods.health", lambda: (instance_id, ModCompatibilityManager.scan(instance)), tr("task.mods.analyze_compatibility"), blocking=False)
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
@@ -174,7 +176,7 @@ class ModController(BaseController):
             instance_id, allowed_types, update_result = result
             if self._matches_instance(instance_id):
                 count = len(update_result.updated_projects)
-                self.status_changed.emit(f"Updated {count} Modrinth mod(s)")
+                self.status_changed.emit(tr("status.mods.updated_modrinth", count=count))
                 self.log_created.emit(f"Updated Modrinth mods: {', '.join(update_result.updated_projects) or 'none'}")
                 for warning in update_result.warnings:
                     self.log_created.emit(f"Mod update warning: {warning}")
@@ -186,7 +188,7 @@ class ModController(BaseController):
         if task_id == "mods.lock":
             instance_id, changed = result
             if self._matches_instance(instance_id):
-                self.status_changed.emit(f"Updated {len(changed)} mod version lock(s)")
+                self.status_changed.emit(tr("status.mods.updated_locks", count=len(changed)))
                 self.refresh()
                 self.check_updates(self._last_allowed_types)
             return
@@ -198,7 +200,7 @@ class ModController(BaseController):
         if task_id in {"mods.add", "mods.remove", "mods.toggle"}:
             if task_id in {"mods.add", "mods.remove"}:
                 self.updates_changed.emit(ModrinthModUpdateReport(entries=()))
-            self.status_changed.emit("Mod folder updated")
+            self.status_changed.emit(tr("status.mods.folder_updated"))
             self.log_created.emit(f"Completed task: {task_id}")
             self.refresh()
 

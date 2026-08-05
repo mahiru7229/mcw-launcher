@@ -139,3 +139,48 @@ def test_repairs_quilt_instance(monkeypatch):
     monkeypatch.setattr(QuiltVersionManager, "repair", lambda version, loader_version, reporter=None: expected)
 
     assert ModLoaderManager.repair(instance) is expected
+
+
+def test_forwards_preferred_java_to_forge_load(monkeypatch):
+    expected = object()
+    captured = {}
+
+    def load(game_version, loader_version, reporter=None, preferred_java_path=None):
+        captured["path"] = preferred_java_path
+        return expected
+
+    monkeypatch.setattr(ForgeVersionManager, "load", load)
+    instance = SimpleNamespace(version_id="1.20.1", mod_loader=("forge", "47.3.0"))
+
+    assert ModLoaderManager.load(instance, preferred_java_path="C:/Java/custom/javaw.exe") is expected
+    assert captured["path"] == "C:/Java/custom/javaw.exe"
+
+
+def test_forwards_preferred_java_to_forge_prepare(monkeypatch):
+    expected = object()
+    captured = {}
+
+    def install(version, loader_version, reporter=None, force_refresh=False, preferred_java_path=None):
+        captured["path"] = preferred_java_path
+        return expected
+
+    monkeypatch.setattr(ForgeVersionManager, "install", install)
+
+    assert ModLoaderManager.prepare(object(), "forge", "47.3.0", preferred_java_path="C:/Java/custom/javaw.exe") is expected
+    assert captured["path"] == "C:/Java/custom/javaw.exe"
+
+
+def test_forwards_preferred_java_to_forge_repair(monkeypatch):
+    expected = object()
+    captured = {}
+    instance = SimpleNamespace(version_id="1.20.1", mod_loader=("forge", "47.3.0"))
+    monkeypatch.setattr(VersionManager, "load", lambda version_id: object())
+
+    def repair(version, loader_version, reporter=None, preferred_java_path=None):
+        captured["path"] = preferred_java_path
+        return expected
+
+    monkeypatch.setattr(ForgeVersionManager, "repair", repair)
+
+    assert ModLoaderManager.repair(instance, preferred_java_path="C:/Java/custom/javaw.exe") is expected
+    assert captured["path"] == "C:/Java/custom/javaw.exe"

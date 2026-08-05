@@ -140,3 +140,29 @@ def test_lan_agent_log_button_emits_loaded_instance(gui_app) -> None:
     page.lan_agent_log_button.click()
 
     assert emitted == ["Pack"]
+
+
+def test_java_selection_mode_disables_path_in_automatic_mode(gui_app) -> None:
+    page = InstanceSettingsPage()
+    page.set_settings("Pack", make_settings())
+
+    assert page.java_mode_combo.currentData() == "auto"
+    assert page.java_path_input.isEnabled() is False
+    assert page.java_browse_button.isEnabled() is False
+    assert page.form_data()["java_path"] == ""
+
+
+def test_java_selection_mode_round_trips_custom_path(gui_app) -> None:
+    page = InstanceSettingsPage()
+    settings = make_settings()
+    settings.java_path = "C:/Java/bin/javaw.exe"
+
+    page.set_settings("Pack", settings)
+
+    assert page.java_mode_combo.currentData() == "custom"
+    assert page.java_path_input.isEnabled() is True
+    assert page.form_data()["java_mode"] == "custom"
+    assert page.form_data()["java_path"] == "C:/Java/bin/javaw.exe"
+
+    page.java_mode_combo.setCurrentIndex(page.java_mode_combo.findData("auto"))
+    assert page.form_data()["java_path"] == ""

@@ -88,8 +88,7 @@ def test_run_installer_imports_legacy_without_starting_java(monkeypatch, tmp_pat
 
     forge_root = tmp_path / "forge-root"
     monkeypatch.setattr(Paths, "forge_root", staticmethod(lambda: forge_root))
-    monkeypatch.setattr("src.core.modloader.forge.forge_version_manager.JavaResolver.resolve", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Java must not run for a legacy profile")))
-    monkeypatch.setattr("src.core.modloader.forge.forge_version_manager.subprocess.run", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("subprocess must not run for a legacy profile")))
+    monkeypatch.setattr("src.core.modloader.forge.forge_version_manager.ModLoaderJavaRunner.run", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Java must not run for a legacy profile")))
 
     ForgeVersionManager._run_installer(make_version(tmp_path), "11.15.1.2318-1.8.9", installer, tmp_path / "staging", None)
 
@@ -118,6 +117,236 @@ def test_normalize_legacy_library_builds_download_metadata(monkeypatch, tmp_path
     assert artifact["url"] == "https://repo.example/maven/com/example/legacy/1.0/legacy-1.0.jar"
     assert artifact["sha1"] == sha1
     assert artifact["size"] == 0
+
+
+def test_normalize_hashless_legacy_library_downloads_and_records_sha1(monkeypatch, tmp_path: Path) -> None:
+    root = tmp_path / "libraries"
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))
+    calls = []
+
+    def fake_download_and_hash(**kwargs):
+        calls.append(kwargs)
+        target = kwargs["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"launchwrapper")
+        return target, "b" * 40, len(b"launchwrapper")
+
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
+        staticmethod(fake_download_and_hash),
+    )
+    profile = {
+        "libraries": [
+            {
+                "name": "net.minecraft:launchwrapper:1.8",
+                "checksums": ["d41d8cd98f00b204e9800998ecf8427e"],
+            }
+        ]
+    }
+
+    normalized = ForgeVersionManager._normalize_libraries(profile)
+    artifact = normalized["libraries"][0]["downloads"]["artifact"]
+
+    assert calls[0]["url"] == "https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar"
+    assert artifact == {
+        "path": "net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar",
+        "url": "https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar",
+        "sha1": "b" * 40,
+        "size": len(b"launchwrapper"),
+    }
+
+
+def test_normalize_legacy_native_only_library_builds_windows_classifier(monkeypatch, tmp_path: Path) -> None:
+    root = tmp_path / "libraries"
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))
+    calls = []
+
+    def fake_download_and_hash(**kwargs):
+        calls.append(kwargs)
+        target = kwargs["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"native-library")
+        return target, "c" * 40, len(b"native-library")
+
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
+        staticmethod(fake_download_and_hash),
+    )
+    profile = {
+        "libraries": [
+            {
+                "name": "org.lwjgl.lwjgl:lwjgl-platform:2.9.0",
+                "natives": {"windows": "natives-windows"},
+                "extract": {"exclude": ["META-INF/"]},
+            }
+        ]
+    }
+
+    normalized = ForgeVersionManager._normalize_libraries(profile)
+    library = normalized["libraries"][0]
+    classifiers = library["downloads"]["classifiers"]
+
+    assert "artifact" not in library["downloads"]
+    assert calls[0]["url"] == "https://libraries.minecraft.net/org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar"
+    assert classifiers["natives-windows"] == {
+        "path": "org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar",
+        "url": "https://libraries.minecraft.net/org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar",
+        "sha1": "c" * 40,
+        "size": len(b"native-library"),
+    }
+
+
+def test_normalize_legacy_platform_infers_windows_native_when_mapping_is_missing(monkeypatch, tmp_path: Path) -> None:
+    root = tmp_path / "libraries"
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))
+
+    def fake_download_and_hash(**kwargs):
+        target = kwargs["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"native-library")
+        return target, "f" * 40, len(b"native-library")
+
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
+        staticmethod(fake_download_and_hash),
+    )
+    profile = {"libraries": [{"name": "net.java.jinput:jinput-platform:2.0.5"}]}
+
+    normalized = ForgeVersionManager._normalize_libraries(profile)
+    library = normalized["libraries"][0]
+
+    assert library["natives"] == {"windows": "natives-windows"}
+    assert "artifact" not in library["downloads"]
+    assert library["downloads"]["classifiers"]["natives-windows"]["path"] == "net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5-natives-windows.jar"
+
+
+def test_normalize_skips_osx_only_nightly_native_on_windows(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: tmp_path / "libraries"))
+    monkeypatch.setattr(
+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_os",
+        staticmethod(lambda: "windows"),
+    )
+    monkeypatch.setattr(
+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_arch",
+        staticmethod(lambda: "x64"),
+    )
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
+        staticmethod(lambda **kwargs: (_ for _ in ()).throw(AssertionError("A disallowed OS library must not be downloaded"))),
+    )
+    library = {
+        "name": "org.lwjgl.lwjgl:lwjgl-platform:2.9.1-nightly-20130708-debug3",
+        "natives": {"linux": "natives-linux", "osx": "natives-osx", "windows": "natives-windows"},
+        "rules": [{"action": "allow", "os": {"name": "osx", "version": "^10\\.5\\.\\d$"}}],
+        "extract": {"exclude": ["META-INF/"]},
+    }
+
+    normalized = ForgeVersionManager._normalize_libraries({"libraries": [library]})
+
+    assert normalized["libraries"] == [library]
+    assert "downloads" not in normalized["libraries"][0]
+
+
+def test_windows_native_cache_ignores_osx_only_nightly_library(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_os",
+        staticmethod(lambda: "windows"),
+    )
+    monkeypatch.setattr(
+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_arch",
+        staticmethod(lambda: "x64"),
+    )
+    cache = tmp_path / "forge.json"
+    cache.write_text(
+        '{"id":"forge-1.6.4-9.11.1.1345","mainClass":"net.minecraft.launchwrapper.Launch","libraries":['
+        '{"name":"net.minecraft:launchwrapper:1.8","downloads":{"artifact":{"path":"net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","url":"https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","sha1":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":100}}},'
+        '{"name":"org.lwjgl.lwjgl:lwjgl-platform:2.9.0","natives":{"windows":"natives-windows"},"downloads":{"classifiers":{"natives-windows":{"path":"org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar","url":"https://libraries.minecraft.net/org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar","sha1":"cccccccccccccccccccccccccccccccccccccccc","size":609967}}}},'
+        '{"name":"org.lwjgl.lwjgl:lwjgl-platform:2.9.1-nightly-20130708-debug3","natives":{"linux":"natives-linux","osx":"natives-osx","windows":"natives-windows"},"rules":[{"action":"allow","os":{"name":"osx","version":"^10\\\\.5\\\\.\\\\d$"}}]}],"forge":{"schemaVersion":1,"gameVersion":"1.6.4","loaderVersion":"9.11.1.1345"}}',
+        encoding="utf-8",
+    )
+
+    assert ForgeVersionManager._load_cached(cache, "1.6.4", "9.11.1.1345") is not None
+
+
+def test_normalize_legacy_native_library_preserves_existing_artifact(monkeypatch, tmp_path: Path) -> None:
+    root = tmp_path / "libraries"
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))
+    calls = []
+
+    def fake_download_and_hash(**kwargs):
+        calls.append(kwargs)
+        target = kwargs["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"native")
+        return target, "d" * 40, len(b"native")
+
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
+        staticmethod(fake_download_and_hash),
+    )
+    artifact = {
+        "path": "com/example/hybrid/1.0/hybrid-1.0.jar",
+        "url": "https://repo.example/com/example/hybrid/1.0/hybrid-1.0.jar",
+        "sha1": "e" * 40,
+        "size": 10,
+    }
+    profile = {
+        "libraries": [
+            {
+                "name": "com.example:hybrid:1.0",
+                "url": "https://repo.example/",
+                "natives": {"windows": "natives-windows-${arch}"},
+                "downloads": {"artifact": artifact},
+            }
+        ]
+    }
+
+    normalized = ForgeVersionManager._normalize_libraries(profile)
+    downloads = normalized["libraries"][0]["downloads"]
+
+    assert downloads["artifact"] == artifact
+    assert calls[0]["path"].name == "hybrid-1.0-natives-windows-64.jar"
+    assert "natives-windows-64" in downloads["classifiers"]
+
+
+def test_incomplete_windows_native_cache_is_invalidated(tmp_path: Path) -> None:
+    cache = tmp_path / "forge.json"
+    cache.write_text(
+        '{"id":"forge-1.6.4-9.11.1.1345","mainClass":"net.minecraft.launchwrapper.Launch","libraries":[{"name":"net.minecraft:launchwrapper:1.8","downloads":{"artifact":{"path":"net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","url":"https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","sha1":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":100}}},{"name":"org.lwjgl.lwjgl:lwjgl-platform:2.9.0","natives":{"windows":"natives-windows"},"downloads":{}}],"forge":{"schemaVersion":1,"gameVersion":"1.6.4","loaderVersion":"9.11.1.1345"}}',
+        encoding="utf-8",
+    )
+
+    assert ForgeVersionManager._load_cached(cache, "1.6.4", "9.11.1.1345") is None
+
+
+def test_complete_windows_native_cache_is_reused(tmp_path: Path) -> None:
+    cache = tmp_path / "forge.json"
+    cache.write_text(
+        '{"id":"forge-1.6.4-9.11.1.1345","mainClass":"net.minecraft.launchwrapper.Launch","libraries":[{"name":"net.minecraft:launchwrapper:1.8","downloads":{"artifact":{"path":"net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","url":"https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","sha1":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":100}}},{"name":"org.lwjgl.lwjgl:lwjgl-platform:2.9.0","natives":{"windows":"natives-windows"},"downloads":{"classifiers":{"natives-windows":{"path":"org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar","url":"https://libraries.minecraft.net/org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar","sha1":"cccccccccccccccccccccccccccccccccccccccc","size":609967}}}}],"forge":{"schemaVersion":1,"gameVersion":"1.6.4","loaderVersion":"9.11.1.1345"}}',
+        encoding="utf-8",
+    )
+
+    assert ForgeVersionManager._load_cached(cache, "1.6.4", "9.11.1.1345") is not None
+
+
+def test_incomplete_legacy_launchwrapper_cache_is_invalidated(tmp_path: Path) -> None:
+    cache = tmp_path / "forge.json"
+    cache.write_text(
+        '{"id":"forge-1.6.4-9.11.1.1345","mainClass":"net.minecraft.launchwrapper.Launch","libraries":[{"name":"net.minecraftforge:minecraftforge:9.11.1.1345"},{"name":"net.minecraft:launchwrapper:1.8"}],"forge":{"schemaVersion":1,"gameVersion":"1.6.4","loaderVersion":"9.11.1.1345"}}',
+        encoding="utf-8",
+    )
+
+    assert ForgeVersionManager._load_cached(cache, "1.6.4", "9.11.1.1345") is None
+
+
+def test_complete_legacy_launchwrapper_cache_is_reused(tmp_path: Path) -> None:
+    cache = tmp_path / "forge.json"
+    cache.write_text(
+        '{"id":"forge-1.6.4-9.11.1.1345","mainClass":"net.minecraft.launchwrapper.Launch","libraries":[{"name":"net.minecraftforge:minecraftforge:9.11.1.1345"},{"name":"net.minecraft:launchwrapper:1.8","downloads":{"artifact":{"path":"net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","url":"https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","sha1":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":100}}}],"forge":{"schemaVersion":1,"gameVersion":"1.6.4","loaderVersion":"9.11.1.1345"}}',
+        encoding="utf-8",
+    )
+
+    assert ForgeVersionManager._load_cached(cache, "1.6.4", "9.11.1.1345") is not None
 
 
 def test_detects_unsupported_install_client_error() -> None:
@@ -293,3 +522,40 @@ def test_validate_installation_still_reports_missing_current_os_library(monkeypa
     issues = ForgeVersionManager.validate_installation(version, "1.20.1", "47.4.21", verify_files=True)
 
     assert issues == ["Missing required library: com/example/windows-only/1.0/windows-only-1.0.jar"]
+
+
+def test_validate_installation_accepts_pre_1_7_minecraftforge_runtime(tmp_path: Path) -> None:
+    raw = make_version(tmp_path).raw_json.copy()
+    raw.update({
+        "id": "1.6.4-Forge9.11.1.1345",
+        "mainClass": "net.minecraft.launchwrapper.Launch",
+        "forge": {"schemaVersion": 1, "gameVersion": "1.6.4", "loaderVersion": "9.11.1.1345"},
+        "libraries": [{"name": "net.minecraftforge:minecraftforge:9.11.1.1345"}],
+        "minecraftArguments": "--username ${auth_player_name} --tweakClass cpw.mods.fml.common.launcher.FMLTweaker",
+    })
+    version = make_version(tmp_path)
+    version.id = raw["id"]
+    version.raw_json = raw
+    version.main_class = raw["mainClass"]
+
+    assert ForgeVersionManager.validate_installation(version, "1.6.4", "9.11.1.1345", verify_files=False) == []
+
+
+def test_run_installer_reports_java_runner_output_on_failure(monkeypatch, tmp_path: Path) -> None:
+    import pytest
+
+    from src.core.modloader.java_installer_runner import ModLoaderInstallerResult
+
+    installer = tmp_path / "forge-installer.jar"
+    installer.write_bytes(b"not-a-legacy-installer")
+    forge_root = tmp_path / "forge-root"
+    monkeypatch.setattr(Paths, "forge_root", staticmethod(lambda: forge_root))
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.ModLoaderJavaRunner.run",
+        staticmethod(lambda *args, **kwargs: ModLoaderInstallerResult(1, "installer line\nfinal Forge detail", Path("java"), 1)),
+    )
+
+    with pytest.raises(RuntimeError, match="final Forge detail"):
+        ForgeVersionManager._run_installer(make_version(tmp_path), "47.3.0", installer, tmp_path / "staging", None)
+
+    assert "final Forge detail" in (forge_root / "logs" / "forge-1.20.1-47.3.0.log").read_text(encoding="utf-8")

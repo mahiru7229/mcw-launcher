@@ -78,7 +78,7 @@ class SidebarWidget(QFrame):
             layout.addWidget(button)
 
         layout.addStretch()
-        self._footer = QLabel(f"Dev by {DEVELOPER_NAME}\nPNG theme assets fall back safely when missing.")
+        self._footer = QLabel(tr("sidebar.footer", developer=DEVELOPER_NAME))
         self._footer.setObjectName("TinyLabel")
         self._footer.setWordWrap(True)
         self._footer.setVisible(not self._compact)

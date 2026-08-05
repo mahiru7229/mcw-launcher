@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal, Slot
 
+from mcw_core.api.language.language_manager import tr
+
 from mcw_core.api.instance.instance_manager import InstanceManager
 from mcw_core.api.lan.lan_hosting_manager import LanHostingManager
 from mcw_core.api.progress.progress_reporter import ProgressReporter
@@ -36,14 +38,14 @@ class LanHostingController(BaseController):
         return self._task_runner.run(
             self.TASK_ID,
             task,
-            f"Preparing LAN hosting support for '{normalized_name}'...",
+            tr("task.lan.prepare", instance=normalized_name),
         )
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
         if task_id != self.TASK_ID:
             return
-        self.status_changed.emit("LAN hosting support is ready")
+        self.status_changed.emit(tr("lan.prepare.completed"))
         self.log_created.emit("Prepared LAN authentication and connection support")
         self.prepared.emit(result)
 

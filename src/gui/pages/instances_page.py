@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QTimer, Signal
-from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy, QWidget
 
-from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
 from mcw_core.api.language.language_manager import tr
+from src.gui.localization import retranslate_widget_tree
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
 from src.gui.theme.runtime import set_theme_icon
@@ -15,13 +15,11 @@ from src.gui.theme.runtime import set_theme_icon
 class InstancesPage(BasePage):
     refresh_requested = Signal()
     selected_instance_changed = Signal(str)
-    create_requested = Signal(str, str, str)
     rename_requested = Signal(str, str)
     clone_requested = Signal(str, str, bool)
     delete_requested = Signal(str)
     import_requested = Signal(object)
     export_requested = Signal(str, object, bool)
-    import_modpack_package_requested = Signal(object)
     export_modpack_requested = Signal(str)
     fabric_versions_requested = Signal(str)
     quilt_versions_requested = Signal(str)
@@ -34,9 +32,6 @@ class InstancesPage(BasePage):
     export_forge_diagnostics_requested = Signal(str)
     repair_instance_requested = Signal(str)
     manage_mods_requested = Signal(str)
-    browse_modpacks_requested = Signal()
-    browse_curseforge_modpacks_requested = Signal()
-    browse_ftb_modpacks_requested = Signal()
     backup_requested = Signal(str, str)
     restore_backup_requested = Signal(str, object)
     open_backups_requested = Signal(str)
@@ -47,9 +42,8 @@ class InstancesPage(BasePage):
     apply_modpack_update_requested = Signal(str)
 
     def __init__(self) -> None:
-        super().__init__("Instances", "Create and manage isolated Minecraft instances with Vanilla, Fabric, Quilt, Forge, or NeoForge.", "instances")
+        super().__init__("Instances", "Manage the selected Minecraft instance, its mod loader, maintenance tools, backups, and managed modpack state.", "instances")
         self._instances: dict[str, object] = {}
-        self._versions: list[object] = []
         self._fabric_versions: dict[str, list[object]] = {}
         self._quilt_versions: dict[str, list[object]] = {}
         self._forge_versions: dict[str, list[object]] = {}
@@ -58,11 +52,9 @@ class InstancesPage(BasePage):
         self._synchronizing = False
         self._modpack_update_info: object | None = None
         self._modpack_managed = False
-        self._version_filter_timer = QTimer(self)
-        self._version_filter_timer.setSingleShot(True)
-        self._version_filter_timer.setInterval(25)
-        self._version_filter_timer.timeout.connect(self._apply_version_filter)
+        self._responsive_signature: tuple[bool, int] | None = None
         self._build_ui()
+        self.retranslate_dynamic()
 
     def _build_ui(self) -> None:
         selected_card = CardWidget("Active instance")
@@ -84,62 +76,36 @@ class InstancesPage(BasePage):
         selected_card.layout.addLayout(selected_actions)
         self.root_layout.addWidget(selected_card)
 
-        create_card = CardWidget("Create instance", "Choose Vanilla, Fabric, Quilt, Forge, or NeoForge. Automatic mode selects a compatible loader version.")
-        self.create_name_input = QLineEdit()
-        self.create_name_input.setPlaceholderText("New instance name")
-        self.version_combo = QComboBox()
-        self.snapshot_checkbox = QCheckBox("Show snapshots, old alpha, and old beta")
-        self.snapshot_checkbox.toggled.connect(self._queue_version_filter)
-        self.create_loader_combo = QComboBox()
-        self.create_loader_combo.addItem("Vanilla", "vanilla")
-        self.create_loader_combo.addItem("Fabric", "fabric")
-        self.create_loader_combo.addItem("Quilt", "quilt")
-        self.create_loader_combo.addItem("Forge", "forge")
-        self.create_loader_combo.addItem("NeoForge", "neoforge")
-        self.create_loader_status = QLabel("Fabric, Quilt, Forge, and NeoForge versions can be changed later under Manage selected instance.")
-        self.create_loader_status.setObjectName("MutedLabel")
-        self.create_loader_status.setWordWrap(True)
-        create_button = set_theme_icon(QPushButton("Create instance"), "icon.action.add")
-        create_button.setObjectName("PrimaryButton")
-        create_button.clicked.connect(self._request_create)
-        self.browse_modpacks_button = set_theme_icon(QPushButton("Browse Modrinth modpacks"), "icon.action.modrinth")
-        self.browse_modpacks_button.clicked.connect(self.browse_modpacks_requested.emit)
-        self.browse_curseforge_modpacks_button = set_theme_icon(QPushButton("Browse CurseForge modpacks"), "icon.action.download")
-        self.browse_curseforge_modpacks_button.setVisible(CurseForgeConfigManager.is_configured())
-        self.browse_curseforge_modpacks_button.clicked.connect(self.browse_curseforge_modpacks_requested.emit)
-        self.browse_ftb_modpacks_button = set_theme_icon(QPushButton(tr("ftb.modpack.browse")), "icon.action.download")
-        self.browse_ftb_modpacks_button.clicked.connect(self.browse_ftb_modpacks_requested.emit)
-        self.import_modpack_package_button = set_theme_icon(QPushButton(tr("modpack_package.import.local_button")), "icon.action.import")
-        self.import_modpack_package_button.clicked.connect(self._choose_modpack_import)
-        create_card.layout.addWidget(QLabel("Name"))
-        create_card.layout.addWidget(self.create_name_input)
-        create_card.layout.addWidget(QLabel("Minecraft version"))
-        create_card.layout.addWidget(self.version_combo)
-        create_card.layout.addWidget(self.snapshot_checkbox)
-        create_card.layout.addWidget(QLabel("Mod loader"))
-        create_card.layout.addWidget(self.create_loader_combo)
-        create_card.layout.addWidget(self.create_loader_status)
-        create_card.layout.addWidget(create_button)
-        create_card.layout.addWidget(self.browse_modpacks_button)
-        create_card.layout.addWidget(self.browse_curseforge_modpacks_button)
-        create_card.layout.addWidget(self.browse_ftb_modpacks_button)
-        create_card.layout.addWidget(self.import_modpack_package_button)
-        self.root_layout.addWidget(create_card)
-
-        manage_card = CardWidget("Manage selected instance", "Change the selected instance's Fabric, Quilt, Forge, or NeoForge version without recreating it.")
+        self.manage_card = CardWidget("Manage selected instance", "Change the selected instance's Fabric, Quilt, Forge, or NeoForge version without recreating it.")
+        self.manage_card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.manage_loader_label = QLabel("Mod loader")
         self.manage_loader_combo = QComboBox()
+        self.manage_loader_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.manage_loader_combo.setMinimumContentsLength(16)
+        self.manage_loader_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.manage_loader_combo.addItem("Vanilla", "vanilla")
         self.manage_loader_combo.addItem("Fabric", "fabric")
         self.manage_loader_combo.addItem("Quilt", "quilt")
         self.manage_loader_combo.addItem("Forge", "forge")
         self.manage_loader_combo.addItem("NeoForge", "neoforge")
         self.manage_loader_combo.currentTextChanged.connect(self._manage_loader_selected)
+        self.manage_loader_version_label = QLabel("Loader version")
         self.manage_loader_version_combo = QComboBox()
+        self.manage_loader_version_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.manage_loader_version_combo.setMinimumContentsLength(22)
+        self.manage_loader_version_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.manage_loader_version_combo.setEnabled(False)
+        self.loader_fields_widget = QWidget()
+        self.loader_fields_layout = QGridLayout(self.loader_fields_widget)
+        self.loader_fields_layout.setContentsMargins(0, 0, 0, 0)
+        self.loader_fields_layout.setHorizontalSpacing(10)
+        self.loader_fields_layout.setVerticalSpacing(7)
+
         self.manage_loader_status = QLabel("Select an instance to manage its mod loader.")
         self.manage_loader_status.setObjectName("MutedLabel")
         self.manage_loader_status.setWordWrap(True)
         self.apply_loader_button = set_theme_icon(QPushButton("Apply mod loader"), "icon.action.save")
+        self.apply_loader_button.setObjectName("PrimaryButton")
         self.apply_loader_button.clicked.connect(self._request_loader_change)
         self.apply_loader_button.setEnabled(False)
         self.repair_loader_button = set_theme_icon(QPushButton("Repair mod loader"), "icon.action.repair")
@@ -157,53 +123,70 @@ class InstancesPage(BasePage):
         self.export_forge_diagnostics_button.setToolTip("Export Forge profile, logs, mod metadata, and pre-launch results without accounts, tokens, worlds, or mod JAR contents.")
         self.export_forge_diagnostics_button.clicked.connect(lambda: self.export_forge_diagnostics_requested.emit(self.current_instance_name()))
         self.export_forge_diagnostics_button.setEnabled(False)
+        self._loader_action_buttons = (
+            self.apply_loader_button,
+            self.repair_loader_button,
+            self.restore_forge_button,
+            self.open_forge_logs_button,
+            self.export_forge_diagnostics_button,
+        )
+        for button in self._loader_action_buttons:
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.loader_actions_widget = QWidget()
+        self.loader_actions_layout = QGridLayout(self.loader_actions_widget)
+        self.loader_actions_layout.setContentsMargins(0, 0, 0, 0)
+        self.loader_actions_layout.setHorizontalSpacing(8)
+        self.loader_actions_layout.setVerticalSpacing(8)
+
         self.repair_instance_button = set_theme_icon(QPushButton(tr("repair.center.button")), "icon.action.repair")
         self.repair_instance_button.setToolTip(tr("repair.center.tooltip"))
         self.repair_instance_button.clicked.connect(self._request_instance_repair)
         self.repair_instance_button.setEnabled(False)
+        self.repair_instance_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
+        self.target_name_label = QLabel("Target name")
         self.target_name_input = QLineEdit()
         self.target_name_input.setPlaceholderText("New name or clone name")
         self.include_saves_checkbox = QCheckBox("Include saves when cloning or exporting")
-        action_grid = QGridLayout()
-        rename_button = set_theme_icon(QPushButton("Rename"), "icon.action.edit")
-        clone_button = set_theme_icon(QPushButton("Clone"), "icon.action.clone")
-        delete_button = set_theme_icon(QPushButton("Delete"), "icon.action.remove")
-        delete_button.setObjectName("DangerButton")
-        import_button = set_theme_icon(QPushButton("Import .mcwpack"), "icon.action.import")
-        export_button = set_theme_icon(QPushButton("Export .mcwpack"), "icon.action.export")
+        self.rename_button = set_theme_icon(QPushButton("Rename"), "icon.action.edit")
+        self.clone_button = set_theme_icon(QPushButton("Clone"), "icon.action.clone")
+        self.delete_button = set_theme_icon(QPushButton("Delete"), "icon.action.remove")
+        self.delete_button.setObjectName("DangerButton")
+        self.import_button = set_theme_icon(QPushButton("Import .mcwpack"), "icon.action.import")
+        self.export_button = set_theme_icon(QPushButton("Export .mcwpack"), "icon.action.export")
         self.manage_mods_button = set_theme_icon(QPushButton("Manage mods"), "icon.action.mods")
         self.manage_mods_button.setObjectName("PrimaryButton")
         self.manage_mods_button.setEnabled(False)
-        rename_button.clicked.connect(lambda: self.rename_requested.emit(self.current_instance_name(), self.target_name_input.text()))
-        clone_button.clicked.connect(lambda: self.clone_requested.emit(self.current_instance_name(), self.target_name_input.text(), self.include_saves_checkbox.isChecked()))
-        delete_button.clicked.connect(self._confirm_delete)
-        import_button.clicked.connect(self._choose_import)
-        export_button.clicked.connect(self._choose_export)
+        self.rename_button.clicked.connect(lambda: self.rename_requested.emit(self.current_instance_name(), self.target_name_input.text()))
+        self.clone_button.clicked.connect(lambda: self.clone_requested.emit(self.current_instance_name(), self.target_name_input.text(), self.include_saves_checkbox.isChecked()))
+        self.delete_button.clicked.connect(self._confirm_delete)
+        self.import_button.clicked.connect(self._choose_import)
+        self.export_button.clicked.connect(self._choose_export)
         self.manage_mods_button.clicked.connect(lambda: self.manage_mods_requested.emit(self.current_instance_name()))
-        action_grid.addWidget(rename_button, 0, 0)
-        action_grid.addWidget(clone_button, 0, 1)
-        action_grid.addWidget(delete_button, 0, 2)
-        action_grid.addWidget(import_button, 1, 0)
-        action_grid.addWidget(export_button, 1, 1)
-        action_grid.addWidget(self.manage_mods_button, 1, 2)
-        action_grid.addWidget(self.repair_instance_button, 2, 0, 1, 3)
+        self._instance_action_buttons = (
+            self.rename_button,
+            self.clone_button,
+            self.delete_button,
+            self.import_button,
+            self.export_button,
+            self.manage_mods_button,
+        )
+        for button in self._instance_action_buttons:
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.instance_actions_widget = QWidget()
+        self.instance_actions_layout = QGridLayout(self.instance_actions_widget)
+        self.instance_actions_layout.setContentsMargins(0, 0, 0, 0)
+        self.instance_actions_layout.setHorizontalSpacing(8)
+        self.instance_actions_layout.setVerticalSpacing(8)
 
-        manage_card.layout.addWidget(QLabel("Mod loader"))
-        manage_card.layout.addWidget(self.manage_loader_combo)
-        manage_card.layout.addWidget(QLabel("Loader version"))
-        manage_card.layout.addWidget(self.manage_loader_version_combo)
-        manage_card.layout.addWidget(self.manage_loader_status)
-        manage_card.layout.addWidget(self.apply_loader_button)
-        manage_card.layout.addWidget(self.repair_loader_button)
-        manage_card.layout.addWidget(self.restore_forge_button)
-        manage_card.layout.addWidget(self.open_forge_logs_button)
-        manage_card.layout.addWidget(self.export_forge_diagnostics_button)
-        manage_card.layout.addWidget(QLabel("Target name"))
-        manage_card.layout.addWidget(self.target_name_input)
-        manage_card.layout.addWidget(self.include_saves_checkbox)
-        manage_card.layout.addLayout(action_grid)
-        self.root_layout.addWidget(manage_card)
+        self.manage_card.layout.addWidget(self.loader_fields_widget)
+        self.manage_card.layout.addWidget(self.manage_loader_status)
+        self.manage_card.layout.addWidget(self.loader_actions_widget)
+        self.manage_card.layout.addWidget(self.target_name_label)
+        self.manage_card.layout.addWidget(self.target_name_input)
+        self.manage_card.layout.addWidget(self.include_saves_checkbox)
+        self.manage_card.layout.addWidget(self.instance_actions_widget)
+        self.root_layout.addWidget(self.manage_card)
 
         lifecycle_card = CardWidget("Backup and Modrinth pack lifecycle", "Create safe backups, restore an instance, and update managed Modrinth packs without overwriting user-modified files.")
         lifecycle_card.setProperty("themeRole", "lifecycle")
@@ -241,10 +224,60 @@ class InstancesPage(BasePage):
         lifecycle_card.layout.addWidget(self.apply_modpack_update_button)
         self.root_layout.addWidget(lifecycle_card)
         self.root_layout.addStretch()
+        self._sync_responsive_layout(force=True)
 
-    def set_versions(self, versions: list) -> None:
-        self._versions = list(versions)
-        self._apply_version_filter()
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._sync_responsive_layout()
+
+    def _sync_responsive_layout(self, width: int | None = None, force: bool = False) -> None:
+        available_width = max(1, int(width if width is not None else self.viewport().width()))
+        fields_side_by_side = available_width >= 700
+        action_columns = 3 if available_width >= 760 else 2 if available_width >= 520 else 1
+        signature = (fields_side_by_side, action_columns)
+        if not force and signature == self._responsive_signature:
+            return
+        self._responsive_signature = signature
+
+        self._clear_grid(self.loader_fields_layout)
+        if fields_side_by_side:
+            self.loader_fields_layout.addWidget(self.manage_loader_label, 0, 0)
+            self.loader_fields_layout.addWidget(self.manage_loader_version_label, 0, 1)
+            self.loader_fields_layout.addWidget(self.manage_loader_combo, 1, 0)
+            self.loader_fields_layout.addWidget(self.manage_loader_version_combo, 1, 1)
+            self.loader_fields_layout.setColumnStretch(0, 1)
+            self.loader_fields_layout.setColumnStretch(1, 1)
+        else:
+            self.loader_fields_layout.addWidget(self.manage_loader_label, 0, 0)
+            self.loader_fields_layout.addWidget(self.manage_loader_combo, 1, 0)
+            self.loader_fields_layout.addWidget(self.manage_loader_version_label, 2, 0)
+            self.loader_fields_layout.addWidget(self.manage_loader_version_combo, 3, 0)
+            self.loader_fields_layout.setColumnStretch(0, 1)
+            self.loader_fields_layout.setColumnStretch(1, 0)
+
+        self._reflow_button_grid(self.loader_actions_layout, self._loader_action_buttons, action_columns)
+        self._reflow_button_grid(self.instance_actions_layout, self._instance_action_buttons, action_columns, self.repair_instance_button)
+        self.set_compact_mode(not fields_side_by_side)
+
+    @staticmethod
+    def _clear_grid(layout: QGridLayout) -> None:
+        while layout.count():
+            layout.takeAt(0)
+        for column in range(3):
+            layout.setColumnStretch(column, 0)
+
+    @classmethod
+    def _reflow_button_grid(cls, layout: QGridLayout, buttons: tuple[QPushButton, ...], columns: int, trailing_button: QPushButton | None = None) -> None:
+        cls._clear_grid(layout)
+        column_count = max(1, int(columns))
+        for index, button in enumerate(buttons):
+            row, column = divmod(index, column_count)
+            layout.addWidget(button, row, column)
+        for column in range(column_count):
+            layout.setColumnStretch(column, 1)
+        if trailing_button is not None:
+            trailing_row = (len(buttons) + column_count - 1) // column_count
+            layout.addWidget(trailing_button, trailing_row, 0, 1, column_count)
 
     def set_fabric_versions(self, game_version: str, versions: list) -> None:
         self._fabric_versions[game_version] = list(versions)
@@ -290,9 +323,6 @@ class InstancesPage(BasePage):
         self._synchronizing = False
         self._render_instance(self.instance_combo.currentText())
 
-    def set_show_snapshots(self, enabled: bool) -> None:
-        self.snapshot_checkbox.setChecked(enabled)
-
     def current_instance_name(self) -> str:
         return self.instance_combo.currentText().strip()
 
@@ -307,9 +337,6 @@ class InstancesPage(BasePage):
         finally:
             self._synchronizing = previous
 
-    def selected_create_loader(self) -> str:
-        return str(self.create_loader_combo.currentData() or "vanilla")
-
     def selected_manage_loader(self) -> tuple[str, str]:
         loader_name = str(self.manage_loader_combo.currentData() or "vanilla")
         loader_version = str(self.manage_loader_version_combo.currentData() or "").strip() if loader_name in {"fabric", "quilt", "forge", "neoforge"} else "-1"
@@ -322,18 +349,6 @@ class InstancesPage(BasePage):
         self.set_interaction_locked(busy)
         if not busy:
             self._render_instance(self.current_instance_name())
-
-    def _queue_version_filter(self, _checked: bool) -> None:
-        self._version_filter_timer.start()
-
-    def _apply_version_filter(self) -> None:
-        selected = self.version_combo.currentText()
-        include_all = self.snapshot_checkbox.isChecked()
-        version_ids = [version.id for version in self._versions if include_all or getattr(version, "type", "") == "release"]
-        self.version_combo.clear()
-        self.version_combo.addItems(version_ids)
-        if selected in version_ids:
-            self.version_combo.setCurrentText(selected)
 
     def _instance_selected(self, name: str) -> None:
         self._render_instance(name)
@@ -601,9 +616,6 @@ class InstancesPage(BasePage):
         if answer == QMessageBox.StandardButton.Yes:
             self.repair_modpack_requested.emit(name)
 
-    def _request_create(self) -> None:
-        self.create_requested.emit(self.create_name_input.text(), self.version_combo.currentText(), self.selected_create_loader())
-
     def _request_loader_change(self) -> None:
         name = self.current_instance_name()
         if not name:
@@ -653,11 +665,6 @@ class InstancesPage(BasePage):
         if answer == QMessageBox.StandardButton.Yes:
             self.delete_requested.emit(name)
 
-    def _choose_modpack_import(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, tr("modpack_package.import.file_title"), "", tr("modpack_package.import.file_filter"))
-        if path:
-            self.import_modpack_package_requested.emit(Path(path))
-
     def _choose_import(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, tr("Import MCW instance"), "", tr("modpack_package.import.universal_filter"))
         if path:
@@ -669,12 +676,11 @@ class InstancesPage(BasePage):
             self.export_modpack_requested.emit(name)
 
     def retranslate_dynamic(self) -> None:
+        retranslate_widget_tree(self)
+        self.title_label.setText(tr("navigation.instances"))
+        self.subtitle_label.setText(tr("instances.advanced.subtitle"))
         self.open_instance_folder_button.setText(tr("instances.open_folder"))
         self.refresh_instances_button.setText(tr("instances.refresh"))
-        self.browse_modpacks_button.setText(tr("modrinth.modpack.browse"))
-        self.browse_curseforge_modpacks_button.setText(tr("curseforge.modpack.browse"))
-        self.browse_ftb_modpacks_button.setText(tr("ftb.modpack.browse"))
-        self.import_modpack_package_button.setText(tr("modpack_package.import.local_button"))
         self.restore_forge_button.setText(tr("forge.restore_previous"))
         self.restore_forge_button.setToolTip(tr("forge.restore.tooltip"))
         self.open_forge_logs_button.setText(tr("forge.open_logs"))

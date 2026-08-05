@@ -7,6 +7,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QAbstractItemView, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
 from mcw_core.api.language.language_manager import tr
+from mcw_core.api.curseforge.curseforge_links import best_manual_download_url
 from src.gui.window_sizing import resize_dialog_to_screen
 class CurseForgeManualDownloadDialog(QDialog):
     files_selected = Signal(object)
@@ -141,7 +142,7 @@ class CurseForgeManualDownloadDialog(QDialog):
 
     @staticmethod
     def _best_url(requirement: object) -> str:
-        return str(getattr(requirement, "direct_url", "") or getattr(requirement, "version_url", "") or getattr(requirement, "project_url", "")).strip()
+        return best_manual_download_url(requirement)
 
     @staticmethod
     def _requirement_key(requirement: object) -> tuple[str, str, str, str]:

@@ -18,6 +18,8 @@ def task_progress_profile(task_id: str) -> TaskProgressProfile | None:
 
     exact = {
         "java.scan": TaskProgressProfile(ProgressStage.SELECTING_JAVA, "java.scan.completed", "java.scan.completed_detail", "java.scan.failed"),
+        "account.security.audit": TaskProgressProfile(ProgressStage.PREPARING, "account.security.audit_completed", "account.security.audit_completed_detail", "account.security.audit_failed"),
+        "account.security.reprotect": TaskProgressProfile(ProgressStage.PREPARING, "account.security.reprotect_completed", "account.security.reprotect_completed_detail", "account.security.reprotect_failed"),
         "mods.update.check": TaskProgressProfile(ProgressStage.CHECKING_MODS, "mods.update_check.completed", "mods.update_check.completed_detail", "mods.update_check.failed"),
         "mods.update.apply": TaskProgressProfile(ProgressStage.DOWNLOADING_MODS, "mods.update.completed", "mods.update.completed_detail", "mods.update.failed"),
         "modpack.scan": TaskProgressProfile(ProgressStage.CHECKING_MODPACK, "modpack.scan.completed", "modpack.scan.completed_detail", "modpack.scan.failed"),

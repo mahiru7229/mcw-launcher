@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -11,6 +13,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QSpinBox,
     QTabWidget,
@@ -47,7 +50,7 @@ class InstanceSettingsEditorDialog(QDialog):
     def settings_data(self) -> dict:
         return SettingsManager.to_dict(
             InstanceSettings(
-                java_path=self.java_path_input.text().strip(),
+                java_path=self.java_path_input.text().strip() if str(self.java_mode_combo.currentData() or "auto") == "custom" else "",
                 min_memory=self.min_memory.value(),
                 max_memory=self.max_memory.value(),
                 jvm_arguments=self._lines(self.jvm_arguments.toPlainText()),
@@ -67,7 +70,7 @@ class InstanceSettingsEditorDialog(QDialog):
     @staticmethod
     def summary(settings: dict | InstanceSettings | None) -> str:
         normalized = SettingsManager.from_dict(settings)
-        java = str(normalized.java_path or "").strip() or tr("instance_defaults.java.auto")
+        java = str(normalized.java_path or "").strip() or tr("java.selection.mode.auto")
         fullscreen = tr("instance_defaults.window.fullscreen_suffix") if normalized.fullscreen else ""
         return tr(
             "instance_defaults.summary",
@@ -115,17 +118,27 @@ class InstanceSettingsEditorDialog(QDialog):
         java_group = QGroupBox(tr("instance_defaults.group.java"))
         java_form = QFormLayout(java_group)
         java_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        self.java_mode_combo = QComboBox()
+        self.java_mode_combo.addItem(tr("java.selection.mode.auto"), "auto")
+        self.java_mode_combo.addItem(tr("java.selection.mode.custom"), "custom")
+        self.java_mode_combo.currentIndexChanged.connect(self._update_java_mode)
+        java_form.addRow(tr("java.selection.mode_label"), self.java_mode_combo)
+
         java_row = QWidget()
         java_row_layout = QHBoxLayout(java_row)
         java_row_layout.setContentsMargins(0, 0, 0, 0)
         java_row_layout.setSpacing(8)
         self.java_path_input = QLineEdit()
-        self.java_path_input.setPlaceholderText(tr("instance_defaults.java.placeholder"))
-        browse_button = QPushButton(tr("instance_defaults.java.browse"))
-        browse_button.clicked.connect(self._browse_java)
+        self.java_path_input.setPlaceholderText(tr("java.selection.path_placeholder"))
+        self.java_browse_button = QPushButton(tr("java.selection.browse"))
+        self.java_browse_button.clicked.connect(self._browse_java)
         java_row_layout.addWidget(self.java_path_input, 1)
-        java_row_layout.addWidget(browse_button)
+        java_row_layout.addWidget(self.java_browse_button)
         java_form.addRow(tr("instance_defaults.java.path"), java_row)
+        recovery_hint = QLabel(tr("java.selection.recovery_hint"))
+        recovery_hint.setObjectName("MutedLabel")
+        recovery_hint.setWordWrap(True)
+        java_form.addRow("", recovery_hint)
 
         self.min_memory = QSpinBox()
         self.max_memory = QSpinBox()
@@ -213,7 +226,10 @@ class InstanceSettingsEditorDialog(QDialog):
 
     def _apply_settings(self, data: dict | InstanceSettings | None) -> None:
         settings = SettingsManager.from_dict(data)
-        self.java_path_input.setText(str(settings.java_path or ""))
+        java_path = str(settings.java_path or "")
+        self._set_combo(self.java_mode_combo, "custom" if java_path.strip() else "auto")
+        self.java_path_input.setText(java_path)
+        self._update_java_mode()
         minimum, maximum = MemoryAllocationPolicy.normalize(
             settings.min_memory,
             settings.max_memory,
@@ -241,7 +257,27 @@ class InstanceSettingsEditorDialog(QDialog):
             tr("instance_defaults.java.filter"),
         )
         if path:
+            self._set_combo(self.java_mode_combo, "custom")
             self.java_path_input.setText(path)
+            self._update_java_mode()
+
+    def _update_java_mode(self, *_args) -> None:
+        custom = str(self.java_mode_combo.currentData() or "auto") == "custom"
+        self.java_path_input.setEnabled(custom)
+        self.java_browse_button.setEnabled(custom)
+
+    def accept(self) -> None:
+        if str(self.java_mode_combo.currentData() or "auto") == "custom":
+            java_path = self.java_path_input.text().strip()
+            if not java_path:
+                QMessageBox.warning(self, tr("instance_defaults.editor.title"), tr("Choose a Java executable or switch Java selection to Automatic."))
+                self.java_path_input.setFocus()
+                return
+            if not Path(java_path).is_file():
+                QMessageBox.warning(self, tr("instance_defaults.editor.title"), tr("Java path does not exist: {path}", path=java_path))
+                self.java_path_input.setFocus()
+                return
+        super().accept()
 
     def _minimum_changed(self, minimum: int) -> None:
         if minimum > self.max_memory.value():

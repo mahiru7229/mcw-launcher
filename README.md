@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Stable-v1.0.2-brightgreen" alt="Stable version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.1.0">
+    <img src="https://img.shields.io/badge/Stable-v1.1.0-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -44,9 +44,66 @@ Mỗi instance có riêng:
 
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 ---
-Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.0.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
+Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.1.0
+
+**v1.1.0** đưa nhánh 1.1 lên stable với hai lớp bảo vệ cuối trước khi tạo và tải nội dung:
+
+- Add Instance hiển thị danh sách phiên bản Fabric, Quilt, Forge hoặc NeoForge tương thích với Minecraft version đã chọn.
+- Không thể tạo instance modded khi loader không có bản tương thích hoặc metadata chưa tải xong.
+- CurseForge manual download ưu tiên trang file theo slug thay vì URL CDN vừa lỗi hoặc fallback project ID dễ dẫn tới 404.
+- Bao gồm toàn bộ sửa lỗi của beta: Java tự phục hồi, retry mạng, responsive mod-loader UI, Forge legacy và progress bảo vệ tài khoản.
+- MCW Core được phát hành đồng bộ dưới dạng `mcw-core 1.1.0`.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.0.md`](docs/RELEASE-v1.1.0.md).
+
+## Có gì mới trong v1.1.0-beta.4
+
+**v1.1.0-beta.4** hoàn thiện cơ chế retry metadata khi mạng hoặc máy chủ gặp lỗi tạm thời:
+
+- Tự động thử tối đa 3 lần với khoảng chờ 0,5 giây và 1 giây.
+- Chỉ retry timeout, lỗi kết nối/DNS tạm thời, rate limit và các lỗi máy chủ có khả năng phục hồi.
+- Không retry lỗi validation, loader không hỗ trợ, xác thực hoặc các HTTP client error vĩnh viễn.
+- Sau khi ba lần tự động thất bại, hiển thị hộp thoại **Thử lại/Hủy**.
+- Nút Thử lại chạy lại đúng tác vụ và tham số trước đó, bắt đầu một vòng retry giới hạn mới.
+- Ngăn task trùng, giới hạn số task được ghi nhớ và lọc dữ liệu nhạy cảm khỏi lỗi hiển thị/log.
+- Áp dụng cho Minecraft manifest, metadata mod loader, Modrinth, CurseForge, FTB, resource pack và shader pack.
+- Không thay đổi triển khai MCW Core và không phát hành wheel mới; distribution dùng để build vẫn là `1.1.0b2`.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.4.md`](docs/RELEASE-v1.1.0-beta.4.md).
+
+## Có gì mới trong v1.1.0-beta.3
+
+**v1.1.0-beta.3** hoàn thiện luồng quản lý mod loader và dọn lại cửa sổ quản lý instance nâng cao:
+
+- Cửa sổ quản lý nâng cao có thể thay đổi kích thước và phù hợp hơn với màn hình nhỏ hoặc Windows display scaling.
+- Hai trường Mod loader và Loader version tự chuyển từ bố cục ngang sang dọc khi chiều rộng bị thu hẹp.
+- Các nút thao tác tự sắp xếp thành 3, 2 hoặc 1 cột để tránh tràn giao diện.
+- Combo box phiên bản loader có thể co lại khi tên phiên bản dài.
+- Xóa toàn bộ form tạo instance khỏi khu vực quản lý nâng cao; việc tạo instance chỉ còn ở luồng Add Instance chính.
+- Giữ nguyên luồng tạo instance và cài modpack hiện có trong Create Instance Dialog.
+- Thêm regression test cho responsive layout và ranh giới giữa Create Instance với Manage selected instance.
+- Không có thay đổi triển khai MCW Core và không phát hành wheel mới; distribution dùng để build vẫn là `1.1.0b2`. Runtime `mcw_core.__version__` tiếp tục theo metadata launcher dùng chung.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.3.md`](docs/RELEASE-v1.1.0-beta.3.md).
+
+## Có gì mới trong v1.1.0-beta.2
+
+**v1.1.0-beta.2** chỉ tập trung vào lựa chọn và tự phục hồi Java cho từng instance:
+
+- Thêm chế độ chọn Java rõ ràng: **Tự động** hoặc **Đường dẫn file thực thi tùy chọn**.
+- Áp dụng cùng một lựa chọn cho trang Instance Settings và trình chỉnh sửa thiết lập mặc định của instance.
+- Kiểm tra đường dẫn Java tùy chọn trước khi lưu và trước khi launch.
+- Nếu Java tùy chọn bị thiếu hoặc không tương thích, launcher tự chọn Java phù hợp và chuyển instance về chế độ Tự động sau khi phục hồi thành công.
+- Nếu Java đã chọn thoát ngay với dấu hiệu lỗi runtime/phiên bản, launcher thử lại một lần bằng Java tương thích khác hoặc Java do launcher quản lý.
+- Nếu không thể tìm hoặc cài Java thay thế, launcher dừng an toàn và hiển thị lỗi rõ ràng thay vì tiếp tục với runtime sai.
+- Giữ lại log của lần launch Java thất bại khi retry xảy ra trong cùng một giây.
+- Các mục responsive cài mod loader, retry mạng, Forge legacy và progress bảo vệ tài khoản vẫn dành cho các beta sau.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.2.md`](docs/RELEASE-v1.1.0-beta.2.md).
 
 ## Có gì mới trong v1.0.2
 

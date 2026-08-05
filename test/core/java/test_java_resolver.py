@@ -101,3 +101,31 @@ def test_resolve_accepts_raw_java_16_for_java_16_metadata(monkeypatch: pytest.Mo
     monkeypatch.setattr("src.core.java.java_resolver.JavaManager.get_major_version", lambda path: 16)
 
     assert JavaResolver.resolve(16, preferred_path=java) == java
+
+
+def test_resolve_with_recovery_falls_back_from_invalid_preferred_java(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    preferred = tmp_path / "missing" / "javaw.exe"
+    fallback = tmp_path / "managed" / "bin" / "javaw.exe"
+    fallback.parent.mkdir(parents=True)
+    fallback.write_bytes(b"")
+    monkeypatch.setattr(JavaResolver, "resolve_alternative", lambda required, excluded, reporter=None: fallback)
+
+    result = JavaResolver.resolve_with_recovery(17, preferred_path=preferred)
+
+    assert result.path == fallback
+    assert result.automatic is True
+    assert result.recovered is True
+    assert result.rejected_path == preferred
+    assert "does not exist" in result.recovery_reason
+
+
+def test_resolve_with_recovery_reports_when_both_paths_fail(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    preferred = tmp_path / "missing" / "javaw.exe"
+
+    def fail_recovery(required, excluded, reporter=None):
+        raise RuntimeError("download unavailable")
+
+    monkeypatch.setattr(JavaResolver, "resolve_alternative", fail_recovery)
+
+    with pytest.raises(RuntimeError, match="automatic Java recovery also failed"):
+        JavaResolver.resolve_with_recovery(17, preferred_path=preferred)

@@ -42,7 +42,7 @@ from src.gui.widget.card_widget import CardWidget
 class InstanceWorkspacePage(BasePage):
     refresh_requested = Signal()
     selected_instance_changed = Signal(str)
-    create_requested = Signal(str, str, str)
+    create_requested = Signal(str, str, str, str)
     rename_requested = Signal(str, str)
     clone_requested = Signal(str, str, bool)
     delete_requested = Signal(str)
@@ -250,6 +250,10 @@ class InstanceWorkspacePage(BasePage):
 
     def _connect_dialogs(self) -> None:
         self.create_dialog.create_requested.connect(self.create_requested.emit)
+        self.create_dialog.fabric_versions_requested.connect(self.fabric_versions_requested.emit)
+        self.create_dialog.quilt_versions_requested.connect(self.quilt_versions_requested.emit)
+        self.create_dialog.forge_versions_requested.connect(self.forge_versions_requested.emit)
+        self.create_dialog.neoforge_versions_requested.connect(self.neoforge_versions_requested.emit)
         self.create_dialog.import_modpack_package_requested.connect(self._choose_modpack_import)
         self.create_dialog.browse_modrinth_requested.connect(self.browse_modpacks_requested.emit)
         self.create_dialog.browse_curseforge_requested.connect(self.browse_curseforge_modpacks_requested.emit)
@@ -270,13 +274,11 @@ class InstanceWorkspacePage(BasePage):
     def _forward_advanced_signals(self) -> None:
         signal_names = (
             "refresh_requested",
-            "create_requested",
             "rename_requested",
             "clone_requested",
             "delete_requested",
             "import_requested",
             "export_requested",
-            "import_modpack_package_requested",
             "export_modpack_requested",
             "fabric_versions_requested",
             "quilt_versions_requested",
@@ -289,9 +291,6 @@ class InstanceWorkspacePage(BasePage):
             "export_forge_diagnostics_requested",
             "repair_instance_requested",
             "manage_mods_requested",
-            "browse_modpacks_requested",
-            "browse_curseforge_modpacks_requested",
-            "browse_ftb_modpacks_requested",
             "backup_requested",
             "restore_backup_requested",
             "open_backups_requested",
@@ -314,20 +313,23 @@ class InstanceWorkspacePage(BasePage):
 
     def set_versions(self, versions: list[object]) -> None:
         self._versions = list(versions)
-        self.advanced_page.set_versions(versions)
         self.create_dialog.set_versions(versions)
 
     def set_fabric_versions(self, game_version: str, versions: list[object]) -> None:
         self.advanced_page.set_fabric_versions(game_version, versions)
+        self.create_dialog.set_fabric_versions(game_version, versions)
 
     def set_quilt_versions(self, game_version: str, versions: list[object]) -> None:
         self.advanced_page.set_quilt_versions(game_version, versions)
+        self.create_dialog.set_quilt_versions(game_version, versions)
 
     def set_forge_versions(self, game_version: str, versions: list[object]) -> None:
         self.advanced_page.set_forge_versions(game_version, versions)
+        self.create_dialog.set_forge_versions(game_version, versions)
 
     def set_neoforge_versions(self, game_version: str, versions: list[object]) -> None:
         self.advanced_page.set_neoforge_versions(game_version, versions)
+        self.create_dialog.set_neoforge_versions(game_version, versions)
 
     def set_instances(self, instances: list[object], selected_name: str) -> None:
         self._instances = {str(instance.name): instance for instance in instances}
@@ -348,7 +350,6 @@ class InstanceWorkspacePage(BasePage):
 
     def set_show_snapshots(self, enabled: bool) -> None:
         self._show_snapshots = bool(enabled)
-        self.advanced_page.set_show_snapshots(enabled)
         self.create_dialog.set_show_snapshots(enabled)
 
     def set_account(self, account: object | None) -> None:
@@ -869,6 +870,7 @@ class InstanceWorkspacePage(BasePage):
         self.set_account(self._account)
         self.create_dialog.retranslate_dynamic()
         self.management_dialog.retranslate_dynamic()
+        self.advanced_page.retranslate_dynamic()
         self.advanced_dialog.set_instance_name(self.current_instance_name())
         self._render_selected()
         self._update_library_status()

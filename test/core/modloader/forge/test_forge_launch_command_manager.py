@@ -122,6 +122,45 @@ def test_prepare_requires_module_path_for_modern_forge() -> None:
         )
 
 
+
+def test_prepare_adds_certificate_compatibility_property_for_legacy_forge() -> None:
+    version = SimpleNamespace(
+        main_class="net.minecraft.launchwrapper.Launch",
+        raw_json={"forge": {"gameVersion": "1.6.4", "loaderVersion": "9.11.1.1345"}},
+    )
+
+    result = ForgeLaunchCommandManager.prepare(version, ["-Xmx2G"])
+
+    assert result == ["-Xmx2G", "-Dfml.ignoreInvalidMinecraftCertificates=true"]
+
+
+def test_prepare_normalizes_conflicting_legacy_certificate_property() -> None:
+    version = SimpleNamespace(
+        main_class="net.minecraft.launchwrapper.Launch",
+        raw_json={"forge": {"gameVersion": "1.6.4", "loaderVersion": "9.11.1.1345"}},
+    )
+
+    result = ForgeLaunchCommandManager.prepare(
+        version,
+        [
+            "-Dfml.ignoreInvalidMinecraftCertificates=false",
+            "-Xmx2G",
+            "-Dfml.ignoreInvalidMinecraftCertificates=true",
+        ],
+    )
+
+    assert result == ["-Dfml.ignoreInvalidMinecraftCertificates=true", "-Xmx2G"]
+
+
+def test_prepare_does_not_bypass_certificates_for_non_forge_launchwrapper() -> None:
+    version = SimpleNamespace(
+        main_class="net.minecraft.launchwrapper.Launch",
+        raw_json={},
+    )
+    arguments = ["-Xmx2G"]
+
+    assert ForgeLaunchCommandManager.prepare(version, arguments) == arguments
+
 def test_prepare_leaves_non_forge_arguments_unchanged() -> None:
     arguments = ["-Xmx2G", "-cp", "minecraft.jar"]
 

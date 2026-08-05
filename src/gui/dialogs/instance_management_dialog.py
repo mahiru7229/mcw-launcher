@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from mcw_core.api.language.language_manager import tr
+from src.gui.localization import retranslate_widget_tree
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.window_sizing import resize_dialog_to_screen
 
@@ -26,22 +27,32 @@ class AdvancedInstanceManagerDialog(QDialog):
     def __init__(self, advanced_page: QWidget, parent=None) -> None:
         super().__init__(parent)
         self._advanced_page = advanced_page
+        self._instance_name = ""
         self.setModal(False)
-        resize_dialog_to_screen(self, 940, 760, 760, 580)
+        resize_dialog_to_screen(self, 940, 720, 620, 480, lock_maximum=False)
+        self.setMinimumSize(520, 420)
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 12)
         root.setSpacing(8)
         root.addWidget(self._advanced_page, 1)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        close_button = buttons.button(QDialogButtonBox.StandardButton.Close)
-        if close_button is not None:
-            close_button.setText(tr("common.close"))
+        self.close_button = buttons.button(QDialogButtonBox.StandardButton.Close)
+        if self.close_button is not None:
+            self.close_button.setText(tr("common.close"))
         buttons.rejected.connect(self.close)
         root.addWidget(buttons)
-        self.setWindowTitle(tr("workspace.advanced.title"))
+        self.retranslate_dynamic()
 
     def set_instance_name(self, name: str) -> None:
-        self.setWindowTitle(tr("workspace.advanced.title_for", name=name) if name else tr("workspace.advanced.title"))
+        self._instance_name = str(name or "")
+        self.retranslate_dynamic()
+
+    def retranslate_dynamic(self) -> None:
+        retranslate_widget_tree(self)
+        self._advanced_page.retranslate_dynamic()
+        if self.close_button is not None:
+            self.close_button.setText(tr("common.close"))
+        self.setWindowTitle(tr("workspace.advanced.title_for", name=self._instance_name) if self._instance_name else tr("workspace.advanced.title"))
 
 
 class InstanceManagementDialog(QDialog):
