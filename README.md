@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Beta-v1.1.0--beta.5-orange" alt="Beta version">
+    <img src="https://img.shields.io/badge/Beta-v1.1.0--beta.6-orange" alt="Beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.0.2">
     <img src="https://img.shields.io/badge/Stable-v1.0.2-brightgreen" alt="Stable version">
@@ -51,19 +51,17 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.0.2 hỗ trợ nâng cấp
 
 ---
 
-## Có gì mới trong v1.1.0-beta.5
+## Có gì mới trong v1.1.0-beta.6
 
-**v1.1.0-beta.5** sửa lỗi Forge legacy không thể khởi động do các tùy chọn đơn trị bị lặp, đặc biệt là `--gameDir` trên các profile LaunchWrapper như Forge 1.12.2:
+**v1.1.0-beta.6** hoàn tất các lỗi còn lại của nhánh beta: progress bảo vệ tài khoản được trả về trạng thái cuối, Forge/NeoForge installer dùng đúng Java của instance và có một lần tự phục hồi khi Java lỗi, đồng thời Forge rất cũ dùng artifact `net.minecraftforge:minecraftforge` không còn bị báo sai “no runtime”.
 
-- Chuẩn hóa game arguments ngay trước khi ghép lệnh Java cuối cùng.
-- Nhận diện cả dạng `--option value` và `--option=value`.
-- Chỉ giữ một giá trị cho các tùy chọn đơn trị; với đường dẫn/thông tin do launcher quản lý, giá trị canonical từ launch context luôn được ưu tiên.
-- Không gộp nhầm các tùy chọn có thể lặp hợp lệ như `--tweakClass`.
-- Từ chối lệnh launch có tùy chọn đơn trị bị thiếu giá trị trước khi tạo tiến trình Java.
-- Thêm regression test cho profile Forge legacy kế thừa, `minecraftArguments` bị ghép lặp và xung đột từ custom game arguments.
-- Không phát hành MCW Core wheel mới; distribution dùng để build vẫn là `1.1.0b2`.
+- Progress bảo vệ tài khoản kết thúc rõ ràng ở thành công hoặc thất bại.
+- Java tùy chọn được truyền xuyên suốt các luồng cài, đổi, sửa và khôi phục mod loader.
+- Installer retry đúng một lần khi phát hiện lỗi runtime Java đáng tin cậy.
+- Forge 1.6.4/9.11.1.1345 và các profile legacy tương tự được nhận diện runtime đúng.
+- MCW Core wheel vẫn giữ `1.1.0b2`; bản này chỉ phát hành launcher diff.
 
-Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.5.md`](docs/RELEASE-v1.1.0-beta.5.md).
+Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.6.md`](docs/RELEASE-v1.1.0-beta.6.md).
 
 ## Có gì mới trong v1.1.0-beta.4
 

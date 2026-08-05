@@ -1,30 +1,24 @@
-# MCW Launcher v1.1.0-beta.5 launcher diff
+# MCW Launcher v1.1.0-beta.6 — Launcher diff
 
-Apply this patch on top of the completed **v1.1.0-beta.4** launcher tree.
+## Baseline
 
-## Included
-
-- Normalizes reserved single-value game options before the final Java launch command is created.
-- Fixes legacy Forge/LaunchWrapper profiles that contain duplicate `--gameDir` values, including Forge 1.12.2-style inherited `minecraftArguments`.
-- Handles both `--option value` and `--option=value` forms.
-- Uses canonical launch-context values for launcher-controlled paths and version fields.
-- Preserves repeatable Forge options such as `--tweakClass`.
-- Rejects malformed single-value options before Java is spawned.
-- Includes version metadata, README/release notes, and regression tests.
-
-## Delivery boundary
-
-- This is a launcher-repository changed-files patch only.
-- No `mcw_core/` implementation files, wheel, or separate MCW Core source archive are included.
-- `src/core/minecraft/` is the implementation bundled inside the launcher repository; it is included because the launch-command fix lives there.
-- The standalone MCW Core distribution remains `1.1.0b2` until the final v1.1.0 release.
+Apply this patch on top of a complete **MCW Launcher v1.1.0-beta.5** source tree.
 
 ## Apply
 
-Extract this ZIP into the repository root and allow files to be replaced.
+Extract the ZIP into the repository root and allow files to be replaced.
+
+This package contains launcher repository changes only. It does **not** contain a standalone `mcw_core` source archive, wheel, or any compiled executable.
+
+Files under `src/core/` are the implementation bundled directly inside the launcher repository and are required for the Forge/NeoForge fixes.
+
+## Main fixes
+
+- Account credential re-protection now returns shared progress to a final success or failure state.
+- Forge/NeoForge installers use the Java selected for the instance and retry once with another compatible Java on a recognized Java-runtime failure.
+- Pre-1.7 Forge profiles using `net.minecraftforge:minecraftforge` are accepted as valid Forge runtimes instead of being blocked by the false `no runtime` error.
 
 ## Validation
 
-- `PYTHONPATH=. pytest -q`: **1304 passed, 81 skipped, 2 warnings**.
-- `python -m compileall -q src mcw_core test launcher.py`: passed.
-- Perform a Windows smoke test with a real Forge 1.12.2 instance to confirm LaunchWrapper no longer reports multiple values for `gameDir`.
+- 1312 passed, 82 skipped, 2 warnings.
+- `python -m compileall -q src test launcher.py` passed.

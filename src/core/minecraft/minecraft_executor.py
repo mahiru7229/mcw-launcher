@@ -152,7 +152,11 @@ class MinecraftExecutor:
             VersionManifestManager.get()
             download_pause_controller.raise_if_requested()
             reporter.status(stage=ProgressStage.LOADING_VERSION, message=f"Loading Minecraft {instance.version_id}...")
-            version = ModLoaderManager.load(instance, reporter)
+            preferred_loader_java = str(getattr(settings, "java_path", "") or "").strip()
+            if preferred_loader_java:
+                version = ModLoaderManager.load(instance, reporter, preferred_java_path=preferred_loader_java)
+            else:
+                version = ModLoaderManager.load(instance, reporter)
             verification_cache = VerificationCache(Paths.instance_repair_cache(instance))
             download_pause_controller.raise_if_requested()
 

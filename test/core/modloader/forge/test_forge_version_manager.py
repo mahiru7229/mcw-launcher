@@ -88,8 +88,7 @@ def test_run_installer_imports_legacy_without_starting_java(monkeypatch, tmp_pat
 
     forge_root = tmp_path / "forge-root"
     monkeypatch.setattr(Paths, "forge_root", staticmethod(lambda: forge_root))
-    monkeypatch.setattr("src.core.modloader.forge.forge_version_manager.JavaResolver.resolve", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Java must not run for a legacy profile")))
-    monkeypatch.setattr("src.core.modloader.forge.forge_version_manager.subprocess.run", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("subprocess must not run for a legacy profile")))
+    monkeypatch.setattr("src.core.modloader.forge.forge_version_manager.ModLoaderJavaRunner.run", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Java must not run for a legacy profile")))
 
     ForgeVersionManager._run_installer(make_version(tmp_path), "11.15.1.2318-1.8.9", installer, tmp_path / "staging", None)
 
@@ -293,3 +292,40 @@ def test_validate_installation_still_reports_missing_current_os_library(monkeypa
     issues = ForgeVersionManager.validate_installation(version, "1.20.1", "47.4.21", verify_files=True)
 
     assert issues == ["Missing required library: com/example/windows-only/1.0/windows-only-1.0.jar"]
+
+
+def test_validate_installation_accepts_pre_1_7_minecraftforge_runtime(tmp_path: Path) -> None:
+    raw = make_version(tmp_path).raw_json.copy()
+    raw.update({
+        "id": "1.6.4-Forge9.11.1.1345",
+        "mainClass": "net.minecraft.launchwrapper.Launch",
+        "forge": {"schemaVersion": 1, "gameVersion": "1.6.4", "loaderVersion": "9.11.1.1345"},
+        "libraries": [{"name": "net.minecraftforge:minecraftforge:9.11.1.1345"}],
+        "minecraftArguments": "--username ${auth_player_name} --tweakClass cpw.mods.fml.common.launcher.FMLTweaker",
+    })
+    version = make_version(tmp_path)
+    version.id = raw["id"]
+    version.raw_json = raw
+    version.main_class = raw["mainClass"]
+
+    assert ForgeVersionManager.validate_installation(version, "1.6.4", "9.11.1.1345", verify_files=False) == []
+
+
+def test_run_installer_reports_java_runner_output_on_failure(monkeypatch, tmp_path: Path) -> None:
+    import pytest
+
+    from src.core.modloader.java_installer_runner import ModLoaderInstallerResult
+
+    installer = tmp_path / "forge-installer.jar"
+    installer.write_bytes(b"not-a-legacy-installer")
+    forge_root = tmp_path / "forge-root"
+    monkeypatch.setattr(Paths, "forge_root", staticmethod(lambda: forge_root))
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.ModLoaderJavaRunner.run",
+        staticmethod(lambda *args, **kwargs: ModLoaderInstallerResult(1, "installer line\nfinal Forge detail", Path("java"), 1)),
+    )
+
+    with pytest.raises(RuntimeError, match="final Forge detail"):
+        ForgeVersionManager._run_installer(make_version(tmp_path), "47.3.0", installer, tmp_path / "staging", None)
+
+    assert "final Forge detail" in (forge_root / "logs" / "forge-1.20.1-47.3.0.log").read_text(encoding="utf-8")

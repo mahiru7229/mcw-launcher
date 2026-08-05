@@ -1869,7 +1869,11 @@
         "network.retry.manual.available": "Network request failed. Manual retry is available.",
         "network.retry.manual.available_log": "Automatic network retries exhausted for {task}. Last error: {error}",
         "network.retry.manual.cancelled": "Network retry cancelled.",
-        "network.retry.manual.could_not_start": "The request could not be restarted. Wait for the current task to finish and try again."
+        "network.retry.manual.could_not_start": "The request could not be restarted. Wait for the current task to finish and try again.",
+        "java.mod_loader.retrying": "The selected Java runtime could not run the mod-loader installer. Retrying with another compatible runtime...",
+        "account.security.reprotect_completed": "Account protection completed.",
+        "account.security.reprotect_completed_detail": "Stored account credentials were checked and re-protected successfully.",
+        "account.security.reprotect_failed": "Account protection failed."
     },
     "aliases": {
         "MCW Launcher": "app.name",

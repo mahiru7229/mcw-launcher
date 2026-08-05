@@ -169,3 +169,21 @@ def test_runtime_detection_accepts_rule_wrapped_game_arguments() -> None:
     }
 
     assert NeoForgeVersionManager._has_neoforge_runtime([], raw, "21.1.200") is True
+
+
+def test_run_installer_reports_java_runner_output_on_failure(monkeypatch, tmp_path: Path) -> None:
+    from src.core.modloader.java_installer_runner import ModLoaderInstallerResult
+
+    installer = tmp_path / "neoforge-installer.jar"
+    installer.write_bytes(b"not-a-legacy-installer")
+    neoforge_root = tmp_path / "neoforge-root"
+    monkeypatch.setattr(Paths, "neoforge_root", staticmethod(lambda: neoforge_root))
+    monkeypatch.setattr(
+        "src.core.modloader.neoforge.neoforge_version_manager.ModLoaderJavaRunner.run",
+        staticmethod(lambda *args, **kwargs: ModLoaderInstallerResult(1, "installer line\nfinal NeoForge detail", Path("java"), 1)),
+    )
+
+    with pytest.raises(RuntimeError, match="final NeoForge detail"):
+        NeoForgeVersionManager._run_installer(make_version(tmp_path), "21.1.200", installer, tmp_path / "staging", None)
+
+    assert "final NeoForge detail" in (neoforge_root / "logs" / "neoforge-1.21.1-21.1.200.log").read_text(encoding="utf-8")

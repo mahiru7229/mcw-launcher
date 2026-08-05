@@ -1869,7 +1869,11 @@
         "network.retry.manual.available": "Yêu cầu mạng thất bại. Bạn có thể thử lại thủ công.",
         "network.retry.manual.available_log": "Đã dùng hết số lần thử mạng tự động cho {task}. Lỗi gần nhất: {error}",
         "network.retry.manual.cancelled": "Đã hủy thử lại yêu cầu mạng.",
-        "network.retry.manual.could_not_start": "Không thể khởi động lại yêu cầu. Hãy chờ tác vụ hiện tại hoàn tất rồi thử lại."
+        "network.retry.manual.could_not_start": "Không thể khởi động lại yêu cầu. Hãy chờ tác vụ hiện tại hoàn tất rồi thử lại.",
+        "java.mod_loader.retrying": "Java đã chọn không thể chạy trình cài mod loader. Đang thử lại bằng một runtime tương thích khác...",
+        "account.security.reprotect_completed": "Đã hoàn tất bảo vệ tài khoản.",
+        "account.security.reprotect_completed_detail": "Thông tin đăng nhập đã lưu được kiểm tra và mã hóa lại thành công.",
+        "account.security.reprotect_failed": "Bảo vệ tài khoản thất bại."
     },
     "aliases": {
         "Show static text over themed controls": "launcher_settings.theme.show_static_text",
