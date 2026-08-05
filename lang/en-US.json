@@ -1233,7 +1233,7 @@
         "mods.choose_supported_instance": "Choose a Fabric, Quilt, Forge, or NeoForge instance to manage its mods.",
         "mods.vanilla_apply_loader": "This instance is Vanilla. Apply Fabric, Quilt, Forge, or NeoForge from the Instances page before adding mods.",
         "workspace.create.title": "Add Instance",
-        "workspace.create.description": "Create a Minecraft instance or install a modpack. Loader versions are resolved automatically and can be changed later.",
+        "workspace.create.description": "Create a Minecraft instance or install a modpack. For modded instances, choose a loader version confirmed to support the selected Minecraft version.",
         "workspace.create.minecraft_tab": "Minecraft",
         "workspace.create.modpack_tab": "Modpack",
         "workspace.create.name_placeholder": "Instance name",
@@ -1241,7 +1241,7 @@
         "workspace.create.minecraft_version": "Minecraft version",
         "workspace.create.loader": "Mod loader",
         "workspace.create.show_snapshots": "Show snapshots, old alpha, and old beta versions",
-        "workspace.create.loader_hint": "Automatic mode chooses a compatible stable loader version. You can fine-tune the loader later from Edit Instance.",
+        "workspace.create.loader_hint": "MCW loads the exact versions published for the selected Minecraft version. Creation stays disabled when that loader has no compatible release.",
         "workspace.create.modpack_hint": "Browse a provider or import an existing MCW package. The new instance will appear in the library when installation starts.",
         "workspace.create.browse_modrinth": "Browse Modrinth modpacks",
         "workspace.create.browse_curseforge": "Browse CurseForge modpacks",
@@ -1873,7 +1873,14 @@
         "java.mod_loader.retrying": "The selected Java runtime could not run the mod-loader installer. Retrying with another compatible runtime...",
         "account.security.reprotect_completed": "Account protection completed.",
         "account.security.reprotect_completed_detail": "Stored account credentials were checked and re-protected successfully.",
-        "account.security.reprotect_failed": "Account protection failed."
+        "account.security.reprotect_failed": "Account protection failed.",
+        "workspace.create.loader_version": "Loader version",
+        "workspace.create.loader_version.select_minecraft": "Select a Minecraft version to check compatible loader versions.",
+        "workspace.create.loader_version.vanilla": "Vanilla does not require a separate loader version.",
+        "workspace.create.loader_version.loading": "Loading {loader} versions compatible with Minecraft {version}...",
+        "workspace.create.loader_version.available": "{count} compatible {loader} version(s) found for Minecraft {version}. Selected: {selected}.",
+        "workspace.create.loader_version.unavailable": "{loader} has no compatible version for Minecraft {version}, or its metadata service could not be reached. Choose another Minecraft version or loader.",
+        "workspace.create.loader_version.required": "Select a compatible {loader} version for Minecraft {version} first."
     },
     "aliases": {
         "MCW Launcher": "app.name",

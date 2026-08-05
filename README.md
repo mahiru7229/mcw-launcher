@@ -6,11 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases">
-    <img src="https://img.shields.io/badge/Beta-v1.1.0--beta.6-orange" alt="Beta version">
-  </a>
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.0.2">
-    <img src="https://img.shields.io/badge/Stable-v1.0.2-brightgreen" alt="Stable version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.1.0">
+    <img src="https://img.shields.io/badge/Stable-v1.1.0-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -47,21 +44,21 @@ Mỗi instance có riêng:
 
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 ---
-Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.0.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
+Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
 
-## Có gì mới trong v1.1.0-beta.6
+## Có gì mới trong v1.1.0
 
-**v1.1.0-beta.6** hoàn tất các lỗi còn lại của nhánh beta: progress bảo vệ tài khoản được trả về trạng thái cuối, Forge/NeoForge installer dùng đúng Java của instance và có một lần tự phục hồi khi Java lỗi, đồng thời Forge rất cũ dùng artifact `net.minecraftforge:minecraftforge` không còn bị báo sai “no runtime”.
+**v1.1.0** đưa nhánh 1.1 lên stable với hai lớp bảo vệ cuối trước khi tạo và tải nội dung:
 
-- Progress bảo vệ tài khoản kết thúc rõ ràng ở thành công hoặc thất bại.
-- Java tùy chọn được truyền xuyên suốt các luồng cài, đổi, sửa và khôi phục mod loader.
-- Installer retry đúng một lần khi phát hiện lỗi runtime Java đáng tin cậy.
-- Forge 1.6.4/9.11.1.1345 và các profile legacy tương tự được nhận diện runtime đúng.
-- MCW Core wheel vẫn giữ `1.1.0b2`; bản này chỉ phát hành launcher diff.
+- Add Instance hiển thị danh sách phiên bản Fabric, Quilt, Forge hoặc NeoForge tương thích với Minecraft version đã chọn.
+- Không thể tạo instance modded khi loader không có bản tương thích hoặc metadata chưa tải xong.
+- CurseForge manual download ưu tiên trang file theo slug thay vì URL CDN vừa lỗi hoặc fallback project ID dễ dẫn tới 404.
+- Bao gồm toàn bộ sửa lỗi của beta: Java tự phục hồi, retry mạng, responsive mod-loader UI, Forge legacy và progress bảo vệ tài khoản.
+- MCW Core được phát hành đồng bộ dưới dạng `mcw-core 1.1.0`.
 
-Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.6.md`](docs/RELEASE-v1.1.0-beta.6.md).
+Xem chi tiết tại [`docs/RELEASE-v1.1.0.md`](docs/RELEASE-v1.1.0.md).
 
 ## Có gì mới trong v1.1.0-beta.4
 

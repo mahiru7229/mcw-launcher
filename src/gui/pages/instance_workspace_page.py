@@ -42,7 +42,7 @@ from src.gui.widget.card_widget import CardWidget
 class InstanceWorkspacePage(BasePage):
     refresh_requested = Signal()
     selected_instance_changed = Signal(str)
-    create_requested = Signal(str, str, str)
+    create_requested = Signal(str, str, str, str)
     rename_requested = Signal(str, str)
     clone_requested = Signal(str, str, bool)
     delete_requested = Signal(str)
@@ -250,6 +250,10 @@ class InstanceWorkspacePage(BasePage):
 
     def _connect_dialogs(self) -> None:
         self.create_dialog.create_requested.connect(self.create_requested.emit)
+        self.create_dialog.fabric_versions_requested.connect(self.fabric_versions_requested.emit)
+        self.create_dialog.quilt_versions_requested.connect(self.quilt_versions_requested.emit)
+        self.create_dialog.forge_versions_requested.connect(self.forge_versions_requested.emit)
+        self.create_dialog.neoforge_versions_requested.connect(self.neoforge_versions_requested.emit)
         self.create_dialog.import_modpack_package_requested.connect(self._choose_modpack_import)
         self.create_dialog.browse_modrinth_requested.connect(self.browse_modpacks_requested.emit)
         self.create_dialog.browse_curseforge_requested.connect(self.browse_curseforge_modpacks_requested.emit)
@@ -313,15 +317,19 @@ class InstanceWorkspacePage(BasePage):
 
     def set_fabric_versions(self, game_version: str, versions: list[object]) -> None:
         self.advanced_page.set_fabric_versions(game_version, versions)
+        self.create_dialog.set_fabric_versions(game_version, versions)
 
     def set_quilt_versions(self, game_version: str, versions: list[object]) -> None:
         self.advanced_page.set_quilt_versions(game_version, versions)
+        self.create_dialog.set_quilt_versions(game_version, versions)
 
     def set_forge_versions(self, game_version: str, versions: list[object]) -> None:
         self.advanced_page.set_forge_versions(game_version, versions)
+        self.create_dialog.set_forge_versions(game_version, versions)
 
     def set_neoforge_versions(self, game_version: str, versions: list[object]) -> None:
         self.advanced_page.set_neoforge_versions(game_version, versions)
+        self.create_dialog.set_neoforge_versions(game_version, versions)
 
     def set_instances(self, instances: list[object], selected_name: str) -> None:
         self._instances = {str(instance.name): instance for instance in instances}

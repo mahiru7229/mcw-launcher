@@ -1233,7 +1233,7 @@
         "mods.choose_supported_instance": "Chọn một instance Fabric, Quilt, Forge hoặc NeoForge để quản lý mod.",
         "mods.vanilla_apply_loader": "Instance này đang là Vanilla. Hãy áp dụng Fabric, Quilt, Forge hoặc NeoForge trong trang Instance trước khi thêm mod.",
         "workspace.create.title": "Thêm instance",
-        "workspace.create.description": "Tạo instance Minecraft hoặc cài modpack. Phiên bản loader được tự động chọn và vẫn có thể đổi sau.",
+        "workspace.create.description": "Tạo instance Minecraft hoặc cài modpack. Với instance có mod, hãy chọn một phiên bản loader đã được xác nhận hỗ trợ phiên bản Minecraft đã chọn.",
         "workspace.create.minecraft_tab": "Minecraft",
         "workspace.create.modpack_tab": "Modpack",
         "workspace.create.name_placeholder": "Tên instance",
@@ -1241,7 +1241,7 @@
         "workspace.create.minecraft_version": "Phiên bản Minecraft",
         "workspace.create.loader": "Mod loader",
         "workspace.create.show_snapshots": "Hiện snapshot, old alpha và old beta",
-        "workspace.create.loader_hint": "Chế độ tự động sẽ chọn loader ổn định tương thích. Có thể chỉnh lại loader trong Edit Instance.",
+        "workspace.create.loader_hint": "MCW chỉ tải danh sách phiên bản loader được phát hành cho phiên bản Minecraft đã chọn. Nút tạo sẽ bị khóa nếu loader đó không có bản tương thích.",
         "workspace.create.modpack_hint": "Duyệt modpack từ provider hoặc nhập gói MCW có sẵn. Instance mới sẽ xuất hiện trong thư viện khi bắt đầu cài.",
         "workspace.create.browse_modrinth": "Duyệt modpack Modrinth",
         "workspace.create.browse_curseforge": "Duyệt modpack CurseForge",
@@ -1873,7 +1873,14 @@
         "java.mod_loader.retrying": "Java đã chọn không thể chạy trình cài mod loader. Đang thử lại bằng một runtime tương thích khác...",
         "account.security.reprotect_completed": "Đã hoàn tất bảo vệ tài khoản.",
         "account.security.reprotect_completed_detail": "Thông tin đăng nhập đã lưu được kiểm tra và mã hóa lại thành công.",
-        "account.security.reprotect_failed": "Bảo vệ tài khoản thất bại."
+        "account.security.reprotect_failed": "Bảo vệ tài khoản thất bại.",
+        "workspace.create.loader_version": "Phiên bản loader",
+        "workspace.create.loader_version.select_minecraft": "Hãy chọn phiên bản Minecraft để kiểm tra các phiên bản loader tương thích.",
+        "workspace.create.loader_version.vanilla": "Vanilla không cần chọn phiên bản loader riêng.",
+        "workspace.create.loader_version.loading": "Đang tải các phiên bản {loader} tương thích với Minecraft {version}...",
+        "workspace.create.loader_version.available": "Tìm thấy {count} phiên bản {loader} tương thích với Minecraft {version}. Đã chọn: {selected}.",
+        "workspace.create.loader_version.unavailable": "{loader} không có phiên bản tương thích với Minecraft {version}, hoặc không thể kết nối dịch vụ metadata. Hãy chọn phiên bản Minecraft hoặc loader khác.",
+        "workspace.create.loader_version.required": "Hãy chọn một phiên bản {loader} tương thích với Minecraft {version} trước."
     },
     "aliases": {
         "Show static text over themed controls": "launcher_settings.theme.show_static_text",
