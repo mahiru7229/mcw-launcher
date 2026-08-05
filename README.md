@@ -7,6 +7,9 @@
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
+    <img src="https://img.shields.io/badge/Beta-v1.1.0--beta.1-orange" alt="Beta version">
+  </a>
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.0.2">
     <img src="https://img.shields.io/badge/Stable-v1.0.2-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
@@ -47,6 +50,18 @@ Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh b
 Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.0.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.1.0-beta.1
+
+**v1.1.0-beta.1** là beta đầu tiên của nhánh 1.1.0 và chỉ xử lý các phần còn chưa dịch:
+
+- Dịch đầy đủ cửa sổ Quản lý instance nâng cao.
+- Dịch progress chuẩn bị thư viện/assets Minecraft.
+- Dịch progress kiểm tra file CurseForge, kể cả thông báo theo lượt kiểm tra lại.
+- Bổ sung regression test cho giao diện và progress tiếng Việt.
+- Chưa bao gồm Java selector, retry mạng, responsive mod loader, Forge legacy hoặc progress bảo vệ tài khoản; các mục này sẽ được tách sang beta sau.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.1.md`](docs/RELEASE-v1.1.0-beta.1.md).
 
 ## Có gì mới trong v1.0.2
 

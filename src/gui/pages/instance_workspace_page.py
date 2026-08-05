@@ -869,6 +869,7 @@ class InstanceWorkspacePage(BasePage):
         self.set_account(self._account)
         self.create_dialog.retranslate_dynamic()
         self.management_dialog.retranslate_dynamic()
+        self.advanced_page.retranslate_dynamic()
         self.advanced_dialog.set_instance_name(self.current_instance_name())
         self._render_selected()
         self._update_library_status()

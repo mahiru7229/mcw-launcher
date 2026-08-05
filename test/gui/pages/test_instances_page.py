@@ -8,6 +8,7 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+from mcw_core.api.language.language_manager import language_manager
 from src.gui.pages.instances_page import InstancesPage
 from src.models.modloader.fabric_loader_version import FabricLoaderVersion
 
@@ -143,3 +144,19 @@ def test_manage_neoforge_versions_and_repair_are_available(app):
     assert page.manage_mods_button.isEnabled() is True
     assert page.repair_loader_button.isEnabled() is True
     assert page.export_forge_diagnostics_button.isEnabled() is True
+
+
+def test_advanced_instance_page_is_fully_retranslated_to_vietnamese(app):
+    previous = language_manager.current_locale
+    language_manager.set_language("vi-VN", notify=False)
+    try:
+        page = InstancesPage()
+
+        assert page.title_label.text() == "Instance"
+        assert page.subtitle_label.text() == "Tạo và quản lý các instance Minecraft độc lập với Vanilla, Fabric, Quilt, Forge hoặc NeoForge."
+        assert page.refresh_instances_button.text() == "Làm mới danh sách instance"
+        assert page.create_name_input.placeholderText() == "Tên instance mới"
+        assert page.snapshot_checkbox.text() == "Hiển thị snapshot, alpha cũ và beta cũ"
+        assert page.apply_loader_button.text() == "Áp dụng mod loader"
+    finally:
+        language_manager.set_language(previous, notify=False)

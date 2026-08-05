@@ -16,6 +16,7 @@
         "home.subtitle": "Your launch deck: current account, active instance, and core status in one place.",
         "accounts.subtitle": "Manage offline accounts. Microsoft sign-in is prepared but remains locked until application approval is granted.",
         "instances.subtitle": "Create and manage isolated Minecraft instances, including Fabric Loader and per-instance mods.",
+        "instances.subtitle.modloaders": "Create and manage isolated Minecraft instances with Vanilla, Fabric, Quilt, Forge, or NeoForge.",
         "instance_settings.subtitle": "Settings are loaded and saved through the public SettingsManager API.",
         "launcher_settings.subtitle": "Preferences here belong to the GUI, not to an individual Minecraft instance.",
         "logs.subtitle": "Frontend activity and structured progress events appear here.",
@@ -1700,6 +1701,10 @@
         "progress.minecraft.checking_client": "Checking Minecraft client...",
         "progress.minecraft.checking_libraries": "Checking Minecraft libraries...",
         "progress.minecraft.checking_assets": "Checking Minecraft assets...",
+        "progress.minecraft.preparing_libraries": "Preparing Minecraft libraries...",
+        "progress.minecraft.preparing_assets": "Preparing Minecraft assets...",
+        "progress.curseforge.checking_files": "Checking CurseForge files...",
+        "progress.curseforge.checking_files_after_round": "Checking CurseForge files after round {round}/3...",
         "progress.minecraft.building_context": "Building launch context...",
         "progress.minecraft.building_command": "Building launch command...",
         "progress.minecraft.selecting_java": "Selecting Java runtime...",
@@ -2276,6 +2281,10 @@
         "Managed modpack file checks": "managed_content.launcher.title",
         "These defaults apply to every instance unless that instance overrides them.": "managed_content.launcher.detail",
         "Hide sidebar": "sidebar.toggle.hide",
-        "Show sidebar": "sidebar.toggle.show"
+        "Show sidebar": "sidebar.toggle.show",
+        "Create and manage isolated Minecraft instances with Vanilla, Fabric, Quilt, Forge, or NeoForge.": "instances.subtitle.modloaders",
+        "Preparing Minecraft libraries...": "progress.minecraft.preparing_libraries",
+        "Preparing Minecraft assets...": "progress.minecraft.preparing_assets",
+        "Checking CurseForge files...": "progress.curseforge.checking_files"
     }
 }

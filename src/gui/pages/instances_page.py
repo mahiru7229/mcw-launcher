@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QH
 
 from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
 from mcw_core.api.language.language_manager import tr
+from src.gui.localization import retranslate_widget_tree
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
 from src.gui.theme.runtime import set_theme_icon
@@ -63,6 +64,7 @@ class InstancesPage(BasePage):
         self._version_filter_timer.setInterval(25)
         self._version_filter_timer.timeout.connect(self._apply_version_filter)
         self._build_ui()
+        self.retranslate_dynamic()
 
     def _build_ui(self) -> None:
         selected_card = CardWidget("Active instance")
@@ -669,6 +671,9 @@ class InstancesPage(BasePage):
             self.export_modpack_requested.emit(name)
 
     def retranslate_dynamic(self) -> None:
+        retranslate_widget_tree(self)
+        self.title_label.setText(tr("navigation.instances"))
+        self.subtitle_label.setText(tr("instances.subtitle.modloaders"))
         self.open_instance_folder_button.setText(tr("instances.open_folder"))
         self.refresh_instances_button.setText(tr("instances.refresh"))
         self.browse_modpacks_button.setText(tr("modrinth.modpack.browse"))
