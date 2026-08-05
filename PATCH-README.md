@@ -1,23 +1,27 @@
-# MCW Launcher v1.1.0-beta.6 — Forge 1.6.4 OS-rule native hotfix
+# MCW Launcher v1.1.0-beta.6 — Legacy Forge certificate compatibility hotfix
 
-Apply this patch after the previous Beta 6 native-classifier hotfix.
+Apply this patch after the previous v1.1.0-beta.6 Forge 1.6.4 hotfixes.
+Extract the ZIP into the launcher repository root and overwrite the existing files.
 
 ## Fix
 
-Older Minecraft metadata can contain an LWJGL nightly native entry that is only allowed on macOS 10.5. The previous compatibility normalizer inspected every `*-platform` entry before evaluating its operating-system rules, so Windows attempted to resolve a nonexistent `natives-windows` classifier.
+LaunchWrapper-based Forge profiles now receive exactly one JVM property:
 
-This patch:
+```text
+-Dfml.ignoreInvalidMinecraftCertificates=true
+```
 
-- skips metadata normalization and downloads for libraries disallowed on the current OS;
-- ignores disallowed libraries when validating whether the Windows native cache is complete;
-- preserves those library entries unchanged for metadata compatibility;
-- adds regression coverage for `org.lwjgl.lwjgl:lwjgl-platform:2.9.1-nightly-20130708-debug3`.
+The property is limited to profiles that:
 
-## Apply
+- use `net.minecraft.launchwrapper.Launch`; and
+- contain MCW Forge metadata.
 
-Extract the ZIP over the launcher repository root.
+Before enabling this compatibility property, MCW performs a full SHA-1 verification of the Minecraft client JAR. A mismatched JAR is deleted and downloaded again through the existing verified client-download pipeline. Other Minecraft profiles keep the normal fast verification path.
+
+This allows old FML certificate checks to run on current Java security policies without weakening MCW's own client-integrity verification.
 
 ## Validation
 
-- Forge/native/classpath tests: `62 passed`
-- Python compile check: passed
+- Forge, Minecraft executor, launcher-manager, and client-download tests: `122 passed`
+- Python compile validation: passed
+- No MCW Core package, wheel, or source archive is included

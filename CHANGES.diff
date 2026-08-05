@@ -1,77 +1,177 @@
---- a/src/core/modloader/forge/forge_version_manager.py
-+++ b/src/core/modloader/forge/forge_version_manager.py
-@@ -224,7 +224,7 @@
-             if not isinstance(raw, dict):
-                 continue
-             item = deepcopy(raw)
--            if item.get("clientreq") is False:
-+            if item.get("clientreq") is False or not LibraryRuleManager.is_allowed(item):
-                 output.append(item)
-                 continue
-             coordinate = str(item.get("name") or "").strip()
-@@ -425,7 +425,7 @@
-     def _windows_native_cache_is_complete(data: dict) -> bool:
-         libraries = data.get("libraries") if isinstance(data.get("libraries"), list) else []
-         for item in libraries:
--            if not isinstance(item, dict):
-+            if not isinstance(item, dict) or not LibraryRuleManager.is_allowed(item):
-                 continue
-             natives = item.get("natives") if isinstance(item.get("natives"), dict) else {}
-             classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
---- a/test/core/modloader/forge/test_forge_version_manager.py
-+++ b/test/core/modloader/forge/test_forge_version_manager.py
-@@ -220,6 +220,54 @@
-     assert library["downloads"]["classifiers"]["natives-windows"]["path"] == "net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5-natives-windows.jar"
+--- a/src/core/modloader/forge/forge_launch_command_manager.py
++++ b/src/core/modloader/forge/forge_launch_command_manager.py
+@@ -10,6 +10,8 @@
+     """Validate and normalize JVM arguments required by modern Forge."""
+ 
+     MODERN_MAIN_CLASS = "cpw.mods.bootstraplauncher.BootstrapLauncher"
++    LEGACY_MAIN_CLASS = "net.minecraft.launchwrapper.Launch"
++    LEGACY_CERTIFICATE_PROPERTY = "fml.ignoreInvalidMinecraftCertificates"
+     MODULE_PATH_FLAGS = ("-p", "--module-path")
+     DEFAULT_IGNORE_LIST = (
+         "bootstraplauncher",
+@@ -33,6 +35,14 @@
+     @classmethod
+     def prepare(cls, version: Version, jvm_arguments: list[str], client_path: Path | None = None, library_directory: Path | None = None) -> list[str]:
+         arguments = [str(value) for value in jvm_arguments]
++        if cls.is_legacy_forge(version):
++            # Minecraft 1.6-era Forge validates Mojang's historical JAR
++            # certificate chain. Modern Java 8 security policies can reject
++            # that old signature even after MCW has verified the official
++            # client JAR by its Mojang SHA-1. Keep the bypass scoped to the
++            # legacy Forge LaunchWrapper profile and normalize conflicting
++            # user-provided values so FML can start reliably.
++            return cls._ensure_system_property(arguments, cls.LEGACY_CERTIFICATE_PROPERTY, "true")
+         if not cls.is_modern_forge(version):
+             return arguments
+ 
+@@ -95,6 +105,12 @@
+         loader_metadata = cls._loader_metadata(raw)
+         return str(getattr(version, "main_class", "")).strip() == cls.MODERN_MAIN_CLASS and loader_metadata is not None
+ 
++    @classmethod
++    def is_legacy_forge(cls, version: Version) -> bool:
++        raw = getattr(version, "raw_json", None)
++        forge_metadata = raw.get("forge") if isinstance(raw, dict) else None
++        return str(getattr(version, "main_class", "")).strip() == cls.LEGACY_MAIN_CLASS and isinstance(forge_metadata, dict)
++
+     @staticmethod
+     def _loader_metadata(raw: object) -> dict | None:
+         if not isinstance(raw, dict):
+--- a/src/core/minecraft/minecraft_executor.py
++++ b/src/core/minecraft/minecraft_executor.py
+@@ -21,6 +21,7 @@
+ from src.core.minecraft.launcher_manager import LauncherManager
+ from src.core.minecraft.library_manager import DownloadLibraryManager
+ from src.core.modloader.mod_loader_manager import ModLoaderManager
++from src.core.modloader.forge.forge_launch_command_manager import ForgeLaunchCommandManager
+ from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManager
+ from src.core.modloader.forge.compatibility_confirmation import CompatibilityConfirmationRequired
+ from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
+@@ -54,6 +55,12 @@
+         return loader(version=version, reporter=reporter)
+ 
+     @staticmethod
++    def _load_client(version: object, reporter: ProgressReporter, verification_cache: VerificationCache):
++        if ForgeLaunchCommandManager.is_legacy_forge(version):
++            return DownloadClientManager.load(version=version, reporter=reporter, verification_cache=verification_cache, fast_verify=False)
++        return MinecraftExecutor._load_with_fast_verification(DownloadClientManager.load, version, reporter, verification_cache)
++
++    @staticmethod
+     def _start_with_java_recovery(instance: Instance, command: list[str], required_java_major: int, reporter: ProgressReporter, preferred_java: str, lan_log_path) -> tuple[object, object, tuple[str, ...]]:
+         resolution = JavaResolver.resolve_with_recovery(required_java_major, reporter, preferred_java)
+         java = resolution.path
+@@ -174,7 +181,7 @@
+                     raise CompatibilityConfirmationRequired(instance.name, forge_preflight)
+ 
+             reporter.status(stage=ProgressStage.DOWNLOADING_CLIENT, message="Checking Minecraft client...")
+-            MinecraftExecutor._load_with_fast_verification(DownloadClientManager.load, version, reporter, verification_cache)
++            MinecraftExecutor._load_client(version, reporter, verification_cache)
+             download_pause_controller.raise_if_requested()
+ 
+             reporter.status(stage=ProgressStage.DOWNLOADING_LIBRARIES, message="Checking Minecraft libraries...")
+--- a/test/core/modloader/forge/test_forge_launch_command_manager.py
++++ b/test/core/modloader/forge/test_forge_launch_command_manager.py
+@@ -122,6 +122,45 @@
+         )
  
  
-+def test_normalize_skips_osx_only_nightly_native_on_windows(monkeypatch, tmp_path: Path) -> None:
-+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: tmp_path / "libraries"))
-+    monkeypatch.setattr(
-+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_os",
-+        staticmethod(lambda: "windows"),
++
++def test_prepare_adds_certificate_compatibility_property_for_legacy_forge() -> None:
++    version = SimpleNamespace(
++        main_class="net.minecraft.launchwrapper.Launch",
++        raw_json={"forge": {"gameVersion": "1.6.4", "loaderVersion": "9.11.1.1345"}},
 +    )
-+    monkeypatch.setattr(
-+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_arch",
-+        staticmethod(lambda: "x64"),
++
++    result = ForgeLaunchCommandManager.prepare(version, ["-Xmx2G"])
++
++    assert result == ["-Xmx2G", "-Dfml.ignoreInvalidMinecraftCertificates=true"]
++
++
++def test_prepare_normalizes_conflicting_legacy_certificate_property() -> None:
++    version = SimpleNamespace(
++        main_class="net.minecraft.launchwrapper.Launch",
++        raw_json={"forge": {"gameVersion": "1.6.4", "loaderVersion": "9.11.1.1345"}},
 +    )
-+    monkeypatch.setattr(
-+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
-+        staticmethod(lambda **kwargs: (_ for _ in ()).throw(AssertionError("A disallowed OS library must not be downloaded"))),
++
++    result = ForgeLaunchCommandManager.prepare(
++        version,
++        [
++            "-Dfml.ignoreInvalidMinecraftCertificates=false",
++            "-Xmx2G",
++            "-Dfml.ignoreInvalidMinecraftCertificates=true",
++        ],
 +    )
-+    library = {
-+        "name": "org.lwjgl.lwjgl:lwjgl-platform:2.9.1-nightly-20130708-debug3",
-+        "natives": {"linux": "natives-linux", "osx": "natives-osx", "windows": "natives-windows"},
-+        "rules": [{"action": "allow", "os": {"name": "osx", "version": "^10\\.5\\.\\d$"}}],
-+        "extract": {"exclude": ["META-INF/"]},
++
++    assert result == ["-Dfml.ignoreInvalidMinecraftCertificates=true", "-Xmx2G"]
++
++
++def test_prepare_does_not_bypass_certificates_for_non_forge_launchwrapper() -> None:
++    version = SimpleNamespace(
++        main_class="net.minecraft.launchwrapper.Launch",
++        raw_json={},
++    )
++    arguments = ["-Xmx2G"]
++
++    assert ForgeLaunchCommandManager.prepare(version, arguments) == arguments
++
+ def test_prepare_leaves_non_forge_arguments_unchanged() -> None:
+     arguments = ["-Xmx2G", "-cp", "minecraft.jar"]
+ 
+--- a/test/core/minecraft/test_minecraft_executor.py
++++ b/test/core/minecraft/test_minecraft_executor.py
+@@ -172,6 +172,55 @@
+     }
+ 
+ 
++
++def test_load_client_forces_full_hash_for_legacy_forge(monkeypatch: pytest.MonkeyPatch) -> None:
++    version = SimpleNamespace(
++        main_class="net.minecraft.launchwrapper.Launch",
++        raw_json={"forge": {"gameVersion": "1.6.4", "loaderVersion": "9.11.1.1345"}},
++    )
++    reporter = object()
++    verification_cache = object()
++    received = {}
++
++    def fake_load(**kwargs):
++        received.update(kwargs)
++        return Path("1.6.4.jar")
++
++    monkeypatch.setattr(DownloadClientManager, "load", fake_load)
++
++    result = MinecraftExecutor._load_client(version, reporter, verification_cache)
++
++    assert result == Path("1.6.4.jar")
++    assert received == {
++        "version": version,
++        "reporter": reporter,
++        "verification_cache": verification_cache,
++        "fast_verify": False,
 +    }
 +
-+    normalized = ForgeVersionManager._normalize_libraries({"libraries": [library]})
 +
-+    assert normalized["libraries"] == [library]
-+    assert "downloads" not in normalized["libraries"][0]
++def test_load_client_keeps_fast_verification_for_non_legacy_profiles(monkeypatch: pytest.MonkeyPatch) -> None:
++    version = SimpleNamespace(main_class="net.minecraft.client.main.Main", raw_json={})
++    reporter = object()
++    verification_cache = object()
++    received = {}
 +
++    def fake_load(**kwargs):
++        received.update(kwargs)
++        return Path("client.jar")
 +
-+def test_windows_native_cache_ignores_osx_only_nightly_library(monkeypatch, tmp_path: Path) -> None:
-+    monkeypatch.setattr(
-+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_os",
-+        staticmethod(lambda: "windows"),
-+    )
-+    monkeypatch.setattr(
-+        "src.core.minecraft.library_rule_manager.LibraryRuleManager._get_current_arch",
-+        staticmethod(lambda: "x64"),
-+    )
-+    cache = tmp_path / "forge.json"
-+    cache.write_text(
-+        '{"id":"forge-1.6.4-9.11.1.1345","mainClass":"net.minecraft.launchwrapper.Launch","libraries":['
-+        '{"name":"net.minecraft:launchwrapper:1.8","downloads":{"artifact":{"path":"net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","url":"https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","sha1":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":100}}},'
-+        '{"name":"org.lwjgl.lwjgl:lwjgl-platform:2.9.0","natives":{"windows":"natives-windows"},"downloads":{"classifiers":{"natives-windows":{"path":"org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar","url":"https://libraries.minecraft.net/org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar","sha1":"cccccccccccccccccccccccccccccccccccccccc","size":609967}}}},'
-+        '{"name":"org.lwjgl.lwjgl:lwjgl-platform:2.9.1-nightly-20130708-debug3","natives":{"linux":"natives-linux","osx":"natives-osx","windows":"natives-windows"},"rules":[{"action":"allow","os":{"name":"osx","version":"^10\\\\.5\\\\.\\\\d$"}}]}],"forge":{"schemaVersion":1,"gameVersion":"1.6.4","loaderVersion":"9.11.1.1345"}}',
-+        encoding="utf-8",
-+    )
++    monkeypatch.setattr(DownloadClientManager, "load", fake_load)
 +
-+    assert ForgeVersionManager._load_cached(cache, "1.6.4", "9.11.1.1345") is not None
++    result = MinecraftExecutor._load_client(version, reporter, verification_cache)
 +
++    assert result == Path("client.jar")
++    assert received == {
++        "version": version,
++        "reporter": reporter,
++        "verification_cache": verification_cache,
++        "fast_verify": True,
++    }
 +
- def test_normalize_legacy_native_library_preserves_existing_artifact(monkeypatch, tmp_path: Path) -> None:
-     root = tmp_path / "libraries"
-     monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))
+ def test_run_returns_launch_information(
+     monkeypatch: pytest.MonkeyPatch,
+ ):

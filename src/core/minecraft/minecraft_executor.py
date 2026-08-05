@@ -21,6 +21,7 @@ from src.core.minecraft.download_manager import DownloadClientManager
 from src.core.minecraft.launcher_manager import LauncherManager
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.modloader.forge.forge_launch_command_manager import ForgeLaunchCommandManager
 from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManager
 from src.core.modloader.forge.compatibility_confirmation import CompatibilityConfirmationRequired
 from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
@@ -52,6 +53,12 @@ class MinecraftExecutor:
         if supports_cache:
             return loader(version=version, reporter=reporter, verification_cache=verification_cache, fast_verify=True)
         return loader(version=version, reporter=reporter)
+
+    @staticmethod
+    def _load_client(version: object, reporter: ProgressReporter, verification_cache: VerificationCache):
+        if ForgeLaunchCommandManager.is_legacy_forge(version):
+            return DownloadClientManager.load(version=version, reporter=reporter, verification_cache=verification_cache, fast_verify=False)
+        return MinecraftExecutor._load_with_fast_verification(DownloadClientManager.load, version, reporter, verification_cache)
 
     @staticmethod
     def _start_with_java_recovery(instance: Instance, command: list[str], required_java_major: int, reporter: ProgressReporter, preferred_java: str, lan_log_path) -> tuple[object, object, tuple[str, ...]]:
@@ -174,7 +181,7 @@ class MinecraftExecutor:
                     raise CompatibilityConfirmationRequired(instance.name, forge_preflight)
 
             reporter.status(stage=ProgressStage.DOWNLOADING_CLIENT, message="Checking Minecraft client...")
-            MinecraftExecutor._load_with_fast_verification(DownloadClientManager.load, version, reporter, verification_cache)
+            MinecraftExecutor._load_client(version, reporter, verification_cache)
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.DOWNLOADING_LIBRARIES, message="Checking Minecraft libraries...")
