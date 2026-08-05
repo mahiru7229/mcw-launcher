@@ -1,27 +1,22 @@
-# MCW Launcher v1.1.0-beta.6 — Legacy Forge certificate compatibility hotfix
+# MCW Launcher v1.1.0 — pytest freeze hotfix
 
-Apply this patch after the previous v1.1.0-beta.6 Forge 1.6.4 hotfixes.
-Extract the ZIP into the launcher repository root and overwrite the existing files.
+Apply this patch to the root of the MCW Launcher v1.1.0 repository.
 
-## Fix
+## Fixed
 
-LaunchWrapper-based Forge profiles now receive exactly one JVM property:
+`test_workspace_create_dialog_emits_public_create_contract` still used the old three-argument create signal and attempted to create a Quilt instance without supplying the newly-required loader version.
 
-```text
--Dfml.ignoreInvalidMinecraftCertificates=true
-```
+That path opens `QMessageBox.information(...)`. Under pytest with `QT_QPA_PLATFORM=offscreen`, the modal message box is invisible and waits forever, making the suite appear frozen.
 
-The property is limited to profiles that:
+The test now:
 
-- use `net.minecraft.launchwrapper.Launch`; and
-- contain MCW Forge metadata.
+- provides a compatible Quilt loader version;
+- validates the selected loader version;
+- listens to the stable four-argument create contract;
+- completes without opening a modal dialog.
 
-Before enabling this compatibility property, MCW performs a full SHA-1 verification of the Minecraft client JAR. A mismatched JAR is deleted and downloaded again through the existing verified client-download pipeline. Other Minecraft profiles keep the normal fast verification path.
+## Changed file
 
-This allows old FML certificate checks to run on current Java security policies without weakening MCW's own client-integrity verification.
+- `test/gui/pages/test_instance_workspace_page.py`
 
-## Validation
-
-- Forge, Minecraft executor, launcher-manager, and client-download tests: `122 passed`
-- Python compile validation: passed
-- No MCW Core package, wheel, or source archive is included
+This is a test-only patch. Runtime launcher and MCW Core code are unchanged.

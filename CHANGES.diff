@@ -1,177 +1,23 @@
---- a/src/core/modloader/forge/forge_launch_command_manager.py
-+++ b/src/core/modloader/forge/forge_launch_command_manager.py
-@@ -10,6 +10,8 @@
-     """Validate and normalize JVM arguments required by modern Forge."""
+--- /mnt/data/MCW-Launcher-v1.1.0-test-freeze-hotfix/original.py	2026-08-05 19:01:11.370410945 +0000
++++ /mnt/data/_inspect_mcw110/mcw-launcher-v1.1.0/test/gui/pages/test_instance_workspace_page.py	2026-08-05 19:01:11.797917991 +0000
+@@ -78,14 +78,17 @@
+ def test_workspace_create_dialog_emits_public_create_contract(gui_app):
+     page = InstanceWorkspacePage()
+     page.set_versions([SimpleNamespace(id="1.21.1", type="release")])
+-    emitted: list[tuple[str, str, str]] = []
+-    page.create_requested.connect(lambda name, version, loader: emitted.append((name, version, loader)))
++    page.set_quilt_versions("1.21.1", [SimpleNamespace(version="0.27.1", stable=True)])
++    emitted: list[tuple[str, str, str, str]] = []
++    page.create_requested.connect(lambda name, version, loader, loader_version: emitted.append((name, version, loader, loader_version)))
  
-     MODERN_MAIN_CLASS = "cpw.mods.bootstraplauncher.BootstrapLauncher"
-+    LEGACY_MAIN_CLASS = "net.minecraft.launchwrapper.Launch"
-+    LEGACY_CERTIFICATE_PROPERTY = "fml.ignoreInvalidMinecraftCertificates"
-     MODULE_PATH_FLAGS = ("-p", "--module-path")
-     DEFAULT_IGNORE_LIST = (
-         "bootstraplauncher",
-@@ -33,6 +35,14 @@
-     @classmethod
-     def prepare(cls, version: Version, jvm_arguments: list[str], client_path: Path | None = None, library_directory: Path | None = None) -> list[str]:
-         arguments = [str(value) for value in jvm_arguments]
-+        if cls.is_legacy_forge(version):
-+            # Minecraft 1.6-era Forge validates Mojang's historical JAR
-+            # certificate chain. Modern Java 8 security policies can reject
-+            # that old signature even after MCW has verified the official
-+            # client JAR by its Mojang SHA-1. Keep the bypass scoped to the
-+            # legacy Forge LaunchWrapper profile and normalize conflicting
-+            # user-provided values so FML can start reliably.
-+            return cls._ensure_system_property(arguments, cls.LEGACY_CERTIFICATE_PROPERTY, "true")
-         if not cls.is_modern_forge(version):
-             return arguments
+     page.create_dialog.name_input.setText("New Quilt")
+     page.create_dialog.loader_combo.setCurrentIndex(page.create_dialog.loader_combo.findData("quilt"))
++
++    assert page.create_dialog.selected_loader_version() == "0.27.1"
+     page.create_dialog._request_create()
  
-@@ -95,6 +105,12 @@
-         loader_metadata = cls._loader_metadata(raw)
-         return str(getattr(version, "main_class", "")).strip() == cls.MODERN_MAIN_CLASS and loader_metadata is not None
+-    assert emitted == [("New Quilt", "1.21.1", "quilt")]
++    assert emitted == [("New Quilt", "1.21.1", "quilt", "0.27.1")]
+     assert not hasattr(page.advanced_page, "create_name_input")
+     assert not hasattr(page.advanced_page, "create_requested")
  
-+    @classmethod
-+    def is_legacy_forge(cls, version: Version) -> bool:
-+        raw = getattr(version, "raw_json", None)
-+        forge_metadata = raw.get("forge") if isinstance(raw, dict) else None
-+        return str(getattr(version, "main_class", "")).strip() == cls.LEGACY_MAIN_CLASS and isinstance(forge_metadata, dict)
-+
-     @staticmethod
-     def _loader_metadata(raw: object) -> dict | None:
-         if not isinstance(raw, dict):
---- a/src/core/minecraft/minecraft_executor.py
-+++ b/src/core/minecraft/minecraft_executor.py
-@@ -21,6 +21,7 @@
- from src.core.minecraft.launcher_manager import LauncherManager
- from src.core.minecraft.library_manager import DownloadLibraryManager
- from src.core.modloader.mod_loader_manager import ModLoaderManager
-+from src.core.modloader.forge.forge_launch_command_manager import ForgeLaunchCommandManager
- from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManager
- from src.core.modloader.forge.compatibility_confirmation import CompatibilityConfirmationRequired
- from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
-@@ -54,6 +55,12 @@
-         return loader(version=version, reporter=reporter)
- 
-     @staticmethod
-+    def _load_client(version: object, reporter: ProgressReporter, verification_cache: VerificationCache):
-+        if ForgeLaunchCommandManager.is_legacy_forge(version):
-+            return DownloadClientManager.load(version=version, reporter=reporter, verification_cache=verification_cache, fast_verify=False)
-+        return MinecraftExecutor._load_with_fast_verification(DownloadClientManager.load, version, reporter, verification_cache)
-+
-+    @staticmethod
-     def _start_with_java_recovery(instance: Instance, command: list[str], required_java_major: int, reporter: ProgressReporter, preferred_java: str, lan_log_path) -> tuple[object, object, tuple[str, ...]]:
-         resolution = JavaResolver.resolve_with_recovery(required_java_major, reporter, preferred_java)
-         java = resolution.path
-@@ -174,7 +181,7 @@
-                     raise CompatibilityConfirmationRequired(instance.name, forge_preflight)
- 
-             reporter.status(stage=ProgressStage.DOWNLOADING_CLIENT, message="Checking Minecraft client...")
--            MinecraftExecutor._load_with_fast_verification(DownloadClientManager.load, version, reporter, verification_cache)
-+            MinecraftExecutor._load_client(version, reporter, verification_cache)
-             download_pause_controller.raise_if_requested()
- 
-             reporter.status(stage=ProgressStage.DOWNLOADING_LIBRARIES, message="Checking Minecraft libraries...")
---- a/test/core/modloader/forge/test_forge_launch_command_manager.py
-+++ b/test/core/modloader/forge/test_forge_launch_command_manager.py
-@@ -122,6 +122,45 @@
-         )
- 
- 
-+
-+def test_prepare_adds_certificate_compatibility_property_for_legacy_forge() -> None:
-+    version = SimpleNamespace(
-+        main_class="net.minecraft.launchwrapper.Launch",
-+        raw_json={"forge": {"gameVersion": "1.6.4", "loaderVersion": "9.11.1.1345"}},
-+    )
-+
-+    result = ForgeLaunchCommandManager.prepare(version, ["-Xmx2G"])
-+
-+    assert result == ["-Xmx2G", "-Dfml.ignoreInvalidMinecraftCertificates=true"]
-+
-+
-+def test_prepare_normalizes_conflicting_legacy_certificate_property() -> None:
-+    version = SimpleNamespace(
-+        main_class="net.minecraft.launchwrapper.Launch",
-+        raw_json={"forge": {"gameVersion": "1.6.4", "loaderVersion": "9.11.1.1345"}},
-+    )
-+
-+    result = ForgeLaunchCommandManager.prepare(
-+        version,
-+        [
-+            "-Dfml.ignoreInvalidMinecraftCertificates=false",
-+            "-Xmx2G",
-+            "-Dfml.ignoreInvalidMinecraftCertificates=true",
-+        ],
-+    )
-+
-+    assert result == ["-Dfml.ignoreInvalidMinecraftCertificates=true", "-Xmx2G"]
-+
-+
-+def test_prepare_does_not_bypass_certificates_for_non_forge_launchwrapper() -> None:
-+    version = SimpleNamespace(
-+        main_class="net.minecraft.launchwrapper.Launch",
-+        raw_json={},
-+    )
-+    arguments = ["-Xmx2G"]
-+
-+    assert ForgeLaunchCommandManager.prepare(version, arguments) == arguments
-+
- def test_prepare_leaves_non_forge_arguments_unchanged() -> None:
-     arguments = ["-Xmx2G", "-cp", "minecraft.jar"]
- 
---- a/test/core/minecraft/test_minecraft_executor.py
-+++ b/test/core/minecraft/test_minecraft_executor.py
-@@ -172,6 +172,55 @@
-     }
- 
- 
-+
-+def test_load_client_forces_full_hash_for_legacy_forge(monkeypatch: pytest.MonkeyPatch) -> None:
-+    version = SimpleNamespace(
-+        main_class="net.minecraft.launchwrapper.Launch",
-+        raw_json={"forge": {"gameVersion": "1.6.4", "loaderVersion": "9.11.1.1345"}},
-+    )
-+    reporter = object()
-+    verification_cache = object()
-+    received = {}
-+
-+    def fake_load(**kwargs):
-+        received.update(kwargs)
-+        return Path("1.6.4.jar")
-+
-+    monkeypatch.setattr(DownloadClientManager, "load", fake_load)
-+
-+    result = MinecraftExecutor._load_client(version, reporter, verification_cache)
-+
-+    assert result == Path("1.6.4.jar")
-+    assert received == {
-+        "version": version,
-+        "reporter": reporter,
-+        "verification_cache": verification_cache,
-+        "fast_verify": False,
-+    }
-+
-+
-+def test_load_client_keeps_fast_verification_for_non_legacy_profiles(monkeypatch: pytest.MonkeyPatch) -> None:
-+    version = SimpleNamespace(main_class="net.minecraft.client.main.Main", raw_json={})
-+    reporter = object()
-+    verification_cache = object()
-+    received = {}
-+
-+    def fake_load(**kwargs):
-+        received.update(kwargs)
-+        return Path("client.jar")
-+
-+    monkeypatch.setattr(DownloadClientManager, "load", fake_load)
-+
-+    result = MinecraftExecutor._load_client(version, reporter, verification_cache)
-+
-+    assert result == Path("client.jar")
-+    assert received == {
-+        "version": version,
-+        "reporter": reporter,
-+        "verification_cache": verification_cache,
-+        "fast_verify": True,
-+    }
-+
- def test_run_returns_launch_information(
-     monkeypatch: pytest.MonkeyPatch,
- ):

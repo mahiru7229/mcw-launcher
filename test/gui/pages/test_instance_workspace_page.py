@@ -78,14 +78,17 @@ def test_workspace_selection_emits_instance_name(gui_app):
 def test_workspace_create_dialog_emits_public_create_contract(gui_app):
     page = InstanceWorkspacePage()
     page.set_versions([SimpleNamespace(id="1.21.1", type="release")])
-    emitted: list[tuple[str, str, str]] = []
-    page.create_requested.connect(lambda name, version, loader: emitted.append((name, version, loader)))
+    page.set_quilt_versions("1.21.1", [SimpleNamespace(version="0.27.1", stable=True)])
+    emitted: list[tuple[str, str, str, str]] = []
+    page.create_requested.connect(lambda name, version, loader, loader_version: emitted.append((name, version, loader, loader_version)))
 
     page.create_dialog.name_input.setText("New Quilt")
     page.create_dialog.loader_combo.setCurrentIndex(page.create_dialog.loader_combo.findData("quilt"))
+
+    assert page.create_dialog.selected_loader_version() == "0.27.1"
     page.create_dialog._request_create()
 
-    assert emitted == [("New Quilt", "1.21.1", "quilt")]
+    assert emitted == [("New Quilt", "1.21.1", "quilt", "0.27.1")]
     assert not hasattr(page.advanced_page, "create_name_input")
     assert not hasattr(page.advanced_page, "create_requested")
 
