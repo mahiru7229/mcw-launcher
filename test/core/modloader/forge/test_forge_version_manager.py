@@ -119,6 +119,63 @@ def test_normalize_legacy_library_builds_download_metadata(monkeypatch, tmp_path
     assert artifact["size"] == 0
 
 
+def test_normalize_hashless_legacy_library_downloads_and_records_sha1(monkeypatch, tmp_path: Path) -> None:
+    root = tmp_path / "libraries"
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))
+    calls = []
+
+    def fake_download_and_hash(**kwargs):
+        calls.append(kwargs)
+        target = kwargs["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"launchwrapper")
+        return target, "b" * 40, len(b"launchwrapper")
+
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
+        staticmethod(fake_download_and_hash),
+    )
+    profile = {
+        "libraries": [
+            {
+                "name": "net.minecraft:launchwrapper:1.8",
+                "checksums": ["d41d8cd98f00b204e9800998ecf8427e"],
+            }
+        ]
+    }
+
+    normalized = ForgeVersionManager._normalize_libraries(profile)
+    artifact = normalized["libraries"][0]["downloads"]["artifact"]
+
+    assert calls[0]["url"] == "https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar"
+    assert artifact == {
+        "path": "net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar",
+        "url": "https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar",
+        "sha1": "b" * 40,
+        "size": len(b"launchwrapper"),
+    }
+
+
+def test_incomplete_legacy_launchwrapper_cache_is_invalidated(tmp_path: Path) -> None:
+    cache = tmp_path / "forge.json"
+    cache.write_text(
+        '{"id":"forge-1.6.4-9.11.1.1345","mainClass":"net.minecraft.launchwrapper.Launch","libraries":[{"name":"net.minecraftforge:minecraftforge:9.11.1.1345"},{"name":"net.minecraft:launchwrapper:1.8"}],"forge":{"schemaVersion":1,"gameVersion":"1.6.4","loaderVersion":"9.11.1.1345"}}',
+        encoding="utf-8",
+    )
+
+    assert ForgeVersionManager._load_cached(cache, "1.6.4", "9.11.1.1345") is None
+
+
+def test_complete_legacy_launchwrapper_cache_is_reused(tmp_path: Path) -> None:
+    cache = tmp_path / "forge.json"
+    cache.write_text(
+        '{"id":"forge-1.6.4-9.11.1.1345","mainClass":"net.minecraft.launchwrapper.Launch","libraries":[{"name":"net.minecraftforge:minecraftforge:9.11.1.1345"},{"name":"net.minecraft:launchwrapper:1.8","downloads":{"artifact":{"path":"net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","url":"https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","sha1":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":100}}}],"forge":{"schemaVersion":1,"gameVersion":"1.6.4","loaderVersion":"9.11.1.1345"}}',
+        encoding="utf-8",
+    )
+
+    assert ForgeVersionManager._load_cached(cache, "1.6.4", "9.11.1.1345") is not None
+
+
 def test_detects_unsupported_install_client_error() -> None:
     output = "joptsimple.UnrecognizedOptionException: 'installClient' is not a recognized option"
 

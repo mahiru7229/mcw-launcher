@@ -40,6 +40,24 @@ Nguyên nhân là các bản Forge rất cũ dùng Maven artifact `net.minecraft
 
 Beta 6 bổ sung `minecraftforge` vào danh sách runtime hợp lệ. Profile legacy vẫn phải có main class, metadata Forge đúng và các thư viện bắt buộc vẫn được kiểm tra bình thường.
 
+### Hotfix LaunchWrapper cho Forge 1.6.4
+
+Sau khi bỏ chặn sai “no runtime”, Forge 1.6.4 có thể đi tiếp đến Java nhưng dừng tại:
+
+```text
+Error: Could not find or load main class net.minecraft.launchwrapper.Launch
+```
+
+Profile Forge đời cũ chỉ cung cấp Maven coordinate cho một số dependency và không có khối `downloads.artifact` hiện đại. Launcher trước đây bỏ qua các mục này, nên `net.minecraft:launchwrapper:1.8` không được tải hoặc thêm vào classpath.
+
+Hotfix này:
+
+- Chủ động tải và tính SHA-1 cho dependency Forge legacy thiếu metadata tải xuống.
+- Tạo lại `downloads.artifact` đầy đủ để pipeline tải/kiểm tra hiện tại tiếp tục hoạt động.
+- Thêm fallback classpath cho Maven coordinate legacy đã tồn tại trên đĩa.
+- Vẫn ghép classpath bằng `os.pathsep`, tương ứng dấu `;` trên Windows.
+- Tự vô hiệu hóa riêng cache LaunchWrapper legacy chưa đầy đủ để profile được dựng lại, không bắt các instance Forge hiện đại cài lại.
+
 ### Phiên bản
 
 - Launcher runtime: `v1.1.0-beta.6`
@@ -54,7 +72,7 @@ Beta 6 bổ sung `minecraftforge` vào danh sách runtime hợp lệ. Profile le
 - Regression test cho việc truyền Java tùy chọn qua load/prepare/repair.
 - Regression test cho progress profile của bảo vệ tài khoản.
 - Toàn bộ source và test qua `compileall`.
-- Toàn bộ test suite: **1312 passed, 82 skipped, 2 warnings**.
+- Toàn bộ test suite: **1316 passed, 82 skipped, 2 warnings**.
 
 ### Smoke test Windows đề xuất
 
@@ -97,6 +115,24 @@ Beta 6 closes three issues found after Beta 5:
 
 Old Forge profiles can use the Maven artifact `net.minecraftforge:minecraftforge`. The validator previously recognized only `net.minecraftforge:forge` and newer FML component artifacts. Beta 6 recognizes `minecraftforge` as a valid legacy Forge runtime while retaining all existing metadata and file verification.
 
+### Forge 1.6.4 LaunchWrapper hotfix
+
+After the false “no runtime” block was removed, Forge 1.6.4 could reach Java but fail with:
+
+```text
+Error: Could not find or load main class net.minecraft.launchwrapper.Launch
+```
+
+Legacy Forge profiles can declare dependencies only as Maven coordinates without a modern `downloads.artifact` block. Those entries were skipped, so `net.minecraft:launchwrapper:1.8` was not downloaded or placed on the classpath.
+
+This hotfix:
+
+- Downloads and hashes legacy Forge dependencies that lack modern artifact metadata.
+- Rebuilds complete `downloads.artifact` entries for the normal download and verification pipeline.
+- Adds a classpath fallback for existing legacy Maven-coordinate libraries.
+- Keeps platform-correct classpath joining through `os.pathsep` (`;` on Windows).
+- Invalidates only incomplete legacy LaunchWrapper caches so modern Forge instances are not reinstalled unnecessarily.
+
 ### Versioning
 
 - Launcher runtime: `v1.1.0-beta.6`
@@ -106,7 +142,7 @@ Old Forge profiles can use the Maven artifact `net.minecraftforge:minecraftforge
 
 ### Validation
 
-- Full test suite: **1312 passed, 82 skipped, 2 warnings**.
+- Full test suite: **1316 passed, 82 skipped, 2 warnings**.
 - Source and tests pass `compileall`.
 - Regression coverage includes Forge 1.6.4 `minecraftforge` runtime detection, mod-loader Java recovery, preferred-Java forwarding, and account-protection progress completion.
 

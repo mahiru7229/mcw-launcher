@@ -66,7 +66,7 @@ class ForgeVersionManager:
             ForgeVersionManager._run_installer(base_version, loader, installer, staging, reporter, preferred_java_path)
             profile = ForgeVersionManager._find_profile(staging, loader)
             ForgeVersionManager._import_libraries(staging, reporter)
-            normalized = ForgeVersionManager._normalize_libraries(profile)
+            normalized = ForgeVersionManager._normalize_libraries(profile, reporter)
             merged = ForgeVersionManager._merge_profiles(base_version.raw_json, normalized, base_version.id, loader)
             ForgeVersionManager._write_json(cache_path, merged)
             version = VersionManager._parse_version(merged, cache_path)
@@ -217,27 +217,42 @@ class ForgeVersionManager:
                 reporter.files(stage=ProgressStage.INSTALLING_MOD_LOADER, message="Importing Forge libraries...", current=index, total=total)
 
     @staticmethod
-    def _normalize_libraries(profile: dict) -> dict:
+    def _normalize_libraries(profile: dict, reporter: ProgressReporter | None = None) -> dict:
         normalized = deepcopy(profile)
         output: list[dict] = []
         for raw in profile.get("libraries", []):
             if not isinstance(raw, dict):
                 continue
             item = deepcopy(raw)
+            if item.get("clientreq") is False:
+                output.append(item)
+                continue
             downloads = item.get("downloads") if isinstance(item.get("downloads"), dict) else {}
-            if isinstance(downloads.get("artifact"), dict):
+            artifact = downloads.get("artifact") if isinstance(downloads.get("artifact"), dict) else None
+            if artifact is not None and artifact.get("path") and artifact.get("url") and artifact.get("sha1"):
                 output.append(item)
                 continue
             coordinate = str(item.get("name") or "").strip()
             path = ForgeVersionManager._maven_path(coordinate)
             local = Paths.libraries() / path
             repository = ForgeVersionManager._library_repository(item, coordinate)
+            url = repository + path.as_posix()
             sha1 = ForgeVersionManager._sha1(local) if local.is_file() else ForgeVersionManager._legacy_library_sha1(item)
-            if not sha1:
-                output.append(item)
-                continue
             size = local.stat().st_size if local.is_file() else max(0, int(item.get("size") or 0))
-            item["downloads"] = {"artifact": {"path": path.as_posix(), "url": repository + path.as_posix(), "sha1": sha1, "size": size}}
+            if not sha1:
+                try:
+                    _, sha1, size = HttpDownloader.download_and_hash(
+                        url=url,
+                        path=local,
+                        max_retry=3,
+                        timeout=30.0,
+                        reporter=reporter,
+                        progress_stage=ProgressStage.INSTALLING_MOD_LOADER,
+                        progress_message=f"Downloading Forge library {path.name}...",
+                    )
+                except Exception as error:
+                    raise RuntimeError(f"Could not resolve legacy Forge library '{coordinate}'.") from error
+            item["downloads"] = {"artifact": {"path": path.as_posix(), "url": url, "sha1": sha1, "size": size}}
             output.append(item)
         normalized["libraries"] = output
         return normalized
@@ -326,8 +341,22 @@ class ForgeVersionManager:
             return None
         if not data.get("mainClass") or not data.get("libraries"):
             return None
+        if not ForgeVersionManager._legacy_launchwrapper_cache_is_complete(data):
+            return None
         return data
 
+    @staticmethod
+    def _legacy_launchwrapper_cache_is_complete(data: dict) -> bool:
+        if str(data.get("mainClass") or "").strip() != "net.minecraft.launchwrapper.Launch":
+            return True
+        libraries = data.get("libraries") if isinstance(data.get("libraries"), list) else []
+        for item in libraries:
+            if not isinstance(item, dict) or not str(item.get("name") or "").startswith("net.minecraft:launchwrapper:"):
+                continue
+            downloads = item.get("downloads") if isinstance(item.get("downloads"), dict) else {}
+            artifact = downloads.get("artifact") if isinstance(downloads.get("artifact"), dict) else {}
+            return bool(artifact.get("path") and artifact.get("url") and artifact.get("sha1"))
+        return False
 
     @staticmethod
     def validate_installation(version: Version, game_version: str, forge_version: str, verify_files: bool = True) -> list[str]:

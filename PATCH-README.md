@@ -1,24 +1,20 @@
-# MCW Launcher v1.1.0-beta.6 — Launcher diff
+# MCW Launcher v1.1.0-beta.6 — Forge 1.6.4 LaunchWrapper hotfix
 
-## Baseline
+Áp dụng patch này lên **v1.1.0-beta.6** đã cài trước đó.
 
-Apply this patch on top of a complete **MCW Launcher v1.1.0-beta.5** source tree.
+## Cách áp dụng
 
-## Apply
+1. Đóng MCW Launcher.
+2. Giải nén ZIP vào thư mục gốc repository launcher.
+3. Cho phép ghi đè các file trùng tên.
+4. Chạy lại launcher rồi Launch instance Forge 1.6.4.
 
-Extract the ZIP into the repository root and allow files to be replaced.
+Launcher sẽ tự bỏ cache Forge legacy chưa đầy đủ và dựng lại profile. Không cần xóa instance hoặc xóa toàn bộ cache thủ công.
 
-This package contains launcher repository changes only. It does **not** contain a standalone `mcw_core` source archive, wheel, or any compiled executable.
+## Phạm vi
 
-Files under `src/core/` are the implementation bundled directly inside the launcher repository and are required for the Forge/NeoForge fixes.
-
-## Main fixes
-
-- Account credential re-protection now returns shared progress to a final success or failure state.
-- Forge/NeoForge installers use the Java selected for the instance and retry once with another compatible Java on a recognized Java-runtime failure.
-- Pre-1.7 Forge profiles using `net.minecraftforge:minecraftforge` are accepted as valid Forge runtimes instead of being blocked by the false `no runtime` error.
-
-## Validation
-
-- 1312 passed, 82 skipped, 2 warnings.
-- `python -m compileall -q src test launcher.py` passed.
+- Tải và tạo metadata SHA-1 cho dependency Forge legacy thiếu `downloads.artifact`.
+- Đưa `net.minecraft:launchwrapper:1.8` vào classpath.
+- Dùng `os.pathsep` để giữ dấu phân cách classpath đúng nền tảng (`;` trên Windows).
+- Chỉ vô hiệu hóa cache LaunchWrapper legacy chưa đầy đủ; Forge hiện đại không bị cài lại.
+- Không chứa package `mcw_core/`, wheel hoặc Core source archive.

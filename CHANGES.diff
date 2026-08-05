@@ -1,927 +1,332 @@
-diff --git a/README.md b/README.md
-index 54d482e0b1e8e5403892fe438c8aac7a71aee985..9e64c77ca6bf07ddc5fb94414027ddd1ad933870 100644
---- a/README.md
-+++ b/README.md
-@@ -7,7 +7,7 @@
- 
- <p align="center">
-   <a href="https://github.com/mahiru7229/mcw-launcher/releases">
--    <img src="https://img.shields.io/badge/Beta-v1.1.0--beta.5-orange" alt="Beta version">
-+    <img src="https://img.shields.io/badge/Beta-v1.1.0--beta.6-orange" alt="Beta version">
-   </a>
-   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.0.2">
-     <img src="https://img.shields.io/badge/Stable-v1.0.2-brightgreen" alt="Stable version">
-@@ -51,19 +51,17 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.0.2 hỗ trợ nâng cấp
- 
- ---
- 
--## Có gì mới trong v1.1.0-beta.5
-+## Có gì mới trong v1.1.0-beta.6
- 
--**v1.1.0-beta.5** sửa lỗi Forge legacy không thể khởi động do các tùy chọn đơn trị bị lặp, đặc biệt là `--gameDir` trên các profile LaunchWrapper như Forge 1.12.2:
-+**v1.1.0-beta.6** hoàn tất các lỗi còn lại của nhánh beta: progress bảo vệ tài khoản được trả về trạng thái cuối, Forge/NeoForge installer dùng đúng Java của instance và có một lần tự phục hồi khi Java lỗi, đồng thời Forge rất cũ dùng artifact `net.minecraftforge:minecraftforge` không còn bị báo sai “no runtime”.
- 
--- Chuẩn hóa game arguments ngay trước khi ghép lệnh Java cuối cùng.
--- Nhận diện cả dạng `--option value` và `--option=value`.
--- Chỉ giữ một giá trị cho các tùy chọn đơn trị; với đường dẫn/thông tin do launcher quản lý, giá trị canonical từ launch context luôn được ưu tiên.
--- Không gộp nhầm các tùy chọn có thể lặp hợp lệ như `--tweakClass`.
--- Từ chối lệnh launch có tùy chọn đơn trị bị thiếu giá trị trước khi tạo tiến trình Java.
--- Thêm regression test cho profile Forge legacy kế thừa, `minecraftArguments` bị ghép lặp và xung đột từ custom game arguments.
--- Không phát hành MCW Core wheel mới; distribution dùng để build vẫn là `1.1.0b2`.
-+- Progress bảo vệ tài khoản kết thúc rõ ràng ở thành công hoặc thất bại.
-+- Java tùy chọn được truyền xuyên suốt các luồng cài, đổi, sửa và khôi phục mod loader.
-+- Installer retry đúng một lần khi phát hiện lỗi runtime Java đáng tin cậy.
-+- Forge 1.6.4/9.11.1.1345 và các profile legacy tương tự được nhận diện runtime đúng.
-+- MCW Core wheel vẫn giữ `1.1.0b2`; bản này chỉ phát hành launcher diff.
- 
--Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.5.md`](docs/RELEASE-v1.1.0-beta.5.md).
-+Xem chi tiết tại [`docs/RELEASE-v1.1.0-beta.6.md`](docs/RELEASE-v1.1.0-beta.6.md).
- 
- ## Có gì mới trong v1.1.0-beta.4
- 
-diff --git a/docs/RELEASE-v1.1.0-beta.6.md b/docs/RELEASE-v1.1.0-beta.6.md
-new file mode 100644
-index 0000000000000000000000000000000000000000..a5634f92b025511da95a52ca2385e88f46a1e09b
---- /dev/null
-+++ b/docs/RELEASE-v1.1.0-beta.6.md
-@@ -0,0 +1,119 @@
-+# MCW Launcher v1.1.0-beta.6
-+
-+## Tiếng Việt
-+
-+### Phạm vi
-+
-+Beta 6 hoàn tất ba lỗi còn lại được phát hiện sau Beta 5:
-+
-+1. Progress của tác vụ **bảo vệ lại tài khoản** không trở về trạng thái hoàn tất hoặc thất bại.
-+2. Trình cài Forge/NeoForge chưa dùng đúng Java đã chọn cho instance và chưa tự phục hồi khi Java đó không thể chạy installer.
-+3. Forge rất cũ, điển hình Forge `9.11.1.1345` cho Minecraft `1.6.4`, bị báo sai rằng runtime Forge không tồn tại.
-+
-+### Bảo vệ tài khoản
-+
-+- Thêm progress profile riêng cho `account.security.reprotect`.
-+- Khi bắt đầu, launcher hiển thị trạng thái đang bảo vệ lại thông tin đăng nhập.
-+- Khi hoàn tất, progress chuyển sang trạng thái thành công với thanh tiến trình 100%.
-+- Khi lỗi, progress chuyển sang trạng thái thất bại thay vì mắc kẹt ở thông báo đang xử lý.
-+- Bổ sung bản dịch tiếng Anh và tiếng Việt cho trạng thái hoàn tất/thất bại.
-+
-+### Java cho trình cài mod loader
-+
-+- Forge và NeoForge installer nhận đường dẫn Java đã chọn trong thiết lập instance.
-+- Luồng tạo instance sử dụng Java từ thiết lập mặc định của instance khi cần chạy installer.
-+- Luồng đổi, sửa chữa, khôi phục mod loader và cài profile còn thiếu khi Launch đều truyền đúng Java đã chọn.
-+- Nếu Java tùy chọn không tồn tại, sai major hoặc không đọc được phiên bản, launcher tự chuyển sang runtime tương thích.
-+- Nếu installer thực sự thoát với dấu hiệu lỗi Java như `UnsupportedClassVersionError`, JNI/JVM initialization error hoặc JVM option không được hỗ trợ, launcher thử lại đúng một lần bằng Java tương thích khác.
-+- Log installer giữ riêng nội dung của từng lần chạy cùng đường dẫn Java đã dùng, giúp chẩn đoán chính xác hơn.
-+- Không retry các lỗi installer thông thường không liên quan đến Java.
-+
-+### Forge cũ báo “no runtime”
-+
-+Diagnostic của Forge `9.11.1.1345` cho Minecraft `1.6.4` cho thấy profile đã được import và instance được đánh dấu healthy, nhưng pre-launch validator vẫn chặn với:
-+
-+```text
-+The Forge runtime is missing from the launch profile.
-+```
-+
-+Nguyên nhân là các bản Forge rất cũ dùng Maven artifact `net.minecraftforge:minecraftforge`, trong khi validator trước đây chỉ nhận `net.minecraftforge:forge` và các component FML hiện đại.
-+
-+Beta 6 bổ sung `minecraftforge` vào danh sách runtime hợp lệ. Profile legacy vẫn phải có main class, metadata Forge đúng và các thư viện bắt buộc vẫn được kiểm tra bình thường.
-+
-+### Phiên bản
-+
-+- Launcher runtime: `v1.1.0-beta.6`
-+- Update channel: `beta`
-+- Không phát hành MCW Core wheel mới; distribution dùng để build vẫn là `mcw-core 1.1.0b2`.
-+- Gói bàn giao chỉ chứa launcher diff. Các file trong `src/core/` là implementation được bundle trong launcher; không có thay đổi trong package `mcw_core/` và không phát hành Core riêng.
-+
-+### Xác thực
-+
-+- Regression test cho Forge 1.6.4 sử dụng artifact `minecraftforge`.
-+- Regression test cho retry Java của mod-loader installer.
-+- Regression test cho việc truyền Java tùy chọn qua load/prepare/repair.
-+- Regression test cho progress profile của bảo vệ tài khoản.
-+- Toàn bộ source và test qua `compileall`.
-+- Toàn bộ test suite: **1312 passed, 82 skipped, 2 warnings**.
-+
-+### Smoke test Windows đề xuất
-+
-+1. Mở một instance Forge 1.6.4 với Forge 9.11.1.1345 và Launch.
-+2. Xác nhận không còn lỗi `The Forge runtime is missing from the launch profile`.
-+3. Chọn một Java sai hoặc không tương thích trong Instance Settings, sau đó đổi/cài Forge hoặc NeoForge.
-+4. Xác nhận launcher tự chọn Java khác và installer tiếp tục, không lặp vô hạn.
-+5. Chạy **Re-protect account credentials** và xác nhận progress kết thúc ở trạng thái thành công hoặc thất bại rõ ràng.
-+
-+---
-+
-+## English
-+
-+### Scope
-+
-+Beta 6 closes three issues found after Beta 5:
-+
-+1. The **re-protect account credentials** task did not return the shared progress area to a terminal state.
-+2. Forge/NeoForge installers did not consistently use the instance-selected Java runtime and could not recover from a Java-specific installer failure.
-+3. Very old Forge releases, notably Forge `9.11.1.1345` for Minecraft `1.6.4`, were incorrectly reported as having no Forge runtime.
-+
-+### Account protection progress
-+
-+- Adds a dedicated progress profile for `account.security.reprotect`.
-+- Success now produces a terminal 100% completion state.
-+- Failure now produces a terminal failed state instead of leaving the UI stuck on the running message.
-+- Adds English and Vietnamese completion/failure translations.
-+
-+### Mod-loader installer Java selection
-+
-+- Forge and NeoForge installers receive the Java path selected for the instance.
-+- New-instance installation uses the Java path from instance defaults.
-+- Loader change, repair, restore, and launch-time profile installation pass the selected Java consistently.
-+- Invalid custom paths recover to an automatic compatible runtime.
-+- A Java-specific installer exit is retried once with another compatible runtime.
-+- Installer logs preserve each attempt and the Java executable used.
-+- Non-Java installer failures are not retried.
-+
-+### Legacy Forge “no runtime” false positive
-+
-+Old Forge profiles can use the Maven artifact `net.minecraftforge:minecraftforge`. The validator previously recognized only `net.minecraftforge:forge` and newer FML component artifacts. Beta 6 recognizes `minecraftforge` as a valid legacy Forge runtime while retaining all existing metadata and file verification.
-+
-+### Versioning
-+
-+- Launcher runtime: `v1.1.0-beta.6`
-+- Update channel: `beta`
-+- No new MCW Core wheel is published; the build distribution remains `mcw-core 1.1.0b2`.
-+- The delivery contains launcher diff files only. Files under `src/core/` are the implementation bundled with the launcher; the `mcw_core/` package is unchanged and no standalone Core release is published.
-+
-+### Validation
-+
-+- Full test suite: **1312 passed, 82 skipped, 2 warnings**.
-+- Source and tests pass `compileall`.
-+- Regression coverage includes Forge 1.6.4 `minecraftforge` runtime detection, mod-loader Java recovery, preferred-Java forwarding, and account-protection progress completion.
-+
-+### Recommended Windows smoke test
-+
-+1. Launch a Forge 1.6.4 instance with Forge 9.11.1.1345.
-+2. Confirm that `The Forge runtime is missing from the launch profile` no longer appears.
-+3. Select an invalid or incompatible Java executable in Instance Settings, then install or change Forge/NeoForge.
-+4. Confirm that the launcher selects another compatible Java runtime and retries at most once.
-+5. Run **Re-protect account credentials** and confirm that progress ends in a clear success or failure state.
-diff --git a/lang/en-US.json b/lang/en-US.json
-index 368609f9c9a28858f5c3fc31a61269ea04fce9f3..fb635964d917b2d722b734d95cea4a1aaada59ec 100644
---- a/lang/en-US.json
-+++ b/lang/en-US.json
-@@ -1869,7 +1869,11 @@
-         "network.retry.manual.available": "Network request failed. Manual retry is available.",
-         "network.retry.manual.available_log": "Automatic network retries exhausted for {task}. Last error: {error}",
-         "network.retry.manual.cancelled": "Network retry cancelled.",
--        "network.retry.manual.could_not_start": "The request could not be restarted. Wait for the current task to finish and try again."
-+        "network.retry.manual.could_not_start": "The request could not be restarted. Wait for the current task to finish and try again.",
-+        "java.mod_loader.retrying": "The selected Java runtime could not run the mod-loader installer. Retrying with another compatible runtime...",
-+        "account.security.reprotect_completed": "Account protection completed.",
-+        "account.security.reprotect_completed_detail": "Stored account credentials were checked and re-protected successfully.",
-+        "account.security.reprotect_failed": "Account protection failed."
-     },
-     "aliases": {
-         "MCW Launcher": "app.name",
-diff --git a/lang/vi-VN.json b/lang/vi-VN.json
-index 2d3b4c9a6465279ec8d1719fe576daf586fa0d53..63590576aafae9e54620b297157d90a2d1b8bc09 100644
---- a/lang/vi-VN.json
-+++ b/lang/vi-VN.json
-@@ -1869,7 +1869,11 @@
-         "network.retry.manual.available": "Yêu cầu mạng thất bại. Bạn có thể thử lại thủ công.",
-         "network.retry.manual.available_log": "Đã dùng hết số lần thử mạng tự động cho {task}. Lỗi gần nhất: {error}",
-         "network.retry.manual.cancelled": "Đã hủy thử lại yêu cầu mạng.",
--        "network.retry.manual.could_not_start": "Không thể khởi động lại yêu cầu. Hãy chờ tác vụ hiện tại hoàn tất rồi thử lại."
-+        "network.retry.manual.could_not_start": "Không thể khởi động lại yêu cầu. Hãy chờ tác vụ hiện tại hoàn tất rồi thử lại.",
-+        "java.mod_loader.retrying": "Java đã chọn không thể chạy trình cài mod loader. Đang thử lại bằng một runtime tương thích khác...",
-+        "account.security.reprotect_completed": "Đã hoàn tất bảo vệ tài khoản.",
-+        "account.security.reprotect_completed_detail": "Thông tin đăng nhập đã lưu được kiểm tra và mã hóa lại thành công.",
-+        "account.security.reprotect_failed": "Bảo vệ tài khoản thất bại."
-     },
-     "aliases": {
-         "Show static text over themed controls": "launcher_settings.theme.show_static_text",
-diff --git a/src/config.py b/src/config.py
-index df13788b87a5b23102b30fd1537569915a8211e2..fc42981de60abff084ca529ecedbcbc77cbd5473 100644
---- a/src/config.py
-+++ b/src/config.py
-@@ -1,7 +1,7 @@
- from __future__ import annotations
- 
--VERSION = "v1.1.0-beta.5"
--VERSION_ID = "1.1.0-beta.5"
-+VERSION = "v1.1.0-beta.6"
-+VERSION_ID = "1.1.0-beta.6"
- VERSION_TAG = f"v{VERSION_ID}"
- UPDATE_CHANNEL = "beta"
- GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
-diff --git a/src/core/minecraft/minecraft_executor.py b/src/core/minecraft/minecraft_executor.py
-index 9d0ed0a04ea723b06245566ffc7b346f7a5112ee..c382ffbdb45b4c4fb81663370f3f2dc6fbed7400 100644
---- a/src/core/minecraft/minecraft_executor.py
-+++ b/src/core/minecraft/minecraft_executor.py
-@@ -152,7 +152,11 @@ class MinecraftExecutor:
-             VersionManifestManager.get()
-             download_pause_controller.raise_if_requested()
-             reporter.status(stage=ProgressStage.LOADING_VERSION, message=f"Loading Minecraft {instance.version_id}...")
--            version = ModLoaderManager.load(instance, reporter)
-+            preferred_loader_java = str(getattr(settings, "java_path", "") or "").strip()
-+            if preferred_loader_java:
-+                version = ModLoaderManager.load(instance, reporter, preferred_java_path=preferred_loader_java)
-+            else:
-+                version = ModLoaderManager.load(instance, reporter)
-             verification_cache = VerificationCache(Paths.instance_repair_cache(instance))
-             download_pause_controller.raise_if_requested()
- 
-diff --git a/src/core/modloader/forge/forge_change_manager.py b/src/core/modloader/forge/forge_change_manager.py
-index ad0ec0db8fb12fca1bad620c3da53ac6ed1e0523..0bca208089d16cb9ee3d17d5913d48ff9e24d245 100644
---- a/src/core/modloader/forge/forge_change_manager.py
-+++ b/src/core/modloader/forge/forge_change_manager.py
-@@ -6,6 +6,7 @@ import os
- 
- from src.core.fs.paths import Paths
- from src.core.instance.instance_manager import InstanceManager
-+from src.core.instance.settings_manager import SettingsManager
- from src.core.minecraft.library_manager import DownloadLibraryManager
- from src.core.minecraft.version_manager import VersionManager
- from src.core.modloader.forge.forge_version_manager import ForgeVersionManager
-@@ -39,7 +40,11 @@ class ForgeChangeManager:
-             )
- 
-         base_version = VersionManager.load(instance.version_id)
--        prepared = ModLoaderManager.prepare(base_version, *resolved_loader, reporter=reporter)
-+        preferred_java = str(getattr(SettingsManager.load(instance), "java_path", "") or "").strip()
-+        if preferred_java:
-+            prepared = ModLoaderManager.prepare(base_version, *resolved_loader, reporter=reporter, preferred_java_path=preferred_java)
-+        else:
-+            prepared = ModLoaderManager.prepare(base_version, *resolved_loader, reporter=reporter)
-         cls._verify_prepared(instance.version_id, resolved_loader, prepared, reporter)
- 
-         snapshot = cls._build_snapshot(instance, previous_loader, resolved_loader)
-@@ -78,7 +83,11 @@ class ForgeChangeManager:
-             )
- 
-         base_version = VersionManager.load(instance.version_id)
--        prepared = ModLoaderManager.prepare(base_version, *previous_loader, reporter=reporter)
-+        preferred_java = str(getattr(SettingsManager.load(instance), "java_path", "") or "").strip()
-+        if preferred_java:
-+            prepared = ModLoaderManager.prepare(base_version, *previous_loader, reporter=reporter, preferred_java_path=preferred_java)
-+        else:
-+            prepared = ModLoaderManager.prepare(base_version, *previous_loader, reporter=reporter)
-         cls._verify_prepared(instance.version_id, previous_loader, prepared, reporter)
- 
-         reverse_snapshot = cls._build_snapshot(instance, current_loader, previous_loader)
-diff --git a/src/core/modloader/forge/forge_version_manager.py b/src/core/modloader/forge/forge_version_manager.py
-index 941aaf4d1b783dfe7f4425d07788e9cc2cd02aa8..9190f88a2c3f6806c7b6783019b734c1b62c49cd 100644
 --- a/src/core/modloader/forge/forge_version_manager.py
 +++ b/src/core/modloader/forge/forge_version_manager.py
-@@ -6,17 +6,15 @@ from pathlib import Path
- from threading import Lock
- import hashlib
- import json
--import os
- import shutil
--import subprocess
- 
- from src.core.fs.paths import Paths
--from src.core.java.java_resolver import JavaResolver
- from src.core.minecraft.library_manager import DownloadLibraryManager
- from src.core.minecraft.library_rule_manager import LibraryRuleManager
- from src.core.minecraft.version_manager import VersionManager
- from src.core.modloader.forge.forge_metadata_client import ForgeMetadataClient
- from src.core.modloader.forge.legacy_forge_installer import LegacyForgeInstaller
-+from src.core.modloader.java_installer_runner import ModLoaderJavaRunner
- from src.core.network.httpx_downloader import HttpDownloader
- from src.core.progress.progress_reporter import ProgressReporter
- from src.models.minecraft.version import Version
-@@ -40,11 +38,11 @@ class ForgeVersionManager:
-         return ForgeMetadataClient.recommended_version(game_version)
- 
-     @staticmethod
--    def load(game_version: str, forge_version: str, reporter: ProgressReporter | None = None) -> Version:
--        return ForgeVersionManager.install(VersionManager.load(game_version), forge_version, reporter=reporter)
-+    def load(game_version: str, forge_version: str, reporter: ProgressReporter | None = None, preferred_java_path: str | Path | None = None) -> Version:
-+        return ForgeVersionManager.install(VersionManager.load(game_version), forge_version, reporter=reporter, preferred_java_path=preferred_java_path)
- 
-     @staticmethod
--    def install(base_version: Version, forge_version: str, reporter: ProgressReporter | None = None, force_refresh: bool = False) -> Version:
-+    def install(base_version: Version, forge_version: str, reporter: ProgressReporter | None = None, force_refresh: bool = False, preferred_java_path: str | Path | None = None) -> Version:
-         loader = str(forge_version).strip()
-         if not loader:
-             raise RuntimeError("Select a Minecraft Forge version.")
-@@ -65,7 +63,7 @@ class ForgeVersionManager:
-                 shutil.rmtree(staging, ignore_errors=True)
-             staging.mkdir(parents=True, exist_ok=True)
-             ForgeVersionManager._prepare_staging(base_version, staging)
--            ForgeVersionManager._run_installer(base_version, loader, installer, staging, reporter)
-+            ForgeVersionManager._run_installer(base_version, loader, installer, staging, reporter, preferred_java_path)
+@@ -66,7 +66,7 @@
+             ForgeVersionManager._run_installer(base_version, loader, installer, staging, reporter, preferred_java_path)
              profile = ForgeVersionManager._find_profile(staging, loader)
              ForgeVersionManager._import_libraries(staging, reporter)
-             normalized = ForgeVersionManager._normalize_libraries(profile)
-@@ -77,7 +75,7 @@ class ForgeVersionManager:
-             return version
+-            normalized = ForgeVersionManager._normalize_libraries(profile)
++            normalized = ForgeVersionManager._normalize_libraries(profile, reporter)
+             merged = ForgeVersionManager._merge_profiles(base_version.raw_json, normalized, base_version.id, loader)
+             ForgeVersionManager._write_json(cache_path, merged)
+             version = VersionManager._parse_version(merged, cache_path)
+@@ -217,27 +217,42 @@
+                 reporter.files(stage=ProgressStage.INSTALLING_MOD_LOADER, message="Importing Forge libraries...", current=index, total=total)
  
      @staticmethod
--    def repair(base_version: Version, forge_version: str, reporter: ProgressReporter | None = None) -> Version:
-+    def repair(base_version: Version, forge_version: str, reporter: ProgressReporter | None = None, preferred_java_path: str | Path | None = None) -> Version:
-         loader = str(forge_version).strip()
-         if not loader:
-             raise RuntimeError("Select a Minecraft Forge version.")
-@@ -88,7 +86,7 @@ class ForgeVersionManager:
-         if reporter is not None:
-             reporter.status(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Repairing Minecraft Forge {loader}...")
-         try:
--            version = ForgeVersionManager.install(base_version, loader, reporter=reporter, force_refresh=True)
-+            version = ForgeVersionManager.install(base_version, loader, reporter=reporter, force_refresh=True, preferred_java_path=preferred_java_path)
-             DownloadLibraryManager.load(version, reporter=reporter)
-             issues = ForgeVersionManager.validate_installation(version, base_version.id, loader, verify_files=True)
-             if issues:
-@@ -137,7 +135,7 @@ class ForgeVersionManager:
-                 shutil.copy2(client, target)
- 
-     @staticmethod
--    def _run_installer(base_version: Version, forge_version: str, installer: Path, staging: Path, reporter: ProgressReporter | None) -> None:
-+    def _run_installer(base_version: Version, forge_version: str, installer: Path, staging: Path, reporter: ProgressReporter | None, preferred_java_path: str | Path | None = None) -> None:
-         log_path = Paths.forge_root() / "logs" / f"forge-{base_version.id}-{forge_version}.log"
-         log_path.parent.mkdir(parents=True, exist_ok=True)
- 
-@@ -152,12 +150,16 @@ class ForgeVersionManager:
-             return
- 
-         java_major = int((base_version.java_version or {}).get("majorVersion") or 8)
--        java = JavaResolver.resolve(java_major, reporter)
-         if reporter is not None:
-             reporter.status(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Running Forge {forge_version} installer...")
--        creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
--        result = subprocess.run([str(java), "-jar", str(installer), "--installClient", str(staging)], cwd=staging, capture_output=True, text=True, timeout=15 * 60, creationflags=creation_flags)
--        output = (result.stdout or "") + ("\n" if result.stdout and result.stderr else "") + (result.stderr or "")
-+        result = ModLoaderJavaRunner.run(
-+            java_major,
-+            ["-jar", str(installer), "--installClient", str(staging)],
-+            staging,
-+            reporter=reporter,
-+            preferred_java_path=preferred_java_path,
-+        )
-+        output = result.output
-         log_path.write_text(output, encoding="utf-8", errors="replace")
-         if result.returncode != 0:
-             if ForgeVersionManager._is_unsupported_install_client(output):
-@@ -166,7 +168,7 @@ class ForgeVersionManager:
-                     "Please send the Forge installer log so support for this legacy profile can be added.\n"
-                     + "\n".join(output.splitlines()[-12:])
-                 )
--            tail = "\n".join((result.stderr or result.stdout or "Forge installer failed.").splitlines()[-12:])
-+            tail = "\n".join((output or "Forge installer failed.").splitlines()[-12:])
-             raise RuntimeError(f"Forge installer exited with code {result.returncode}.\n{tail}")
- 
-     @staticmethod
-@@ -367,7 +369,7 @@ class ForgeVersionManager:
- 
-     @staticmethod
-     def _has_forge_runtime(libraries: list, raw: dict, forge_version: str) -> bool:
--        runtime_artifacts = {"forge", "fmlloader", "fmlcore", "javafmllanguage", "lowcodelanguage", "mclanguage"}
-+        runtime_artifacts = {"forge", "minecraftforge", "fmlloader", "fmlcore", "javafmllanguage", "lowcodelanguage", "mclanguage"}
-         for item in libraries:
-             if not isinstance(item, dict):
+-    def _normalize_libraries(profile: dict) -> dict:
++    def _normalize_libraries(profile: dict, reporter: ProgressReporter | None = None) -> dict:
+         normalized = deepcopy(profile)
+         output: list[dict] = []
+         for raw in profile.get("libraries", []):
+             if not isinstance(raw, dict):
                  continue
-diff --git a/src/core/modloader/java_installer_runner.py b/src/core/modloader/java_installer_runner.py
-new file mode 100644
-index 0000000000000000000000000000000000000000..e777abca0e792ea6133e2c8e81d456af4c0ceb05
---- /dev/null
-+++ b/src/core/modloader/java_installer_runner.py
-@@ -0,0 +1,111 @@
-+from __future__ import annotations
-+
-+from dataclasses import dataclass
-+import os
-+from pathlib import Path
-+import subprocess
-+
-+from src.core.java.java_resolver import JavaRecoveryError, JavaResolver
-+from src.core.java.java_runtime import JavaRuntime
-+from src.core.progress.progress_reporter import ProgressReporter
-+from src.models.progress.progress_stage import ProgressStage
-+
-+
-+@dataclass(frozen=True, slots=True)
-+class ModLoaderInstallerResult:
-+    returncode: int
-+    output: str
-+    java_path: Path
-+    attempts: int
-+
-+
-+class ModLoaderJavaRunner:
-+    """Run a Java-based mod-loader installer with one bounded Java recovery."""
-+
+             item = deepcopy(raw)
++            if item.get("clientreq") is False:
++                output.append(item)
++                continue
+             downloads = item.get("downloads") if isinstance(item.get("downloads"), dict) else {}
+-            if isinstance(downloads.get("artifact"), dict):
++            artifact = downloads.get("artifact") if isinstance(downloads.get("artifact"), dict) else None
++            if artifact is not None and artifact.get("path") and artifact.get("url") and artifact.get("sha1"):
+                 output.append(item)
+                 continue
+             coordinate = str(item.get("name") or "").strip()
+             path = ForgeVersionManager._maven_path(coordinate)
+             local = Paths.libraries() / path
+             repository = ForgeVersionManager._library_repository(item, coordinate)
++            url = repository + path.as_posix()
+             sha1 = ForgeVersionManager._sha1(local) if local.is_file() else ForgeVersionManager._legacy_library_sha1(item)
+-            if not sha1:
+-                output.append(item)
+-                continue
+             size = local.stat().st_size if local.is_file() else max(0, int(item.get("size") or 0))
+-            item["downloads"] = {"artifact": {"path": path.as_posix(), "url": repository + path.as_posix(), "sha1": sha1, "size": size}}
++            if not sha1:
++                try:
++                    _, sha1, size = HttpDownloader.download_and_hash(
++                        url=url,
++                        path=local,
++                        max_retry=3,
++                        timeout=30.0,
++                        reporter=reporter,
++                        progress_stage=ProgressStage.INSTALLING_MOD_LOADER,
++                        progress_message=f"Downloading Forge library {path.name}...",
++                    )
++                except Exception as error:
++                    raise RuntimeError(f"Could not resolve legacy Forge library '{coordinate}'.") from error
++            item["downloads"] = {"artifact": {"path": path.as_posix(), "url": url, "sha1": sha1, "size": size}}
+             output.append(item)
+         normalized["libraries"] = output
+         return normalized
+@@ -326,8 +341,22 @@
+             return None
+         if not data.get("mainClass") or not data.get("libraries"):
+             return None
++        if not ForgeVersionManager._legacy_launchwrapper_cache_is_complete(data):
++            return None
+         return data
+ 
 +    @staticmethod
-+    def run(
-+        required_major: int,
-+        arguments: list[str],
-+        cwd: Path,
-+        reporter: ProgressReporter | None = None,
-+        preferred_java_path: str | Path | None = None,
-+        timeout: float = 15 * 60,
-+    ) -> ModLoaderInstallerResult:
-+        resolution = JavaResolver.resolve_with_recovery(required_major, reporter, preferred_java_path)
-+        selected = resolution.path
-+        attempts: list[tuple[Path, subprocess.CompletedProcess[str] | OSError]] = []
-+
-+        first = ModLoaderJavaRunner._invoke(selected, arguments, cwd, timeout)
-+        attempts.append((selected, first))
-+        if ModLoaderJavaRunner._should_retry(first):
-+            if reporter is not None:
-+                reporter.status(ProgressStage.SELECTING_JAVA, "java.recovery.runtime_failed")
-+            try:
-+                selected = JavaResolver.resolve_alternative(required_major, {selected}, reporter)
-+            except Exception as error:
-+                details = ModLoaderJavaRunner._attempt_output(attempts)
-+                raise JavaRecoveryError(
-+                    "The mod-loader installer could not run with the selected Java runtime, and MCW could not prepare an alternative. "
-+                    f"Installer details: {details}. Recovery error: {error}"
-+                ) from error
-+            if reporter is not None:
-+                reporter.status(ProgressStage.INSTALLING_MOD_LOADER, "java.mod_loader.retrying")
-+            second = ModLoaderJavaRunner._invoke(selected, arguments, cwd, timeout)
-+            attempts.append((selected, second))
-+
-+        final = attempts[-1][1]
-+        output = ModLoaderJavaRunner._attempt_output(attempts)
-+        if isinstance(final, OSError):
-+            raise JavaRecoveryError(
-+                "The mod-loader installer could not start with the selected Java runtime. "
-+                f"Installer details: {output}"
-+            ) from final
-+        return ModLoaderInstallerResult(
-+            returncode=int(final.returncode),
-+            output=output,
-+            java_path=selected,
-+            attempts=len(attempts),
-+        )
-+
-+    @staticmethod
-+    def _invoke(java: Path, arguments: list[str], cwd: Path, timeout: float) -> subprocess.CompletedProcess[str] | OSError:
-+        creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-+        try:
-+            return subprocess.run(
-+                [str(java), *arguments],
-+                cwd=cwd,
-+                capture_output=True,
-+                text=True,
-+                timeout=timeout,
-+                creationflags=creation_flags,
-+            )
-+        except OSError as error:
-+            return error
-+
-+    @staticmethod
-+    def _should_retry(result: subprocess.CompletedProcess[str] | OSError) -> bool:
-+        if isinstance(result, OSError):
++    def _legacy_launchwrapper_cache_is_complete(data: dict) -> bool:
++        if str(data.get("mainClass") or "").strip() != "net.minecraft.launchwrapper.Launch":
 +            return True
-+        if result.returncode == 0:
-+            return False
-+        return JavaRuntime.is_java_runtime_failure(ModLoaderJavaRunner._completed_output(result))
-+
++        libraries = data.get("libraries") if isinstance(data.get("libraries"), list) else []
++        for item in libraries:
++            if not isinstance(item, dict) or not str(item.get("name") or "").startswith("net.minecraft:launchwrapper:"):
++                continue
++            downloads = item.get("downloads") if isinstance(item.get("downloads"), dict) else {}
++            artifact = downloads.get("artifact") if isinstance(downloads.get("artifact"), dict) else {}
++            return bool(artifact.get("path") and artifact.get("url") and artifact.get("sha1"))
++        return False
+ 
+     @staticmethod
+     def validate_installation(version: Version, game_version: str, forge_version: str, verify_files: bool = True) -> list[str]:
+--- a/src/core/minecraft/classpath_builder.py
++++ b/src/core/minecraft/classpath_builder.py
+@@ -1,12 +1,8 @@
+-from src.models.minecraft.version import Version
+ from pathlib import Path
+-from src.core.minecraft.library_rule_manager import LibraryRuleManager
+ import os
+ 
+-
+-
+-
+-
++from src.core.minecraft.library_rule_manager import LibraryRuleManager
++from src.models.minecraft.version import Version
+ 
+ 
+ class ClasspathBuilder:
+@@ -15,17 +11,42 @@
+     def build(version: Version, client_path: Path, libraries_dir: Path) -> str:
+         classpath: list[str] = []
+         for library in version.libraries:
+-            if not LibraryRuleManager.is_allowed(library):
++            if not LibraryRuleManager.is_allowed(library) or library.get("clientreq") is False:
+                 continue
+-            downloads = library.get("downloads")
+-            if downloads is None:
++            artifact_path = ClasspathBuilder._artifact_path(library, libraries_dir)
++            if artifact_path is None:
+                 continue
++            classpath.append(str(libraries_dir / artifact_path))
++        classpath.append(str(client_path))
++        return os.pathsep.join(classpath)
+ 
+-            artifact = downloads.get("artifact")
+-            if artifact is None:
+-                continue
 +    @staticmethod
-+    def _completed_output(result: subprocess.CompletedProcess[str]) -> str:
-+        stdout = str(result.stdout or "")
-+        stderr = str(result.stderr or "")
-+        return stdout + ("\n" if stdout and stderr else "") + stderr
++    def _artifact_path(library: dict, libraries_dir: Path) -> Path | None:
++        downloads = library.get("downloads") if isinstance(library.get("downloads"), dict) else {}
++        artifact = downloads.get("artifact") if isinstance(downloads.get("artifact"), dict) else {}
++        configured = str(artifact.get("path") or "").strip()
++        if configured:
++            return Path(configured)
 +
++        legacy = ClasspathBuilder._legacy_maven_path(str(library.get("name") or ""))
++        if legacy is None or not (libraries_dir / legacy).is_file():
++            return None
++        return legacy
+ 
+-            library_path = libraries_dir / Path(artifact["path"])
+-            classpath.append(str(library_path))
+-        classpath.append(str(client_path))
+-        return os.pathsep.join(classpath)
+\ No newline at end of file
 +    @staticmethod
-+    def _attempt_output(attempts: list[tuple[Path, subprocess.CompletedProcess[str] | OSError]]) -> str:
-+        sections: list[str] = []
-+        for index, (java, result) in enumerate(attempts, start=1):
-+            header = f"[Java attempt {index}: {java}]"
-+            if isinstance(result, OSError):
-+                body = f"{type(result).__name__}: {result}"
-+            else:
-+                body = ModLoaderJavaRunner._completed_output(result).strip()
-+                if not body:
-+                    body = f"Process exited with code {result.returncode}."
-+            sections.append(f"{header}\n{body}")
-+        return "\n\n".join(sections)
-diff --git a/src/core/modloader/mod_loader_manager.py b/src/core/modloader/mod_loader_manager.py
-index 947a13cc024b50780ab5d1f4beec1c3e85bc7ff8..1e9f863e66e3c82f819f07dfac1c13f51d7eac5c 100644
---- a/src/core/modloader/mod_loader_manager.py
-+++ b/src/core/modloader/mod_loader_manager.py
-@@ -1,3 +1,4 @@
-+from src.core.instance.settings_manager import SettingsManager
- from src.core.minecraft.version_manager import VersionManager
- from src.core.modloader.fabric.fabric_version_manager import FabricVersionManager
- from src.core.modloader.forge.forge_version_manager import ForgeVersionManager
-@@ -19,46 +20,60 @@ class ModLoaderManager:
-     FORGE_FAMILY = frozenset({FORGE, NEOFORGE})
- 
-     @staticmethod
--    def load(instance: Instance, reporter: ProgressReporter | None = None) -> Version:
-+    def load(instance: Instance, reporter: ProgressReporter | None = None, preferred_java_path: str | None = None) -> Version:
-         loader_name, loader_version = ModLoaderManager.normalize(getattr(instance, "mod_loader", (ModLoaderManager.VANILLA, "-1")))
-         if loader_name == ModLoaderManager.VANILLA:
-             return VersionManager.load(instance.version_id)
-         if loader_name == ModLoaderManager.FABRIC:
-             return FabricVersionManager.load(instance.version_id, loader_version, reporter)
-         if loader_name == ModLoaderManager.FORGE:
-+            if preferred_java_path:
-+                return ForgeVersionManager.load(instance.version_id, loader_version, reporter, preferred_java_path=preferred_java_path)
-             return ForgeVersionManager.load(instance.version_id, loader_version, reporter)
-         if loader_name == ModLoaderManager.NEOFORGE:
-+            if preferred_java_path:
-+                return NeoForgeVersionManager.load(instance.version_id, loader_version, reporter, preferred_java_path=preferred_java_path)
-             return NeoForgeVersionManager.load(instance.version_id, loader_version, reporter)
-         if loader_name == ModLoaderManager.QUILT:
-             return QuiltVersionManager.load(instance.version_id, loader_version, reporter)
-         raise RuntimeError(f"Unsupported mod loader: {loader_name}")
- 
-     @staticmethod
--    def prepare(version: Version, loader_name: str, loader_version: str, reporter: ProgressReporter | None = None) -> Version:
-+    def prepare(version: Version, loader_name: str, loader_version: str, reporter: ProgressReporter | None = None, preferred_java_path: str | None = None) -> Version:
-         loader_name, loader_version = ModLoaderManager.normalize((loader_name, loader_version))
-         if loader_name == ModLoaderManager.VANILLA:
-             return version
-         if loader_name == ModLoaderManager.FABRIC:
-             return FabricVersionManager.install(version, loader_version, reporter)
-         if loader_name == ModLoaderManager.FORGE:
-+            if preferred_java_path:
-+                return ForgeVersionManager.install(version, loader_version, reporter, preferred_java_path=preferred_java_path)
-             return ForgeVersionManager.install(version, loader_version, reporter)
-         if loader_name == ModLoaderManager.NEOFORGE:
-+            if preferred_java_path:
-+                return NeoForgeVersionManager.install(version, loader_version, reporter, preferred_java_path=preferred_java_path)
-             return NeoForgeVersionManager.install(version, loader_version, reporter)
-         if loader_name == ModLoaderManager.QUILT:
-             return QuiltVersionManager.install(version, loader_version, reporter)
-         raise RuntimeError(f"Unsupported mod loader: {loader_name}")
- 
-     @staticmethod
--    def repair(instance: Instance, reporter: ProgressReporter | None = None) -> Version:
-+    def repair(instance: Instance, reporter: ProgressReporter | None = None, preferred_java_path: str | None = None) -> Version:
-         loader_name, loader_version = ModLoaderManager.normalize(getattr(instance, "mod_loader", (ModLoaderManager.VANILLA, "-1")))
-         if loader_name not in ModLoaderManager.MODDED_LOADERS:
-             raise RuntimeError("Only Fabric, Quilt, Forge, or NeoForge instances can be repaired.")
-         base_version = VersionManager.load(instance.version_id)
-+        if preferred_java_path is None and loader_name in ModLoaderManager.FORGE_FAMILY and hasattr(instance, "instance_dir"):
-+            preferred_java_path = str(getattr(SettingsManager.load(instance), "java_path", "") or "").strip()
-         if loader_name == ModLoaderManager.FABRIC:
-             return FabricVersionManager.repair(base_version, loader_version, reporter)
-         if loader_name == ModLoaderManager.FORGE:
-+            if preferred_java_path:
-+                return ForgeVersionManager.repair(base_version, loader_version, reporter, preferred_java_path=preferred_java_path)
-             return ForgeVersionManager.repair(base_version, loader_version, reporter)
-         if loader_name == ModLoaderManager.NEOFORGE:
-+            if preferred_java_path:
-+                return NeoForgeVersionManager.repair(base_version, loader_version, reporter, preferred_java_path=preferred_java_path)
-             return NeoForgeVersionManager.repair(base_version, loader_version, reporter)
-         return QuiltVersionManager.repair(base_version, loader_version, reporter)
- 
-diff --git a/src/core/modloader/neoforge/neoforge_version_manager.py b/src/core/modloader/neoforge/neoforge_version_manager.py
-index 06165753a2856c01294f7bd558a467bcc4152efc..3d94533eba9f65a9285110972dac0dd439c064f3 100644
---- a/src/core/modloader/neoforge/neoforge_version_manager.py
-+++ b/src/core/modloader/neoforge/neoforge_version_manager.py
-@@ -6,17 +6,15 @@ from pathlib import Path
- from threading import Lock
- import hashlib
- import json
--import os
- import shutil
--import subprocess
- 
- from src.core.fs.paths import Paths
--from src.core.java.java_resolver import JavaResolver
- from src.core.minecraft.library_manager import DownloadLibraryManager
- from src.core.minecraft.library_rule_manager import LibraryRuleManager
- from src.core.minecraft.version_manager import VersionManager
- from src.core.modloader.neoforge.neoforge_metadata_client import NeoForgeMetadataClient
- from src.core.modloader.forge.legacy_forge_installer import LegacyForgeInstaller
-+from src.core.modloader.java_installer_runner import ModLoaderJavaRunner
- from src.core.network.httpx_downloader import HttpDownloader
- from src.core.progress.progress_reporter import ProgressReporter
- from src.models.minecraft.version import Version
-@@ -40,11 +38,11 @@ class NeoForgeVersionManager:
-         return NeoForgeMetadataClient.recommended_version(game_version)
- 
-     @staticmethod
--    def load(game_version: str, neoforge_version: str, reporter: ProgressReporter | None = None) -> Version:
--        return NeoForgeVersionManager.install(VersionManager.load(game_version), neoforge_version, reporter=reporter)
-+    def load(game_version: str, neoforge_version: str, reporter: ProgressReporter | None = None, preferred_java_path: str | Path | None = None) -> Version:
-+        return NeoForgeVersionManager.install(VersionManager.load(game_version), neoforge_version, reporter=reporter, preferred_java_path=preferred_java_path)
- 
-     @staticmethod
--    def install(base_version: Version, neoforge_version: str, reporter: ProgressReporter | None = None, force_refresh: bool = False) -> Version:
-+    def install(base_version: Version, neoforge_version: str, reporter: ProgressReporter | None = None, force_refresh: bool = False, preferred_java_path: str | Path | None = None) -> Version:
-         loader = str(neoforge_version).strip()
-         if not loader:
-             raise RuntimeError("Select a Minecraft NeoForge version.")
-@@ -65,7 +63,7 @@ class NeoForgeVersionManager:
-                 shutil.rmtree(staging, ignore_errors=True)
-             staging.mkdir(parents=True, exist_ok=True)
-             NeoForgeVersionManager._prepare_staging(base_version, staging)
--            NeoForgeVersionManager._run_installer(base_version, loader, installer, staging, reporter)
-+            NeoForgeVersionManager._run_installer(base_version, loader, installer, staging, reporter, preferred_java_path)
-             profile = NeoForgeVersionManager._find_profile(staging, base_version.id, loader)
-             NeoForgeVersionManager._import_libraries(staging, reporter)
-             normalized = NeoForgeVersionManager._normalize_libraries(profile)
-@@ -80,7 +78,7 @@ class NeoForgeVersionManager:
-             return version
- 
-     @staticmethod
--    def repair(base_version: Version, neoforge_version: str, reporter: ProgressReporter | None = None) -> Version:
-+    def repair(base_version: Version, neoforge_version: str, reporter: ProgressReporter | None = None, preferred_java_path: str | Path | None = None) -> Version:
-         loader = str(neoforge_version).strip()
-         if not loader:
-             raise RuntimeError("Select a Minecraft NeoForge version.")
-@@ -91,7 +89,7 @@ class NeoForgeVersionManager:
-         if reporter is not None:
-             reporter.status(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Repairing Minecraft NeoForge {loader}...")
-         try:
--            version = NeoForgeVersionManager.install(base_version, loader, reporter=reporter, force_refresh=True)
-+            version = NeoForgeVersionManager.install(base_version, loader, reporter=reporter, force_refresh=True, preferred_java_path=preferred_java_path)
-             DownloadLibraryManager.load(version, reporter=reporter)
-             issues = NeoForgeVersionManager.validate_installation(version, base_version.id, loader, verify_files=True)
-             if issues:
-@@ -140,7 +138,7 @@ class NeoForgeVersionManager:
-                 shutil.copy2(client, target)
- 
-     @staticmethod
--    def _run_installer(base_version: Version, neoforge_version: str, installer: Path, staging: Path, reporter: ProgressReporter | None) -> None:
-+    def _run_installer(base_version: Version, neoforge_version: str, installer: Path, staging: Path, reporter: ProgressReporter | None, preferred_java_path: str | Path | None = None) -> None:
-         log_path = Paths.neoforge_root() / "logs" / f"neoforge-{base_version.id}-{neoforge_version}.log"
-         log_path.parent.mkdir(parents=True, exist_ok=True)
- 
-@@ -155,12 +153,16 @@ class NeoForgeVersionManager:
-             return
- 
-         java_major = int((base_version.java_version or {}).get("majorVersion") or 8)
--        java = JavaResolver.resolve(java_major, reporter)
-         if reporter is not None:
-             reporter.status(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Running NeoForge {neoforge_version} installer...")
--        creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
--        result = subprocess.run([str(java), "-jar", str(installer), "--installClient", str(staging)], cwd=staging, capture_output=True, text=True, timeout=15 * 60, creationflags=creation_flags)
--        output = (result.stdout or "") + ("\n" if result.stdout and result.stderr else "") + (result.stderr or "")
-+        result = ModLoaderJavaRunner.run(
-+            java_major,
-+            ["-jar", str(installer), "--installClient", str(staging)],
-+            staging,
-+            reporter=reporter,
-+            preferred_java_path=preferred_java_path,
-+        )
-+        output = result.output
-         log_path.write_text(output, encoding="utf-8", errors="replace")
-         if result.returncode != 0:
-             if NeoForgeVersionManager._is_unsupported_install_client(output):
-@@ -169,7 +171,7 @@ class NeoForgeVersionManager:
-                     "Please send the NeoForge installer log so support for this legacy profile can be added.\n"
-                     + "\n".join(output.splitlines()[-12:])
-                 )
--            tail = "\n".join((result.stderr or result.stdout or "NeoForge installer failed.").splitlines()[-12:])
-+            tail = "\n".join((output or "NeoForge installer failed.").splitlines()[-12:])
-             raise RuntimeError(f"NeoForge installer exited with code {result.returncode}.\n{tail}")
- 
-     @staticmethod
-diff --git a/src/gui/task_progress.py b/src/gui/task_progress.py
-index 444fd552bfe7fc6825035f4fa06c42c3fe21c1a8..5f8ab2a49bb7a6865efc03b9a02b3350319f680e 100644
---- a/src/gui/task_progress.py
-+++ b/src/gui/task_progress.py
-@@ -18,6 +18,8 @@ def task_progress_profile(task_id: str) -> TaskProgressProfile | None:
- 
-     exact = {
-         "java.scan": TaskProgressProfile(ProgressStage.SELECTING_JAVA, "java.scan.completed", "java.scan.completed_detail", "java.scan.failed"),
-+        "account.security.audit": TaskProgressProfile(ProgressStage.PREPARING, "account.security.audit_completed", "account.security.audit_completed_detail", "account.security.audit_failed"),
-+        "account.security.reprotect": TaskProgressProfile(ProgressStage.PREPARING, "account.security.reprotect_completed", "account.security.reprotect_completed_detail", "account.security.reprotect_failed"),
-         "mods.update.check": TaskProgressProfile(ProgressStage.CHECKING_MODS, "mods.update_check.completed", "mods.update_check.completed_detail", "mods.update_check.failed"),
-         "mods.update.apply": TaskProgressProfile(ProgressStage.DOWNLOADING_MODS, "mods.update.completed", "mods.update.completed_detail", "mods.update.failed"),
-         "modpack.scan": TaskProgressProfile(ProgressStage.CHECKING_MODPACK, "modpack.scan.completed", "modpack.scan.completed_detail", "modpack.scan.failed"),
-diff --git a/test/core/config/test_version_metadata.py b/test/core/config/test_version_metadata.py
-index db4d13f39175a39c2b8ec6ff8fa17386b76aebeb..5c01321be651e0a88d79011b4ce36c60e11427b8 100644
---- a/test/core/config/test_version_metadata.py
-+++ b/test/core/config/test_version_metadata.py
-@@ -6,9 +6,9 @@ from src.gui.config import VERSION_ID as GUI_VERSION_ID
- 
- 
- def test_launcher_version_metadata_has_one_source_of_truth() -> None:
--    assert VERSION == "v1.1.0-beta.5"
--    assert VERSION_ID == "1.1.0-beta.5"
--    assert VERSION_TAG == "v1.1.0-beta.5"
-+    assert VERSION == "v1.1.0-beta.6"
-+    assert VERSION_ID == "1.1.0-beta.6"
-+    assert VERSION_TAG == "v1.1.0-beta.6"
-     assert UPDATE_CHANNEL == "beta"
-     assert GUI_VERSION == VERSION
-     assert GUI_VERSION_ID == VERSION_ID
-diff --git a/test/core/modloader/forge/test_forge_version_manager.py b/test/core/modloader/forge/test_forge_version_manager.py
-index 64b069071b6488b19fbac23dbd7507541f1b9d58..109a8ec35509ced8eabbf497d71df077a4f71106 100644
++    def _legacy_maven_path(coordinate: str) -> Path | None:
++        raw = str(coordinate).strip()
++        extension = "jar"
++        if "@" in raw:
++            raw, extension = raw.rsplit("@", 1)
++            extension = extension.strip() or "jar"
++        parts = [part.strip() for part in raw.split(":")]
++        if len(parts) < 3:
++            return None
++        group, artifact, version = parts[:3]
++        classifier = parts[3] if len(parts) > 3 else ""
++        values = (group, artifact, version, classifier, extension)
++        if not group or not artifact or not version or any("/" in value or "\\" in value for value in values):
++            return None
++        filename = f"{artifact}-{version}{'-' + classifier if classifier else ''}.{extension}"
++        return Path(*group.split("."), artifact, version, filename)
 --- a/test/core/modloader/forge/test_forge_version_manager.py
 +++ b/test/core/modloader/forge/test_forge_version_manager.py
-@@ -88,8 +88,7 @@ def test_run_installer_imports_legacy_without_starting_java(monkeypatch, tmp_pat
+@@ -119,6 +119,63 @@
+     assert artifact["size"] == 0
  
-     forge_root = tmp_path / "forge-root"
-     monkeypatch.setattr(Paths, "forge_root", staticmethod(lambda: forge_root))
--    monkeypatch.setattr("src.core.modloader.forge.forge_version_manager.JavaResolver.resolve", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Java must not run for a legacy profile")))
--    monkeypatch.setattr("src.core.modloader.forge.forge_version_manager.subprocess.run", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("subprocess must not run for a legacy profile")))
-+    monkeypatch.setattr("src.core.modloader.forge.forge_version_manager.ModLoaderJavaRunner.run", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Java must not run for a legacy profile")))
  
-     ForgeVersionManager._run_installer(make_version(tmp_path), "11.15.1.2318-1.8.9", installer, tmp_path / "staging", None)
- 
-@@ -293,3 +292,40 @@ def test_validate_installation_still_reports_missing_current_os_library(monkeypa
-     issues = ForgeVersionManager.validate_installation(version, "1.20.1", "47.4.21", verify_files=True)
- 
-     assert issues == ["Missing required library: com/example/windows-only/1.0/windows-only-1.0.jar"]
++def test_normalize_hashless_legacy_library_downloads_and_records_sha1(monkeypatch, tmp_path: Path) -> None:
++    root = tmp_path / "libraries"
++    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))
++    calls = []
 +
++    def fake_download_and_hash(**kwargs):
++        calls.append(kwargs)
++        target = kwargs["path"]
++        target.parent.mkdir(parents=True, exist_ok=True)
++        target.write_bytes(b"launchwrapper")
++        return target, "b" * 40, len(b"launchwrapper")
 +
-+def test_validate_installation_accepts_pre_1_7_minecraftforge_runtime(tmp_path: Path) -> None:
-+    raw = make_version(tmp_path).raw_json.copy()
-+    raw.update({
-+        "id": "1.6.4-Forge9.11.1.1345",
-+        "mainClass": "net.minecraft.launchwrapper.Launch",
-+        "forge": {"schemaVersion": 1, "gameVersion": "1.6.4", "loaderVersion": "9.11.1.1345"},
-+        "libraries": [{"name": "net.minecraftforge:minecraftforge:9.11.1.1345"}],
-+        "minecraftArguments": "--username ${auth_player_name} --tweakClass cpw.mods.fml.common.launcher.FMLTweaker",
-+    })
-+    version = make_version(tmp_path)
-+    version.id = raw["id"]
-+    version.raw_json = raw
-+    version.main_class = raw["mainClass"]
-+
-+    assert ForgeVersionManager.validate_installation(version, "1.6.4", "9.11.1.1345", verify_files=False) == []
-+
-+
-+def test_run_installer_reports_java_runner_output_on_failure(monkeypatch, tmp_path: Path) -> None:
-+    import pytest
-+
-+    from src.core.modloader.java_installer_runner import ModLoaderInstallerResult
-+
-+    installer = tmp_path / "forge-installer.jar"
-+    installer.write_bytes(b"not-a-legacy-installer")
-+    forge_root = tmp_path / "forge-root"
-+    monkeypatch.setattr(Paths, "forge_root", staticmethod(lambda: forge_root))
 +    monkeypatch.setattr(
-+        "src.core.modloader.forge.forge_version_manager.ModLoaderJavaRunner.run",
-+        staticmethod(lambda *args, **kwargs: ModLoaderInstallerResult(1, "installer line\nfinal Forge detail", Path("java"), 1)),
++        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
++        staticmethod(fake_download_and_hash),
++    )
++    profile = {
++        "libraries": [
++            {
++                "name": "net.minecraft:launchwrapper:1.8",
++                "checksums": ["d41d8cd98f00b204e9800998ecf8427e"],
++            }
++        ]
++    }
++
++    normalized = ForgeVersionManager._normalize_libraries(profile)
++    artifact = normalized["libraries"][0]["downloads"]["artifact"]
++
++    assert calls[0]["url"] == "https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar"
++    assert artifact == {
++        "path": "net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar",
++        "url": "https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar",
++        "sha1": "b" * 40,
++        "size": len(b"launchwrapper"),
++    }
++
++
++def test_incomplete_legacy_launchwrapper_cache_is_invalidated(tmp_path: Path) -> None:
++    cache = tmp_path / "forge.json"
++    cache.write_text(
++        '{"id":"forge-1.6.4-9.11.1.1345","mainClass":"net.minecraft.launchwrapper.Launch","libraries":[{"name":"net.minecraftforge:minecraftforge:9.11.1.1345"},{"name":"net.minecraft:launchwrapper:1.8"}],"forge":{"schemaVersion":1,"gameVersion":"1.6.4","loaderVersion":"9.11.1.1345"}}',
++        encoding="utf-8",
 +    )
 +
-+    with pytest.raises(RuntimeError, match="final Forge detail"):
-+        ForgeVersionManager._run_installer(make_version(tmp_path), "47.3.0", installer, tmp_path / "staging", None)
-+
-+    assert "final Forge detail" in (forge_root / "logs" / "forge-1.20.1-47.3.0.log").read_text(encoding="utf-8")
-diff --git a/test/core/modloader/neoforge/test_neoforge_version_manager.py b/test/core/modloader/neoforge/test_neoforge_version_manager.py
-index 714f135f6b72749298c3329ca1f54eb4d6692cf4..48e90111440cca3cf875618ba6fa3fef25b690d1 100644
---- a/test/core/modloader/neoforge/test_neoforge_version_manager.py
-+++ b/test/core/modloader/neoforge/test_neoforge_version_manager.py
-@@ -169,3 +169,21 @@ def test_runtime_detection_accepts_rule_wrapped_game_arguments() -> None:
-     }
- 
-     assert NeoForgeVersionManager._has_neoforge_runtime([], raw, "21.1.200") is True
++    assert ForgeVersionManager._load_cached(cache, "1.6.4", "9.11.1.1345") is None
 +
 +
-+def test_run_installer_reports_java_runner_output_on_failure(monkeypatch, tmp_path: Path) -> None:
-+    from src.core.modloader.java_installer_runner import ModLoaderInstallerResult
-+
-+    installer = tmp_path / "neoforge-installer.jar"
-+    installer.write_bytes(b"not-a-legacy-installer")
-+    neoforge_root = tmp_path / "neoforge-root"
-+    monkeypatch.setattr(Paths, "neoforge_root", staticmethod(lambda: neoforge_root))
-+    monkeypatch.setattr(
-+        "src.core.modloader.neoforge.neoforge_version_manager.ModLoaderJavaRunner.run",
-+        staticmethod(lambda *args, **kwargs: ModLoaderInstallerResult(1, "installer line\nfinal NeoForge detail", Path("java"), 1)),
++def test_complete_legacy_launchwrapper_cache_is_reused(tmp_path: Path) -> None:
++    cache = tmp_path / "forge.json"
++    cache.write_text(
++        '{"id":"forge-1.6.4-9.11.1.1345","mainClass":"net.minecraft.launchwrapper.Launch","libraries":[{"name":"net.minecraftforge:minecraftforge:9.11.1.1345"},{"name":"net.minecraft:launchwrapper:1.8","downloads":{"artifact":{"path":"net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","url":"https://libraries.minecraft.net/net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar","sha1":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":100}}}],"forge":{"schemaVersion":1,"gameVersion":"1.6.4","loaderVersion":"9.11.1.1345"}}',
++        encoding="utf-8",
 +    )
 +
-+    with pytest.raises(RuntimeError, match="final NeoForge detail"):
-+        NeoForgeVersionManager._run_installer(make_version(tmp_path), "21.1.200", installer, tmp_path / "staging", None)
-+
-+    assert "final NeoForge detail" in (neoforge_root / "logs" / "neoforge-1.21.1-21.1.200.log").read_text(encoding="utf-8")
-diff --git a/test/core/modloader/test_java_installer_runner.py b/test/core/modloader/test_java_installer_runner.py
-new file mode 100644
-index 0000000000000000000000000000000000000000..ab967f1d0582d590fe929f73277ea7953d41d65f
---- /dev/null
-+++ b/test/core/modloader/test_java_installer_runner.py
-@@ -0,0 +1,50 @@
-+from pathlib import Path
-+import subprocess
-+from types import SimpleNamespace
-+
-+from src.core.java.java_resolver import JavaResolver
-+from src.core.modloader.java_installer_runner import ModLoaderJavaRunner
++    assert ForgeVersionManager._load_cached(cache, "1.6.4", "9.11.1.1345") is not None
 +
 +
-+def test_retries_mod_loader_installer_once_after_java_runtime_failure(monkeypatch):
-+    first_java = Path("C:/Java/8/bin/javaw.exe")
-+    second_java = Path("C:/Java/17/bin/javaw.exe")
-+    calls: list[Path] = []
-+
-+    monkeypatch.setattr(JavaResolver, "resolve_with_recovery", staticmethod(lambda required, reporter=None, preferred_path=None: SimpleNamespace(path=first_java)))
-+    monkeypatch.setattr(JavaResolver, "resolve_alternative", staticmethod(lambda required, excluded, reporter=None: second_java))
-+
-+    def invoke(java, arguments, cwd, timeout):
-+        calls.append(java)
-+        if len(calls) == 1:
-+            return subprocess.CompletedProcess([str(java)], 1, stdout="UnsupportedClassVersionError", stderr="")
-+        return subprocess.CompletedProcess([str(java)], 0, stdout="installed", stderr="")
-+
-+    monkeypatch.setattr(ModLoaderJavaRunner, "_invoke", staticmethod(invoke))
-+
-+    result = ModLoaderJavaRunner.run(8, ["-jar", "installer.jar"], Path("."), preferred_java_path=first_java)
-+
-+    assert calls == [first_java, second_java]
-+    assert result.returncode == 0
-+    assert result.java_path == second_java
-+    assert result.attempts == 2
-+    assert "Java attempt 1" in result.output
-+    assert "Java attempt 2" in result.output
-+
-+
-+def test_does_not_retry_non_java_installer_failure(monkeypatch):
-+    java = Path("C:/Java/17/bin/javaw.exe")
-+    calls: list[Path] = []
-+    monkeypatch.setattr(JavaResolver, "resolve_with_recovery", staticmethod(lambda required, reporter=None, preferred_path=None: SimpleNamespace(path=java)))
-+
-+    def invoke(selected, arguments, cwd, timeout):
-+        calls.append(selected)
-+        return subprocess.CompletedProcess([str(selected)], 1, stdout="Installer data is invalid", stderr="")
-+
-+    monkeypatch.setattr(ModLoaderJavaRunner, "_invoke", staticmethod(invoke))
-+
-+    result = ModLoaderJavaRunner.run(17, ["-jar", "installer.jar"], Path("."))
-+
-+    assert calls == [java]
-+    assert result.returncode == 1
-+    assert result.attempts == 1
-diff --git a/test/core/modloader/test_mod_loader_manager.py b/test/core/modloader/test_mod_loader_manager.py
-index 7d91ec9429b8138a8674f7b40656bd7dafd0c709..89c726ce71f3d87c5b1840e8d9092d4872d3dbc4 100644
---- a/test/core/modloader/test_mod_loader_manager.py
-+++ b/test/core/modloader/test_mod_loader_manager.py
-@@ -139,3 +139,48 @@ def test_repairs_quilt_instance(monkeypatch):
-     monkeypatch.setattr(QuiltVersionManager, "repair", lambda version, loader_version, reporter=None: expected)
+ def test_detects_unsupported_install_client_error() -> None:
+     output = "joptsimple.UnrecognizedOptionException: 'installClient' is not a recognized option"
  
-     assert ModLoaderManager.repair(instance) is expected
-+
-+
-+def test_forwards_preferred_java_to_forge_load(monkeypatch):
-+    expected = object()
-+    captured = {}
-+
-+    def load(game_version, loader_version, reporter=None, preferred_java_path=None):
-+        captured["path"] = preferred_java_path
-+        return expected
-+
-+    monkeypatch.setattr(ForgeVersionManager, "load", load)
-+    instance = SimpleNamespace(version_id="1.20.1", mod_loader=("forge", "47.3.0"))
-+
-+    assert ModLoaderManager.load(instance, preferred_java_path="C:/Java/custom/javaw.exe") is expected
-+    assert captured["path"] == "C:/Java/custom/javaw.exe"
-+
-+
-+def test_forwards_preferred_java_to_forge_prepare(monkeypatch):
-+    expected = object()
-+    captured = {}
-+
-+    def install(version, loader_version, reporter=None, force_refresh=False, preferred_java_path=None):
-+        captured["path"] = preferred_java_path
-+        return expected
-+
-+    monkeypatch.setattr(ForgeVersionManager, "install", install)
-+
-+    assert ModLoaderManager.prepare(object(), "forge", "47.3.0", preferred_java_path="C:/Java/custom/javaw.exe") is expected
-+    assert captured["path"] == "C:/Java/custom/javaw.exe"
-+
-+
-+def test_forwards_preferred_java_to_forge_repair(monkeypatch):
-+    expected = object()
-+    captured = {}
-+    instance = SimpleNamespace(version_id="1.20.1", mod_loader=("forge", "47.3.0"))
-+    monkeypatch.setattr(VersionManager, "load", lambda version_id: object())
-+
-+    def repair(version, loader_version, reporter=None, preferred_java_path=None):
-+        captured["path"] = preferred_java_path
-+        return expected
-+
-+    monkeypatch.setattr(ForgeVersionManager, "repair", repair)
-+
-+    assert ModLoaderManager.repair(instance, preferred_java_path="C:/Java/custom/javaw.exe") is expected
-+    assert captured["path"] == "C:/Java/custom/javaw.exe"
-diff --git a/test/gui/test_account_security_progress_profile.py b/test/gui/test_account_security_progress_profile.py
-new file mode 100644
-index 0000000000000000000000000000000000000000..e1ddf2533d533154d28bc569a0ae550cb79047fb
---- /dev/null
-+++ b/test/gui/test_account_security_progress_profile.py
-@@ -0,0 +1,12 @@
-+from src.gui.task_progress import task_progress_profile
-+from src.models.progress.progress_stage import ProgressStage
-+
-+
-+def test_account_reprotect_has_terminal_progress_profile():
-+    profile = task_progress_profile("account.security.reprotect")
-+
-+    assert profile is not None
-+    assert profile.stage is ProgressStage.PREPARING
-+    assert profile.success_message == "account.security.reprotect_completed"
-+    assert profile.success_detail == "account.security.reprotect_completed_detail"
-+    assert profile.failure_message == "account.security.reprotect_failed"
-diff --git a/test/test_public_api.py b/test/test_public_api.py
-index 2de88f5b7969e67a7feed5574cd7f45e837f6ec4..c284d1840fc7c2e3a78c549173838fda2228eabe 100644
---- a/test/test_public_api.py
-+++ b/test/test_public_api.py
-@@ -8,7 +8,7 @@ from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, derive_custo
+--- a/test/core/minecraft/test_classpath_builder.py
++++ b/test/core/minecraft/test_classpath_builder.py
+@@ -234,6 +234,39 @@
+     assert result == str(client_path)
  
  
- def test_bundled_core_runtime_version_follows_launcher_beta_5() -> None:
--    assert mcw_core.__version__ == "1.1.0-beta.5"
-+    assert mcw_core.__version__ == "1.1.0-beta.6"
++def test_build_adds_existing_legacy_maven_library_without_download_metadata(
++    monkeypatch: pytest.MonkeyPatch,
++    tmp_path: Path,
++):
++    monkeypatch.setattr(
++        LibraryRuleManager,
++        "is_allowed",
++        lambda library: True,
++    )
++
++    libraries_dir = tmp_path / "libraries"
++    launchwrapper = libraries_dir / "net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar"
++    launchwrapper.parent.mkdir(parents=True)
++    launchwrapper.write_bytes(b"launchwrapper")
++    client_path = tmp_path / "client.jar"
++    version = make_version([
++        {
++            "name": "net.minecraft:launchwrapper:1.8"
++        }
++    ])
++
++    result = ClasspathBuilder.build(
++        version=version,
++        client_path=client_path,
++        libraries_dir=libraries_dir,
++    )
++
++    assert result.split(os.pathsep) == [
++        str(launchwrapper),
++        str(client_path),
++    ]
++
++
+ def test_build_skips_library_with_none_downloads(
+     monkeypatch: pytest.MonkeyPatch,
+     tmp_path: Path,
+--- a/docs/RELEASE-v1.1.0-beta.6.md
++++ b/docs/RELEASE-v1.1.0-beta.6.md
+@@ -40,6 +40,24 @@
  
+ Beta 6 bổ sung `minecraftforge` vào danh sách runtime hợp lệ. Profile legacy vẫn phải có main class, metadata Forge đúng và các thư viện bắt buộc vẫn được kiểm tra bình thường.
  
- def test_distribution_version_when_installed() -> None:
++### Hotfix LaunchWrapper cho Forge 1.6.4
++
++Sau khi bỏ chặn sai “no runtime”, Forge 1.6.4 có thể đi tiếp đến Java nhưng dừng tại:
++
++```text
++Error: Could not find or load main class net.minecraft.launchwrapper.Launch
++```
++
++Profile Forge đời cũ chỉ cung cấp Maven coordinate cho một số dependency và không có khối `downloads.artifact` hiện đại. Launcher trước đây bỏ qua các mục này, nên `net.minecraft:launchwrapper:1.8` không được tải hoặc thêm vào classpath.
++
++Hotfix này:
++
++- Chủ động tải và tính SHA-1 cho dependency Forge legacy thiếu metadata tải xuống.
++- Tạo lại `downloads.artifact` đầy đủ để pipeline tải/kiểm tra hiện tại tiếp tục hoạt động.
++- Thêm fallback classpath cho Maven coordinate legacy đã tồn tại trên đĩa.
++- Vẫn ghép classpath bằng `os.pathsep`, tương ứng dấu `;` trên Windows.
++- Tự vô hiệu hóa riêng cache LaunchWrapper legacy chưa đầy đủ để profile được dựng lại, không bắt các instance Forge hiện đại cài lại.
++
+ ### Phiên bản
+ 
+ - Launcher runtime: `v1.1.0-beta.6`
+@@ -54,7 +72,7 @@
+ - Regression test cho việc truyền Java tùy chọn qua load/prepare/repair.
+ - Regression test cho progress profile của bảo vệ tài khoản.
+ - Toàn bộ source và test qua `compileall`.
+-- Toàn bộ test suite: **1312 passed, 82 skipped, 2 warnings**.
++- Toàn bộ test suite: **1316 passed, 82 skipped, 2 warnings**.
+ 
+ ### Smoke test Windows đề xuất
+ 
+@@ -97,6 +115,24 @@
+ 
+ Old Forge profiles can use the Maven artifact `net.minecraftforge:minecraftforge`. The validator previously recognized only `net.minecraftforge:forge` and newer FML component artifacts. Beta 6 recognizes `minecraftforge` as a valid legacy Forge runtime while retaining all existing metadata and file verification.
+ 
++### Forge 1.6.4 LaunchWrapper hotfix
++
++After the false “no runtime” block was removed, Forge 1.6.4 could reach Java but fail with:
++
++```text
++Error: Could not find or load main class net.minecraft.launchwrapper.Launch
++```
++
++Legacy Forge profiles can declare dependencies only as Maven coordinates without a modern `downloads.artifact` block. Those entries were skipped, so `net.minecraft:launchwrapper:1.8` was not downloaded or placed on the classpath.
++
++This hotfix:
++
++- Downloads and hashes legacy Forge dependencies that lack modern artifact metadata.
++- Rebuilds complete `downloads.artifact` entries for the normal download and verification pipeline.
++- Adds a classpath fallback for existing legacy Maven-coordinate libraries.
++- Keeps platform-correct classpath joining through `os.pathsep` (`;` on Windows).
++- Invalidates only incomplete legacy LaunchWrapper caches so modern Forge instances are not reinstalled unnecessarily.
++
+ ### Versioning
+ 
+ - Launcher runtime: `v1.1.0-beta.6`
+@@ -106,7 +142,7 @@
+ 
+ ### Validation
+ 
+-- Full test suite: **1312 passed, 82 skipped, 2 warnings**.
++- Full test suite: **1316 passed, 82 skipped, 2 warnings**.
+ - Source and tests pass `compileall`.
+ - Regression coverage includes Forge 1.6.4 `minecraftforge` runtime detection, mod-loader Java recovery, preferred-Java forwarding, and account-protection progress completion.
+ 

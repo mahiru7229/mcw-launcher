@@ -234,6 +234,39 @@ def test_build_skips_library_without_downloads(
     assert result == str(client_path)
 
 
+def test_build_adds_existing_legacy_maven_library_without_download_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    monkeypatch.setattr(
+        LibraryRuleManager,
+        "is_allowed",
+        lambda library: True,
+    )
+
+    libraries_dir = tmp_path / "libraries"
+    launchwrapper = libraries_dir / "net/minecraft/launchwrapper/1.8/launchwrapper-1.8.jar"
+    launchwrapper.parent.mkdir(parents=True)
+    launchwrapper.write_bytes(b"launchwrapper")
+    client_path = tmp_path / "client.jar"
+    version = make_version([
+        {
+            "name": "net.minecraft:launchwrapper:1.8"
+        }
+    ])
+
+    result = ClasspathBuilder.build(
+        version=version,
+        client_path=client_path,
+        libraries_dir=libraries_dir,
+    )
+
+    assert result.split(os.pathsep) == [
+        str(launchwrapper),
+        str(client_path),
+    ]
+
+
 def test_build_skips_library_with_none_downloads(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
