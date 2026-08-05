@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, Signal
-from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton
+from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy, QWidget
 
 from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
 from mcw_core.api.language.language_manager import tr
@@ -59,6 +59,7 @@ class InstancesPage(BasePage):
         self._synchronizing = False
         self._modpack_update_info: object | None = None
         self._modpack_managed = False
+        self._responsive_signature: tuple[bool, int] | None = None
         self._version_filter_timer = QTimer(self)
         self._version_filter_timer.setSingleShot(True)
         self._version_filter_timer.setInterval(25)
@@ -128,20 +129,36 @@ class InstancesPage(BasePage):
         create_card.layout.addWidget(self.import_modpack_package_button)
         self.root_layout.addWidget(create_card)
 
-        manage_card = CardWidget("Manage selected instance", "Change the selected instance's Fabric, Quilt, Forge, or NeoForge version without recreating it.")
+        self.manage_card = CardWidget("Manage selected instance", "Change the selected instance's Fabric, Quilt, Forge, or NeoForge version without recreating it.")
+        self.manage_card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.manage_loader_label = QLabel("Mod loader")
         self.manage_loader_combo = QComboBox()
+        self.manage_loader_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.manage_loader_combo.setMinimumContentsLength(16)
+        self.manage_loader_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.manage_loader_combo.addItem("Vanilla", "vanilla")
         self.manage_loader_combo.addItem("Fabric", "fabric")
         self.manage_loader_combo.addItem("Quilt", "quilt")
         self.manage_loader_combo.addItem("Forge", "forge")
         self.manage_loader_combo.addItem("NeoForge", "neoforge")
         self.manage_loader_combo.currentTextChanged.connect(self._manage_loader_selected)
+        self.manage_loader_version_label = QLabel("Loader version")
         self.manage_loader_version_combo = QComboBox()
+        self.manage_loader_version_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.manage_loader_version_combo.setMinimumContentsLength(22)
+        self.manage_loader_version_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.manage_loader_version_combo.setEnabled(False)
+        self.loader_fields_widget = QWidget()
+        self.loader_fields_layout = QGridLayout(self.loader_fields_widget)
+        self.loader_fields_layout.setContentsMargins(0, 0, 0, 0)
+        self.loader_fields_layout.setHorizontalSpacing(10)
+        self.loader_fields_layout.setVerticalSpacing(7)
+
         self.manage_loader_status = QLabel("Select an instance to manage its mod loader.")
         self.manage_loader_status.setObjectName("MutedLabel")
         self.manage_loader_status.setWordWrap(True)
         self.apply_loader_button = set_theme_icon(QPushButton("Apply mod loader"), "icon.action.save")
+        self.apply_loader_button.setObjectName("PrimaryButton")
         self.apply_loader_button.clicked.connect(self._request_loader_change)
         self.apply_loader_button.setEnabled(False)
         self.repair_loader_button = set_theme_icon(QPushButton("Repair mod loader"), "icon.action.repair")
@@ -159,53 +176,70 @@ class InstancesPage(BasePage):
         self.export_forge_diagnostics_button.setToolTip("Export Forge profile, logs, mod metadata, and pre-launch results without accounts, tokens, worlds, or mod JAR contents.")
         self.export_forge_diagnostics_button.clicked.connect(lambda: self.export_forge_diagnostics_requested.emit(self.current_instance_name()))
         self.export_forge_diagnostics_button.setEnabled(False)
+        self._loader_action_buttons = (
+            self.apply_loader_button,
+            self.repair_loader_button,
+            self.restore_forge_button,
+            self.open_forge_logs_button,
+            self.export_forge_diagnostics_button,
+        )
+        for button in self._loader_action_buttons:
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.loader_actions_widget = QWidget()
+        self.loader_actions_layout = QGridLayout(self.loader_actions_widget)
+        self.loader_actions_layout.setContentsMargins(0, 0, 0, 0)
+        self.loader_actions_layout.setHorizontalSpacing(8)
+        self.loader_actions_layout.setVerticalSpacing(8)
+
         self.repair_instance_button = set_theme_icon(QPushButton(tr("repair.center.button")), "icon.action.repair")
         self.repair_instance_button.setToolTip(tr("repair.center.tooltip"))
         self.repair_instance_button.clicked.connect(self._request_instance_repair)
         self.repair_instance_button.setEnabled(False)
+        self.repair_instance_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
+        self.target_name_label = QLabel("Target name")
         self.target_name_input = QLineEdit()
         self.target_name_input.setPlaceholderText("New name or clone name")
         self.include_saves_checkbox = QCheckBox("Include saves when cloning or exporting")
-        action_grid = QGridLayout()
-        rename_button = set_theme_icon(QPushButton("Rename"), "icon.action.edit")
-        clone_button = set_theme_icon(QPushButton("Clone"), "icon.action.clone")
-        delete_button = set_theme_icon(QPushButton("Delete"), "icon.action.remove")
-        delete_button.setObjectName("DangerButton")
-        import_button = set_theme_icon(QPushButton("Import .mcwpack"), "icon.action.import")
-        export_button = set_theme_icon(QPushButton("Export .mcwpack"), "icon.action.export")
+        self.rename_button = set_theme_icon(QPushButton("Rename"), "icon.action.edit")
+        self.clone_button = set_theme_icon(QPushButton("Clone"), "icon.action.clone")
+        self.delete_button = set_theme_icon(QPushButton("Delete"), "icon.action.remove")
+        self.delete_button.setObjectName("DangerButton")
+        self.import_button = set_theme_icon(QPushButton("Import .mcwpack"), "icon.action.import")
+        self.export_button = set_theme_icon(QPushButton("Export .mcwpack"), "icon.action.export")
         self.manage_mods_button = set_theme_icon(QPushButton("Manage mods"), "icon.action.mods")
         self.manage_mods_button.setObjectName("PrimaryButton")
         self.manage_mods_button.setEnabled(False)
-        rename_button.clicked.connect(lambda: self.rename_requested.emit(self.current_instance_name(), self.target_name_input.text()))
-        clone_button.clicked.connect(lambda: self.clone_requested.emit(self.current_instance_name(), self.target_name_input.text(), self.include_saves_checkbox.isChecked()))
-        delete_button.clicked.connect(self._confirm_delete)
-        import_button.clicked.connect(self._choose_import)
-        export_button.clicked.connect(self._choose_export)
+        self.rename_button.clicked.connect(lambda: self.rename_requested.emit(self.current_instance_name(), self.target_name_input.text()))
+        self.clone_button.clicked.connect(lambda: self.clone_requested.emit(self.current_instance_name(), self.target_name_input.text(), self.include_saves_checkbox.isChecked()))
+        self.delete_button.clicked.connect(self._confirm_delete)
+        self.import_button.clicked.connect(self._choose_import)
+        self.export_button.clicked.connect(self._choose_export)
         self.manage_mods_button.clicked.connect(lambda: self.manage_mods_requested.emit(self.current_instance_name()))
-        action_grid.addWidget(rename_button, 0, 0)
-        action_grid.addWidget(clone_button, 0, 1)
-        action_grid.addWidget(delete_button, 0, 2)
-        action_grid.addWidget(import_button, 1, 0)
-        action_grid.addWidget(export_button, 1, 1)
-        action_grid.addWidget(self.manage_mods_button, 1, 2)
-        action_grid.addWidget(self.repair_instance_button, 2, 0, 1, 3)
+        self._instance_action_buttons = (
+            self.rename_button,
+            self.clone_button,
+            self.delete_button,
+            self.import_button,
+            self.export_button,
+            self.manage_mods_button,
+        )
+        for button in self._instance_action_buttons:
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.instance_actions_widget = QWidget()
+        self.instance_actions_layout = QGridLayout(self.instance_actions_widget)
+        self.instance_actions_layout.setContentsMargins(0, 0, 0, 0)
+        self.instance_actions_layout.setHorizontalSpacing(8)
+        self.instance_actions_layout.setVerticalSpacing(8)
 
-        manage_card.layout.addWidget(QLabel("Mod loader"))
-        manage_card.layout.addWidget(self.manage_loader_combo)
-        manage_card.layout.addWidget(QLabel("Loader version"))
-        manage_card.layout.addWidget(self.manage_loader_version_combo)
-        manage_card.layout.addWidget(self.manage_loader_status)
-        manage_card.layout.addWidget(self.apply_loader_button)
-        manage_card.layout.addWidget(self.repair_loader_button)
-        manage_card.layout.addWidget(self.restore_forge_button)
-        manage_card.layout.addWidget(self.open_forge_logs_button)
-        manage_card.layout.addWidget(self.export_forge_diagnostics_button)
-        manage_card.layout.addWidget(QLabel("Target name"))
-        manage_card.layout.addWidget(self.target_name_input)
-        manage_card.layout.addWidget(self.include_saves_checkbox)
-        manage_card.layout.addLayout(action_grid)
-        self.root_layout.addWidget(manage_card)
+        self.manage_card.layout.addWidget(self.loader_fields_widget)
+        self.manage_card.layout.addWidget(self.manage_loader_status)
+        self.manage_card.layout.addWidget(self.loader_actions_widget)
+        self.manage_card.layout.addWidget(self.target_name_label)
+        self.manage_card.layout.addWidget(self.target_name_input)
+        self.manage_card.layout.addWidget(self.include_saves_checkbox)
+        self.manage_card.layout.addWidget(self.instance_actions_widget)
+        self.root_layout.addWidget(self.manage_card)
 
         lifecycle_card = CardWidget("Backup and Modrinth pack lifecycle", "Create safe backups, restore an instance, and update managed Modrinth packs without overwriting user-modified files.")
         lifecycle_card.setProperty("themeRole", "lifecycle")
@@ -243,6 +277,60 @@ class InstancesPage(BasePage):
         lifecycle_card.layout.addWidget(self.apply_modpack_update_button)
         self.root_layout.addWidget(lifecycle_card)
         self.root_layout.addStretch()
+        self._sync_responsive_layout(force=True)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._sync_responsive_layout()
+
+    def _sync_responsive_layout(self, width: int | None = None, force: bool = False) -> None:
+        available_width = max(1, int(width if width is not None else self.viewport().width()))
+        fields_side_by_side = available_width >= 700
+        action_columns = 3 if available_width >= 760 else 2 if available_width >= 520 else 1
+        signature = (fields_side_by_side, action_columns)
+        if not force and signature == self._responsive_signature:
+            return
+        self._responsive_signature = signature
+
+        self._clear_grid(self.loader_fields_layout)
+        if fields_side_by_side:
+            self.loader_fields_layout.addWidget(self.manage_loader_label, 0, 0)
+            self.loader_fields_layout.addWidget(self.manage_loader_version_label, 0, 1)
+            self.loader_fields_layout.addWidget(self.manage_loader_combo, 1, 0)
+            self.loader_fields_layout.addWidget(self.manage_loader_version_combo, 1, 1)
+            self.loader_fields_layout.setColumnStretch(0, 1)
+            self.loader_fields_layout.setColumnStretch(1, 1)
+        else:
+            self.loader_fields_layout.addWidget(self.manage_loader_label, 0, 0)
+            self.loader_fields_layout.addWidget(self.manage_loader_combo, 1, 0)
+            self.loader_fields_layout.addWidget(self.manage_loader_version_label, 2, 0)
+            self.loader_fields_layout.addWidget(self.manage_loader_version_combo, 3, 0)
+            self.loader_fields_layout.setColumnStretch(0, 1)
+            self.loader_fields_layout.setColumnStretch(1, 0)
+
+        self._reflow_button_grid(self.loader_actions_layout, self._loader_action_buttons, action_columns)
+        self._reflow_button_grid(self.instance_actions_layout, self._instance_action_buttons, action_columns, self.repair_instance_button)
+        self.set_compact_mode(not fields_side_by_side)
+
+    @staticmethod
+    def _clear_grid(layout: QGridLayout) -> None:
+        while layout.count():
+            layout.takeAt(0)
+        for column in range(3):
+            layout.setColumnStretch(column, 0)
+
+    @classmethod
+    def _reflow_button_grid(cls, layout: QGridLayout, buttons: tuple[QPushButton, ...], columns: int, trailing_button: QPushButton | None = None) -> None:
+        cls._clear_grid(layout)
+        column_count = max(1, int(columns))
+        for index, button in enumerate(buttons):
+            row, column = divmod(index, column_count)
+            layout.addWidget(button, row, column)
+        for column in range(column_count):
+            layout.setColumnStretch(column, 1)
+        if trailing_button is not None:
+            trailing_row = (len(buttons) + column_count - 1) // column_count
+            layout.addWidget(trailing_button, trailing_row, 0, 1, column_count)
 
     def set_versions(self, versions: list) -> None:
         self._versions = list(versions)

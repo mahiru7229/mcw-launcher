@@ -29,7 +29,8 @@ class AdvancedInstanceManagerDialog(QDialog):
         self._advanced_page = advanced_page
         self._instance_name = ""
         self.setModal(False)
-        resize_dialog_to_screen(self, 940, 760, 760, 580)
+        resize_dialog_to_screen(self, 940, 720, 620, 480, lock_maximum=False)
+        self.setMinimumSize(520, 420)
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 12)
         root.setSpacing(8)

@@ -8,7 +8,8 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
-from src.gui.dialogs.instance_management_dialog import InstanceManagementDialog
+from src.gui.dialogs.instance_management_dialog import AdvancedInstanceManagerDialog, InstanceManagementDialog
+from src.gui.pages.instances_page import InstancesPage
 
 
 def make_instance(loader=("vanilla", "-1")) -> SimpleNamespace:
@@ -37,3 +38,12 @@ def test_instance_editor_disables_mod_actions_for_vanilla(gui_app):
     assert dialog.manage_mods_button.isEnabled() is False
     assert dialog.open_logs_button.isEnabled() is False
     assert dialog.export_diagnostics_button.isEnabled() is False
+
+
+def test_advanced_instance_manager_dialog_is_resizable_for_compact_screens(gui_app):
+    dialog = AdvancedInstanceManagerDialog(InstancesPage())
+
+    assert dialog.minimumWidth() == 520
+    assert dialog.minimumHeight() == 420
+    assert dialog.maximumWidth() > dialog.width()
+    assert dialog.maximumHeight() > dialog.height()

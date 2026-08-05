@@ -160,3 +160,36 @@ def test_advanced_instance_page_is_fully_retranslated_to_vietnamese(app):
         assert page.apply_loader_button.text() == "Áp dụng mod loader"
     finally:
         language_manager.set_language(previous, notify=False)
+
+
+def test_mod_loader_layout_reflows_for_wide_medium_and_narrow_widths(app):
+    page = InstancesPage()
+
+    page._sync_responsive_layout(width=900, force=True)
+    assert page.loader_fields_layout.getItemPosition(page.loader_fields_layout.indexOf(page.manage_loader_label)) == (0, 0, 1, 1)
+    assert page.loader_fields_layout.getItemPosition(page.loader_fields_layout.indexOf(page.manage_loader_version_label)) == (0, 1, 1, 1)
+    assert page.loader_actions_layout.getItemPosition(page.loader_actions_layout.indexOf(page.restore_forge_button)) == (0, 2, 1, 1)
+    assert page._compact is False
+
+    page._sync_responsive_layout(width=620, force=True)
+    assert page.loader_fields_layout.getItemPosition(page.loader_fields_layout.indexOf(page.manage_loader_combo)) == (1, 0, 1, 1)
+    assert page.loader_fields_layout.getItemPosition(page.loader_fields_layout.indexOf(page.manage_loader_version_label)) == (2, 0, 1, 1)
+    assert page.loader_actions_layout.getItemPosition(page.loader_actions_layout.indexOf(page.restore_forge_button)) == (1, 0, 1, 1)
+    assert page.instance_actions_layout.getItemPosition(page.instance_actions_layout.indexOf(page.delete_button)) == (1, 0, 1, 1)
+    assert page._compact is True
+
+    page._sync_responsive_layout(width=480, force=True)
+    assert page.loader_actions_layout.getItemPosition(page.loader_actions_layout.indexOf(page.repair_loader_button)) == (1, 0, 1, 1)
+    assert page.instance_actions_layout.getItemPosition(page.instance_actions_layout.indexOf(page.clone_button)) == (1, 0, 1, 1)
+    assert page.instance_actions_layout.getItemPosition(page.instance_actions_layout.indexOf(page.repair_instance_button)) == (6, 0, 1, 1)
+
+
+def test_mod_loader_comboboxes_can_shrink_without_horizontal_overflow(app):
+    from PySide6.QtWidgets import QComboBox, QSizePolicy
+
+    page = InstancesPage()
+
+    assert page.manage_loader_combo.sizeAdjustPolicy() == QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+    assert page.manage_loader_version_combo.sizeAdjustPolicy() == QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+    assert page.manage_loader_combo.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
+    assert page.manage_loader_version_combo.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
