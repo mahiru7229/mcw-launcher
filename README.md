@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.1.0">
-    <img src="https://img.shields.io/badge/Stable-v1.1.0-brightgreen" alt="Stable version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.1.1">
+    <img src="https://img.shields.io/badge/Stable-v1.1.1-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -44,21 +44,24 @@ Mỗi instance có riêng:
 
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 ---
-Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
+Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.1 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
 
-## Có gì mới trong v1.1.1-beta.6
+## Có gì mới trong v1.1.1
 
-**v1.1.1-beta.6** sửa bước kiểm tra dependency của các modpack Forge cũ như RLCraft:
+**v1.1.1** đưa toàn bộ nhánh dependency và tương thích Forge legacy lên stable:
 
-- Quét cả thư mục mod chính và thư mục legacy chính xác `mods/<minecraft-version>/`, thay vì bỏ sót mod Forge 1.12.2 được loader chấp nhận.
-- Khi dependency đã được tác giả modpack ghim nhưng file local bị thiếu hoặc không cung cấp đúng mod ID, launcher đưa đúng file ghim trở lại hàng đợi tải/repair thay vì tìm một version thay thế.
-- Lưu `projectName`, `projectSlug` và `expectedModIds` trong CurseForge pack registry để các lần audit sau đối chiếu bằng identity ổn định.
-- Xác minh JAR sau download thực sự cung cấp mod ID mong đợi trước khi cho dependency audit vượt qua.
-- Giữ nguyên version/file ID của manifest và chỉ dùng provider bridge khi pack thật sự không có dependency đó.
+- Hoàn thiện dependency bắt buộc cho Modrinth, CurseForge và ATLauncher, bao gồm dependency nhiều tầng, manual download và provider bridge theo hash.
+- Nhận diện dependency được cung cấp qua Forge JarJar, nested JAR và identity CurseForge đã xác minh bằng SHA-1.
+- Hỗ trợ đúng thư mục mod legacy `mods/<minecraft-version>/`, metadata `mcmod.info` nhiều mod ID và file do modpack ghim.
+- Không tải lại file manual đã import, không biến lỗi parser legacy thành trạng thái file thiếu và không chạy lại Forge installer khi cache hợp lệ.
+- Sửa so sánh Maven/Forge range có thành phần chữ, ví dụ `0.6.10` khớp `[0.6.8.a,0.7)`.
+- Bao gồm ATLauncher provider và luồng nhập OptiFine trực tiếp của nhánh v1.1.1.
 
-Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.6.md`](docs/RELEASE-v1.1.1-beta.6.md).
+Đã smoke test thành công với SkyFactory 3 (Forge 1.10.2) và RLCraft (Forge 1.12.2).
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.1.md`](docs/RELEASE-v1.1.1.md).
 
 ## Có gì mới trong v1.1.1-beta.5
 

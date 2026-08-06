@@ -1,5 +1,7 @@
 {
-  "note": "MCW Launcher uses the public gateway below by default. Up to five custom HTTPS gateway links can still be configured in Launcher Settings and are stored with Windows DPAPI.",
-  "default_gateway_url": "https://mcw-curseforge-gateway.vercel.app/api/curseforge",
-  "gateway_slots": 5
+  "schema_version": 3,
+  "default_gateway_url": "",
+  "bundled_gateway_urls": [],
+  "gateway_urls": [],
+  "client_token": ""
 }
