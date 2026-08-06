@@ -33,6 +33,7 @@ class CreateInstanceDialog(QDialog):
     browse_modrinth_requested = Signal()
     browse_curseforge_requested = Signal()
     browse_ftb_requested = Signal()
+    browse_atlauncher_requested = Signal()
 
     MODDED_LOADERS = {"fabric", "quilt", "forge", "neoforge"}
 
@@ -130,14 +131,17 @@ class CreateInstanceDialog(QDialog):
         self.modrinth_button = set_theme_icon(QPushButton(), "icon.action.modrinth")
         self.curseforge_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.ftb_button = set_theme_icon(QPushButton(), "icon.action.download")
+        self.atlauncher_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.import_button = set_theme_icon(QPushButton(), "icon.action.import")
         self.modrinth_button.clicked.connect(self._browse_modrinth)
         self.curseforge_button.clicked.connect(self._browse_curseforge)
         self.ftb_button.clicked.connect(self._browse_ftb)
+        self.atlauncher_button.clicked.connect(self._browse_atlauncher)
         self.import_button.clicked.connect(self._import_package)
         layout.addWidget(self.modrinth_button)
         layout.addWidget(self.curseforge_button)
         layout.addWidget(self.ftb_button)
+        layout.addWidget(self.atlauncher_button)
         layout.addWidget(self.import_button)
         layout.addStretch(1)
         return tab
@@ -291,6 +295,10 @@ class CreateInstanceDialog(QDialog):
         self.browse_ftb_requested.emit()
         self.accept()
 
+    def _browse_atlauncher(self) -> None:
+        self.browse_atlauncher_requested.emit()
+        self.accept()
+
     def _import_package(self) -> None:
         self.import_modpack_package_requested.emit()
         self.accept()
@@ -311,6 +319,7 @@ class CreateInstanceDialog(QDialog):
         self.modrinth_button.setText(tr("workspace.create.browse_modrinth"))
         self.curseforge_button.setText(tr("workspace.create.browse_curseforge"))
         self.ftb_button.setText(tr("workspace.create.browse_ftb"))
+        self.atlauncher_button.setText(tr("workspace.create.browse_atlauncher"))
         self.curseforge_button.setVisible(CurseForgeConfigManager.is_configured())
         self.import_button.setText(tr("modpack_package.import.local_button"))
         self.create_button.setText(tr("workspace.create.create_button"))

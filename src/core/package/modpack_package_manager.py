@@ -965,7 +965,7 @@ class ModpackPackageManager:
         root = Path(instance.instance_dir)
         ignored_roots = {"mods", "logs", "crash-reports"}
         ignored_files = {"instance.json", "settings.json"}
-        ignored_mcw = {"mod-provenance.json", "modrinth.json", "curseforge.json", "modrinth-pack.json", "curseforge-pack.json", "ftb-pack.json", "content-library.json", "manual-files.json", "portable-disabled-files.json", "portable-referenced-files.json"}
+        ignored_mcw = {"mod-provenance.json", "modrinth.json", "curseforge.json", "modrinth-pack.json", "curseforge-pack.json", "ftb-pack.json", "atlauncher-pack.json", "content-library.json", "manual-files.json", "portable-disabled-files.json", "portable-referenced-files.json"}
         output: list[tuple[Path, str]] = []
         for path in root.rglob("*"):
             if not path.is_file() or path.is_symlink():

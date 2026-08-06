@@ -1,22 +1,36 @@
-# MCW Launcher v1.1.0 — pytest freeze hotfix
+# MCW Launcher v1.1.1-beta.1 — ATLauncher patch
 
-Apply this patch to the root of the MCW Launcher v1.1.0 repository.
+This archive contains only launcher repository files changed from MCW Launcher v1.1.0.
+It does not include a standalone MCW Core source archive or wheel.
 
-## Fixed
+## Apply
 
-`test_workspace_create_dialog_emits_public_create_contract` still used the old three-argument create signal and attempted to create a Quilt instance without supplying the newly-required loader version.
+1. Close MCW Launcher and any running test process.
+2. Back up the repository or commit the current working tree.
+3. Extract this ZIP into the repository root and allow files to be replaced.
+4. Keep the v1.1.0 pytest-freeze hotfix if it is already present; this patch does not replace that test file.
+5. Run `python -m pytest -q`.
 
-That path opens `QMessageBox.information(...)`. Under pytest with `QT_QPA_PLATFORM=offscreen`, the modal message box is invisible and waits forever, making the suite appear frozen.
+## ATLauncher Beta 1 scope
 
-The test now:
+- Public pack search/browser through the ATLauncher V2 GraphQL API.
+- V1/CDN fallback for pack details, versions, and `Configs.json` installation manifests.
+- Explicit pack-version and release-channel selection.
+- Vanilla, Forge, NeoForge, Fabric, and Quilt runtime resolution.
+- Deferred first-launch file downloads with SHA-1/MD5 verification and bounded retries.
+- Safe staged extraction of `Configs.zip`.
+- ATLauncher registry, provenance, Content Library integration, cache status, and cache clearing.
 
-- provides a compatible Quilt loader version;
-- validates the selected loader version;
-- listens to the stable four-argument create contract;
-- completes without opening a modal dialog.
+Packs requiring browser-only files, custom libraries/main classes, jar mods, extract/decomp actions,
+or other legacy install behavior are deliberately blocked in this beta instead of being partially installed.
 
-## Changed file
+## Suggested Windows smoke test
 
-- `test/gui/pages/test_instance_workspace_page.py`
+1. Open Add Instance and choose **Browse ATLauncher packs**.
+2. Search for a public pack and open its details.
+3. Select a supported version and create an instance.
+4. Launch it once and verify aggregate download progress.
+5. Confirm files pass checksum verification and `Configs.zip` content appears in the instance.
+6. Confirm the ATLauncher pack appears in Content Library.
 
-This is a test-only patch. Runtime launcher and MCW Core code are unchanged.
+Changed repository files: 40

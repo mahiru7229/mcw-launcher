@@ -36,6 +36,7 @@ from src.gui.controllers.curseforge_controller import CurseForgeController
 from src.gui.controllers.content_pack_controller import ContentPackController
 from src.gui.controllers.content_library_controller import ContentLibraryController
 from src.gui.controllers.ftb_controller import FTBController
+from src.gui.controllers.atlauncher_controller import ATLauncherController
 from src.gui.controllers.backup_controller import BackupController
 from src.gui.controllers.java_controller import JavaController
 from src.gui.controllers.modpack_lifecycle_controller import ModpackLifecycleController
@@ -57,6 +58,7 @@ from src.gui.dialogs.content_pack_manager_dialog import ContentPackManagerDialog
 from src.gui.dialogs.content_library_dialog import ContentLibraryDialog
 from src.gui.dialogs.curseforge_manual_download_dialog import CurseForgeManualDownloadDialog
 from src.gui.dialogs.ftb_browser_dialog import FTBBrowserDialog
+from src.gui.dialogs.atlauncher_browser_dialog import ATLauncherBrowserDialog
 from src.gui.dialogs.lan_agent_log_dialog import LanAgentLogDialog
 from src.gui.dialogs.instance_import_settings_dialog import InstanceImportSettingsDialog
 from src.gui.dialogs.modpack_export_dialog import ModpackExportDialog
@@ -117,6 +119,7 @@ class MainWindow(QMainWindow):
         self.content_pack_controller = ContentPackController(self.task_runner)
         self.content_library_controller = ContentLibraryController(self.task_runner)
         self.ftb_controller = FTBController(self.task_runner)
+        self.atlauncher_controller = ATLauncherController(self.task_runner)
         self.instance_settings_controller = InstanceSettingsController()
         self.gui_settings_controller = GuiSettingsController()
         self._startup_settings = self.gui_settings_controller.load()
@@ -136,6 +139,7 @@ class MainWindow(QMainWindow):
         self._mod_catalog_tasks: set[str] = set()
         self._curseforge_tasks: set[str] = set()
         self._ftb_tasks: set[str] = set()
+        self._atlauncher_tasks: set[str] = set()
         self._curseforge_catalog_tasks: set[str] = set()
         self._content_tasks: set[str] = set()
         self._suppress_loader_progress = False
@@ -264,6 +268,7 @@ class MainWindow(QMainWindow):
         self.resource_pack_browser_dialog = ContentPackBrowserDialog(ContentPackManager.RESOURCE_PACK, self)
         self.shader_pack_browser_dialog = ContentPackBrowserDialog(ContentPackManager.SHADER_PACK, self)
         self.ftb_modpack_dialog = FTBBrowserDialog(self)
+        self.atlauncher_modpack_dialog = ATLauncherBrowserDialog(self)
         self.curseforge_manual_dialog = CurseForgeManualDownloadDialog(self)
         self.portable_manual_dialog = CurseForgeManualDownloadDialog(self)
         self.repair_center_dialog = RepairCenterDialog(self)
@@ -337,6 +342,7 @@ class MainWindow(QMainWindow):
         self.instances_page.browse_modpacks_requested.connect(self._open_modrinth_modpacks)
         self.instances_page.browse_curseforge_modpacks_requested.connect(self._open_curseforge_modpacks)
         self.instances_page.browse_ftb_modpacks_requested.connect(self._open_ftb_modpacks)
+        self.instances_page.browse_atlauncher_modpacks_requested.connect(self._open_atlauncher_modpacks)
         self.instances_page.rename_requested.connect(self.instance_controller.rename)
         self.instances_page.clone_requested.connect(self.instance_controller.clone)
         self.instances_page.delete_requested.connect(self.instance_controller.delete)
@@ -542,6 +548,21 @@ class MainWindow(QMainWindow):
         self.ftb_controller.cache_cleared.connect(lambda info: (self.ftb_modpack_dialog.set_cache_info(info), QMessageBox.information(self, tr("ftb.modpack.title"), tr("ftb.cache.cleared"))))
         self.ftb_controller.modpack_installed.connect(self._ftb_modpack_installed)
 
+        self.atlauncher_modpack_dialog.search_requested.connect(self.atlauncher_controller.search)
+        self.atlauncher_modpack_dialog.refresh_requested.connect(lambda query, sort, index: self.atlauncher_controller.search(query, sort, index, force_refresh=True))
+        self.atlauncher_modpack_dialog.project_details_requested.connect(self.atlauncher_controller.load_project_details)
+        self.atlauncher_modpack_dialog.versions_requested.connect(self.atlauncher_controller.load_versions)
+        self.atlauncher_modpack_dialog.version_details_requested.connect(self.atlauncher_controller.load_version_details)
+        self.atlauncher_modpack_dialog.clear_cache_requested.connect(self.atlauncher_controller.clear_cache)
+        self.atlauncher_modpack_dialog.install_modpack_requested.connect(self._install_atlauncher_modpack)
+        self.atlauncher_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
+        self.atlauncher_controller.search_results_changed.connect(self.atlauncher_modpack_dialog.set_search_result)
+        self.atlauncher_controller.project_details_changed.connect(self.atlauncher_modpack_dialog.set_project_details)
+        self.atlauncher_controller.versions_changed.connect(self.atlauncher_modpack_dialog.set_versions)
+        self.atlauncher_controller.version_details_changed.connect(self.atlauncher_modpack_dialog.set_version_details)
+        self.atlauncher_controller.cache_cleared.connect(lambda info: (self.atlauncher_modpack_dialog.set_cache_info(info), QMessageBox.information(self, tr("atlauncher.modpack.title"), tr("atlauncher.cache.cleared"))))
+        self.atlauncher_controller.modpack_installed.connect(self._atlauncher_modpack_installed)
+
         self.content_pack_manager_dialog.browse_requested.connect(self._open_content_pack_browser)
         self.content_pack_manager_dialog.import_requested.connect(self._import_content_pack)
         self.content_pack_manager_dialog.refresh_requested.connect(self._refresh_content_pack_entries)
@@ -574,6 +595,7 @@ class MainWindow(QMainWindow):
         self.modrinth_controller.progress_received.connect(self._on_progress)
         self.curseforge_controller.progress_received.connect(self._on_progress)
         self.ftb_controller.progress_received.connect(self._on_progress)
+        self.atlauncher_controller.progress_received.connect(self._on_progress)
         self.content_pack_controller.progress_received.connect(self._on_progress)
         self.mod_controller.progress_received.connect(self._on_progress)
         self.java_controller.progress_received.connect(self._on_progress)
@@ -626,6 +648,7 @@ class MainWindow(QMainWindow):
             self.modrinth_controller,
             self.curseforge_controller,
             self.ftb_controller,
+            self.atlauncher_controller,
             self.content_pack_controller,
             self.content_library_controller,
             self.instance_settings_controller,
@@ -1313,6 +1336,13 @@ class MainWindow(QMainWindow):
         self.ftb_modpack_dialog.set_searching()
         self.ftb_controller.search("", "popularity", 0)
 
+    def _open_atlauncher_modpacks(self) -> None:
+        self.atlauncher_modpack_dialog.show()
+        self.atlauncher_modpack_dialog.raise_()
+        self.atlauncher_modpack_dialog.activateWindow()
+        self.atlauncher_modpack_dialog.set_searching()
+        self.atlauncher_controller.search("", "popularity", 0)
+
     def _search_curseforge_mods(self, project_type: str, query: str, sort: str, index: int) -> None:
         self.curseforge_controller.search(project_type, query, sort, index, game_version=self.curseforge_mod_dialog.game_version, loader=self.curseforge_mod_dialog.loader)
 
@@ -1456,6 +1486,23 @@ class MainWindow(QMainWindow):
         self.ftb_controller.install_modpack(
             int(project_id),
             int(version_id),
+            str(instance_name),
+            bool(install_optional_files),
+            tuple(allowed_release_types) if isinstance(allowed_release_types, (list, tuple, set)) else ("release",),
+            settings,
+        )
+
+    def _install_atlauncher_modpack(self, safe_name: str, version_name: str, instance_name: str, install_optional_files: bool, allowed_release_types: object) -> None:
+        version = self.atlauncher_modpack_dialog.selected_version
+        recommended_minimum = int(getattr(version, "minimum_memory_mb", 0) or 0)
+        recommended_maximum = int(getattr(version, "recommended_memory_mb", 0) or 0)
+        settings = self._prompt_modpack_settings(str(instance_name), recommended_minimum, recommended_maximum)
+        if settings is None:
+            self.atlauncher_modpack_dialog.set_busy(False)
+            return
+        self.atlauncher_controller.install_modpack(
+            str(safe_name),
+            str(version_name),
             str(instance_name),
             bool(install_optional_files),
             tuple(allowed_release_types) if isinstance(allowed_release_types, (list, tuple, set)) else ("release",),
@@ -1619,6 +1666,14 @@ class MainWindow(QMainWindow):
         self.ftb_modpack_dialog.close()
         QMessageBox.information(self, tr("ftb.modpack.install"), tr("ftb.modpack.installed", name=selected_name))
 
+
+
+    def _atlauncher_modpack_installed(self, result: object) -> None:
+        instance = getattr(result, "instance", None)
+        selected_name = str(getattr(instance, "name", ""))
+        self.instance_controller.refresh(selected_name=selected_name)
+        self.atlauncher_modpack_dialog.close()
+        QMessageBox.information(self, tr("atlauncher.modpack.install"), tr("atlauncher.modpack.installed", name=selected_name))
 
 
     def _request_lan_hosting_prepare(self, instance_name: str, auth_mode: str, connection_provider: str) -> None:
@@ -1966,6 +2021,7 @@ class MainWindow(QMainWindow):
         self.curseforge_mod_dialog.set_channel_preferences(include_beta, include_alpha)
         self.curseforge_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
         self.ftb_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.atlauncher_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
         self.resource_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
         self.shader_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
         self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
@@ -1976,6 +2032,7 @@ class MainWindow(QMainWindow):
         self.curseforge_mod_dialog.set_show_project_descriptions(show_content_descriptions)
         self.curseforge_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
         self.ftb_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
+        self.atlauncher_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
         self.resource_pack_browser_dialog.set_show_project_descriptions(show_content_descriptions)
         self.shader_pack_browser_dialog.set_show_project_descriptions(show_content_descriptions)
         curseforge_available = bool(settings.get("curseforge_gateway_urls", ()))
@@ -2024,6 +2081,7 @@ class MainWindow(QMainWindow):
         self.curseforge_mod_dialog.set_channel_preferences(include_beta, include_alpha)
         self.curseforge_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
         self.ftb_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.atlauncher_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
         self.resource_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
         self.shader_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
         self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
@@ -2137,6 +2195,7 @@ class MainWindow(QMainWindow):
             self.curseforge_mod_dialog,
             self.curseforge_modpack_dialog,
             self.ftb_modpack_dialog,
+            self.atlauncher_modpack_dialog,
             self.content_pack_manager_dialog,
             self.content_library_dialog,
             self.resource_pack_browser_dialog,
@@ -2177,6 +2236,9 @@ class MainWindow(QMainWindow):
         if task_id.startswith("ftb."):
             self._ftb_tasks.add(task_id)
             self.ftb_modpack_dialog.set_busy(True)
+        if task_id.startswith("atlauncher."):
+            self._atlauncher_tasks.add(task_id)
+            self.atlauncher_modpack_dialog.set_busy(True)
         if task_id.startswith("content."):
             self._content_tasks.add(task_id)
             self.content_pack_manager_dialog.set_busy(True)
@@ -2233,6 +2295,9 @@ class MainWindow(QMainWindow):
         if task_id.startswith("ftb."):
             self._ftb_tasks.discard(task_id)
             self.ftb_modpack_dialog.set_busy(bool(self._ftb_tasks))
+        if task_id.startswith("atlauncher."):
+            self._atlauncher_tasks.discard(task_id)
+            self.atlauncher_modpack_dialog.set_busy(bool(self._atlauncher_tasks))
         if task_id.startswith("content."):
             self._content_tasks.discard(task_id)
             busy = bool(self._content_tasks)

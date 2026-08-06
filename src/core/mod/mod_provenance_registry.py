@@ -20,7 +20,7 @@ class ModProvenanceRegistry:
 
     SCHEMA_VERSION = 1
     _MODRINTH_CDN_PATTERN = re.compile(r"^/data/([^/]+)/versions/([^/]+)/([^/]+)$", re.IGNORECASE)
-    _PROVIDERS = {"modrinth", "curseforge", "ftb", "local", "manual", "unknown"}
+    _PROVIDERS = {"modrinth", "curseforge", "ftb", "atlauncher", "local", "manual", "unknown"}
 
     @staticmethod
     def empty() -> dict:
@@ -71,6 +71,7 @@ class ModProvenanceRegistry:
         ModProvenanceRegistry._merge_modrinth_pack(instance, merge)
         ModProvenanceRegistry._merge_curseforge_pack(instance, merge)
         ModProvenanceRegistry._merge_ftb_pack(instance, merge)
+        ModProvenanceRegistry._merge_atlauncher_pack(instance, merge)
 
         # Directly installed mods are more specific than a pack-level record.
         from src.core.modrinth.modrinth_registry import ModrinthRegistry
@@ -242,6 +243,30 @@ class ModProvenanceRegistry:
                 "downloadUrls": raw.get("urls", []),
                 "managedByModpack": True,
                 "packProvider": "ftb",
+                "packProjectId": pack_project_id,
+                "packVersionId": pack_version_id,
+            }, 20)
+
+    @staticmethod
+    def _merge_atlauncher_pack(instance: Instance, merge) -> None:
+        from src.core.atlauncher.atlauncher_pack_registry import ATLauncherPackRegistry
+
+        pack = ATLauncherPackRegistry.load(instance)
+        pack_project_id = str(pack.get("safeName") or pack.get("packId") or "").strip()
+        pack_version_id = str(pack.get("versionName") or pack.get("versionId") or "").strip()
+        for raw in pack.get("managedFiles", []):
+            if not isinstance(raw, dict) or not ModProvenanceRegistry._is_mod_path(raw.get("path")):
+                continue
+            merge({
+                "fileName": raw.get("fileName") or PurePosixPath(str(raw.get("path") or "")).name,
+                "path": raw.get("path"),
+                "provider": raw.get("provider") or "atlauncher",
+                "fileId": raw.get("fileId"),
+                "sha1": raw.get("sha1"),
+                "size": raw.get("size"),
+                "downloadUrls": raw.get("urls", []),
+                "managedByModpack": True,
+                "packProvider": "atlauncher",
                 "packProjectId": pack_project_id,
                 "packVersionId": pack_version_id,
             }, 20)

@@ -40,13 +40,27 @@ Mỗi instance có riêng:
 - Mods, resource packs, shader packs và saves.
 - Java runtime, RAM, JVM arguments và cấu hình cửa sổ.
 - Trạng thái runtime, lịch sử launch, backup và dữ liệu repair.
-- Metadata nguồn cho mod/modpack từ Modrinth, CurseForge hoặc FTB.
+- Metadata nguồn cho mod/modpack từ Modrinth, CurseForge, FTB hoặc ATLauncher.
 
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 ---
 Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.1.1-beta.1
+
+**v1.1.1-beta.1** mở đầu tích hợp ATLauncher:
+
+- Thêm browser ATLauncher trong Add Instance và workspace của instance.
+- Tìm kiếm pack công khai qua V2 GraphQL, với V1/CDN fallback cho metadata và manifest cài đặt.
+- Chọn version, kênh release/beta/alpha và các file tùy chọn được khuyến nghị trước khi tạo instance.
+- Tải file pack ở lần Launch đầu tiên, có retry giới hạn và xác minh SHA-1/MD5.
+- Hỗ trợ Configs.zip với staging và kiểm tra an toàn đường dẫn.
+- Pack dùng custom libraries, jar mods, extract/decomp hoặc browser-only files sẽ bị chặn rõ ràng trong beta này thay vì cài dở dang.
+- Chưa phát hành Core wheel mới; ATLauncher được bundle trong launcher để smoke test trước khi đồng bộ Core stable.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.1.md`](docs/RELEASE-v1.1.1-beta.1.md).
 
 ## Có gì mới trong v1.1.0
 

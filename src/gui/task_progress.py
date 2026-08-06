@@ -47,7 +47,7 @@ def task_progress_profile(task_id: str) -> TaskProgressProfile | None:
         return TaskProgressProfile(ProgressStage.PREPARING, "update.check.completed", "update.check.completed_detail", "update.check.failed")
     if task in {"instance.create", "instance.loader", "instance.loader.repair", "instance.loader.restore"}:
         return TaskProgressProfile(ProgressStage.INSTALLING_MOD_LOADER, "loader.progress.ready", "loader.progress.ready_detail", "loader.progress.failed")
-    if task.startswith("modrinth.install.modpack") or task.startswith("curseforge.install.modpack") or task.startswith("ftb.install.modpack"):
+    if task.startswith("modrinth.install.modpack") or task.startswith("curseforge.install.modpack") or task.startswith("ftb.install.modpack") or task.startswith("atlauncher.install.modpack"):
         return TaskProgressProfile(ProgressStage.DOWNLOADING_MODPACK, "modpack.install.completed", "modpack.install.completed_detail", "modpack.install.failed")
     if task.startswith("modrinth.install.mod") or task.startswith("curseforge.install.mod"):
         return TaskProgressProfile(ProgressStage.DOWNLOADING_MODS, "mods.install.completed", "mods.install.completed_detail", "mods.install.failed")

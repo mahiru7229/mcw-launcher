@@ -1,23 +1,3625 @@
---- /mnt/data/MCW-Launcher-v1.1.0-test-freeze-hotfix/original.py	2026-08-05 19:01:11.370410945 +0000
-+++ /mnt/data/_inspect_mcw110/mcw-launcher-v1.1.0/test/gui/pages/test_instance_workspace_page.py	2026-08-05 19:01:11.797917991 +0000
-@@ -78,14 +78,17 @@
- def test_workspace_create_dialog_emits_public_create_contract(gui_app):
-     page = InstanceWorkspacePage()
-     page.set_versions([SimpleNamespace(id="1.21.1", type="release")])
--    emitted: list[tuple[str, str, str]] = []
--    page.create_requested.connect(lambda name, version, loader: emitted.append((name, version, loader)))
-+    page.set_quilt_versions("1.21.1", [SimpleNamespace(version="0.27.1", stable=True)])
-+    emitted: list[tuple[str, str, str, str]] = []
-+    page.create_requested.connect(lambda name, version, loader, loader_version: emitted.append((name, version, loader, loader_version)))
- 
-     page.create_dialog.name_input.setText("New Quilt")
-     page.create_dialog.loader_combo.setCurrentIndex(page.create_dialog.loader_combo.findData("quilt"))
+--- a/docs/RELEASE-v1.1.1-beta.1.md
++++ b/docs/RELEASE-v1.1.1-beta.1.md
+@@ -0,0 +1,114 @@
++# MCW Launcher v1.1.1-beta.1
 +
-+    assert page.create_dialog.selected_loader_version() == "0.27.1"
-     page.create_dialog._request_create()
++## Tiếng Việt
++
++MCW Launcher **v1.1.1-beta.1** bắt đầu nhánh 1.1.1 với phần đầu tiên của tích hợp **ATLauncher**. Bản beta này tập trung vào browser, metadata, tạo instance và pipeline tải nội dung được quản lý; các pack dùng thao tác cài đặt legacy/phức tạp được nhận diện và chặn an toàn thay vì cài dở dang.
++
++### ATLauncher provider
++
++- Thêm tab/browser ATLauncher trong luồng **Add Instance** và thanh công cụ instance.
++- Tìm kiếm pack công khai, phân trang, sắp xếp và xem trạng thái cache.
++- Xem thông tin pack, website hỗ trợ, phiên bản Minecraft, changelog và kênh phát hành.
++- Hỗ trợ bộ lọc `release`, `beta` và `alpha`.
++- Chọn chính xác phiên bản pack trước khi cài.
++- Cho phép chọn cài các file tùy chọn được pack khuyến nghị.
++
++### API và khả năng phục hồi metadata
++
++- Dùng ATLauncher V2 GraphQL cho luồng duyệt/tìm kiếm công khai.
++- Dùng API V1 và CDN manifest làm fallback cho chi tiết pack, danh sách phiên bản và dữ liệu cài đặt.
++- Gửi `User-Agent` riêng của MCW Launcher theo yêu cầu của ATLauncher.
++- Cache metadata có TTL, giới hạn kích thước và fallback sang cache cũ khi dịch vụ tạm thời không truy cập được.
++- Chi tiết GraphQL được cô lập sau adapter để hạn chế ảnh hưởng khi schema V2 beta thay đổi.
++
++### Cài đặt pack
++
++- Tạo instance với đúng Minecraft version và loader được manifest khai báo: Vanilla, Forge, NeoForge, Fabric hoặc Quilt.
++- Lưu registry ATLauncher riêng trong `.mcw/atlauncher-pack.json`.
++- Các file pack được tải có trì hoãn ở lần Launch đầu tiên, có tối đa ba lần thử và xác minh SHA-1/MD5.
++- Hiển thị progress tổng hợp thay vì spam tên từng file.
++- Hỗ trợ `Configs.zip` với giải nén staging, giới hạn kích thước/số entry và chống path traversal hoặc symbolic link.
++- Ghi provenance provider `atlauncher` và hiển thị nội dung đã quản lý trong Content Library.
++- Áp dụng mức RAM khuyến nghị của pack vào cấu trúc settings Java đúng chuẩn khi người dùng chưa chọn override riêng.
++
++### Giới hạn của Beta 1
++
++Bản beta này từ chối cài và giải thích rõ nếu pack cần một trong các hành vi chưa được hỗ trợ:
++
++- file bắt buộc tải qua trình duyệt;
++- custom library hoặc custom main class;
++- Java/game argument riêng của pack;
++- thao tác delete/keep/extract/decomp;
++- jar mod hoặc file legacy ghi trực tiếp vào root;
++- quy trình cài đặt đặc biệt ngoài contract an toàn hiện tại.
++
++Provider-native export/import ATLauncher chưa nằm trong phạm vi Beta 1. Registry nội bộ ATLauncher được loại khỏi danh sách file portable để tránh xuất nhầm metadata vận hành.
++
++### Phiên bản
++
++- Launcher runtime: `v1.1.1-beta.1`
++- Update channel: `beta`
++- Python distribution metadata: `1.1.1b1`
++- Không phát hành MCW Core wheel riêng trong beta này; implementation ATLauncher được bundle trong launcher để kiểm thử trước khi đồng bộ vào bản Core stable tiếp theo.
++
++### Xác thực
++
++- Toàn bộ launcher test suite: `1350 passed, 86 skipped, 2 warnings`.
++- Kiểm thử ATLauncher riêng: `14 passed`.
++- Python `compileall`: đạt cho `src`, `mcw_core` và `test`.
++- Kiểm thử có mock bao phủ GraphQL/V1 fallback, parser manifest, installer, registry, tải trì hoãn, progress tổng hợp và giải nén ZIP an toàn.
++- Môi trường build không có kết nối trực tiếp ổn định tới ATLauncher và không chạy được Minecraft GUI Windows, vì vậy vẫn cần smoke test thực tế với một số pack công khai trước khi lên beta tiếp theo.
++
++---
++
++## English
++
++MCW Launcher **v1.1.1-beta.1** starts the 1.1.1 line with the first phase of **ATLauncher** integration. This beta focuses on browsing, metadata, instance creation, and managed-content delivery. Packs requiring complex or legacy install actions are detected and safely rejected instead of being partially installed.
++
++### ATLauncher provider
++
++- Adds an ATLauncher browser to **Add Instance** and the instance toolbar.
++- Searches public packs with paging, sorting, and cache status.
++- Displays pack information, support website, Minecraft version, changelog, and release channel.
++- Supports `release`, `beta`, and `alpha` filters.
++- Requires an explicit pack-version selection before installation.
++- Allows recommended optional files to be included.
++
++### API and metadata recovery
++
++- Uses the public ATLauncher V2 GraphQL API for browsing and search.
++- Uses the V1 API and CDN manifests as fallbacks for pack details, version lists, and install data.
++- Sends a dedicated MCW Launcher `User-Agent` as required by ATLauncher.
++- Adds TTL-based metadata caching, a bounded cache size, and stale-cache fallback during temporary service failures.
++- Keeps GraphQL schema details behind an adapter so changes to the beta V2 schema remain isolated.
++
++### Pack installation
++
++- Creates an instance using the Minecraft version and primary loader declared by the manifest: Vanilla, Forge, NeoForge, Fabric, or Quilt.
++- Persists an ATLauncher registry in `.mcw/atlauncher-pack.json`.
++- Defers managed file downloads until first Launch, with up to three attempts and SHA-1/MD5 verification.
++- Reports aggregate progress instead of exposing every file name in the main progress message.
++- Supports `Configs.zip` through staging extraction, entry/size limits, path-traversal protection, and symbolic-link rejection.
++- Records `atlauncher` provenance and exposes managed entries in Content Library.
++- Applies the pack's recommended memory to the correct nested Java settings when no explicit settings override is supplied.
++
++### Beta 1 limitations
++
++This beta refuses installation with a clear error when a pack requires unsupported behavior such as browser-only files, custom libraries/main classes, pack-specific Java or game arguments, delete/keep/extract/decomp actions, jar mods, legacy root files, or another special install workflow outside the current safe contract.
++
++Provider-native ATLauncher export/import is not part of Beta 1. Internal ATLauncher registry data is excluded from portable file enumeration to avoid exporting runtime metadata as pack content.
++
++### Version metadata
++
++- Launcher runtime: `v1.1.1-beta.1`
++- Update channel: `beta`
++- Python distribution metadata: `1.1.1b1`
++- No standalone MCW Core wheel is published for this beta; the ATLauncher implementation remains bundled in the launcher until the next stable Core synchronization.
++
++### Validation
++
++- Full launcher test suite: `1350 passed, 86 skipped, 2 warnings`.
++- ATLauncher-focused tests: `14 passed`.
++- Python `compileall`: passed for `src`, `mcw_core`, and `test`.
++- Mocked coverage includes GraphQL/V1 fallback, manifest parsing, installation, registry persistence, deferred downloads, aggregate progress, and safe ZIP extraction.
++- The build environment cannot perform a reliable live ATLauncher or Windows Minecraft GUI smoke test, so real public packs still require Windows validation before the next beta.
+--- a/lang/en-US.json
++++ b/lang/en-US.json
+@@ -1880,7 +1880,62 @@
+         "workspace.create.loader_version.loading": "Loading {loader} versions compatible with Minecraft {version}...",
+         "workspace.create.loader_version.available": "{count} compatible {loader} version(s) found for Minecraft {version}. Selected: {selected}.",
+         "workspace.create.loader_version.unavailable": "{loader} has no compatible version for Minecraft {version}, or its metadata service could not be reached. Choose another Minecraft version or loader.",
+-        "workspace.create.loader_version.required": "Select a compatible {loader} version for Minecraft {version} first."
++        "workspace.create.loader_version.required": "Select a compatible {loader} version for Minecraft {version} first.",
++        "workspace.toolbar.atlauncher": "ATLauncher Packs",
++        "workspace.create.browse_atlauncher": "Browse ATLauncher packs",
++        "content.library.provider.atlauncher": "ATLauncher",
++        "atlauncher.modpack.title": "Browse ATLauncher packs",
++        "atlauncher.modpack.context": "Browse public ATLauncher packs through the official API, review versions, and create a managed MCW instance.",
++        "atlauncher.modpack.install": "Install ATLauncher pack",
++        "atlauncher.modpack.installed": "Created ATLauncher instance '{name}'. Managed files will download when you Launch it.",
++        "atlauncher.modpack.instance_name": "New instance name",
++        "atlauncher.modpack.optional_files": "Include recommended optional files",
++        "atlauncher.search.placeholder": "Search ATLauncher packs (leave empty for the public catalog)",
++        "atlauncher.cache.refresh": "Refresh",
++        "atlauncher.cache.clear": "Clear cache",
++        "atlauncher.cache.cleared": "ATLauncher metadata cache was cleared.",
++        "atlauncher.cache.last_error": "last refresh failed",
++        "atlauncher.cache.never": "ATLauncher cache: {size}/{limit} MiB · no successful refresh yet",
++        "atlauncher.cache.status": "ATLauncher metadata: {source} · cache {size}/{limit} MiB",
++        "atlauncher.cache.source.cached": "cached",
++        "atlauncher.cache.source.live": "live",
++        "atlauncher.channel.release_always": "Recommended releases are always included.",
++        "atlauncher.channel.beta": "Include non-recommended releases",
++        "atlauncher.channel.alpha": "Include development releases",
++        "atlauncher.column.name": "Name",
++        "atlauncher.column.type": "Type",
++        "atlauncher.column.minecraft": "Minecraft",
++        "atlauncher.column.updated": "Updated",
++        "atlauncher.column.description": "Description",
++        "atlauncher.metadata.versions": "Versions",
++        "atlauncher.project.loading_versions": "Loading versions for '{name}'...",
++        "atlauncher.results.contacting": "Contacting ATLauncher...",
++        "atlauncher.results.empty": "No matching ATLauncher packs were found.",
++        "atlauncher.results.more": "Showing {start}–{end} · more results available",
++        "atlauncher.results.range": "Showing {start}–{end}",
++        "atlauncher.results.ready": "Ready to search ATLauncher packs.",
++        "atlauncher.results.searching": "Searching ATLauncher packs...",
++        "atlauncher.sort.name": "Name",
++        "atlauncher.sort.newest": "Newest",
++        "atlauncher.sort.popularity": "Popularity",
++        "atlauncher.sort.updated": "Recently updated",
++        "atlauncher.version.loading": "Loading ATLauncher version metadata...",
++        "atlauncher.versions.none": "No versions are available for the enabled channels: {channels}.",
++        "atlauncher.version.status": "{version} · {channel} · Minecraft {minecraft} · {loader} · {files} files · {size} · recommended memory {memory}",
++        "atlauncher.version.status_limited": "{version} · {channel} · Minecraft {minecraft} · {loader} · {files} files · {size} · recommended memory {memory} · this beta cannot safely install one or more pack actions",
++        "task.atlauncher.search": "Searching ATLauncher packs...",
++        "task.atlauncher.load_details": "Loading ATLauncher pack details...",
++        "task.atlauncher.load_versions": "Loading ATLauncher versions...",
++        "task.atlauncher.load_version_metadata": "Loading ATLauncher version metadata...",
++        "task.atlauncher.install_modpack": "Installing ATLauncher pack as '{instance}'...",
++        "task.atlauncher.clear_cache": "Clearing ATLauncher cache...",
++        "status.atlauncher.modpack_installed": "ATLauncher pack instance created.",
++        "status.atlauncher.cache_cleared": "ATLauncher cache cleared.",
++        "progress.atlauncher.saving_manifest": "Saving ATLauncher modpack manifest...",
++        "progress.atlauncher.checking_files": "Checking ATLauncher pack files...",
++        "progress.atlauncher.downloading_files": "Downloading ATLauncher pack files...",
++        "progress.atlauncher.downloading_configs": "Downloading ATLauncher configuration files...",
++        "progress.atlauncher.ready": "ATLauncher pack '{name}' is ready. Files will download on first launch."
+     },
+     "aliases": {
+         "MCW Launcher": "app.name",
+--- a/lang/vi-VN.json
++++ b/lang/vi-VN.json
+@@ -1880,7 +1880,62 @@
+         "workspace.create.loader_version.loading": "Đang tải các phiên bản {loader} tương thích với Minecraft {version}...",
+         "workspace.create.loader_version.available": "Tìm thấy {count} phiên bản {loader} tương thích với Minecraft {version}. Đã chọn: {selected}.",
+         "workspace.create.loader_version.unavailable": "{loader} không có phiên bản tương thích với Minecraft {version}, hoặc không thể kết nối dịch vụ metadata. Hãy chọn phiên bản Minecraft hoặc loader khác.",
+-        "workspace.create.loader_version.required": "Hãy chọn một phiên bản {loader} tương thích với Minecraft {version} trước."
++        "workspace.create.loader_version.required": "Hãy chọn một phiên bản {loader} tương thích với Minecraft {version} trước.",
++        "workspace.toolbar.atlauncher": "Gói ATLauncher",
++        "workspace.create.browse_atlauncher": "Duyệt gói ATLauncher",
++        "content.library.provider.atlauncher": "ATLauncher",
++        "atlauncher.modpack.title": "Duyệt gói ATLauncher",
++        "atlauncher.modpack.context": "Duyệt các gói ATLauncher công khai qua API chính thức, xem phiên bản và tạo instance được MCW quản lý.",
++        "atlauncher.modpack.install": "Cài gói ATLauncher",
++        "atlauncher.modpack.installed": "Đã tạo instance ATLauncher '{name}'. Các file được quản lý sẽ tải khi bạn Khởi chạy.",
++        "atlauncher.modpack.instance_name": "Tên instance mới",
++        "atlauncher.modpack.optional_files": "Bao gồm các file tùy chọn được khuyến nghị",
++        "atlauncher.search.placeholder": "Tìm gói ATLauncher (để trống để xem danh mục công khai)",
++        "atlauncher.cache.refresh": "Làm mới",
++        "atlauncher.cache.clear": "Xóa bộ nhớ đệm",
++        "atlauncher.cache.cleared": "Đã xóa bộ nhớ đệm metadata ATLauncher.",
++        "atlauncher.cache.last_error": "lần làm mới gần nhất bị lỗi",
++        "atlauncher.cache.never": "Bộ nhớ đệm ATLauncher: {size}/{limit} MiB · chưa làm mới thành công",
++        "atlauncher.cache.status": "Metadata ATLauncher: {source} · bộ nhớ đệm {size}/{limit} MiB",
++        "atlauncher.cache.source.cached": "từ bộ nhớ đệm",
++        "atlauncher.cache.source.live": "trực tiếp",
++        "atlauncher.channel.release_always": "Luôn bao gồm các bản được khuyến nghị.",
++        "atlauncher.channel.beta": "Bao gồm bản không được khuyến nghị",
++        "atlauncher.channel.alpha": "Bao gồm bản phát triển",
++        "atlauncher.column.name": "Tên",
++        "atlauncher.column.type": "Loại",
++        "atlauncher.column.minecraft": "Minecraft",
++        "atlauncher.column.updated": "Cập nhật",
++        "atlauncher.column.description": "Mô tả",
++        "atlauncher.metadata.versions": "Phiên bản",
++        "atlauncher.project.loading_versions": "Đang tải các phiên bản của '{name}'...",
++        "atlauncher.results.contacting": "Đang kết nối ATLauncher...",
++        "atlauncher.results.empty": "Không tìm thấy gói ATLauncher phù hợp.",
++        "atlauncher.results.more": "Đang hiển thị {start}–{end} · còn kết quả tiếp theo",
++        "atlauncher.results.range": "Đang hiển thị {start}–{end}",
++        "atlauncher.results.ready": "Sẵn sàng tìm gói ATLauncher.",
++        "atlauncher.results.searching": "Đang tìm gói ATLauncher...",
++        "atlauncher.sort.name": "Tên",
++        "atlauncher.sort.newest": "Mới nhất",
++        "atlauncher.sort.popularity": "Phổ biến",
++        "atlauncher.sort.updated": "Mới cập nhật",
++        "atlauncher.version.loading": "Đang tải metadata phiên bản ATLauncher...",
++        "atlauncher.versions.none": "Không có phiên bản cho các kênh đang bật: {channels}.",
++        "atlauncher.version.status": "{version} · {channel} · Minecraft {minecraft} · {loader} · {files} file · {size} · RAM khuyến nghị {memory}",
++        "atlauncher.version.status_limited": "{version} · {channel} · Minecraft {minecraft} · {loader} · {files} file · {size} · RAM khuyến nghị {memory} · beta này chưa thể cài an toàn một số thao tác của gói",
++        "task.atlauncher.search": "Đang tìm gói ATLauncher...",
++        "task.atlauncher.load_details": "Đang tải chi tiết gói ATLauncher...",
++        "task.atlauncher.load_versions": "Đang tải phiên bản ATLauncher...",
++        "task.atlauncher.load_version_metadata": "Đang tải metadata phiên bản ATLauncher...",
++        "task.atlauncher.install_modpack": "Đang cài gói ATLauncher thành '{instance}'...",
++        "task.atlauncher.clear_cache": "Đang xóa bộ nhớ đệm ATLauncher...",
++        "status.atlauncher.modpack_installed": "Đã tạo instance từ gói ATLauncher.",
++        "status.atlauncher.cache_cleared": "Đã xóa bộ nhớ đệm ATLauncher.",
++        "progress.atlauncher.saving_manifest": "Đang lưu manifest modpack ATLauncher...",
++        "progress.atlauncher.checking_files": "Đang kiểm tra các file của gói ATLauncher...",
++        "progress.atlauncher.downloading_files": "Đang tải các file của gói ATLauncher...",
++        "progress.atlauncher.downloading_configs": "Đang tải các file cấu hình ATLauncher...",
++        "progress.atlauncher.ready": "Gói ATLauncher '{name}' đã sẵn sàng. Các file sẽ được tải ở lần khởi chạy đầu tiên."
+     },
+     "aliases": {
+         "Show static text over themed controls": "launcher_settings.theme.show_static_text",
+--- a/mcw_core/api/atlauncher/__init__.py
++++ b/mcw_core/api/atlauncher/__init__.py
+@@ -0,0 +1,6 @@
++from mcw_core.api.atlauncher.atlauncher_client import ATLauncherClient
++from mcw_core.api.atlauncher.atlauncher_content_manager import ATLauncherContentManager
++from mcw_core.api.atlauncher.atlauncher_pack_installer import ATLauncherPackInstaller
++from mcw_core.api.atlauncher.atlauncher_pack_registry import ATLauncherPackRegistry
++
++__all__ = ["ATLauncherClient", "ATLauncherContentManager", "ATLauncherPackInstaller", "ATLauncherPackRegistry"]
+--- a/mcw_core/api/atlauncher/atlauncher_client.py
++++ b/mcw_core/api/atlauncher/atlauncher_client.py
+@@ -0,0 +1,3 @@
++from src.core.atlauncher.atlauncher_client import ATLauncherClient
++
++__all__ = ["ATLauncherClient"]
+--- a/mcw_core/api/atlauncher/atlauncher_content_manager.py
++++ b/mcw_core/api/atlauncher/atlauncher_content_manager.py
+@@ -0,0 +1,3 @@
++from src.core.atlauncher.atlauncher_content_manager import ATLauncherContentManager
++
++__all__ = ["ATLauncherContentManager"]
+--- a/mcw_core/api/atlauncher/atlauncher_pack_installer.py
++++ b/mcw_core/api/atlauncher/atlauncher_pack_installer.py
+@@ -0,0 +1,3 @@
++from src.core.atlauncher.atlauncher_pack_installer import ATLauncherPackInstaller
++
++__all__ = ["ATLauncherPackInstaller"]
+--- a/mcw_core/api/atlauncher/atlauncher_pack_registry.py
++++ b/mcw_core/api/atlauncher/atlauncher_pack_registry.py
+@@ -0,0 +1,3 @@
++from src.core.atlauncher.atlauncher_pack_registry import ATLauncherPackRegistry
++
++__all__ = ["ATLauncherPackRegistry"]
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@
  
--    assert emitted == [("New Quilt", "1.21.1", "quilt")]
-+    assert emitted == [("New Quilt", "1.21.1", "quilt", "0.27.1")]
-     assert not hasattr(page.advanced_page, "create_name_input")
-     assert not hasattr(page.advanced_page, "create_requested")
+ [project]
+ name = "mcw-core"
+-version = "1.1.0"
++version = "1.1.1b1"
+ description = "Headless Minecraft runtime, instance, loader, modpack, repair, and launch core used by MCW Launcher"
+ readme = "docs/MCW_CORE_LIBRARY.md"
+ requires-python = ">=3.12"
+--- a/README.md
++++ b/README.md
+@@ -40,13 +40,27 @@
+ - Mods, resource packs, shader packs và saves.
+ - Java runtime, RAM, JVM arguments và cấu hình cửa sổ.
+ - Trạng thái runtime, lịch sử launch, backup và dữ liệu repair.
+-- Metadata nguồn cho mod/modpack từ Modrinth, CurseForge hoặc FTB.
++- Metadata nguồn cho mod/modpack từ Modrinth, CurseForge, FTB hoặc ATLauncher.
  
+ Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
+ ---
+ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
+ 
+ ---
++
++## Có gì mới trong v1.1.1-beta.1
++
++**v1.1.1-beta.1** mở đầu tích hợp ATLauncher:
++
++- Thêm browser ATLauncher trong Add Instance và workspace của instance.
++- Tìm kiếm pack công khai qua V2 GraphQL, với V1/CDN fallback cho metadata và manifest cài đặt.
++- Chọn version, kênh release/beta/alpha và các file tùy chọn được khuyến nghị trước khi tạo instance.
++- Tải file pack ở lần Launch đầu tiên, có retry giới hạn và xác minh SHA-1/MD5.
++- Hỗ trợ Configs.zip với staging và kiểm tra an toàn đường dẫn.
++- Pack dùng custom libraries, jar mods, extract/decomp hoặc browser-only files sẽ bị chặn rõ ràng trong beta này thay vì cài dở dang.
++- Chưa phát hành Core wheel mới; ATLauncher được bundle trong launcher để smoke test trước khi đồng bộ Core stable.
++
++Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.1.md`](docs/RELEASE-v1.1.1-beta.1.md).
+ 
+ ## Có gì mới trong v1.1.0
+ 
+--- a/src/config.py
++++ b/src/config.py
+@@ -1,9 +1,9 @@
+ from __future__ import annotations
+ 
+-VERSION = "v1.1.0"
+-VERSION_ID = "1.1.0"
++VERSION = "v1.1.1-beta.1"
++VERSION_ID = "1.1.1-beta.1"
+ VERSION_TAG = f"v{VERSION_ID}"
+-UPDATE_CHANNEL = "stable"
++UPDATE_CHANNEL = "beta"
+ GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
+ DEVELOPER_NAME = "mahiru7229"
+ LAUNCHER_SLUG = "mcw-launcher"
+@@ -11,6 +11,7 @@
+ MODRINTH_USER_AGENT = f"{DEVELOPER_NAME}/{LAUNCHER_SLUG}/{VERSION_ID} (https://github.com/{GITHUB_REPOSITORY})"
+ CURSEFORGE_USER_AGENT = MODRINTH_USER_AGENT
+ FTB_USER_AGENT = MODRINTH_USER_AGENT
++ATLAUNCHER_USER_AGENT = MODRINTH_USER_AGENT
+ 
+ # No CurseForge gateway is bundled by default. Users, launcher builds, or
+ # managed deployments must provide their own HTTPS gateway through local
+--- a/src/core/atlauncher/__init__.py
++++ b/src/core/atlauncher/__init__.py
+@@ -0,0 +1,6 @@
++from src.core.atlauncher.atlauncher_client import ATLauncherClient
++from src.core.atlauncher.atlauncher_content_manager import ATLauncherContentManager
++from src.core.atlauncher.atlauncher_pack_installer import ATLauncherPackInstaller
++from src.core.atlauncher.atlauncher_pack_registry import ATLauncherPackRegistry
++
++__all__ = ["ATLauncherClient", "ATLauncherContentManager", "ATLauncherPackInstaller", "ATLauncherPackRegistry"]
+--- a/src/core/atlauncher/atlauncher_cache.py
++++ b/src/core/atlauncher/atlauncher_cache.py
+@@ -0,0 +1,244 @@
++from __future__ import annotations
++
++from dataclasses import dataclass
++from datetime import datetime, timezone
++from pathlib import Path
++from threading import RLock
++from time import time
++from typing import Any
++import hashlib
++import json
++import os
++
++from src.core.fs.paths import Paths
++from src.models.atlauncher.cache import ATLauncherCacheInfo
++
++
++@dataclass(frozen=True, slots=True)
++class ATLauncherCacheLookup:
++    payload: Any
++    cache_info: ATLauncherCacheInfo
++
++
++class ATLauncherCache:
++    SCHEMA_VERSION = 1
++    MAX_SIZE_BYTES = 10 * 1024 * 1024
++    TARGET_SIZE_BYTES = 8 * 1024 * 1024
++    _lock = RLock()
++
++    @staticmethod
++    def root() -> Path:
++        directory = Paths.atlauncher_root() / "api"
++        directory.mkdir(parents=True, exist_ok=True)
++        return directory
++
++    @staticmethod
++    def entries_root() -> Path:
++        directory = ATLauncherCache.root() / "entries"
++        directory.mkdir(parents=True, exist_ok=True)
++        return directory
++
++    @staticmethod
++    def index_path() -> Path:
++        return ATLauncherCache.root() / "index.json"
++
++    @staticmethod
++    def make_key(namespace: str, path: str, params: dict[str, object] | None = None) -> str:
++        value = json.dumps(
++            {"namespace": str(namespace).casefold(), "path": str(path), "params": dict(sorted((params or {}).items()))},
++            ensure_ascii=False,
++            sort_keys=True,
++            separators=(",", ":"),
++        )
++        return hashlib.sha256(value.encode("utf-8")).hexdigest()
++
++    @staticmethod
++    def get(cache_key: str, ttl_seconds: int, allow_stale: bool = False) -> ATLauncherCacheLookup | None:
++        with ATLauncherCache._lock:
++            index = ATLauncherCache._load_index()
++            metadata = index.get("entries", {}).get(cache_key)
++            if not isinstance(metadata, dict):
++                return None
++            path = ATLauncherCache.entries_root() / f"{cache_key}.json"
++            entry = ATLauncherCache._read_json(path)
++            if not isinstance(entry, dict) or entry.get("schemaVersion") != ATLauncherCache.SCHEMA_VERSION or "payload" not in entry:
++                ATLauncherCache._remove_entry(index, cache_key, path)
++                ATLauncherCache._write_index(index)
++                return None
++            refreshed_at = float(entry.get("refreshedAt", 0) or 0)
++            age = max(0, int(time() - refreshed_at)) if refreshed_at > 0 else 2**31 - 1
++            stale = ttl_seconds > 0 and age > max(0, int(ttl_seconds))
++            if stale and not allow_stale:
++                return None
++            metadata["lastAccessedAt"] = time()
++            metadata["size"] = ATLauncherCache._safe_size(path)
++            ATLauncherCache._recalculate(index)
++            ATLauncherCache._write_index(index)
++            return ATLauncherCacheLookup(
++                payload=entry.get("payload"),
++                cache_info=ATLauncherCache._info(index, refreshed_at, True, stale, age),
++            )
++
++    @staticmethod
++    def put(cache_key: str, namespace: str, payload: object, ttl_seconds: int) -> ATLauncherCacheLookup:
++        now = time()
++        path = ATLauncherCache.entries_root() / f"{cache_key}.json"
++        with ATLauncherCache._lock:
++            index = ATLauncherCache._load_index()
++            entry = {
++                "schemaVersion": ATLauncherCache.SCHEMA_VERSION,
++                "namespace": str(namespace).strip().casefold(),
++                "refreshedAt": now,
++                "expiresAt": now + max(0, int(ttl_seconds)),
++                "payload": payload,
++            }
++            ATLauncherCache._write_json_atomic(path, entry)
++            index.setdefault("entries", {})[cache_key] = {
++                "namespace": entry["namespace"],
++                "refreshedAt": now,
++                "lastAccessedAt": now,
++                "size": ATLauncherCache._safe_size(path),
++            }
++            provider = index.setdefault("provider", {})
++            provider["lastSuccessfulRefreshAt"] = now
++            provider["lastRefreshError"] = ""
++            ATLauncherCache._recalculate(index)
++            ATLauncherCache._evict(index)
++            ATLauncherCache._write_index(index)
++            return ATLauncherCacheLookup(payload=payload, cache_info=ATLauncherCache._info(index, now, False, False, 0))
++
++    @staticmethod
++    def record_failure(message: str) -> None:
++        with ATLauncherCache._lock:
++            index = ATLauncherCache._load_index()
++            index.setdefault("provider", {})["lastRefreshError"] = str(message).strip()[:500]
++            ATLauncherCache._write_index(index)
++
++    @staticmethod
++    def status() -> ATLauncherCacheInfo:
++        with ATLauncherCache._lock:
++            index = ATLauncherCache._load_index()
++            provider = index.get("provider", {}) if isinstance(index.get("provider"), dict) else {}
++            refreshed = float(provider.get("lastSuccessfulRefreshAt", 0) or 0)
++            age = max(0, int(time() - refreshed)) if refreshed > 0 else 0
++            return ATLauncherCache._info(index, refreshed, False, False, age)
++
++    @staticmethod
++    def clear() -> None:
++        with ATLauncherCache._lock:
++            for path in ATLauncherCache.entries_root().glob("*.json"):
++                try:
++                    path.unlink()
++                except OSError:
++                    pass
++            ATLauncherCache._write_index(ATLauncherCache._empty_index())
++
++    @staticmethod
++    def _empty_index() -> dict[str, object]:
++        return {
++            "schemaVersion": ATLauncherCache.SCHEMA_VERSION,
++            "totalSize": 0,
++            "provider": {"lastSuccessfulRefreshAt": 0.0, "lastRefreshError": ""},
++            "entries": {},
++        }
++
++    @staticmethod
++    def _load_index() -> dict:
++        data = ATLauncherCache._read_json(ATLauncherCache.index_path())
++        if not isinstance(data, dict) or data.get("schemaVersion") != ATLauncherCache.SCHEMA_VERSION:
++            return ATLauncherCache._empty_index()
++        data.setdefault("entries", {})
++        data.setdefault("provider", {})
++        return data
++
++    @staticmethod
++    def _write_index(index: dict) -> None:
++        ATLauncherCache._write_json_atomic(ATLauncherCache.index_path(), index)
++
++    @staticmethod
++    def _evict(index: dict) -> None:
++        ATLauncherCache._recalculate(index)
++        if int(index.get("totalSize", 0) or 0) <= ATLauncherCache.MAX_SIZE_BYTES:
++            return
++        entries = index.get("entries", {}) if isinstance(index.get("entries"), dict) else {}
++        ordered = sorted(entries.items(), key=lambda item: float(item[1].get("lastAccessedAt", 0) or 0) if isinstance(item[1], dict) else 0)
++        for cache_key, _ in ordered:
++            ATLauncherCache._remove_entry(index, cache_key, ATLauncherCache.entries_root() / f"{cache_key}.json")
++            ATLauncherCache._recalculate(index)
++            if int(index.get("totalSize", 0) or 0) <= ATLauncherCache.TARGET_SIZE_BYTES:
++                break
++
++    @staticmethod
++    def _remove_entry(index: dict, cache_key: str, path: Path) -> None:
++        try:
++            path.unlink()
++        except OSError:
++            pass
++        entries = index.get("entries")
++        if isinstance(entries, dict):
++            entries.pop(cache_key, None)
++
++    @staticmethod
++    def _recalculate(index: dict) -> None:
++        entries = index.get("entries", {}) if isinstance(index.get("entries"), dict) else {}
++        total = 0
++        missing: list[str] = []
++        for key, metadata in entries.items():
++            path = ATLauncherCache.entries_root() / f"{key}.json"
++            if not path.exists():
++                missing.append(key)
++                continue
++            size = ATLauncherCache._safe_size(path)
++            if isinstance(metadata, dict):
++                metadata["size"] = size
++            total += size
++        for key in missing:
++            entries.pop(key, None)
++        index["totalSize"] = total
++
++    @staticmethod
++    def _info(index: dict, refreshed_at: float, from_cache: bool, stale: bool, age: int) -> ATLauncherCacheInfo:
++        provider = index.get("provider", {}) if isinstance(index.get("provider"), dict) else {}
++        return ATLauncherCacheInfo(
++            refreshed_at=ATLauncherCache._iso(refreshed_at),
++            from_cache=bool(from_cache),
++            stale=bool(stale),
++            age_seconds=max(0, int(age)),
++            last_error=str(provider.get("lastRefreshError") or ""),
++            cache_size_bytes=max(0, int(index.get("totalSize", 0) or 0)),
++            cache_limit_bytes=ATLauncherCache.MAX_SIZE_BYTES,
++        )
++
++    @staticmethod
++    def _read_json(path: Path) -> object | None:
++        try:
++            return json.loads(path.read_text(encoding="utf-8"))
++        except (FileNotFoundError, OSError, json.JSONDecodeError):
++            return None
++
++    @staticmethod
++    def _write_json_atomic(path: Path, data: object) -> None:
++        path.parent.mkdir(parents=True, exist_ok=True)
++        temporary = path.with_suffix(path.suffix + ".tmp")
++        with temporary.open("w", encoding="utf-8", newline="\n") as output:
++            json.dump(data, output, ensure_ascii=False, separators=(",", ":"))
++            output.write("\n")
++            output.flush()
++            try:
++                os.fsync(output.fileno())
++            except OSError:
++                pass
++        temporary.replace(path)
++
++    @staticmethod
++    def _safe_size(path: Path) -> int:
++        try:
++            return max(0, int(path.stat().st_size))
++        except OSError:
++            return 0
++
++    @staticmethod
++    def _iso(timestamp: float) -> str:
++        if timestamp <= 0:
++            return ""
++        return datetime.fromtimestamp(timestamp, timezone.utc).isoformat()
+--- a/src/core/atlauncher/atlauncher_client.py
++++ b/src/core/atlauncher/atlauncher_client.py
+@@ -0,0 +1,681 @@
++from __future__ import annotations
++
++from datetime import datetime, timezone
++import json
++from pathlib import PurePosixPath
++import re
++from typing import Iterable
++from urllib.parse import quote, urljoin
++
++import httpx
++
++from src.config import ATLAUNCHER_USER_AGENT
++from src.core.atlauncher.atlauncher_cache import ATLauncherCache, ATLauncherCacheLookup
++from src.core.modloader.mod_loader_manager import ModLoaderManager
++from src.core.network.httpx_downloader import HttpDownloader
++from src.models.atlauncher.cache import ATLauncherCacheInfo
++from src.models.atlauncher.pack import ATLauncherPack, ATLauncherSearchResult
++from src.models.atlauncher.version import ATLauncherConfigBundle, ATLauncherFile, ATLauncherVersion, ATLauncherVersionSummary
++
++
++class ATLauncherClient:
++    """ATLauncher metadata adapter with public V2, V1, and CDN fallbacks.
++
++    The V2 provider API is still marked beta, so GraphQL details stay behind a
++    small public contract while stable V1/CDN endpoints provide installation
++    metadata when the browse schema is unavailable.
++    """
++
++    GRAPHQL_URL = "https://api.atlauncher.com/v2/graphql"
++    V1_BASE_URL = "https://api.atlauncher.com/v1/"
++    CDN_BASE_URL = "https://download.nodecdn.net/containers/atl/"
++    WEBSITE_BASE_URL = "https://atlauncher.com/pack/"
++    SEARCH_TTL_SECONDS = 5 * 60
++    PROJECT_TTL_SECONDS = 15 * 60
++    VERSION_TTL_SECONDS = 30 * 60
++    REQUEST_TIMEOUT_SECONDS = 25.0
++    MAX_PAGE_SIZE = 50
++    MAX_SEARCH_WINDOW = 250
++
++    _PACK_FIELDS = """
++        id
++        position
++        name
++        safeName
++        latestVersion {
++            id
++            version
++            minecraftVersion
++            changelog
++            isRecommended
++            canUpdate
++            createdAt
++            updatedAt
++            publishedAt
++        }
++    """
++
++    @staticmethod
++    def cache_status() -> ATLauncherCacheInfo:
++        return ATLauncherCache.status()
++
++    @staticmethod
++    def clear_cache() -> None:
++        ATLauncherCache.clear()
++
++    @staticmethod
++    def search_projects(query: str = "", index: int = 0, page_size: int = 25, sort: str = "popularity", force_refresh: bool = False) -> ATLauncherSearchResult:
++        normalized_query = " ".join(str(query).split())
++        normalized_index = max(0, int(index))
++        normalized_page_size = min(max(1, int(page_size)), ATLauncherClient.MAX_PAGE_SIZE)
++        fetch_count = min(ATLauncherClient.MAX_SEARCH_WINDOW, normalized_index + normalized_page_size + 1)
++        variables = {"first": fetch_count, "query": normalized_query}
++        if normalized_query:
++            queries = (
++                f"""query SearchPacks($first: Int!, $query: String!) {{
++                    searchPacks(first: $first, query: $query, field: NAME) {{ {ATLauncherClient._PACK_FIELDS} }}
++                }}""",
++            )
++            field = "searchPacks"
++        else:
++            queries = (
++                f"""query Packs($first: Int!) {{
++                    packs(first: $first) {{ {ATLauncherClient._PACK_FIELDS} }}
++                }}""",
++            )
++            field = "packs"
++        try:
++            lookup = ATLauncherClient._request_graphql(
++                queries,
++                variables,
++                ttl=ATLauncherClient.SEARCH_TTL_SECONDS,
++                force_refresh=force_refresh,
++                allow_stale_on_error=True,
++                namespace="search" if normalized_query else "packs",
++            )
++            raw = ATLauncherClient._data_list(lookup.payload, field)
++        except RuntimeError:
++            lookup, raw = ATLauncherClient._search_v1(normalized_query, force_refresh)
++        parsed = [ATLauncherClient._parse_pack(item) for item in raw if isinstance(item, dict)]
++        parsed = [item for item in parsed if item.safe_name and item.name]
++        parsed = ATLauncherClient._sort_projects(parsed, sort)
++        page = tuple(parsed[normalized_index : normalized_index + normalized_page_size])
++        has_more = len(parsed) > normalized_index + normalized_page_size
++        known_total = len(parsed) if not has_more else normalized_index + len(page) + 1
++        return ATLauncherSearchResult(
++            projects=page,
++            total_count=known_total,
++            index=normalized_index,
++            page_size=normalized_page_size,
++            has_more=has_more,
++            cache_info=lookup.cache_info,
++        )
++
++    @staticmethod
++    def get_project(safe_name: str, force_refresh: bool = False) -> ATLauncherPack:
++        token = ATLauncherClient._safe_name(safe_name)
++        url = f"{ATLauncherClient.V1_BASE_URL}pack/{quote(token, safe='')}"
++        try:
++            lookup = ATLauncherClient._request_json(
++                url,
++                ttl=ATLauncherClient.PROJECT_TTL_SECONDS,
++                force_refresh=force_refresh,
++                allow_stale_on_error=True,
++                namespace="project-v1",
++            )
++            payload = lookup.payload
++            if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
++                payload = payload["data"]
++            if not isinstance(payload, dict):
++                raise RuntimeError(f"ATLauncher pack '{token}' is unavailable.")
++            project = ATLauncherClient._parse_pack(payload)
++        except RuntimeError:
++            project = ATLauncherClient._get_project_v2(token, force_refresh)
++        if not project.safe_name:
++            raise RuntimeError(f"ATLauncher pack '{token}' returned invalid metadata.")
++        return project
++
++    @staticmethod
++    def get_project_details(safe_name: str, force_refresh: bool = False) -> ATLauncherPack:
++        return ATLauncherClient.get_project(safe_name, force_refresh=force_refresh)
++
++    @staticmethod
++    def list_versions(safe_name: str, release_types: Iterable[str] | None = None, force_refresh: bool = False) -> tuple[ATLauncherVersionSummary, ...]:
++        project = ATLauncherClient.get_project(safe_name, force_refresh=force_refresh)
++        allowed = ATLauncherClient._normalized_release_types(release_types)
++        versions = [version for version in project.versions if version.release_type in allowed]
++        versions.sort(key=lambda item: (item.published_at, item.updated_at, item.version_id, item.version), reverse=True)
++        return tuple(versions)
++
++    @staticmethod
++    def get_version(safe_name: str, version: str, force_refresh: bool = False) -> ATLauncherVersion:
++        token = ATLauncherClient._safe_name(safe_name)
++        version_name = str(version).strip()
++        if not version_name or len(version_name) > 160 or any(character in version_name for character in "\\/\x00\r\n"):
++            raise RuntimeError("Invalid ATLauncher pack version identifier.")
++        manifest_url = f"{ATLauncherClient.CDN_BASE_URL}packs/{quote(token, safe='')}/versions/{quote(version_name, safe='')}/Configs.json"
++        try:
++            lookup = ATLauncherClient._request_json(
++                manifest_url,
++                ttl=ATLauncherClient.VERSION_TTL_SECONDS,
++                force_refresh=force_refresh,
++                allow_stale_on_error=True,
++                namespace="version-manifest",
++            )
++            manifest = lookup.payload
++            if isinstance(manifest, dict) and isinstance(manifest.get("data"), dict):
++                manifest = manifest["data"]
++            if not isinstance(manifest, dict):
++                raise RuntimeError("ATLauncher returned an invalid installation manifest.")
++        except RuntimeError:
++            legacy_url = f"{ATLauncherClient.V1_BASE_URL}pack/{quote(token, safe='')}/{quote(version_name, safe='')}"
++            lookup = ATLauncherClient._request_json(
++                legacy_url,
++                ttl=ATLauncherClient.VERSION_TTL_SECONDS,
++                force_refresh=force_refresh,
++                allow_stale_on_error=True,
++                namespace="version-v1",
++            )
++            manifest = lookup.payload
++            if isinstance(manifest, dict) and isinstance(manifest.get("data"), dict):
++                manifest = manifest["data"]
++            if not isinstance(manifest, dict):
++                raise RuntimeError(f"ATLauncher pack version '{version_name}' is unavailable.")
++        summary = ATLauncherClient._find_version_summary(token, version_name)
++        metadata = {
++            "id": summary.version_id if summary is not None else version_name,
++            "version": version_name,
++            "minecraftVersion": summary.minecraft_version if summary is not None else manifest.get("minecraft"),
++            "changelog": summary.changelog if summary is not None else manifest.get("changelog"),
++            "isRecommended": summary.recommended if summary is not None else bool(manifest.get("recommended", False)),
++            "isDevelopment": summary.development if summary is not None else bool(manifest.get("development", False)),
++            "publishedAt": summary.published_at if summary is not None else manifest.get("published"),
++            "rawJson": manifest,
++        }
++        return ATLauncherClient._parse_version(token, metadata)
++
++    @staticmethod
++    def normalize_loader(value: object) -> str:
++        name = str(value or "").strip().casefold().replace(" ", "").replace("_", "").replace("-", "")
++        aliases = {
++            "": ModLoaderManager.VANILLA,
++            "vanilla": ModLoaderManager.VANILLA,
++            "minecraft": ModLoaderManager.VANILLA,
++            "forge": ModLoaderManager.FORGE,
++            "minecraftforge": ModLoaderManager.FORGE,
++            "neoforge": ModLoaderManager.NEOFORGE,
++            "fabric": ModLoaderManager.FABRIC,
++            "fabricloader": ModLoaderManager.FABRIC,
++            "quilt": ModLoaderManager.QUILT,
++            "quiltloader": ModLoaderManager.QUILT,
++        }
++        return aliases.get(name, name)
++
++    @staticmethod
++    def _request_graphql(queries: tuple[str, ...], variables: dict[str, object], ttl: int, force_refresh: bool, allow_stale_on_error: bool, namespace: str) -> ATLauncherCacheLookup:
++        cache_key = ATLauncherCache.make_key(namespace, "graphql", {"variables": variables, "queries": queries})
++        if not force_refresh:
++            cached = ATLauncherCache.get(cache_key, ttl)
++            if cached is not None:
++                return cached
++        errors: list[str] = []
++        for query in queries:
++            try:
++                response = HttpDownloader.get_client().post(
++                    ATLauncherClient.GRAPHQL_URL,
++                    headers=ATLauncherClient._headers(),
++                    json={"query": query, "variables": variables},
++                    timeout=ATLauncherClient.REQUEST_TIMEOUT_SECONDS,
++                )
++                response.raise_for_status()
++                payload = response.json()
++                if not isinstance(payload, dict):
++                    raise RuntimeError("ATLauncher returned a non-object GraphQL response.")
++                graphql_errors = payload.get("errors")
++                if isinstance(graphql_errors, list) and graphql_errors:
++                    detail = "; ".join(
++                        str(item.get("message") if isinstance(item, dict) else item).strip()
++                        for item in graphql_errors
++                        if str(item.get("message") if isinstance(item, dict) else item).strip()
++                    )
++                    raise RuntimeError(detail or "ATLauncher GraphQL request failed.")
++                if not isinstance(payload.get("data"), dict):
++                    raise RuntimeError("ATLauncher GraphQL response did not contain data.")
++                return ATLauncherCache.put(cache_key, namespace, payload, ttl)
++            except (httpx.HTTPError, ValueError, RuntimeError) as error:
++                errors.append(str(error) or type(error).__name__)
++        return ATLauncherClient._stale_or_error(cache_key, ttl, namespace, errors, allow_stale_on_error)
++
++    @staticmethod
++    def _request_json(url: str, ttl: int, force_refresh: bool, allow_stale_on_error: bool, namespace: str) -> ATLauncherCacheLookup:
++        cache_key = ATLauncherCache.make_key(namespace, url)
++        if not force_refresh:
++            cached = ATLauncherCache.get(cache_key, ttl)
++            if cached is not None:
++                return cached
++        errors: list[str] = []
++        try:
++            response = HttpDownloader.get_client().get(url, headers=ATLauncherClient._headers(), timeout=ATLauncherClient.REQUEST_TIMEOUT_SECONDS)
++            response.raise_for_status()
++            payload = response.json()
++            if not isinstance(payload, (dict, list)):
++                raise RuntimeError("ATLauncher returned an unsupported JSON response.")
++            return ATLauncherCache.put(cache_key, namespace, payload, ttl)
++        except (httpx.HTTPError, ValueError, RuntimeError) as error:
++            errors.append(str(error) or type(error).__name__)
++        return ATLauncherClient._stale_or_error(cache_key, ttl, namespace, errors, allow_stale_on_error)
++
++    @staticmethod
++    def _stale_or_error(cache_key: str, ttl: int, namespace: str, errors: list[str], allow_stale_on_error: bool) -> ATLauncherCacheLookup:
++        detail = "; ".join(dict.fromkeys(item for item in errors if item)) or "No ATLauncher endpoint responded."
++        ATLauncherCache.record_failure(detail)
++        if allow_stale_on_error:
++            stale = ATLauncherCache.get(cache_key, ttl, allow_stale=True)
++            if stale is not None:
++                return stale
++        raise RuntimeError(f"Could not contact the ATLauncher service ({namespace}): {detail}")
++
++    @staticmethod
++    def _headers() -> dict[str, str]:
++        return {"User-Agent": ATLAUNCHER_USER_AGENT, "Accept": "application/json", "Content-Type": "application/json"}
++
++    @staticmethod
++    def _search_v1(query: str, force_refresh: bool) -> tuple[ATLauncherCacheLookup, list]:
++        urls = (
++            f"{ATLauncherClient.V1_BASE_URL}packs/full/public",
++            f"{ATLauncherClient.CDN_BASE_URL}launcher/json/packsnew.json",
++        )
++        errors: list[str] = []
++        for url in urls:
++            try:
++                lookup = ATLauncherClient._request_json(url, ATLauncherClient.SEARCH_TTL_SECONDS, force_refresh, True, "packs-v1")
++                payload = lookup.payload
++                if isinstance(payload, dict):
++                    for key in ("packs", "data", "results"):
++                        if isinstance(payload.get(key), list):
++                            payload = payload[key]
++                            break
++                raw = payload if isinstance(payload, list) else []
++                if query:
++                    needle = query.casefold()
++                    raw = [item for item in raw if isinstance(item, dict) and needle in ATLauncherClient._text(item.get("name")).casefold()]
++                return lookup, raw
++            except RuntimeError as error:
++                errors.append(str(error))
++        raise RuntimeError("; ".join(errors) or "Could not list ATLauncher packs.")
++
++    @staticmethod
++    def _get_project_v2(token: str, force_refresh: bool) -> ATLauncherPack:
++        variables = {"safeName": token}
++        query = f"""query Pack($safeName: String!) {{
++            pack(safeName: $safeName) {{ {ATLauncherClient._PACK_FIELDS} }}
++        }}"""
++        lookup = ATLauncherClient._request_graphql((query,), variables, ATLauncherClient.PROJECT_TTL_SECONDS, force_refresh, True, "project-v2")
++        payload = ATLauncherClient._data_value(lookup.payload, "pack")
++        if not isinstance(payload, dict):
++            raise RuntimeError(f"ATLauncher pack '{token}' is unavailable.")
++        return ATLauncherClient._parse_pack(payload)
++
++    @staticmethod
++    def _find_version_summary(safe_name: str, version_name: str) -> ATLauncherVersionSummary | None:
++        try:
++            project = ATLauncherClient.get_project(safe_name)
++        except RuntimeError:
++            return None
++        return next((item for item in project.versions if item.version == version_name), None)
++
++    @staticmethod
++    def _parse_pack(data: dict) -> ATLauncherPack:
++        safe_name = ATLauncherClient._text(data.get("safeName"))
++        name = ATLauncherClient._text(data.get("name")) or safe_name
++        if not safe_name and name:
++            safe_name = re.sub(r"[^A-Za-z0-9]", "", name)
++        description = ATLauncherClient._text(data.get("description"))
++        raw_versions = data.get("versions") if isinstance(data.get("versions"), list) else []
++        latest = data.get("latestVersion") if isinstance(data.get("latestVersion"), dict) else None
++        versions = [ATLauncherClient._parse_version_summary(item) for item in raw_versions if isinstance(item, dict)]
++        if latest is not None:
++            latest_summary = ATLauncherClient._parse_version_summary(latest)
++            if latest_summary.version and all(item.version != latest_summary.version for item in versions):
++                versions.insert(0, latest_summary)
++        versions = [item for item in versions if item.version]
++        versions.sort(key=lambda item: (item.published_at, item.updated_at, item.version_id, item.version), reverse=True)
++        icon_token = re.sub(r"[^A-Za-z0-9]", "", name).casefold() + ".png" if name else ""
++        icon_url = f"{ATLauncherClient.CDN_BASE_URL}launcher/images/{quote(icon_token, safe='')}" if icon_token else ""
++        website = ATLauncherClient._text(data.get("websiteURL") or data.get("websiteUrl"))
++        if not website and safe_name:
++            website = ATLauncherClient.WEBSITE_BASE_URL + quote(safe_name, safe="")
++        latest_updated = ATLauncherClient._iso(latest.get("updatedAt") or latest.get("updated")) if latest is not None else ""
++        latest_created = ATLauncherClient._iso(latest.get("createdAt") or latest.get("created") or latest.get("publishedAt") or latest.get("published")) if latest is not None else ""
++        return ATLauncherPack(
++            pack_id=ATLauncherClient._text(data.get("id")),
++            safe_name=safe_name,
++            name=name,
++            synopsis=ATLauncherClient._first_sentence(description),
++            description=description,
++            icon_url=icon_url,
++            position=ATLauncherClient._int(data.get("position")),
++            updated_at=ATLauncherClient._iso(data.get("updatedAt") or data.get("updated")) or latest_updated,
++            created_at=ATLauncherClient._iso(data.get("createdAt") or data.get("created")) or latest_created,
++            website_url=website,
++            support_url=ATLauncherClient._text(data.get("supportURL") or data.get("supportUrl")),
++            pack_type=ATLauncherClient._text(data.get("type")),
++            versions=tuple(versions),
++        )
++
++    @staticmethod
++    def _parse_version_summary(data: dict) -> ATLauncherVersionSummary:
++        version_name = ATLauncherClient._text(data.get("version") or data.get("name"))
++        return ATLauncherVersionSummary(
++            version_id=ATLauncherClient._text(data.get("id")) or version_name,
++            version=version_name,
++            minecraft_version=ATLauncherClient._text(data.get("minecraftVersion") or data.get("minecraft")),
++            changelog=ATLauncherClient._text(data.get("changelog")),
++            recommended=bool(data.get("isRecommended", data.get("recommended", False))),
++            development=bool(data.get("isDevelopment", data.get("development", False))),
++            created_at=ATLauncherClient._iso(data.get("createdAt") or data.get("created")),
++            updated_at=ATLauncherClient._iso(data.get("updatedAt") or data.get("updated")),
++            published_at=ATLauncherClient._iso(data.get("publishedAt") or data.get("published")),
++        )
++
++
++    @staticmethod
++    def _parse_version(safe_name: str, data: dict) -> ATLauncherVersion:
++        raw = data.get("rawJson")
++        if isinstance(raw, str):
++            try:
++                manifest = json.loads(raw)
++            except json.JSONDecodeError as error:
++                raise RuntimeError("ATLauncher returned invalid raw pack metadata.") from error
++        elif isinstance(raw, dict):
++            manifest = raw
++        else:
++            manifest = {}
++        if not isinstance(manifest, dict):
++            raise RuntimeError("ATLauncher pack metadata is not an object.")
++        minecraft = ATLauncherClient._text(manifest.get("minecraft") or data.get("minecraftVersion"))
++        loader_name, loader_version = ATLauncherClient._loader(manifest)
++        files: list[ATLauncherFile] = []
++        for collection, library in ((manifest.get("libraries"), True), (manifest.get("mods"), False)):
++            if not isinstance(collection, list):
++                continue
++            for index, item in enumerate(collection):
++                if not isinstance(item, dict) or ATLauncherClient._is_loader_file(item, loader_name):
++                    continue
++                parsed = ATLauncherClient._parse_file(safe_name, data, item, index, library)
++                if parsed is not None:
++                    files.append(parsed)
++        config_bundle = None
++        configs = manifest.get("configs") if isinstance(manifest.get("configs"), dict) else {}
++        no_configs = bool(manifest.get("noConfigs", False))
++        config_sha1 = ATLauncherClient._text(configs.get("sha1") or configs.get("hash"))
++        config_size = ATLauncherClient._int(configs.get("size") or configs.get("filesize"))
++        version_name = ATLauncherClient._text(data.get("version") or manifest.get("version"))
++        if not no_configs and version_name and (config_sha1 or config_size > 0):
++            url = f"{ATLauncherClient.CDN_BASE_URL}packs/{quote(safe_name, safe='')}/versions/{quote(version_name, safe='')}/Configs.zip"
++            config_bundle = ATLauncherConfigBundle(url=url, sha1=config_sha1, size=config_size)
++        unsupported = ATLauncherClient._unsupported_actions(manifest, files)
++        memory = manifest.get("memory") if isinstance(manifest.get("memory"), dict) else {}
++        minimum_memory = ATLauncherClient._memory_mb(memory.get("minimum") or manifest.get("minimumMemory"))
++        recommended_memory = ATLauncherClient._memory_mb(memory.get("recommended") or manifest.get("recommendedMemory"))
++        warnings: list[str] = []
++        if any(file.download_type == "browser" for file in files):
++            warnings.append("Some pack files require a browser-assisted download and cannot be installed automatically yet.")
++        return ATLauncherVersion(
++            pack_id=ATLauncherClient._text(data.get("packId")),
++            safe_name=safe_name,
++            version_id=ATLauncherClient._text(data.get("id")) or version_name,
++            version=version_name,
++            minecraft_version=minecraft,
++            changelog=ATLauncherClient._text(data.get("changelog")),
++            recommended=bool(data.get("isRecommended", False)),
++            development=bool(data.get("isDevelopment", False)),
++            loader=loader_name,
++            loader_version=loader_version,
++            files=tuple(files),
++            config_bundle=config_bundle,
++            minimum_memory_mb=minimum_memory,
++            recommended_memory_mb=recommended_memory,
++            java_version=ATLauncherClient._text(manifest.get("java") or manifest.get("javaVersion")),
++            warnings=tuple(warnings),
++            unsupported_actions=tuple(unsupported),
++            published_at=ATLauncherClient._iso(data.get("publishedAt")),
++            raw_manifest=manifest,
++        )
++
++    @staticmethod
++    def _parse_file(safe_name: str, version_data: dict, item: dict, index: int, library: bool) -> ATLauncherFile | None:
++        name = ATLauncherClient._text(item.get("name"))
++        filename = ATLauncherClient._text(item.get("file"))
++        if not filename:
++            return None
++        raw_type = ATLauncherClient._text(item.get("type") or ("library" if library else "mods")).casefold()
++        path = ATLauncherClient._destination(raw_type, filename, item, ATLauncherClient._text(version_data.get("minecraftVersion")))
++        raw_download = ATLauncherClient._text(item.get("download") or item.get("downloadType") or "direct").casefold()
++        source = ATLauncherClient._text(item.get("url") or item.get("server"))
++        urls = ATLauncherClient._urls(safe_name, ATLauncherClient._text(version_data.get("version")), source, raw_download)
++        dependencies = item.get("depends") or item.get("dependencies") or ()
++        if isinstance(dependencies, str):
++            dependency_values = tuple(value.strip() for value in dependencies.split(",") if value.strip())
++        elif isinstance(dependencies, list):
++            dependency_values = tuple(ATLauncherClient._text(value) for value in dependencies if ATLauncherClient._text(value))
++        else:
++            dependency_values = ()
++        optional = bool(item.get("optional", False))
++        selected = bool(item.get("selected", item.get("default", False)))
++        recommended = bool(item.get("recommended", selected))
++        client_value = item.get("client")
++        return ATLauncherFile(
++            file_id=ATLauncherClient._text(item.get("id")) or f"{index}:{filename}",
++            name=name or PurePosixPath(filename.replace("\\", "/")).name,
++            path=path,
++            urls=urls,
++            sha1=ATLauncherClient._text(item.get("sha1")).casefold(),
++            md5=ATLauncherClient._text(item.get("md5")).casefold(),
++            size=max(0, ATLauncherClient._int(item.get("size") or item.get("filesize"))),
++            download_type=raw_download or "direct",
++            optional=optional,
++            selected=selected,
++            recommended=recommended,
++            client_only=client_value is True,
++            server_only=client_value is False,
++            library=library or bool(item.get("library", False)) or raw_type in {"library", "dependency", "depandency"},
++            dependencies=dependency_values,
++            extract_to=ATLauncherClient._text(item.get("extractTo")),
++            extract_folder=ATLauncherClient._text(item.get("extractFolder")).replace("%s%", "/"),
++            decomp_type=ATLauncherClient._text(item.get("decompType")),
++            decomp_file=ATLauncherClient._text(item.get("decompFile")),
++            force=bool(item.get("force", False)),
++        )
++
++    @staticmethod
++    def _loader(manifest: dict) -> tuple[str, str]:
++        loader = manifest.get("loader") if isinstance(manifest.get("loader"), dict) else {}
++        name = ATLauncherClient.normalize_loader(loader.get("type"))
++        metadata = loader.get("metadata") if isinstance(loader.get("metadata"), dict) else {}
++        version = ATLauncherClient._text(metadata.get("loader") or metadata.get("rawVersion") or metadata.get("version") or loader.get("version"))
++        if not loader:
++            mods = manifest.get("mods") if isinstance(manifest.get("mods"), list) else ()
++            for item in mods:
++                if not isinstance(item, dict):
++                    continue
++                item_name = ATLauncherClient._text(item.get("name")).casefold()
++                item_type = ATLauncherClient._text(item.get("type")).casefold()
++                if "neoforge" in item_name:
++                    return ModLoaderManager.NEOFORGE, ATLauncherClient._text(item.get("version")) or ModLoaderManager.AUTO
++                if item_type == "forge" or item_name == "minecraft forge":
++                    return ModLoaderManager.FORGE, ATLauncherClient._text(item.get("version")) or ModLoaderManager.AUTO
++        if name == ModLoaderManager.VANILLA:
++            return name, "-1"
++        if (metadata.get("recommended") or metadata.get("latest") or loader.get("choose")) and not version:
++            version = ModLoaderManager.AUTO
++        return name, version or ModLoaderManager.AUTO
++
++    @staticmethod
++    def _is_loader_file(item: dict, loader_name: str) -> bool:
++        name = ATLauncherClient._text(item.get("name")).casefold()
++        raw_type = ATLauncherClient._text(item.get("type")).casefold()
++        if loader_name == ModLoaderManager.FORGE and (raw_type == "forge" or name == "minecraft forge"):
++            return True
++        if loader_name == ModLoaderManager.NEOFORGE and "neoforge" in name:
++            return True
++        return False
++
++    @staticmethod
++    def _destination(raw_type: str, filename: str, item: dict, minecraft_version: str) -> str:
++        safe_filename = PurePosixPath(filename.replace("\\", "/")).name
++        mapping = {
++            "mods": "mods",
++            "mod": "mods",
++            "library": ".mcw/atlauncher/libraries",
++            "coremods": "coremods",
++            "flan": "Flan",
++            "ic2lib": "mods/ic2",
++            "denlib": "mods/denlib",
++            "plugins": "plugins",
++            "texturepack": "texturepacks",
++            "resourcepack": "resourcepacks",
++            "shaderpack": "shaderpacks",
++        }
++        if raw_type in {"dependency", "depandency"}:
++            directory = f"mods/{minecraft_version}" if minecraft_version else "mods"
++        elif raw_type in {"root", "jar", "forge", "mcpc"}:
++            directory = ".mcw/atlauncher/legacy"
++        elif raw_type in {"extract", "texturepackextract", "resourcepackextract", "decomp"}:
++            directory = ".mcw/atlauncher/downloads"
++        else:
++            directory = mapping.get(raw_type, "mods")
++        prefix = ATLauncherClient._text(item.get("filePrefix") or item.get("path")).replace("\\", "/").strip("/")
++        if prefix:
++            directory = f"{directory}/{prefix}"
++        return f"{directory}/{safe_filename}" if directory else safe_filename
++
++    @staticmethod
++    def _urls(safe_name: str, version: str, source: str, download_type: str) -> tuple[str, ...]:
++        if download_type == "browser":
++            return (source,) if source.startswith(("http://", "https://")) else ()
++        if download_type == "direct":
++            return (source,) if source.startswith(("http://", "https://")) else ()
++        if download_type == "server":
++            if not source:
++                return ()
++            return (urljoin(ATLauncherClient.CDN_BASE_URL, source.lstrip("/")),)
++        if source.startswith(("http://", "https://")):
++            return (source,)
++        if not source:
++            return ()
++        relative = source.lstrip("/")
++        candidates = [urljoin(ATLauncherClient.CDN_BASE_URL, relative)]
++        if safe_name and version:
++            candidates.append(f"{ATLauncherClient.CDN_BASE_URL}packs/{quote(safe_name, safe='')}/versions/{quote(version, safe='')}/{relative}")
++        return tuple(dict.fromkeys(candidates))
++
++    @staticmethod
++    def _unsupported_actions(manifest: dict, files: list[ATLauncherFile]) -> list[str]:
++        values: list[str] = []
++        for key in ("actions", "installActions", "postInstallActions", "delete", "keep"):
++            raw = manifest.get(key)
++            if isinstance(raw, list) and raw:
++                values.append(key)
++            elif isinstance(raw, dict) and raw:
++                values.append(key)
++        if isinstance(manifest.get("libraries"), list) and manifest["libraries"]:
++            values.append("custom-libraries")
++        main_class = manifest.get("mainClass")
++        extra_arguments = manifest.get("extraArguments")
++        if (isinstance(main_class, dict) and main_class) or (isinstance(main_class, str) and main_class.strip()):
++            values.append("custom-main-class")
++        if (isinstance(extra_arguments, dict) and extra_arguments) or (isinstance(extra_arguments, str) and extra_arguments.strip()):
++            values.append("custom-extra-arguments")
++        for file in files:
++            if file.extract_to or file.extract_folder:
++                values.append(f"extract:{file.name}")
++            if file.decomp_type or file.decomp_file:
++                values.append(f"decomp:{file.name}")
++            if file.path.startswith(".mcw/atlauncher/legacy/"):
++                values.append(f"legacy:{file.name}")
++        return list(dict.fromkeys(values))
++
++    @staticmethod
++    def _sort_projects(projects: list[ATLauncherPack], value: str) -> list[ATLauncherPack]:
++        normalized = str(value or "popularity").strip().casefold()
++        if normalized == "name":
++            return sorted(projects, key=lambda item: item.name.casefold())
++        if normalized == "updated":
++            return sorted(projects, key=lambda item: (item.updated_at, item.position), reverse=True)
++        if normalized == "newest":
++            return sorted(projects, key=lambda item: (item.created_at, item.position), reverse=True)
++        return sorted(projects, key=lambda item: (item.position <= 0, item.position, item.name.casefold()))
++
++
++    @staticmethod
++    def _normalized_release_types(values: Iterable[str] | None) -> frozenset[str]:
++        if values is None:
++            return frozenset({"release", "beta", "alpha"})
++        normalized = {str(value).strip().casefold() for value in values if str(value).strip()}
++        return frozenset(normalized or {"release"})
++
++    @staticmethod
++    def _data_value(payload: object, field: str) -> object:
++        data = payload.get("data") if isinstance(payload, dict) else None
++        return data.get(field) if isinstance(data, dict) else None
++
++    @staticmethod
++    def _data_list(payload: object, field: str) -> list:
++        value = ATLauncherClient._data_value(payload, field)
++        return value if isinstance(value, list) else []
++
++    @staticmethod
++    def _safe_name(value: object) -> str:
++        token = ATLauncherClient._text(value)
++        if not token or len(token) > 120 or any(character in token for character in "\\/\x00\r\n"):
++            raise RuntimeError("Invalid ATLauncher pack identifier.")
++        return token
++
++    @staticmethod
++    def _first_sentence(value: str) -> str:
++        normalized = " ".join(str(value).split())
++        if not normalized:
++            return ""
++        for marker in (". ", "! ", "? "):
++            if marker in normalized:
++                return normalized.split(marker, 1)[0] + marker.strip()
++        return normalized[:240]
++
++    @staticmethod
++    def _memory_mb(value: object) -> int:
++        if isinstance(value, str):
++            raw = value.strip().casefold()
++            multiplier = 1024 if raw.endswith("g") else 1
++            raw = raw.rstrip("mgb ")
++            try:
++                return max(0, int(float(raw) * multiplier))
++            except ValueError:
++                return 0
++        return max(0, ATLauncherClient._int(value))
++
++    @staticmethod
++    def _iso(value: object) -> str:
++        if isinstance(value, (int, float)) and value > 0:
++            try:
++                return datetime.fromtimestamp(float(value), timezone.utc).isoformat()
++            except (OverflowError, OSError, ValueError):
++                return ""
++        text = ATLauncherClient._text(value)
++        if text.isdigit():
++            try:
++                return datetime.fromtimestamp(float(text), timezone.utc).isoformat()
++            except (OverflowError, OSError, ValueError):
++                return text
++        return text
++
++    @staticmethod
++    def _text(value: object) -> str:
++        return str(value or "").strip()
++
++    @staticmethod
++    def _int(value: object) -> int:
++        try:
++            return int(value or 0)
++        except (TypeError, ValueError):
++            return 0
+--- a/src/core/atlauncher/atlauncher_content_manager.py
++++ b/src/core/atlauncher/atlauncher_content_manager.py
+@@ -0,0 +1,208 @@
++from __future__ import annotations
++
++from pathlib import Path, PurePosixPath
++import shutil
++import stat
++import zipfile
++
++from src.core.atlauncher.atlauncher_pack_registry import ATLauncherPackRegistry
++from src.core.mod.mod_manager import ModManager
++from src.core.network.artifact_download_service import ArtifactDownloadService, artifact_download_service
++from src.core.network.download_manager import download_manager
++from src.core.network.download_pause import download_pause_controller
++from src.core.progress.file_batch_progress import FileBatchProgress
++from src.core.progress.progress_reporter import ProgressReporter
++from src.models.instance.instance import Instance
++from src.models.network.artifact import ArtifactRequest
++from src.models.progress.progress_stage import ProgressStage
++
++
++class ATLauncherContentManager:
++    """Materialize deferred ATLauncher pack files before the first launch."""
++
++    PROGRESS_EMIT_INTERVAL_SECONDS = 0.08
++    MAX_CONFIG_ENTRIES = 100_000
++    MAX_CONFIG_BYTES = 10 * 1024 * 1024 * 1024
++
++    @staticmethod
++    def ensure(instance: Instance, reporter: ProgressReporter | None = None, launch_lock_token: str | None = None) -> tuple[str, ...]:
++        if getattr(instance, "instance_dir", None) is None:
++            return ()
++        registry = ATLauncherPackRegistry.load(instance)
++        if not registry:
++            return ()
++        ATLauncherContentManager._ensure_config_bundle(instance, registry, reporter, launch_lock_token)
++        entries = [entry for entry in registry.get("managedFiles", []) if isinstance(entry, dict)]
++        if not entries:
++            ATLauncherPackRegistry.save(instance, registry)
++            return ()
++        missing = ATLauncherContentManager._missing(instance, entries, reporter)
++        if not missing:
++            ATLauncherPackRegistry.save(instance, registry)
++            return ()
++        ModManager.ensure_modifiable(instance, launch_lock_token)
++        batch = FileBatchProgress(
++            reporter=reporter,
++            stage=ProgressStage.DOWNLOADING_MODS,
++            message="Downloading ATLauncher pack files...",
++            total=len(missing),
++            min_emit_interval_seconds=ATLauncherContentManager.PROGRESS_EMIT_INTERVAL_SECONDS,
++        )
++        batch.start()
++        try:
++            for entry in missing:
++                download_pause_controller.raise_if_requested()
++                token = object()
++                child_reporter = batch.reporter_for(token)
++                target, relative = ArtifactDownloadService.safe_destination(Path(instance.instance_dir), str(entry.get("path") or entry.get("fileName") or ""))
++                hashes: dict[str, str] = {}
++                for algorithm in ("sha1", "md5"):
++                    value = str(entry.get(algorithm) or "").strip().casefold()
++                    if value:
++                        hashes[algorithm] = value
++                request = ArtifactRequest(
++                    provider="atlauncher",
++                    purpose="modpack-file",
++                    destination=target,
++                    urls=tuple(str(url).strip() for url in entry.get("urls", []) if str(url).strip()),
++                    expected_filename=Path(str(entry.get("fileName") or target.name)).name,
++                    expected_size=max(0, int(entry.get("size", 0) or 0)),
++                    hashes=hashes,
++                    project_id=str(registry.get("safeName") or registry.get("packId") or ""),
++                    version_id=str(registry.get("versionName") or registry.get("versionId") or ""),
++                    file_id=str(entry.get("fileId") or ""),
++                    max_attempts=3,
++                    max_bytes=max(0, int(entry.get("size", 0) or 0)) or 2 * 1024 * 1024 * 1024,
++                )
++                try:
++                    artifact_download_service.download(request, reporter=child_reporter, progress_stage=ProgressStage.DOWNLOADING_MODS, progress_message="Downloading ATLauncher pack files...")
++                    entry["path"] = relative
++                    entry["pendingDownload"] = False
++                    entry["lastDownloadError"] = ""
++                except Exception as error:
++                    entry["pendingDownload"] = True
++                    entry["lastDownloadError"] = str(error)
++                    raise RuntimeError(f"Could not download required ATLauncher file '{relative}': {error}") from error
++                finally:
++                    batch.complete(token)
++        finally:
++            ATLauncherPackRegistry.save(instance, registry)
++        remaining = ATLauncherContentManager._missing(instance, entries, None)
++        if remaining:
++            paths = ", ".join(str(entry.get("path") or entry.get("fileName") or "unknown") for entry in remaining[:8])
++            raise RuntimeError(f"Required ATLauncher pack files are still missing after download: {paths}")
++        return ()
++
++    @staticmethod
++    def _ensure_config_bundle(instance: Instance, registry: dict, reporter: ProgressReporter | None, launch_lock_token: str | None) -> None:
++        bundle = registry.get("configBundle")
++        if not isinstance(bundle, dict) or bool(bundle.get("applied", False)):
++            return
++        ModManager.ensure_modifiable(instance, launch_lock_token)
++        root = Path(instance.instance_dir)
++        archive_path = root / ".mcw" / "atlauncher" / "Configs.zip"
++        sha1 = str(bundle.get("sha1") or "").strip().casefold()
++        hashes = {"sha1": sha1} if sha1 else {}
++        request = ArtifactRequest(
++            provider="atlauncher",
++            purpose="modpack-configs",
++            destination=archive_path,
++            urls=(str(bundle.get("url") or "").strip(),) if str(bundle.get("url") or "").strip() else (),
++            expected_filename="Configs.zip",
++            expected_size=max(0, int(bundle.get("size", 0) or 0)),
++            hashes=hashes,
++            project_id=str(registry.get("safeName") or registry.get("packId") or ""),
++            version_id=str(registry.get("versionName") or registry.get("versionId") or ""),
++            max_attempts=3,
++            max_bytes=max(0, int(bundle.get("size", 0) or 0)) or 4 * 1024 * 1024 * 1024,
++        )
++        try:
++            artifact_download_service.download(request, reporter=reporter, progress_stage=ProgressStage.DOWNLOADING_MODPACK, progress_message="Downloading ATLauncher configuration files...")
++            ATLauncherContentManager._safe_extract_zip(archive_path, root)
++            bundle["applied"] = True
++            bundle["pendingDownload"] = False
++            bundle["lastDownloadError"] = ""
++        except Exception as error:
++            bundle["applied"] = False
++            bundle["pendingDownload"] = True
++            bundle["lastDownloadError"] = str(error)
++            ATLauncherPackRegistry.save(instance, registry)
++            raise RuntimeError(f"Could not install the ATLauncher configuration bundle: {error}") from error
++        ATLauncherPackRegistry.save(instance, registry)
++
++    @staticmethod
++    def _safe_extract_zip(archive_path: Path, destination: Path) -> None:
++        staging = destination / ".mcw" / "atlauncher" / "configs-staging"
++        if staging.exists():
++            shutil.rmtree(staging, ignore_errors=True)
++        staging.mkdir(parents=True, exist_ok=True)
++        total_size = 0
++        try:
++            with zipfile.ZipFile(archive_path, "r") as archive:
++                entries = archive.infolist()
++                if len(entries) > ATLauncherContentManager.MAX_CONFIG_ENTRIES:
++                    raise RuntimeError("The ATLauncher configuration archive contains too many files.")
++                for member in entries:
++                    download_pause_controller.raise_if_requested()
++                    name = member.filename.replace("\\", "/")
++                    if name.endswith("/"):
++                        continue
++                    if stat.S_ISLNK((member.external_attr >> 16) & 0xFFFF):
++                        raise RuntimeError(f"Symbolic links are not allowed in ATLauncher configuration archives: {name}")
++                    relative = ATLauncherContentManager._safe_relative(name)
++                    total_size += max(0, int(member.file_size or 0))
++                    if total_size > ATLauncherContentManager.MAX_CONFIG_BYTES:
++                        raise RuntimeError("The ATLauncher configuration archive is larger than the safety limit.")
++                    target = staging.joinpath(*relative.parts)
++                    target.parent.mkdir(parents=True, exist_ok=True)
++                    with archive.open(member, "r") as source, target.open("wb") as output:
++                        shutil.copyfileobj(source, output, length=1024 * 1024)
++            for path in staging.rglob("*"):
++                if not path.is_file():
++                    continue
++                relative = path.relative_to(staging)
++                target = destination / relative
++                target.parent.mkdir(parents=True, exist_ok=True)
++                temporary = target.with_name(target.name + ".atl.part")
++                shutil.copy2(path, temporary)
++                temporary.replace(target)
++        except zipfile.BadZipFile as error:
++            raise RuntimeError("ATLauncher returned an invalid configuration archive.") from error
++        finally:
++            shutil.rmtree(staging, ignore_errors=True)
++
++    @staticmethod
++    def _safe_relative(value: str) -> PurePosixPath:
++        normalized = str(value).replace("\\", "/").strip().lstrip("/")
++        path = PurePosixPath(normalized)
++        if not normalized or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts) or ":" in path.parts[0]:
++            raise RuntimeError(f"Unsafe path in ATLauncher configuration archive: {value!r}")
++        if path.parts[0].casefold() in {"instance.json", "settings.json", ".mcw"}:
++            raise RuntimeError(f"Reserved path in ATLauncher configuration archive: {value!r}")
++        return path
++
++    @staticmethod
++    def _missing(instance: Instance, entries: list[dict], reporter: ProgressReporter | None) -> list[dict]:
++        total = len(entries)
++        message = "Checking ATLauncher pack files..."
++        if reporter is not None:
++            reporter.files(ProgressStage.CHECKING_MODS, message, 0, total)
++        missing: list[dict] = []
++        root = Path(instance.instance_dir)
++        for index, entry in enumerate(entries, start=1):
++            target, relative = ArtifactDownloadService.safe_destination(root, str(entry.get("path") or entry.get("fileName") or ""))
++            hashes: dict[str, str] = {}
++            for algorithm in ("sha1", "md5"):
++                value = str(entry.get(algorithm) or "").strip().casefold()
++                if value:
++                    hashes[algorithm] = value
++            valid = download_manager.verify(target, max(0, int(entry.get("size", 0) or 0)), hashes)
++            entry["path"] = relative
++            entry["pendingDownload"] = not valid
++            if valid:
++                entry["lastDownloadError"] = ""
++            else:
++                missing.append(entry)
++            if reporter is not None and (index == total or index % 50 == 0):
++                reporter.files(ProgressStage.CHECKING_MODS, message, index, total)
++        return missing
+--- a/src/core/atlauncher/atlauncher_pack_installer.py
++++ b/src/core/atlauncher/atlauncher_pack_installer.py
+@@ -0,0 +1,208 @@
++from __future__ import annotations
++
++from pathlib import PurePosixPath
++import re
++
++from src.core.atlauncher.atlauncher_client import ATLauncherClient
++from src.core.atlauncher.atlauncher_pack_registry import ATLauncherPackRegistry
++from src.core.instance.instance_artwork_manager import InstanceArtworkManager
++from src.core.instance.instance_manager import InstanceManager
++from src.core.instance.settings_manager import SettingsManager
++from src.core.minecraft.version_manager import VersionManager
++from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
++from src.core.modloader.mod_loader_manager import ModLoaderManager
++from src.core.network.download_pause import download_pause_controller
++from src.core.progress.progress_reporter import ProgressReporter
++from src.models.atlauncher.install_result import ATLauncherModpackInstallResult
++from src.models.atlauncher.version import ATLauncherFile, ATLauncherVersion
++from src.models.progress.progress_stage import ProgressStage
++
++
++class ATLauncherPackInstaller:
++    MAX_FILES = 20_000
++    MAX_TOTAL_BYTES = 50 * 1024 * 1024 * 1024
++    MAX_PATH_LENGTH = 240
++    RESERVED_ROOT_NAMES = {"instance.json", "settings.json", ".mcw"}
++    INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
++    SUPPORTED_LOADERS = frozenset({ModLoaderManager.VANILLA, *ModLoaderManager.MODDED_LOADERS})
++
++    @staticmethod
++    def install(safe_name: str, version_name: str, instance_name: str, install_optional_files: bool = True, allowed_release_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None, settings_override: dict | None = None) -> ATLauncherModpackInstallResult:
++        name = ATLauncherPackInstaller._validated_instance_name(instance_name)
++        if InstanceManager.is_instance_exist(name):
++            raise RuntimeError(f"Instance '{name}' already exists.")
++        allowed = ATLauncherClient._normalized_release_types(allowed_release_types)
++        project = ATLauncherClient.get_project(safe_name)
++        version = ATLauncherClient.get_version(safe_name, version_name)
++        if version.release_type not in allowed:
++            raise RuntimeError(f"ATLauncher pack version '{version.version}' uses the disabled {version.release_type} channel.")
++        minecraft_version, loader_name, loader_version = ATLauncherPackInstaller._runtime(version)
++        selected, skipped_optional, skipped_server, manual = ATLauncherPackInstaller._select_files(version, install_optional_files)
++        if manual:
++            names = ", ".join(file.name for file in manual[:8])
++            raise RuntimeError(f"This ATLauncher pack requires browser-assisted files that MCW Launcher cannot download automatically yet: {names}")
++        if version.unsupported_actions:
++            details = ", ".join(version.unsupported_actions[:8])
++            raise RuntimeError(f"This ATLauncher pack uses installation actions not supported in this beta: {details}")
++        download_pause_controller.raise_if_requested()
++        if reporter is not None:
++            reporter.status(ProgressStage.CHECKING_MODPACK, "Saving ATLauncher modpack manifest...")
++        minecraft = VersionManager.load(minecraft_version)
++        resolved_loader = ModLoaderManager.resolve(minecraft_version, loader_name, loader_version)
++        instance = InstanceManager.create(name=name, version=minecraft, mod_loader=resolved_loader)
++        try:
++            effective_settings = settings_override
++            if effective_settings is None and version.recommended_memory_mb > 0:
++                effective_settings = InstanceManager.default_instance_settings()
++                java = effective_settings.setdefault("java", {})
++                java["max_memory"] = max(int(java.get("max_memory", 0) or 0), version.recommended_memory_mb)
++            if effective_settings is not None:
++                SettingsManager.save_dict(instance, effective_settings)
++            config_bundle = None
++            if version.config_bundle is not None:
++                config_bundle = {
++                    "url": version.config_bundle.url,
++                    "sha1": version.config_bundle.sha1,
++                    "size": version.config_bundle.size,
++                    "applied": False,
++                    "pendingDownload": True,
++                    "lastDownloadError": "",
++                }
++            ATLauncherPackRegistry.save(instance, {
++                "packId": project.pack_id,
++                "safeName": project.safe_name,
++                "name": project.name,
++                "versionId": version.version_id,
++                "versionName": version.version,
++                "minecraftVersion": minecraft_version,
++                "loader": resolved_loader[0],
++                "loaderVersion": resolved_loader[1],
++                "installOptionalFiles": bool(install_optional_files),
++                "minimumMemoryMb": version.minimum_memory_mb,
++                "recommendedMemoryMb": version.recommended_memory_mb,
++                "managedFiles": [ATLauncherPackInstaller._registry_entry(file) for file in selected],
++                "configBundle": config_bundle,
++                "unsupportedActions": list(version.unsupported_actions),
++            })
++            ModProvenanceRegistry.synchronize(instance)
++            if InstanceArtworkManager.apply_provider_artwork(instance, "atlauncher", project.safe_name, project.icon_url, reporter):
++                instance = InstanceManager.load(instance.name)
++        except Exception:
++            InstanceManager.delete_instance(name)
++            raise
++        if reporter is not None:
++            reporter.succeeded(ProgressStage.FINISHED, f"ATLauncher pack '{project.name}' is ready. Files will download on first launch.")
++        return ATLauncherModpackInstallResult(
++            instance=instance,
++            pack_name=project.name,
++            pack_version=version.version,
++            managed_files=len(selected),
++            skipped_optional_files=skipped_optional,
++            skipped_server_files=skipped_server,
++            manual_files=0,
++        )
++
++    @staticmethod
++    def _runtime(version: ATLauncherVersion) -> tuple[str, str, str]:
++        minecraft_version = str(version.minecraft_version).strip()
++        loader_name = ATLauncherClient.normalize_loader(version.loader)
++        loader_version = str(version.loader_version).strip()
++        if not minecraft_version:
++            raise RuntimeError("The ATLauncher pack does not declare a Minecraft version.")
++        if loader_name not in ATLauncherPackInstaller.SUPPORTED_LOADERS:
++            raise RuntimeError(f"The ATLauncher pack uses an unsupported mod loader: {version.loader or 'unknown'}.")
++        if loader_name == ModLoaderManager.VANILLA:
++            loader_version = "-1"
++        return minecraft_version, loader_name, loader_version or ModLoaderManager.AUTO
++
++    @staticmethod
++    def _select_files(version: ATLauncherVersion, install_optional_files: bool) -> tuple[tuple[ATLauncherFile, ...], int, int, tuple[ATLauncherFile, ...]]:
++        if len(version.files) > ATLauncherPackInstaller.MAX_FILES:
++            raise RuntimeError("The ATLauncher pack contains too many files to install safely.")
++        by_name = {file.name.casefold(): file for file in version.files if file.name}
++        selected: list[ATLauncherFile] = []
++        selected_keys: set[str] = set()
++        skipped_optional = 0
++        skipped_server = 0
++        manual: list[ATLauncherFile] = []
++        total_size = 0
++        seen_paths: set[str] = set()
++
++        def add(file: ATLauncherFile) -> None:
++            nonlocal total_size
++            identity = file.file_id or file.path.casefold()
++            if identity in selected_keys:
++                return
++            if file.server_only:
++                return
++            relative = ATLauncherPackInstaller._file_relative_path(file)
++            path_key = relative.as_posix().casefold()
++            if path_key in seen_paths:
++                raise RuntimeError(f"The ATLauncher pack declares the same destination more than once: {relative.as_posix()}")
++            seen_paths.add(path_key)
++            if file.download_type == "browser":
++                manual.append(file)
++            elif not file.urls:
++                raise RuntimeError(f"ATLauncher did not provide a download link for '{file.name}'.")
++            if not file.sha1 and not file.md5:
++                raise RuntimeError(f"ATLauncher did not provide a checksum for '{file.name}'.")
++            total_size += max(0, file.size)
++            if total_size > ATLauncherPackInstaller.MAX_TOTAL_BYTES:
++                raise RuntimeError("The ATLauncher pack is larger than the configured installation safety limit.")
++            selected_keys.add(identity)
++            selected.append(file)
++            for dependency in file.dependencies:
++                dependency_file = by_name.get(dependency.casefold())
++                if dependency_file is not None:
++                    add(dependency_file)
++
++        for file in version.files:
++            if file.server_only:
++                skipped_server += 1
++                continue
++            if file.optional and not install_optional_files:
++                skipped_optional += 1
++                continue
++            if file.optional and install_optional_files and not (file.selected or file.recommended):
++                skipped_optional += 1
++                continue
++            add(file)
++        return tuple(selected), skipped_optional, skipped_server, tuple(manual)
++
++    @staticmethod
++    def _file_relative_path(file: ATLauncherFile) -> PurePosixPath:
++        raw = str(file.path or file.name or "").replace("\\", "/").strip().lstrip("/")
++        path = PurePosixPath(raw)
++        if len(raw) > ATLauncherPackInstaller.MAX_PATH_LENGTH or not raw or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
++            raise RuntimeError(f"Unsafe path in ATLauncher pack: {raw!r}")
++        if ":" in path.parts[0]:
++            raise RuntimeError(f"Unsafe Windows path in ATLauncher pack: {raw!r}")
++        if path.parts[0].casefold() in ATLauncherPackInstaller.RESERVED_ROOT_NAMES and path.parts[0].casefold() != ".mcw":
++            raise RuntimeError(f"Reserved path in ATLauncher pack: {raw!r}")
++        return path
++
++    @staticmethod
++    def _registry_entry(file: ATLauncherFile) -> dict[str, object]:
++        return {
++            "fileId": file.file_id,
++            "name": file.name,
++            "fileName": PurePosixPath(file.path).name,
++            "path": ATLauncherPackInstaller._file_relative_path(file).as_posix(),
++            "sha1": file.sha1,
++            "md5": file.md5,
++            "size": file.size,
++            "urls": list(file.urls),
++            "optional": file.optional,
++            "clientOnly": file.client_only,
++            "library": file.library,
++            "pendingDownload": True,
++            "lastDownloadError": "",
++            "provider": "atlauncher",
++        }
++
++    @staticmethod
++    def _validated_instance_name(value: str) -> str:
++        name = str(value).strip()
++        if not name or name in {".", ".."} or name.endswith((".", " ")) or not ATLauncherPackInstaller.INSTANCE_NAME_PATTERN.fullmatch(name):
++            raise RuntimeError("The modpack instance name contains invalid Windows filename characters or is longer than 80 characters.")
++        return name
+--- a/src/core/atlauncher/atlauncher_pack_registry.py
++++ b/src/core/atlauncher/atlauncher_pack_registry.py
+@@ -0,0 +1,93 @@
++from __future__ import annotations
++
++from datetime import datetime, timezone
++from pathlib import Path, PurePosixPath
++import json
++
++from src.core.fs.paths import Paths
++from src.models.instance.instance import Instance
++
++
++class ATLauncherPackRegistry:
++    SCHEMA_VERSION = 1
++
++    @staticmethod
++    def load(instance: Instance | Path) -> dict:
++        path = Paths.atlauncher_pack_registry(instance) if isinstance(instance, Instance) or getattr(instance, "instance_dir", None) is not None else Path(instance) / ".mcw" / "atlauncher-pack.json"
++        try:
++            data = json.loads(path.read_text(encoding="utf-8"))
++        except (FileNotFoundError, OSError, json.JSONDecodeError):
++            return {}
++        return ATLauncherPackRegistry._normalize(data if isinstance(data, dict) else {})
++
++    @staticmethod
++    def save(instance: Instance | Path, data: dict) -> None:
++        path = Paths.atlauncher_pack_registry(instance) if isinstance(instance, Instance) or getattr(instance, "instance_dir", None) is not None else Path(instance) / ".mcw" / "atlauncher-pack.json"
++        path.parent.mkdir(parents=True, exist_ok=True)
++        normalized = ATLauncherPackRegistry._normalize(dict(data))
++        normalized["updatedAt"] = datetime.now(timezone.utc).isoformat()
++        temporary = path.with_suffix(path.suffix + ".tmp")
++        temporary.write_text(json.dumps(normalized, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
++        temporary.replace(path)
++
++    @staticmethod
++    def is_managed(instance: Instance | Path) -> bool:
++        return bool(ATLauncherPackRegistry.load(instance))
++
++    @staticmethod
++    def _normalize(data: dict) -> dict:
++        managed: list[dict[str, object]] = []
++        for raw in data.get("managedFiles", []) if isinstance(data.get("managedFiles"), list) else []:
++            if not isinstance(raw, dict):
++                continue
++            path = str(raw.get("path") or raw.get("fileName") or "").replace("\\", "/").strip().lstrip("/")
++            pure = PurePosixPath(path)
++            if not path or pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts) or ":" in pure.parts[0]:
++                continue
++            filename = Path(str(raw.get("fileName") or pure.name)).name
++            urls = raw.get("urls") if isinstance(raw.get("urls"), list) else []
++            managed.append({
++                "fileId": str(raw.get("fileId") or "").strip(),
++                "fileName": filename,
++                "name": str(raw.get("name") or filename).strip(),
++                "path": pure.as_posix(),
++                "sha1": str(raw.get("sha1") or "").strip().casefold(),
++                "md5": str(raw.get("md5") or "").strip().casefold(),
++                "size": max(0, ATLauncherPackRegistry._int(raw.get("size"))),
++                "urls": list(dict.fromkeys(str(url).strip() for url in urls if str(url).strip())),
++                "optional": bool(raw.get("optional", False)),
++                "clientOnly": bool(raw.get("clientOnly", False)),
++                "library": bool(raw.get("library", False)),
++                "pendingDownload": bool(raw.get("pendingDownload", False)),
++                "lastDownloadError": str(raw.get("lastDownloadError") or "").strip(),
++                "provider": "atlauncher",
++            })
++        config = data.get("configBundle") if isinstance(data.get("configBundle"), dict) else None
++        normalized_config = None
++        if config:
++            normalized_config = {
++                "url": str(config.get("url") or "").strip(),
++                "sha1": str(config.get("sha1") or "").strip().casefold(),
++                "size": max(0, ATLauncherPackRegistry._int(config.get("size"))),
++                "applied": bool(config.get("applied", False)),
++                "pendingDownload": bool(config.get("pendingDownload", True)),
++                "lastDownloadError": str(config.get("lastDownloadError") or "").strip(),
++            }
++        output = dict(data)
++        output["schemaVersion"] = ATLauncherPackRegistry.SCHEMA_VERSION
++        output["source"] = "atlauncher"
++        output["packId"] = str(data.get("packId") or "").strip()
++        output["safeName"] = str(data.get("safeName") or "").strip()
++        output["versionId"] = str(data.get("versionId") or "").strip()
++        output["versionName"] = str(data.get("versionName") or "").strip()
++        output["managedFiles"] = sorted(managed, key=lambda item: str(item["path"]).casefold())
++        output["configBundle"] = normalized_config
++        output["unsupportedActions"] = [str(value).strip() for value in data.get("unsupportedActions", []) if str(value).strip()] if isinstance(data.get("unsupportedActions"), list) else []
++        return output
++
++    @staticmethod
++    def _int(value: object) -> int:
++        try:
++            return int(value or 0)
++        except (TypeError, ValueError):
++            return 0
+--- a/src/core/content/installed_content_library.py
++++ b/src/core/content/installed_content_library.py
+@@ -9,6 +9,7 @@
+ from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
+ from src.core.curseforge.curseforge_registry import CurseForgeRegistry
+ from src.core.ftb.ftb_pack_registry import FTBPackRegistry
++from src.core.atlauncher.atlauncher_pack_registry import ATLauncherPackRegistry
+ from src.core.mod.mod_manager import ModManager
+ from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
+ from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
+@@ -227,11 +228,12 @@
+             ("modrinth", ModrinthPackRegistry.load(instance)),
+             ("curseforge", CurseForgePackRegistry.load(instance)),
+             ("ftb", FTBPackRegistry.load(instance)),
++            ("atlauncher", ATLauncherPackRegistry.load(instance)),
+         )
+         for provider, data in registries:
+             if not isinstance(data, dict) or not data:
+                 continue
+-            project_id = str(data.get("projectId") or "").strip()
++            project_id = str(data.get("projectId") or data.get("packId") or data.get("safeName") or "").strip()
+             version_id = str(data.get("versionId") or data.get("fileId") or "").strip()
+             if not project_id and not version_id:
+                 continue
+@@ -275,7 +277,7 @@
+     @staticmethod
+     def _provider(value: object) -> str:
+         normalized = str(value or "local").strip().casefold()
+-        return normalized if normalized in {"modrinth", "curseforge", "ftb", "local", "manual", "unknown"} else "unknown"
++        return normalized if normalized in {"modrinth", "curseforge", "ftb", "atlauncher", "local", "manual", "unknown"} else "unknown"
+ 
+     @staticmethod
+     def _item_id(content_type: str, provider: str, project_id: str, file_name: str, sha512_value: str) -> str:
+@@ -291,6 +293,8 @@
+         if provider == "modrinth":
+             slug = "modpack" if content_type == InstalledContentLibraryManager.MODPACK else "mod"
+             return f"https://modrinth.com/{slug}/{project}"
++        if provider == "atlauncher" and content_type == InstalledContentLibraryManager.MODPACK:
++            return f"https://atlauncher.com/pack/{project}"
+         return ""
+ 
+     @staticmethod
+--- a/src/core/fs/paths.py
++++ b/src/core/fs/paths.py
+@@ -495,6 +495,16 @@
+         return Path(instance.instance_dir) / ".mcw" / "ftb-pack.json"
+ 
+     @staticmethod
++    def atlauncher_root() -> Path:
++        directory = Paths.CACHE_ROOT / "content" / "atlauncher"
++        directory.mkdir(parents=True, exist_ok=True)
++        return directory
++
++    @staticmethod
++    def atlauncher_pack_registry(instance: Instance) -> Path:
++        return Path(instance.instance_dir) / ".mcw" / "atlauncher-pack.json"
++
++    @staticmethod
+     def curseforge_root() -> Path:
+         directory = Paths.CACHE_ROOT / "content" / "curseforge"
+         directory.mkdir(parents=True, exist_ok=True)
+--- a/src/core/minecraft/minecraft_executor.py
++++ b/src/core/minecraft/minecraft_executor.py
+@@ -26,6 +26,7 @@
+ from src.core.modloader.forge.compatibility_confirmation import CompatibilityConfirmationRequired
+ from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
+ from src.core.ftb.ftb_content_manager import FTBContentManager
++from src.core.atlauncher.atlauncher_content_manager import ATLauncherContentManager
+ from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
+ from src.core.minecraft.version_manifest_manager import VersionManifestManager
+ from src.core.network.download_pause import download_pause_controller
+@@ -153,6 +154,7 @@
+             modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
+             curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
+             ftb_warnings = FTBContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
++            atlauncher_warnings = ATLauncherContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
+             PortableContentManager.finalize_disabled(instance)
+ 
+             download_pause_controller.raise_if_requested()
+@@ -254,7 +256,7 @@
+                 and (forge_preflight_policy == ManagedContentPolicy.ALLOW or allow_compatibility_issues_once)
+             )
+             forge_warnings = tuple(issue.message for issue in forge_preflight.warnings) + bypassed_compatibility
+-            warnings = tuple(modrinth_warnings) + tuple(curseforge_warnings) + tuple(ftb_warnings) + forge_warnings + tuple(java_recovery_warnings)
++            warnings = tuple(modrinth_warnings) + tuple(curseforge_warnings) + tuple(ftb_warnings) + tuple(atlauncher_warnings) + forge_warnings + tuple(java_recovery_warnings)
+             if warnings:
+                 result["warnings"] = warnings
+             return result
+--- a/src/core/mod/mod_provenance_registry.py
++++ b/src/core/mod/mod_provenance_registry.py
+@@ -20,7 +20,7 @@
+ 
+     SCHEMA_VERSION = 1
+     _MODRINTH_CDN_PATTERN = re.compile(r"^/data/([^/]+)/versions/([^/]+)/([^/]+)$", re.IGNORECASE)
+-    _PROVIDERS = {"modrinth", "curseforge", "ftb", "local", "manual", "unknown"}
++    _PROVIDERS = {"modrinth", "curseforge", "ftb", "atlauncher", "local", "manual", "unknown"}
+ 
+     @staticmethod
+     def empty() -> dict:
+@@ -71,6 +71,7 @@
+         ModProvenanceRegistry._merge_modrinth_pack(instance, merge)
+         ModProvenanceRegistry._merge_curseforge_pack(instance, merge)
+         ModProvenanceRegistry._merge_ftb_pack(instance, merge)
++        ModProvenanceRegistry._merge_atlauncher_pack(instance, merge)
+ 
+         # Directly installed mods are more specific than a pack-level record.
+         from src.core.modrinth.modrinth_registry import ModrinthRegistry
+@@ -242,6 +243,30 @@
+                 "downloadUrls": raw.get("urls", []),
+                 "managedByModpack": True,
+                 "packProvider": "ftb",
++                "packProjectId": pack_project_id,
++                "packVersionId": pack_version_id,
++            }, 20)
++
++    @staticmethod
++    def _merge_atlauncher_pack(instance: Instance, merge) -> None:
++        from src.core.atlauncher.atlauncher_pack_registry import ATLauncherPackRegistry
++
++        pack = ATLauncherPackRegistry.load(instance)
++        pack_project_id = str(pack.get("safeName") or pack.get("packId") or "").strip()
++        pack_version_id = str(pack.get("versionName") or pack.get("versionId") or "").strip()
++        for raw in pack.get("managedFiles", []):
++            if not isinstance(raw, dict) or not ModProvenanceRegistry._is_mod_path(raw.get("path")):
++                continue
++            merge({
++                "fileName": raw.get("fileName") or PurePosixPath(str(raw.get("path") or "")).name,
++                "path": raw.get("path"),
++                "provider": raw.get("provider") or "atlauncher",
++                "fileId": raw.get("fileId"),
++                "sha1": raw.get("sha1"),
++                "size": raw.get("size"),
++                "downloadUrls": raw.get("urls", []),
++                "managedByModpack": True,
++                "packProvider": "atlauncher",
+                 "packProjectId": pack_project_id,
+                 "packVersionId": pack_version_id,
+             }, 20)
+--- a/src/core/package/modpack_package_manager.py
++++ b/src/core/package/modpack_package_manager.py
+@@ -965,7 +965,7 @@
+         root = Path(instance.instance_dir)
+         ignored_roots = {"mods", "logs", "crash-reports"}
+         ignored_files = {"instance.json", "settings.json"}
+-        ignored_mcw = {"mod-provenance.json", "modrinth.json", "curseforge.json", "modrinth-pack.json", "curseforge-pack.json", "ftb-pack.json", "content-library.json", "manual-files.json", "portable-disabled-files.json", "portable-referenced-files.json"}
++        ignored_mcw = {"mod-provenance.json", "modrinth.json", "curseforge.json", "modrinth-pack.json", "curseforge-pack.json", "ftb-pack.json", "atlauncher-pack.json", "content-library.json", "manual-files.json", "portable-disabled-files.json", "portable-referenced-files.json"}
+         output: list[tuple[Path, str]] = []
+         for path in root.rglob("*"):
+             if not path.is_file() or path.is_symlink():
+--- a/src/gui/controllers/atlauncher_controller.py
++++ b/src/gui/controllers/atlauncher_controller.py
+@@ -0,0 +1,122 @@
++from __future__ import annotations
++
++from PySide6.QtCore import Signal, Slot
++
++from mcw_core.api.atlauncher.atlauncher_client import ATLauncherClient
++from mcw_core.api.atlauncher.atlauncher_pack_installer import ATLauncherPackInstaller
++from mcw_core.api.language.language_manager import tr
++from mcw_core.api.progress.progress_reporter import ProgressReporter
++from src.gui.controllers.base_controller import BaseController
++from src.gui.task_runner import TaskRunner
++
++
++class ATLauncherController(BaseController):
++    search_results_changed = Signal(object)
++    project_details_changed = Signal(str, object)
++    versions_changed = Signal(str, object)
++    version_details_changed = Signal(str, str, object)
++    modpack_installed = Signal(object)
++    cache_cleared = Signal(object)
++    progress_received = Signal(object)
++
++    def __init__(self, task_runner: TaskRunner) -> None:
++        super().__init__()
++        self._task_runner = task_runner
++        self._task_runner.task_succeeded.connect(self._on_task_succeeded)
++        self._task_runner.task_failed.connect(self._on_task_failed)
++
++    def search(self, query: str, sort: str, index: int, force_refresh: bool = False) -> bool:
++        return self._run_network_task(
++            self._task_runner,
++            "atlauncher.search",
++            lambda: ATLauncherClient.search_projects(query=query, index=index, page_size=25, sort=sort, force_refresh=force_refresh),
++            tr("task.atlauncher.search"),
++            blocking=False,
++        )
++
++    def load_project_details(self, safe_name: str) -> bool:
++        token = str(safe_name).strip()
++        return self._run_network_task(
++            self._task_runner,
++            f"atlauncher.details.{token}",
++            lambda: (token, ATLauncherClient.get_project_details(token)),
++            tr("task.atlauncher.load_details"),
++            blocking=False,
++        )
++
++    def load_versions(self, safe_name: str, allowed_release_types: tuple[str, ...]) -> bool:
++        token = str(safe_name).strip()
++        return self._run_network_task(
++            self._task_runner,
++            f"atlauncher.versions.{token}",
++            lambda: (token, ATLauncherClient.list_versions(token, allowed_release_types)),
++            tr("task.atlauncher.load_versions"),
++            blocking=False,
++        )
++
++    def load_version_details(self, safe_name: str, version_name: str) -> bool:
++        token = str(safe_name).strip()
++        version = str(version_name).strip()
++        return self._run_network_task(
++            self._task_runner,
++            f"atlauncher.version.{token}.{version}",
++            lambda: (token, version, ATLauncherClient.get_version(token, version)),
++            tr("task.atlauncher.load_version_metadata"),
++            blocking=False,
++        )
++
++    def install_modpack(self, safe_name: str, version_name: str, instance_name: str, install_optional_files: bool, allowed_release_types: tuple[str, ...], settings_override: dict | None = None) -> bool:
++        reporter = ProgressReporter(self.progress_received.emit)
++        return self._task_runner.run(
++            "atlauncher.install.modpack",
++            lambda: ATLauncherPackInstaller.install(
++                safe_name,
++                version_name,
++                instance_name,
++                install_optional_files=install_optional_files,
++                allowed_release_types=allowed_release_types,
++                reporter=reporter,
++                settings_override=settings_override,
++            ),
++            tr("task.atlauncher.install_modpack", instance=instance_name),
++        )
++
++    def clear_cache(self) -> bool:
++        return self._task_runner.run(
++            "atlauncher.cache.clear",
++            lambda: (ATLauncherClient.clear_cache(), ATLauncherClient.cache_status())[1],
++            tr("task.atlauncher.clear_cache"),
++            blocking=False,
++        )
++
++    @Slot(str, object)
++    def _on_task_succeeded(self, task_id: str, result: object) -> None:
++        if task_id == "atlauncher.search":
++            self.search_results_changed.emit(result)
++            return
++        if task_id.startswith("atlauncher.details.") and isinstance(result, tuple) and len(result) == 2:
++            self.project_details_changed.emit(str(result[0]), result[1])
++            return
++        if task_id.startswith("atlauncher.versions.") and isinstance(result, tuple) and len(result) == 2:
++            self.versions_changed.emit(str(result[0]), result[1])
++            return
++        if task_id.startswith("atlauncher.version.") and isinstance(result, tuple) and len(result) == 3:
++            self.version_details_changed.emit(str(result[0]), str(result[1]), result[2])
++            return
++        if task_id == "atlauncher.install.modpack":
++            self.status_changed.emit(tr("status.atlauncher.modpack_installed"))
++            self.log_created.emit("Created an instance from an ATLauncher pack")
++            self.modpack_installed.emit(result)
++            return
++        if task_id == "atlauncher.cache.clear":
++            self.status_changed.emit(tr("status.atlauncher.cache_cleared"))
++            self.cache_cleared.emit(result)
++
++    @Slot(str, object)
++    def _on_task_failed(self, task_id: str, error: Exception) -> None:
++        if not task_id.startswith("atlauncher."):
++            return
++        title = tr("atlauncher.modpack.install") if task_id == "atlauncher.install.modpack" else tr("content.library.provider.atlauncher")
++        if self._offer_network_retry(task_id, title, error):
++            return
++        self._emit_error(title, error)
+--- a/src/gui/dialogs/atlauncher_browser_dialog.py
++++ b/src/gui/dialogs/atlauncher_browser_dialog.py
+@@ -0,0 +1,536 @@
++from __future__ import annotations
++
++from dataclasses import replace
++import re
++
++from PySide6.QtCore import QSize, QTimer, Qt, Signal
++from PySide6.QtGui import QIcon, QPixmap
++from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton, QSizePolicy, QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
++
++from mcw_core.api.atlauncher.atlauncher_client import ATLauncherClient
++from mcw_core.api.instance.instance_manager import InstanceManager
++from mcw_core.api.language.language_manager import tr
++from src.gui.media.remote_image_cache import RemoteImageCache
++from src.gui.media.safe_rich_text import sanitize_html
++from src.gui.theme.runtime import set_theme_icon
++from src.gui.widget.content_project_detail import ContentProjectDetailPanel
++from src.gui.window_sizing import resize_dialog_to_screen
++from src.models.atlauncher.cache import ATLauncherCacheInfo
++from src.models.atlauncher.pack import ATLauncherPack, ATLauncherSearchResult
++from src.models.atlauncher.version import ATLauncherVersion, ATLauncherVersionSummary
++
++
++class ATLauncherBrowserDialog(QDialog):
++    search_requested = Signal(str, str, int)
++    refresh_requested = Signal(str, str, int)
++    project_details_requested = Signal(str)
++    versions_requested = Signal(str, object)
++    version_details_requested = Signal(str, str)
++    clear_cache_requested = Signal()
++    install_modpack_requested = Signal(str, str, str, bool, object)
++    channel_preferences_changed = Signal(bool, bool)
++
++    PAGE_SIZE = 25
++
++    def __init__(self, parent=None) -> None:
++        super().__init__(parent)
++        self.setObjectName("ATLauncherDialog")
++        self._result: ATLauncherSearchResult | None = None
++        self._projects: list[ATLauncherPack] = []
++        self._selected_project: ATLauncherPack | None = None
++        self._versions: list[ATLauncherVersionSummary] = []
++        self._selected_version: ATLauncherVersion | None = None
++        self._index = 0
++        self._busy = False
++        self._suggested_instance_name = ""
++        self._instance_name_customized = False
++        self._pending_channel_preferences = (False, False)
++        self._cache_info = ATLauncherClient.cache_status()
++        self._image_cache = RemoteImageCache(self)
++        self._channel_change_timer = QTimer(self)
++        self._channel_change_timer.setSingleShot(True)
++        self._channel_change_timer.setInterval(60)
++        self._channel_change_timer.timeout.connect(self._apply_queued_channel_change)
++        self._build_ui()
++        self.retranslate_dynamic()
++        self.set_cache_info(self._cache_info)
++
++    def _build_ui(self) -> None:
++        resize_dialog_to_screen(self, 1240, 620, 1000, 500)
++        root = QVBoxLayout(self)
++        root.setContentsMargins(18, 18, 18, 18)
++        root.setSpacing(12)
++
++        self.title_label = QLabel()
++        self.title_label.setObjectName("PageTitle")
++        self.context_label = QLabel()
++        self.context_label.setObjectName("MutedLabel")
++        self.context_label.setWordWrap(True)
++        root.addWidget(self.title_label)
++        root.addWidget(self.context_label)
++
++        search_row = QHBoxLayout()
++        self.search_input = QLineEdit()
++        self.search_input.returnPressed.connect(self._request_search)
++        self.sort_combo = QComboBox()
++        self.sort_combo.addItem("Popularity", "popularity")
++        self.sort_combo.addItem("Recently updated", "updated")
++        self.sort_combo.addItem("Newest", "newest")
++        self.sort_combo.addItem("Name", "name")
++        self.search_button = set_theme_icon(QPushButton(), "icon.action.search")
++        self.search_button.setObjectName("PrimaryButton")
++        self.search_button.clicked.connect(self._request_search)
++        search_row.addWidget(self.search_input, 1)
++        search_row.addWidget(self.sort_combo)
++        search_row.addWidget(self.search_button)
++        root.addLayout(search_row)
++
++        provider_row = QHBoxLayout()
++        self.cache_status_label = QLabel()
++        self.cache_status_label.setObjectName("MutedLabel")
++        self.cache_status_label.setWordWrap(True)
++        self.refresh_button = set_theme_icon(QPushButton(), "icon.action.refresh")
++        self.refresh_button.clicked.connect(self._request_refresh)
++        self.clear_cache_button = QPushButton()
++        self.clear_cache_button.clicked.connect(self._request_clear_cache)
++        provider_row.addWidget(self.cache_status_label, 1)
++        provider_row.addWidget(self.refresh_button)
++        provider_row.addWidget(self.clear_cache_button)
++        root.addLayout(provider_row)
++
++        channel_row = QHBoxLayout()
++        self.release_channel_label = QLabel()
++        self.release_channel_label.setObjectName("MutedLabel")
++        self.include_beta_checkbox = QCheckBox()
++        self.include_alpha_checkbox = QCheckBox()
++        self.include_beta_checkbox.toggled.connect(self._channels_changed)
++        self.include_alpha_checkbox.toggled.connect(self._channels_changed)
++        channel_row.addWidget(self.release_channel_label)
++        channel_row.addStretch()
++        channel_row.addWidget(self.include_beta_checkbox)
++        channel_row.addWidget(self.include_alpha_checkbox)
++        root.addLayout(channel_row)
++
++        splitter = QSplitter(Qt.Orientation.Horizontal)
++        splitter.setChildrenCollapsible(False)
++        results_panel = QWidget()
++        results_layout = QVBoxLayout(results_panel)
++        results_layout.setContentsMargins(0, 0, 0, 0)
++        results_layout.setSpacing(8)
++
++        self.results_table = QTableWidget(0, 5)
++        self.results_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
++        self.results_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
++        self.results_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
++        self.results_table.setAlternatingRowColors(True)
++        self.results_table.setIconSize(QSize(40, 40))
++        self.results_table.verticalHeader().setVisible(False)
++        self.results_table.verticalHeader().setDefaultSectionSize(52)
++        self.results_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
++        self.results_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
++        self.results_table.itemSelectionChanged.connect(self._project_selected)
++        results_layout.addWidget(self.results_table, 1)
++
++        page_row = QHBoxLayout()
++        self.result_count_label = QLabel()
++        self.result_count_label.setObjectName("MutedLabel")
++        self.previous_button = set_theme_icon(QPushButton(), "icon.action.previous")
++        self.next_button = set_theme_icon(QPushButton(), "icon.action.next")
++        self.previous_button.clicked.connect(self._previous_page)
++        self.next_button.clicked.connect(self._next_page)
++        page_row.addWidget(self.result_count_label)
++        page_row.addStretch()
++        page_row.addWidget(self.previous_button)
++        page_row.addWidget(self.next_button)
++        results_layout.addLayout(page_row)
++
++        self.detail_panel = ContentProjectDetailPanel(self._image_cache)
++        self.version_combo = QComboBox()
++        self.version_combo.setMinimumContentsLength(28)
++        self.version_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
++        self.version_combo.currentIndexChanged.connect(self._version_selected)
++        self.instance_name_input = QLineEdit()
++        self.instance_name_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
++        self.instance_name_input.textEdited.connect(self._instance_name_edited)
++        self.optional_checkbox = QCheckBox()
++        self.optional_checkbox.setChecked(True)
++        self.install_button = set_theme_icon(QPushButton(), "icon.action.download")
++        self.install_button.setObjectName("PrimaryButton")
++        self.install_button.setMinimumWidth(220)
++        self.install_button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
++        self.install_button.setEnabled(False)
++        self.install_button.clicked.connect(self._request_install)
++        self.detail_panel.add_action_row((self.version_combo, 1))
++        self.detail_panel.add_action_row((self.instance_name_input, 1))
++        install_row = self.detail_panel.add_action_row((self.optional_checkbox, 0))
++        install_row.addStretch()
++        install_row.addWidget(self.install_button)
++
++        results_panel.setMinimumWidth(420)
++        splitter.addWidget(results_panel)
++        splitter.addWidget(self.detail_panel)
++        splitter.setStretchFactor(0, 5)
++        splitter.setStretchFactor(1, 7)
++        splitter.setSizes([540, 760])
++        root.addWidget(splitter, 1)
++
++    @property
++    def selected_project(self) -> ATLauncherPack | None:
++        return self._selected_project
++
++    @property
++    def selected_version(self) -> ATLauncherVersion | None:
++        return self._selected_version
++
++    @property
++    def allowed_release_types(self) -> tuple[str, ...]:
++        values = ["release"]
++        if self.include_beta_checkbox.isChecked():
++            values.append("beta")
++        if self.include_alpha_checkbox.isChecked():
++            values.append("alpha")
++        return tuple(values)
++
++    def set_channel_preferences(self, include_beta: bool, include_alpha: bool) -> None:
++        self.include_beta_checkbox.blockSignals(True)
++        self.include_alpha_checkbox.blockSignals(True)
++        self.include_beta_checkbox.setChecked(bool(include_beta))
++        self.include_alpha_checkbox.setChecked(bool(include_alpha))
++        self.include_beta_checkbox.blockSignals(False)
++        self.include_alpha_checkbox.blockSignals(False)
++
++    def set_show_project_descriptions(self, visible: bool) -> None:
++        self.detail_panel.set_description_visible(visible)
++
++    def set_searching(self) -> None:
++        self._result = None
++        self._projects = []
++        self.results_table.clearSelection()
++        self.results_table.clearContents()
++        self.results_table.setRowCount(0)
++        self.result_count_label.setText(tr("atlauncher.results.searching"))
++        self.previous_button.setEnabled(False)
++        self.next_button.setEnabled(False)
++        self._clear_selection(tr("atlauncher.results.contacting"))
++
++    def set_search_result(self, result: ATLauncherSearchResult) -> None:
++        self._result = result
++        self._projects = list(result.projects)
++        self._index = result.index
++        self.set_cache_info(result.cache_info)
++        self.results_table.blockSignals(True)
++        try:
++            self.results_table.clearSelection()
++            self.results_table.clearContents()
++            self.results_table.setRowCount(len(self._projects))
++            for row, project in enumerate(self._projects):
++                latest = project.versions[0] if project.versions else None
++                values = [
++                    project.name,
++                    project.pack_type or tr("common.unknown"),
++                    latest.minecraft_version if latest is not None else tr("common.unknown"),
++                    project.updated_at[:10],
++                    project.synopsis,
++                ]
++                for column, value in enumerate(values):
++                    item = QTableWidgetItem(str(value))
++                    item.setData(Qt.ItemDataRole.UserRole, project)
++                    self.results_table.setItem(row, column, item)
++                self._image_cache.request(project.icon_url, lambda pixmap, row=row, safe_name=project.safe_name: self._apply_row_icon(row, safe_name, pixmap))
++            if self._projects:
++                self.results_table.selectRow(0)
++        finally:
++            self.results_table.blockSignals(False)
++        start = result.index + 1 if result.projects else 0
++        end = result.index + len(result.projects)
++        if result.has_more:
++            self.result_count_label.setText(tr("atlauncher.results.more", start=start, end=end))
++        else:
++            self.result_count_label.setText(tr("atlauncher.results.range", start=start, end=end))
++        self.previous_button.setEnabled(not self._busy and result.index > 0)
++        self.next_button.setEnabled(not self._busy and result.has_more)
++        if self._projects:
++            self._select_project(self._projects[0])
++        else:
++            self._clear_selection(tr("atlauncher.results.empty"))
++
++    def set_project_details(self, safe_name: str, project: ATLauncherPack) -> None:
++        current = self._selected_project
++        if current is None or current.safe_name != str(safe_name) or project.safe_name != current.safe_name:
++            return
++        self._selected_project = replace(
++            project,
++            authors=project.authors or current.authors,
++            synopsis=project.synopsis or current.synopsis,
++            icon_url=project.icon_url or current.icon_url,
++            website_url=project.website_url or current.website_url,
++            versions=project.versions or current.versions,
++        )
++        self._render_project_details(self._selected_project)
++
++    def set_versions(self, safe_name: str, versions: object) -> None:
++        if self._selected_project is None or self._selected_project.safe_name != str(safe_name):
++            return
++        self._versions = [version for version in tuple(versions or ()) if isinstance(version, ATLauncherVersionSummary)]
++        self._versions.sort(key=lambda version: (version.published_at, version.updated_at, version.version_id), reverse=True)
++        self.version_combo.blockSignals(True)
++        self.version_combo.clear()
++        for version in self._versions:
++            runtime = version.minecraft_version or tr("common.unknown")
++            self.version_combo.addItem(f"{version.version} • {version.release_type.title()} • {runtime}", version.version)
++        self.version_combo.blockSignals(False)
++        self.install_button.setEnabled(False)
++        if self._versions:
++            self._version_selected()
++        else:
++            channels = ", ".join(value.title() for value in self.allowed_release_types)
++            self.detail_panel.set_status(tr("atlauncher.versions.none", channels=channels))
++
++    def set_version_details(self, safe_name: str, version_name: str, version: ATLauncherVersion) -> None:
++        if self._selected_project is None or self._selected_project.safe_name != str(safe_name):
++            return
++        if str(self.version_combo.currentData() or "") != str(version_name):
++            return
++        self._selected_version = version
++        loader = version.loader.title() if version.loader else tr("common.unknown")
++        memory = f"{version.recommended_memory_mb} MiB" if version.recommended_memory_mb > 0 else tr("common.unknown")
++        blocked = bool(version.unsupported_actions) or any(file.download_type == "browser" for file in version.files)
++        status_key = "atlauncher.version.status_limited" if blocked else "atlauncher.version.status"
++        self.detail_panel.set_status(tr(
++            status_key,
++            version=version.version,
++            channel=version.release_type.title(),
++            minecraft=version.minecraft_version or tr("common.unknown"),
++            loader=loader,
++            files=len([file for file in version.files if not file.server_only]),
++            size=self._format_bytes(version.downloadable_size),
++            memory=memory,
++        ))
++        self.install_button.setEnabled(not self._busy and not blocked)
++
++    def set_cache_info(self, info: ATLauncherCacheInfo) -> None:
++        if isinstance(info, ATLauncherCacheInfo):
++            self._cache_info = info
++        size_mb = self._cache_info.cache_size_bytes / (1024 * 1024)
++        limit_mb = self._cache_info.cache_limit_bytes / (1024 * 1024)
++        source = tr("atlauncher.cache.source.cached") if self._cache_info.from_cache else tr("atlauncher.cache.source.live")
++        if not self._cache_info.refreshed_at:
++            text = tr("atlauncher.cache.never", size=f"{size_mb:.1f}", limit=f"{limit_mb:.0f}")
++        else:
++            text = tr("atlauncher.cache.status", source=source, size=f"{size_mb:.1f}", limit=f"{limit_mb:.0f}")
++        if self._cache_info.last_error:
++            text += " · " + tr("atlauncher.cache.last_error")
++        self.cache_status_label.setText(text)
++
++    def set_busy(self, busy: bool) -> None:
++        self._busy = bool(busy)
++        for widget in (self.search_button, self.refresh_button, self.clear_cache_button, self.results_table, self.version_combo, self.include_beta_checkbox, self.include_alpha_checkbox):
++            widget.setEnabled(not self._busy)
++        blocked = bool(self._selected_version and (self._selected_version.unsupported_actions or any(file.download_type == "browser" for file in self._selected_version.files)))
++        self.install_button.setEnabled(not self._busy and self._selected_version is not None and not blocked)
++        self.detail_panel.open_web_button.setEnabled(not self._busy and bool(self._selected_project and self._selected_project.website_url))
++        self.previous_button.setEnabled(not self._busy and self._result is not None and self._result.index > 0)
++        self.next_button.setEnabled(not self._busy and self._result is not None and self._result.has_more)
++
++    def _channels_changed(self, _checked: bool) -> None:
++        self._pending_channel_preferences = (self.include_beta_checkbox.isChecked(), self.include_alpha_checkbox.isChecked())
++        self.release_channel_label.setText(tr("content.channels.applying"))
++        self.include_beta_checkbox.setEnabled(False)
++        self.include_alpha_checkbox.setEnabled(False)
++        self._commit_feedback(self.release_channel_label, self.include_beta_checkbox, self.include_alpha_checkbox)
++        self._channel_change_timer.start()
++
++    def _apply_queued_channel_change(self) -> None:
++        include_beta, include_alpha = self._pending_channel_preferences
++        self.channel_preferences_changed.emit(include_beta, include_alpha)
++        self.release_channel_label.setText(tr("atlauncher.channel.release_always"))
++        if self._selected_project is not None:
++            self.versions_requested.emit(self._selected_project.safe_name, self.allowed_release_types)
++        if not self._busy:
++            self.include_beta_checkbox.setEnabled(True)
++            self.include_alpha_checkbox.setEnabled(True)
++
++    def _request_search(self) -> None:
++        self._index = 0
++        self.set_searching()
++        self.search_button.setEnabled(False)
++        self._commit_feedback(self.search_button, self.result_count_label)
++        request = (self.search_input.text().strip(), str(self.sort_combo.currentData() or "popularity"), self._index)
++        QTimer.singleShot(0, lambda values=request: self.search_requested.emit(*values))
++
++    def _request_refresh(self) -> None:
++        self.set_searching()
++        self.refresh_button.setEnabled(False)
++        self._commit_feedback(self.refresh_button, self.result_count_label)
++        request = (self.search_input.text().strip(), str(self.sort_combo.currentData() or "popularity"), self._index)
++        QTimer.singleShot(0, lambda values=request: self.refresh_requested.emit(*values))
++
++    def _request_clear_cache(self) -> None:
++        self.clear_cache_button.setEnabled(False)
++        self.cache_status_label.setText(tr("content.cache.clearing"))
++        self._commit_feedback(self.clear_cache_button, self.cache_status_label)
++        QTimer.singleShot(0, self.clear_cache_requested.emit)
++
++    def _project_selected(self) -> None:
++        rows = self.results_table.selectionModel().selectedRows()
++        if not rows:
++            return
++        item = self.results_table.item(rows[0].row(), 0)
++        project = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
++        if isinstance(project, ATLauncherPack):
++            self._select_project(project)
++
++    def _select_project(self, project: ATLauncherPack) -> None:
++        self._selected_project = project
++        self._versions = []
++        self._selected_version = None
++        self.version_combo.clear()
++        self.install_button.setEnabled(False)
++        if not self._instance_name_customized or not self.instance_name_input.text().strip() or self.instance_name_input.text() == self._suggested_instance_name:
++            self._suggested_instance_name = InstanceManager.next_available_name(self._safe_instance_name(project.name))
++            self.instance_name_input.setText(self._suggested_instance_name)
++            self._instance_name_customized = False
++        self.detail_panel.set_loading(
++            project.safe_name,
++            "ATLauncher",
++            project.name,
++            ", ".join(project.authors) or tr("common.unknown"),
++            project.synopsis,
++            project.icon_url,
++            project.website_url,
++            tr("atlauncher.project.loading_versions", name=project.name),
++        )
++        self.project_details_requested.emit(project.safe_name)
++        self.versions_requested.emit(project.safe_name, self.allowed_release_types)
++
++    def _clear_selection(self, message: str) -> None:
++        self._selected_project = None
++        self._versions = []
++        self._selected_version = None
++        self.version_combo.clear()
++        self.install_button.setEnabled(False)
++        self.detail_panel.clear(message)
++
++    def _version_selected(self, _index: int = -1) -> None:
++        self._selected_version = None
++        project = self._selected_project
++        version_name = str(self.version_combo.currentData() or "").strip()
++        self.install_button.setEnabled(False)
++        if project is None or not version_name:
++            return
++        self.detail_panel.set_status(tr("atlauncher.version.loading"))
++        self.version_details_requested.emit(project.safe_name, version_name)
++
++    def _render_project_details(self, project: ATLauncherPack) -> None:
++        game_versions = tuple(dict.fromkeys(version.minecraft_version for version in project.versions if version.minecraft_version))
++        metadata = {
++            tr("content.metadata.updated"): project.updated_at[:10],
++            tr("content.metadata.published"): project.created_at[:10],
++            tr("content.metadata.minecraft"): game_versions[:8],
++            tr("content.metadata.categories"): (project.pack_type,) if project.pack_type else (),
++            tr("atlauncher.metadata.versions"): len(project.versions),
++        }
++        is_html = "<" in project.description and ">" in project.description
++        description = sanitize_html(project.description) if is_html else project.description
++        self.detail_panel.set_project(
++            token=project.safe_name,
++            provider="ATLauncher",
++            title=project.name,
++            author=", ".join(project.authors) or tr("common.unknown"),
++            summary=project.synopsis,
++            description=description or project.synopsis,
++            icon_url=project.icon_url,
++            web_url=project.website_url,
++            metadata=metadata,
++            gallery_urls=project.gallery_urls,
++            description_format="html" if is_html else "plain",
++            status=self.detail_panel.status_label.text(),
++        )
++
++    def _apply_row_icon(self, row: int, safe_name: str, pixmap: QPixmap) -> None:
++        if pixmap.isNull():
++            return
++        item = self.results_table.item(row, 0)
++        project = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
++        if isinstance(project, ATLauncherPack) and project.safe_name == safe_name:
++            item.setIcon(QIcon(self._image_cache.scaled(pixmap, QSize(40, 40))))
++
++    def _instance_name_edited(self, text: str) -> None:
++        self._instance_name_customized = bool(text.strip()) and text != self._suggested_instance_name
++
++    def _request_install(self) -> None:
++        project = self._selected_project
++        version = self._selected_version
++        if project is None or version is None:
++            return
++        self.install_button.setEnabled(False)
++        self.detail_panel.set_status(tr("content.install.preparing"))
++        self._commit_feedback(self.install_button, self.detail_panel.status_label)
++        request = (project.safe_name, version.version, self.instance_name_input.text().strip(), self.optional_checkbox.isChecked(), self.allowed_release_types)
++        QTimer.singleShot(0, lambda values=request: self.install_modpack_requested.emit(*values))
++
++    def _previous_page(self) -> None:
++        self._index = max(0, self._index - self.PAGE_SIZE)
++        self.set_searching()
++        self._commit_feedback(self.result_count_label)
++        request = (self.search_input.text().strip(), str(self.sort_combo.currentData() or "popularity"), self._index)
++        QTimer.singleShot(0, lambda values=request: self.search_requested.emit(*values))
++
++    def _next_page(self) -> None:
++        self._index += self.PAGE_SIZE
++        self.set_searching()
++        self._commit_feedback(self.result_count_label)
++        request = (self.search_input.text().strip(), str(self.sort_combo.currentData() or "popularity"), self._index)
++        QTimer.singleShot(0, lambda values=request: self.search_requested.emit(*values))
++
++    @staticmethod
++    def _safe_instance_name(value: str) -> str:
++        cleaned = re.sub(r'[^\w .()\-\[\]]+', "_", str(value), flags=re.UNICODE).strip().rstrip(". ")
++        return cleaned[:80] or "ATLauncher Pack"
++
++    @staticmethod
++    def _format_bytes(value: int) -> str:
++        size = float(max(0, int(value)))
++        for unit in ("B", "KiB", "MiB", "GiB"):
++            if size < 1024 or unit == "GiB":
++                return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} {unit}"
++            size /= 1024
++        return f"{size:.1f} GiB"
++
++    @staticmethod
++    def _commit_feedback(*widgets: QWidget) -> None:
++        for widget in widgets:
++            widget.update()
++            widget.repaint()
++
++    def retranslate_dynamic(self) -> None:
++        self.setWindowTitle(tr("atlauncher.modpack.title"))
++        self.title_label.setText(tr("atlauncher.modpack.title"))
++        self.context_label.setText(tr("atlauncher.modpack.context"))
++        self.search_input.setPlaceholderText(tr("atlauncher.search.placeholder"))
++        self.search_button.setText(tr("common.search"))
++        self.refresh_button.setText(tr("atlauncher.cache.refresh"))
++        self.clear_cache_button.setText(tr("atlauncher.cache.clear"))
++        self.release_channel_label.setText(tr("atlauncher.channel.release_always"))
++        self.include_beta_checkbox.setText(tr("atlauncher.channel.beta"))
++        self.include_alpha_checkbox.setText(tr("atlauncher.channel.alpha"))
++        self.previous_button.setText(tr("common.previous"))
++        self.next_button.setText(tr("common.next"))
++        self.detail_panel.set_open_web_text(tr("content.open_web"))
++        self.instance_name_input.setPlaceholderText(tr("atlauncher.modpack.instance_name"))
++        self.optional_checkbox.setText(tr("atlauncher.modpack.optional_files"))
++        self.install_button.setText(tr("atlauncher.modpack.install"))
++        self.sort_combo.setItemText(0, tr("atlauncher.sort.popularity"))
++        self.sort_combo.setItemText(1, tr("atlauncher.sort.updated"))
++        self.sort_combo.setItemText(2, tr("atlauncher.sort.newest"))
++        self.sort_combo.setItemText(3, tr("atlauncher.sort.name"))
++        self.results_table.setHorizontalHeaderLabels([
++            tr("atlauncher.column.name"),
++            tr("atlauncher.column.type"),
++            tr("atlauncher.column.minecraft"),
++            tr("atlauncher.column.updated"),
++            tr("atlauncher.column.description"),
++        ])
++        if self._result is None:
++            self.result_count_label.setText(tr("atlauncher.results.ready"))
++        self.set_cache_info(self._cache_info)
+--- a/src/gui/dialogs/create_instance_dialog.py
++++ b/src/gui/dialogs/create_instance_dialog.py
+@@ -33,6 +33,7 @@
+     browse_modrinth_requested = Signal()
+     browse_curseforge_requested = Signal()
+     browse_ftb_requested = Signal()
++    browse_atlauncher_requested = Signal()
+ 
+     MODDED_LOADERS = {"fabric", "quilt", "forge", "neoforge"}
+ 
+@@ -130,14 +131,17 @@
+         self.modrinth_button = set_theme_icon(QPushButton(), "icon.action.modrinth")
+         self.curseforge_button = set_theme_icon(QPushButton(), "icon.action.download")
+         self.ftb_button = set_theme_icon(QPushButton(), "icon.action.download")
++        self.atlauncher_button = set_theme_icon(QPushButton(), "icon.action.download")
+         self.import_button = set_theme_icon(QPushButton(), "icon.action.import")
+         self.modrinth_button.clicked.connect(self._browse_modrinth)
+         self.curseforge_button.clicked.connect(self._browse_curseforge)
+         self.ftb_button.clicked.connect(self._browse_ftb)
++        self.atlauncher_button.clicked.connect(self._browse_atlauncher)
+         self.import_button.clicked.connect(self._import_package)
+         layout.addWidget(self.modrinth_button)
+         layout.addWidget(self.curseforge_button)
+         layout.addWidget(self.ftb_button)
++        layout.addWidget(self.atlauncher_button)
+         layout.addWidget(self.import_button)
+         layout.addStretch(1)
+         return tab
+@@ -291,6 +295,10 @@
+         self.browse_ftb_requested.emit()
+         self.accept()
+ 
++    def _browse_atlauncher(self) -> None:
++        self.browse_atlauncher_requested.emit()
++        self.accept()
++
+     def _import_package(self) -> None:
+         self.import_modpack_package_requested.emit()
+         self.accept()
+@@ -311,6 +319,7 @@
+         self.modrinth_button.setText(tr("workspace.create.browse_modrinth"))
+         self.curseforge_button.setText(tr("workspace.create.browse_curseforge"))
+         self.ftb_button.setText(tr("workspace.create.browse_ftb"))
++        self.atlauncher_button.setText(tr("workspace.create.browse_atlauncher"))
+         self.curseforge_button.setVisible(CurseForgeConfigManager.is_configured())
+         self.import_button.setText(tr("modpack_package.import.local_button"))
+         self.create_button.setText(tr("workspace.create.create_button"))
+--- a/src/gui/main_window_2.py
++++ b/src/gui/main_window_2.py
+@@ -36,6 +36,7 @@
+ from src.gui.controllers.content_pack_controller import ContentPackController
+ from src.gui.controllers.content_library_controller import ContentLibraryController
+ from src.gui.controllers.ftb_controller import FTBController
++from src.gui.controllers.atlauncher_controller import ATLauncherController
+ from src.gui.controllers.backup_controller import BackupController
+ from src.gui.controllers.java_controller import JavaController
+ from src.gui.controllers.modpack_lifecycle_controller import ModpackLifecycleController
+@@ -57,6 +58,7 @@
+ from src.gui.dialogs.content_library_dialog import ContentLibraryDialog
+ from src.gui.dialogs.curseforge_manual_download_dialog import CurseForgeManualDownloadDialog
+ from src.gui.dialogs.ftb_browser_dialog import FTBBrowserDialog
++from src.gui.dialogs.atlauncher_browser_dialog import ATLauncherBrowserDialog
+ from src.gui.dialogs.lan_agent_log_dialog import LanAgentLogDialog
+ from src.gui.dialogs.instance_import_settings_dialog import InstanceImportSettingsDialog
+ from src.gui.dialogs.modpack_export_dialog import ModpackExportDialog
+@@ -117,6 +119,7 @@
+         self.content_pack_controller = ContentPackController(self.task_runner)
+         self.content_library_controller = ContentLibraryController(self.task_runner)
+         self.ftb_controller = FTBController(self.task_runner)
++        self.atlauncher_controller = ATLauncherController(self.task_runner)
+         self.instance_settings_controller = InstanceSettingsController()
+         self.gui_settings_controller = GuiSettingsController()
+         self._startup_settings = self.gui_settings_controller.load()
+@@ -136,6 +139,7 @@
+         self._mod_catalog_tasks: set[str] = set()
+         self._curseforge_tasks: set[str] = set()
+         self._ftb_tasks: set[str] = set()
++        self._atlauncher_tasks: set[str] = set()
+         self._curseforge_catalog_tasks: set[str] = set()
+         self._content_tasks: set[str] = set()
+         self._suppress_loader_progress = False
+@@ -264,6 +268,7 @@
+         self.resource_pack_browser_dialog = ContentPackBrowserDialog(ContentPackManager.RESOURCE_PACK, self)
+         self.shader_pack_browser_dialog = ContentPackBrowserDialog(ContentPackManager.SHADER_PACK, self)
+         self.ftb_modpack_dialog = FTBBrowserDialog(self)
++        self.atlauncher_modpack_dialog = ATLauncherBrowserDialog(self)
+         self.curseforge_manual_dialog = CurseForgeManualDownloadDialog(self)
+         self.portable_manual_dialog = CurseForgeManualDownloadDialog(self)
+         self.repair_center_dialog = RepairCenterDialog(self)
+@@ -337,6 +342,7 @@
+         self.instances_page.browse_modpacks_requested.connect(self._open_modrinth_modpacks)
+         self.instances_page.browse_curseforge_modpacks_requested.connect(self._open_curseforge_modpacks)
+         self.instances_page.browse_ftb_modpacks_requested.connect(self._open_ftb_modpacks)
++        self.instances_page.browse_atlauncher_modpacks_requested.connect(self._open_atlauncher_modpacks)
+         self.instances_page.rename_requested.connect(self.instance_controller.rename)
+         self.instances_page.clone_requested.connect(self.instance_controller.clone)
+         self.instances_page.delete_requested.connect(self.instance_controller.delete)
+@@ -542,6 +548,21 @@
+         self.ftb_controller.cache_cleared.connect(lambda info: (self.ftb_modpack_dialog.set_cache_info(info), QMessageBox.information(self, tr("ftb.modpack.title"), tr("ftb.cache.cleared"))))
+         self.ftb_controller.modpack_installed.connect(self._ftb_modpack_installed)
+ 
++        self.atlauncher_modpack_dialog.search_requested.connect(self.atlauncher_controller.search)
++        self.atlauncher_modpack_dialog.refresh_requested.connect(lambda query, sort, index: self.atlauncher_controller.search(query, sort, index, force_refresh=True))
++        self.atlauncher_modpack_dialog.project_details_requested.connect(self.atlauncher_controller.load_project_details)
++        self.atlauncher_modpack_dialog.versions_requested.connect(self.atlauncher_controller.load_versions)
++        self.atlauncher_modpack_dialog.version_details_requested.connect(self.atlauncher_controller.load_version_details)
++        self.atlauncher_modpack_dialog.clear_cache_requested.connect(self.atlauncher_controller.clear_cache)
++        self.atlauncher_modpack_dialog.install_modpack_requested.connect(self._install_atlauncher_modpack)
++        self.atlauncher_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
++        self.atlauncher_controller.search_results_changed.connect(self.atlauncher_modpack_dialog.set_search_result)
++        self.atlauncher_controller.project_details_changed.connect(self.atlauncher_modpack_dialog.set_project_details)
++        self.atlauncher_controller.versions_changed.connect(self.atlauncher_modpack_dialog.set_versions)
++        self.atlauncher_controller.version_details_changed.connect(self.atlauncher_modpack_dialog.set_version_details)
++        self.atlauncher_controller.cache_cleared.connect(lambda info: (self.atlauncher_modpack_dialog.set_cache_info(info), QMessageBox.information(self, tr("atlauncher.modpack.title"), tr("atlauncher.cache.cleared"))))
++        self.atlauncher_controller.modpack_installed.connect(self._atlauncher_modpack_installed)
++
+         self.content_pack_manager_dialog.browse_requested.connect(self._open_content_pack_browser)
+         self.content_pack_manager_dialog.import_requested.connect(self._import_content_pack)
+         self.content_pack_manager_dialog.refresh_requested.connect(self._refresh_content_pack_entries)
+@@ -574,6 +595,7 @@
+         self.modrinth_controller.progress_received.connect(self._on_progress)
+         self.curseforge_controller.progress_received.connect(self._on_progress)
+         self.ftb_controller.progress_received.connect(self._on_progress)
++        self.atlauncher_controller.progress_received.connect(self._on_progress)
+         self.content_pack_controller.progress_received.connect(self._on_progress)
+         self.mod_controller.progress_received.connect(self._on_progress)
+         self.java_controller.progress_received.connect(self._on_progress)
+@@ -626,6 +648,7 @@
+             self.modrinth_controller,
+             self.curseforge_controller,
+             self.ftb_controller,
++            self.atlauncher_controller,
+             self.content_pack_controller,
+             self.content_library_controller,
+             self.instance_settings_controller,
+@@ -1313,6 +1336,13 @@
+         self.ftb_modpack_dialog.set_searching()
+         self.ftb_controller.search("", "popularity", 0)
+ 
++    def _open_atlauncher_modpacks(self) -> None:
++        self.atlauncher_modpack_dialog.show()
++        self.atlauncher_modpack_dialog.raise_()
++        self.atlauncher_modpack_dialog.activateWindow()
++        self.atlauncher_modpack_dialog.set_searching()
++        self.atlauncher_controller.search("", "popularity", 0)
++
+     def _search_curseforge_mods(self, project_type: str, query: str, sort: str, index: int) -> None:
+         self.curseforge_controller.search(project_type, query, sort, index, game_version=self.curseforge_mod_dialog.game_version, loader=self.curseforge_mod_dialog.loader)
+ 
+@@ -1456,6 +1486,23 @@
+         self.ftb_controller.install_modpack(
+             int(project_id),
+             int(version_id),
++            str(instance_name),
++            bool(install_optional_files),
++            tuple(allowed_release_types) if isinstance(allowed_release_types, (list, tuple, set)) else ("release",),
++            settings,
++        )
++
++    def _install_atlauncher_modpack(self, safe_name: str, version_name: str, instance_name: str, install_optional_files: bool, allowed_release_types: object) -> None:
++        version = self.atlauncher_modpack_dialog.selected_version
++        recommended_minimum = int(getattr(version, "minimum_memory_mb", 0) or 0)
++        recommended_maximum = int(getattr(version, "recommended_memory_mb", 0) or 0)
++        settings = self._prompt_modpack_settings(str(instance_name), recommended_minimum, recommended_maximum)
++        if settings is None:
++            self.atlauncher_modpack_dialog.set_busy(False)
++            return
++        self.atlauncher_controller.install_modpack(
++            str(safe_name),
++            str(version_name),
+             str(instance_name),
+             bool(install_optional_files),
+             tuple(allowed_release_types) if isinstance(allowed_release_types, (list, tuple, set)) else ("release",),
+@@ -1619,6 +1666,14 @@
+         self.ftb_modpack_dialog.close()
+         QMessageBox.information(self, tr("ftb.modpack.install"), tr("ftb.modpack.installed", name=selected_name))
+ 
++
++
++    def _atlauncher_modpack_installed(self, result: object) -> None:
++        instance = getattr(result, "instance", None)
++        selected_name = str(getattr(instance, "name", ""))
++        self.instance_controller.refresh(selected_name=selected_name)
++        self.atlauncher_modpack_dialog.close()
++        QMessageBox.information(self, tr("atlauncher.modpack.install"), tr("atlauncher.modpack.installed", name=selected_name))
+ 
+ 
+     def _request_lan_hosting_prepare(self, instance_name: str, auth_mode: str, connection_provider: str) -> None:
+@@ -1966,6 +2021,7 @@
+         self.curseforge_mod_dialog.set_channel_preferences(include_beta, include_alpha)
+         self.curseforge_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+         self.ftb_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
++        self.atlauncher_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+         self.resource_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
+         self.shader_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
+         self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
+@@ -1976,6 +2032,7 @@
+         self.curseforge_mod_dialog.set_show_project_descriptions(show_content_descriptions)
+         self.curseforge_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
+         self.ftb_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
++        self.atlauncher_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
+         self.resource_pack_browser_dialog.set_show_project_descriptions(show_content_descriptions)
+         self.shader_pack_browser_dialog.set_show_project_descriptions(show_content_descriptions)
+         curseforge_available = bool(settings.get("curseforge_gateway_urls", ()))
+@@ -2024,6 +2081,7 @@
+         self.curseforge_mod_dialog.set_channel_preferences(include_beta, include_alpha)
+         self.curseforge_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+         self.ftb_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
++        self.atlauncher_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+         self.resource_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
+         self.shader_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
+         self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
+@@ -2137,6 +2195,7 @@
+             self.curseforge_mod_dialog,
+             self.curseforge_modpack_dialog,
+             self.ftb_modpack_dialog,
++            self.atlauncher_modpack_dialog,
+             self.content_pack_manager_dialog,
+             self.content_library_dialog,
+             self.resource_pack_browser_dialog,
+@@ -2177,6 +2236,9 @@
+         if task_id.startswith("ftb."):
+             self._ftb_tasks.add(task_id)
+             self.ftb_modpack_dialog.set_busy(True)
++        if task_id.startswith("atlauncher."):
++            self._atlauncher_tasks.add(task_id)
++            self.atlauncher_modpack_dialog.set_busy(True)
+         if task_id.startswith("content."):
+             self._content_tasks.add(task_id)
+             self.content_pack_manager_dialog.set_busy(True)
+@@ -2233,6 +2295,9 @@
+         if task_id.startswith("ftb."):
+             self._ftb_tasks.discard(task_id)
+             self.ftb_modpack_dialog.set_busy(bool(self._ftb_tasks))
++        if task_id.startswith("atlauncher."):
++            self._atlauncher_tasks.discard(task_id)
++            self.atlauncher_modpack_dialog.set_busy(bool(self._atlauncher_tasks))
+         if task_id.startswith("content."):
+             self._content_tasks.discard(task_id)
+             busy = bool(self._content_tasks)
+--- a/src/gui/pages/instance_workspace_page.py
++++ b/src/gui/pages/instance_workspace_page.py
+@@ -66,6 +66,7 @@
+     browse_modpacks_requested = Signal()
+     browse_curseforge_modpacks_requested = Signal()
+     browse_ftb_modpacks_requested = Signal()
++    browse_atlauncher_modpacks_requested = Signal()
+     backup_requested = Signal(str, str)
+     restore_backup_requested = Signal(str, object)
+     open_backups_requested = Signal(str)
+@@ -118,6 +119,7 @@
+         self.modrinth_button = set_theme_icon(QPushButton(), "icon.action.modrinth")
+         self.browse_curseforge_modpacks_button = set_theme_icon(QPushButton(), "icon.action.download")
+         self.browse_ftb_modpacks_button = set_theme_icon(QPushButton(), "icon.action.download")
++        self.browse_atlauncher_modpacks_button = set_theme_icon(QPushButton(), "icon.action.download")
+         self.refresh_button = set_theme_icon(QPushButton(), "icon.action.refresh")
+         self.account_button = set_theme_icon(QPushButton(), "icon.action.account")
+         self.account_button.setIconSize(QSize(32, 32))
+@@ -128,6 +130,7 @@
+         self.modrinth_button.clicked.connect(self.browse_modpacks_requested.emit)
+         self.browse_curseforge_modpacks_button.clicked.connect(self.browse_curseforge_modpacks_requested.emit)
+         self.browse_ftb_modpacks_button.clicked.connect(self.browse_ftb_modpacks_requested.emit)
++        self.browse_atlauncher_modpacks_button.clicked.connect(self.browse_atlauncher_modpacks_requested.emit)
+         self.refresh_button.clicked.connect(self.refresh_requested.emit)
+         self.account_button.clicked.connect(self.manage_accounts_requested.emit)
+ 
+@@ -136,6 +139,7 @@
+         toolbar_layout.addWidget(self.modrinth_button)
+         toolbar_layout.addWidget(self.browse_curseforge_modpacks_button)
+         toolbar_layout.addWidget(self.browse_ftb_modpacks_button)
++        toolbar_layout.addWidget(self.browse_atlauncher_modpacks_button)
+         toolbar_layout.addWidget(self.refresh_button)
+         toolbar_layout.addStretch(1)
+         toolbar_layout.addWidget(self.account_button)
+@@ -258,6 +262,7 @@
+         self.create_dialog.browse_modrinth_requested.connect(self.browse_modpacks_requested.emit)
+         self.create_dialog.browse_curseforge_requested.connect(self.browse_curseforge_modpacks_requested.emit)
+         self.create_dialog.browse_ftb_requested.connect(self.browse_ftb_modpacks_requested.emit)
++        self.create_dialog.browse_atlauncher_requested.connect(self.browse_atlauncher_modpacks_requested.emit)
+ 
+         self.management_dialog.launch_requested.connect(self._request_launch)
+         self.management_dialog.open_folder_requested.connect(self.open_instance_folder_requested.emit)
+@@ -852,6 +857,7 @@
+         self.modrinth_button.setText(tr("workspace.toolbar.modrinth"))
+         self.browse_curseforge_modpacks_button.setText(tr("workspace.toolbar.curseforge"))
+         self.browse_ftb_modpacks_button.setText(tr("workspace.toolbar.ftb"))
++        self.browse_atlauncher_modpacks_button.setText(tr("workspace.toolbar.atlauncher"))
+         self.browse_curseforge_modpacks_button.setVisible(CurseForgeConfigManager.is_configured())
+         self.refresh_button.setText(tr("workspace.toolbar.refresh"))
+         self.search_input.setPlaceholderText(tr("workspace.search.placeholder"))
+--- a/src/gui/task_progress.py
++++ b/src/gui/task_progress.py
+@@ -47,7 +47,7 @@
+         return TaskProgressProfile(ProgressStage.PREPARING, "update.check.completed", "update.check.completed_detail", "update.check.failed")
+     if task in {"instance.create", "instance.loader", "instance.loader.repair", "instance.loader.restore"}:
+         return TaskProgressProfile(ProgressStage.INSTALLING_MOD_LOADER, "loader.progress.ready", "loader.progress.ready_detail", "loader.progress.failed")
+-    if task.startswith("modrinth.install.modpack") or task.startswith("curseforge.install.modpack") or task.startswith("ftb.install.modpack"):
++    if task.startswith("modrinth.install.modpack") or task.startswith("curseforge.install.modpack") or task.startswith("ftb.install.modpack") or task.startswith("atlauncher.install.modpack"):
+         return TaskProgressProfile(ProgressStage.DOWNLOADING_MODPACK, "modpack.install.completed", "modpack.install.completed_detail", "modpack.install.failed")
+     if task.startswith("modrinth.install.mod") or task.startswith("curseforge.install.mod"):
+         return TaskProgressProfile(ProgressStage.DOWNLOADING_MODS, "mods.install.completed", "mods.install.completed_detail", "mods.install.failed")
+--- a/src/models/atlauncher/__init__.py
++++ b/src/models/atlauncher/__init__.py
+@@ -0,0 +1,15 @@
++from src.models.atlauncher.cache import ATLauncherCacheInfo
++from src.models.atlauncher.install_result import ATLauncherModpackInstallResult
++from src.models.atlauncher.pack import ATLauncherPack, ATLauncherSearchResult
++from src.models.atlauncher.version import ATLauncherConfigBundle, ATLauncherFile, ATLauncherVersion, ATLauncherVersionSummary
++
++__all__ = [
++    "ATLauncherCacheInfo",
++    "ATLauncherConfigBundle",
++    "ATLauncherFile",
++    "ATLauncherModpackInstallResult",
++    "ATLauncherPack",
++    "ATLauncherSearchResult",
++    "ATLauncherVersion",
++    "ATLauncherVersionSummary",
++]
+--- a/src/models/atlauncher/cache.py
++++ b/src/models/atlauncher/cache.py
+@@ -0,0 +1,14 @@
++from __future__ import annotations
++
++from dataclasses import dataclass
++
++
++@dataclass(frozen=True, slots=True)
++class ATLauncherCacheInfo:
++    refreshed_at: str = ""
++    from_cache: bool = False
++    stale: bool = False
++    age_seconds: int = 0
++    last_error: str = ""
++    cache_size_bytes: int = 0
++    cache_limit_bytes: int = 10 * 1024 * 1024
+--- a/src/models/atlauncher/install_result.py
++++ b/src/models/atlauncher/install_result.py
+@@ -0,0 +1,16 @@
++from __future__ import annotations
++
++from dataclasses import dataclass
++
++from src.models.instance.instance import Instance
++
++
++@dataclass(frozen=True, slots=True)
++class ATLauncherModpackInstallResult:
++    instance: Instance
++    pack_name: str
++    pack_version: str
++    managed_files: int
++    skipped_optional_files: int
++    skipped_server_files: int
++    manual_files: int = 0
+--- a/src/models/atlauncher/pack.py
++++ b/src/models/atlauncher/pack.py
+@@ -0,0 +1,36 @@
++from __future__ import annotations
++
++from dataclasses import dataclass, field
++
++from src.models.atlauncher.cache import ATLauncherCacheInfo
++from src.models.atlauncher.version import ATLauncherVersionSummary
++
++
++@dataclass(frozen=True, slots=True)
++class ATLauncherPack:
++    pack_id: str
++    safe_name: str
++    name: str
++    synopsis: str = ""
++    description: str = ""
++    authors: tuple[str, ...] = ("ATLauncher",)
++    icon_url: str = ""
++    gallery_urls: tuple[str, ...] = ()
++    tags: tuple[str, ...] = ()
++    position: int = 0
++    updated_at: str = ""
++    created_at: str = ""
++    website_url: str = ""
++    support_url: str = ""
++    pack_type: str = ""
++    versions: tuple[ATLauncherVersionSummary, ...] = ()
++
++
++@dataclass(frozen=True, slots=True)
++class ATLauncherSearchResult:
++    projects: tuple[ATLauncherPack, ...]
++    total_count: int
++    index: int
++    page_size: int
++    has_more: bool = False
++    cache_info: ATLauncherCacheInfo = field(default_factory=ATLauncherCacheInfo)
+--- a/src/models/atlauncher/version.py
++++ b/src/models/atlauncher/version.py
+@@ -0,0 +1,93 @@
++from __future__ import annotations
++
++from dataclasses import dataclass
++
++
++@dataclass(frozen=True, slots=True)
++class ATLauncherVersionSummary:
++    version_id: str
++    version: str
++    minecraft_version: str = ""
++    changelog: str = ""
++    recommended: bool = False
++    development: bool = False
++    created_at: str = ""
++    updated_at: str = ""
++    published_at: str = ""
++
++    @property
++    def release_type(self) -> str:
++        if self.development:
++            return "alpha"
++        return "release" if self.recommended else "beta"
++
++
++@dataclass(frozen=True, slots=True)
++class ATLauncherFile:
++    file_id: str
++    name: str
++    path: str
++    urls: tuple[str, ...]
++    sha1: str = ""
++    md5: str = ""
++    size: int = 0
++    download_type: str = "direct"
++    optional: bool = False
++    selected: bool = False
++    recommended: bool = False
++    client_only: bool = False
++    server_only: bool = False
++    library: bool = False
++    dependencies: tuple[str, ...] = ()
++    extract_to: str = ""
++    extract_folder: str = ""
++    decomp_type: str = ""
++    decomp_file: str = ""
++    force: bool = False
++
++    @property
++    def file_name(self) -> str:
++        return self.name
++
++
++@dataclass(frozen=True, slots=True)
++class ATLauncherConfigBundle:
++    url: str
++    sha1: str
++    size: int
++
++
++@dataclass(frozen=True, slots=True)
++class ATLauncherVersion:
++    pack_id: str
++    safe_name: str
++    version_id: str
++    version: str
++    minecraft_version: str
++    changelog: str
++    recommended: bool
++    development: bool
++    loader: str
++    loader_version: str
++    files: tuple[ATLauncherFile, ...]
++    config_bundle: ATLauncherConfigBundle | None = None
++    minimum_memory_mb: int = 0
++    recommended_memory_mb: int = 0
++    java_version: str = ""
++    warnings: tuple[str, ...] = ()
++    unsupported_actions: tuple[str, ...] = ()
++    published_at: str = ""
++    raw_manifest: dict | None = None
++
++    @property
++    def release_type(self) -> str:
++        if self.development:
++            return "alpha"
++        return "release" if self.recommended else "beta"
++
++    @property
++    def downloadable_size(self) -> int:
++        total = sum(max(0, file.size) for file in self.files if not file.server_only)
++        if self.config_bundle is not None:
++            total += max(0, self.config_bundle.size)
++        return total
+--- a/test/core/atlauncher/test_atlauncher_client.py
++++ b/test/core/atlauncher/test_atlauncher_client.py
+@@ -0,0 +1,178 @@
++from pathlib import Path
++
++import httpx
++
++from src.config import ATLAUNCHER_USER_AGENT
++from src.core.atlauncher.atlauncher_cache import ATLauncherCache
++from src.core.atlauncher.atlauncher_client import ATLauncherClient
++from src.core.network.httpx_downloader import HttpDownloader
++
++
++def configure_client(monkeypatch, tmp_path: Path, handler) -> httpx.Client:
++    client = httpx.Client(transport=httpx.MockTransport(handler))
++    monkeypatch.setattr(HttpDownloader, "get_client", classmethod(lambda cls: client))
++    monkeypatch.setattr(ATLauncherCache, "root", staticmethod(lambda: tmp_path))
++    return client
++
++
++def project_payload() -> dict:
++    return {
++        "id": 25,
++        "position": 2,
++        "name": "Example Pack",
++        "safeName": "ExamplePack",
++        "type": "public",
++        "description": "A test ATLauncher pack. More details follow.",
++        "supportURL": "https://support.example/pack",
++        "websiteURL": "https://example.invalid/pack",
++        "versions": [
++            {
++                "id": 101,
++                "version": "2.0.0",
++                "minecraftVersion": "1.20.1",
++                "recommended": True,
++                "published": 1760000000,
++                "changelog": "Stable",
++            },
++            {
++                "id": 100,
++                "version": "2.0.0-beta",
++                "minecraftVersion": "1.20.1",
++                "recommended": False,
++                "published": 1750000000,
++                "changelog": "Beta",
++            },
++        ],
++    }
++
++
++def version_manifest() -> dict:
++    return {
++        "minecraft": "1.20.1",
++        "loader": {"type": "forge", "metadata": {"version": "47.4.0"}},
++        "configs": {"filesize": 120, "sha1": "c" * 40},
++        "memory": {"minimum": 4096, "recommended": 6144},
++        "mods": [
++            {
++                "name": "Required Mod",
++                "version": "1.0.0",
++                "file": "required.jar",
++                "url": "https://cdn.example/required.jar",
++                "download": "direct",
++                "type": "mods",
++                "md5": "a" * 32,
++                "client": True,
++            },
++            {
++                "name": "Server Hosted Mod",
++                "version": "1.0.0",
++                "file": "server.jar",
++                "url": "packs/ExamplePack/server.jar",
++                "download": "server",
++                "type": "mods",
++                "md5": "b" * 32,
++                "client": True,
++            },
++        ],
++    }
++
++
++def test_search_uses_public_v2_graphql_contract(monkeypatch, tmp_path: Path) -> None:
++    requests: list[httpx.Request] = []
++
++    def handler(request: httpx.Request) -> httpx.Response:
++        requests.append(request)
++        return httpx.Response(200, request=request, json={"data": {"packs": [{
++            "id": 25,
++            "position": 2,
++            "name": "Example Pack",
++            "safeName": "ExamplePack",
++            "latestVersion": {
++                "id": 101,
++                "version": "2.0.0",
++                "minecraftVersion": "1.20.1",
++                "changelog": "Stable",
++                "isRecommended": True,
++                "canUpdate": False,
++                "createdAt": "2026-01-01T00:00:00Z",
++                "updatedAt": "2026-01-02T00:00:00Z",
++                "publishedAt": "2026-01-03T00:00:00Z",
++            },
++        }]}})
++
++    client = configure_client(monkeypatch, tmp_path, handler)
++    result = ATLauncherClient.search_projects(force_refresh=True)
++
++    assert requests[0].url == httpx.URL(ATLauncherClient.GRAPHQL_URL)
++    assert requests[0].headers["user-agent"] == ATLAUNCHER_USER_AGENT
++    body = requests[0].read().decode("utf-8")
++    assert "isDevelopment" not in body
++    assert "rawJson" not in body
++    assert result.projects[0].safe_name == "ExamplePack"
++    assert result.projects[0].versions[0].release_type == "release"
++    client.close()
++
++
++def test_project_uses_public_v1_details_and_parses_versions(monkeypatch, tmp_path: Path) -> None:
++    paths: list[str] = []
++
++    def handler(request: httpx.Request) -> httpx.Response:
++        paths.append(request.url.path)
++        return httpx.Response(200, request=request, json=project_payload())
++
++    client = configure_client(monkeypatch, tmp_path, handler)
++    project = ATLauncherClient.get_project("ExamplePack", force_refresh=True)
++    versions = ATLauncherClient.list_versions("ExamplePack", ("release",), force_refresh=False)
++
++    assert paths == ["/v1/pack/ExamplePack"]
++    assert project.description.startswith("A test")
++    assert project.support_url == "https://support.example/pack"
++    assert [version.version for version in versions] == ["2.0.0"]
++    assert project.icon_url.endswith("launcher/images/examplepack.png")
++    client.close()
++
++
++def test_version_uses_configs_json_and_builds_deferred_files(monkeypatch, tmp_path: Path) -> None:
++    paths: list[str] = []
++
++    def handler(request: httpx.Request) -> httpx.Response:
++        paths.append(request.url.path)
++        if request.url.path.endswith("/Configs.json"):
++            return httpx.Response(200, request=request, json=version_manifest())
++        if request.url.path.endswith("/v1/pack/ExamplePack"):
++            return httpx.Response(200, request=request, json=project_payload())
++        return httpx.Response(404, request=request)
++
++    client = configure_client(monkeypatch, tmp_path, handler)
++    version = ATLauncherClient.get_version("ExamplePack", "2.0.0", force_refresh=True)
++
++    assert paths[0].endswith("/packs/ExamplePack/versions/2.0.0/Configs.json")
++    assert version.minecraft_version == "1.20.1"
++    assert version.loader == "forge"
++    assert version.loader_version == "47.4.0"
++    assert version.recommended_memory_mb == 6144
++    assert version.config_bundle is not None
++    assert version.config_bundle.url.endswith("/packs/ExamplePack/versions/2.0.0/Configs.zip")
++    assert version.files[0].urls == ("https://cdn.example/required.jar",)
++    assert version.files[1].urls == ("https://download.nodecdn.net/containers/atl/packs/ExamplePack/server.jar",)
++    assert not version.unsupported_actions
++    client.close()
++
++
++def test_graphql_failure_falls_back_to_v1_pack_list(monkeypatch, tmp_path: Path) -> None:
++    calls: list[tuple[str, str]] = []
++
++    def handler(request: httpx.Request) -> httpx.Response:
++        calls.append((request.method, request.url.path))
++        if request.method == "POST":
++            return httpx.Response(200, request=request, json={"errors": [{"message": "schema changed"}]})
++        if request.url.path.endswith("/v1/packs/full/public"):
++            return httpx.Response(200, request=request, json=[project_payload()])
++        return httpx.Response(404, request=request)
++
++    client = configure_client(monkeypatch, tmp_path, handler)
++    result = ATLauncherClient.search_projects("Example", force_refresh=True)
++
++    assert result.projects[0].name == "Example Pack"
++    assert calls[:2] == [("POST", "/v2/graphql"), ("GET", "/v1/packs/full/public")]
++    client.close()
+--- a/test/core/atlauncher/test_atlauncher_content_manager.py
++++ b/test/core/atlauncher/test_atlauncher_content_manager.py
+@@ -0,0 +1,102 @@
++from __future__ import annotations
++
++from hashlib import md5
++from pathlib import Path
++import zipfile
++
++import pytest
++
++from src.core.atlauncher.atlauncher_content_manager import ATLauncherContentManager
++from src.core.atlauncher.atlauncher_pack_registry import ATLauncherPackRegistry
++from src.core.mod.mod_manager import ModManager
++from src.core.network.download_manager import download_manager
++from src.core.progress.progress_reporter import ProgressReporter
++from src.models.instance.instance import Instance
++from src.models.progress.progress_stage import ProgressStage
++from src.models.progress.progress_unit import ProgressUnit
++
++
++def test_ensure_downloads_deferred_files_with_aggregate_progress(tmp_path, monkeypatch) -> None:
++    instance_dir = tmp_path / "instance"
++    instance_dir.mkdir()
++    instance = Instance("id", "ATLauncher Pack", "1.20.1", instance_dir, ("forge", "47.4.0"))
++    first = b"first"
++    second = b"second"
++    registry = {
++        "safeName": "ExamplePack",
++        "versionName": "2.0.0",
++        "managedFiles": [
++            {
++                "fileId": "1",
++                "fileName": "first.jar",
++                "path": "mods/first.jar",
++                "md5": md5(first, usedforsecurity=False).hexdigest(),
++                "size": len(first),
++                "urls": ["https://cdn.example/first.jar"],
++                "pendingDownload": True,
++            },
++            {
++                "fileId": "2",
++                "fileName": "second.jar",
++                "path": "mods/second.jar",
++                "md5": md5(second, usedforsecurity=False).hexdigest(),
++                "size": len(second),
++                "urls": ["https://cdn.example/second.jar"],
++                "pendingDownload": True,
++            },
++        ],
++    }
++    payloads = {"first.jar": first, "second.jar": second}
++    requests = []
++    saved: list[dict] = []
++    events = []
++
++    monkeypatch.setattr(ATLauncherPackRegistry, "load", staticmethod(lambda _instance: registry))
++    monkeypatch.setattr(ATLauncherPackRegistry, "save", staticmethod(lambda _instance, data: saved.append(data)))
++    monkeypatch.setattr(download_manager, "verify", lambda path, size, hashes: Path(path).is_file() and Path(path).read_bytes() == payloads[Path(path).name])
++    monkeypatch.setattr(ModManager, "ensure_modifiable", staticmethod(lambda *_args, **_kwargs: None))
++
++    def download(request, reporter=None, progress_stage=None, progress_message=""):
++        requests.append(request)
++        request.destination.parent.mkdir(parents=True, exist_ok=True)
++        content = payloads[request.expected_filename]
++        if reporter is not None:
++            reporter.bytes(progress_stage, request.expected_filename, len(content), len(content), bytes_per_second=2_000_000)
++        request.destination.write_bytes(content)
++        return request.destination
++
++    monkeypatch.setattr("src.core.atlauncher.atlauncher_content_manager.artifact_download_service.download", download)
++
++    assert ATLauncherContentManager.ensure(instance, ProgressReporter(events.append), launch_lock_token="owned") == ()
++
++    assert [request.provider for request in requests] == ["atlauncher", "atlauncher"]
++    assert (instance_dir / "mods" / "first.jar").read_bytes() == first
++    assert (instance_dir / "mods" / "second.jar").read_bytes() == second
++    assert all(entry["pendingDownload"] is False for entry in saved[-1]["managedFiles"])
++    progress = [event for event in events if event.stage is ProgressStage.DOWNLOADING_MODS]
++    assert progress
++    assert all(event.unit is ProgressUnit.FILES for event in progress)
++    assert all(event.message == "Downloading ATLauncher pack files..." for event in progress)
++    assert all("first.jar" not in event.message and "second.jar" not in event.message for event in progress)
++    assert progress[-1].current == 2
++    assert progress[-1].total == 2
++
++
++def test_safe_extract_zip_rejects_traversal_and_extracts_valid_files(tmp_path) -> None:
++    destination = tmp_path / "instance"
++    destination.mkdir()
++    valid = tmp_path / "valid.zip"
++    with zipfile.ZipFile(valid, "w") as archive:
++        archive.writestr("config/example.cfg", "enabled=true")
++
++    ATLauncherContentManager._safe_extract_zip(valid, destination)
++
++    assert (destination / "config" / "example.cfg").read_text(encoding="utf-8") == "enabled=true"
++
++    unsafe = tmp_path / "unsafe.zip"
++    with zipfile.ZipFile(unsafe, "w") as archive:
++        archive.writestr("../outside.txt", "nope")
++
++    with pytest.raises(RuntimeError, match="Unsafe path"):
++        ATLauncherContentManager._safe_extract_zip(unsafe, destination)
++    assert not (tmp_path / "outside.txt").exists()
+--- a/test/core/atlauncher/test_atlauncher_pack_installer.py
++++ b/test/core/atlauncher/test_atlauncher_pack_installer.py
+@@ -0,0 +1,120 @@
++from pathlib import Path
++from types import SimpleNamespace
++
++import pytest
++
++from src.core.atlauncher.atlauncher_client import ATLauncherClient
++from src.core.atlauncher.atlauncher_pack_installer import ATLauncherPackInstaller
++from src.core.atlauncher.atlauncher_pack_registry import ATLauncherPackRegistry
++from src.core.instance.instance_artwork_manager import InstanceArtworkManager
++from src.core.instance.instance_manager import InstanceManager
++from src.core.instance.settings_manager import SettingsManager
++from src.core.minecraft.version_manager import VersionManager
++from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
++from src.core.modloader.mod_loader_manager import ModLoaderManager
++from src.models.atlauncher.pack import ATLauncherPack
++from src.models.atlauncher.version import ATLauncherFile, ATLauncherVersion
++from src.models.instance.instance import Instance
++
++
++def atl_file(name: str, *, optional: bool = False, selected: bool = False, server_only: bool = False, download_type: str = "direct") -> ATLauncherFile:
++    return ATLauncherFile(
++        file_id=name,
++        name=name,
++        path=f"mods/{name}",
++        urls=(f"https://cdn.example/{name}",),
++        md5="a" * 32,
++        size=10,
++        optional=optional,
++        selected=selected,
++        recommended=selected,
++        server_only=server_only,
++        download_type=download_type,
++    )
++
++
++def atl_version(files: tuple[ATLauncherFile, ...], unsupported: tuple[str, ...] = ()) -> ATLauncherVersion:
++    return ATLauncherVersion(
++        pack_id="25",
++        safe_name="ExamplePack",
++        version_id="101",
++        version="2.0.0",
++        minecraft_version="1.20.1",
++        changelog="",
++        recommended=True,
++        development=False,
++        loader="forge",
++        loader_version="47.4.0",
++        files=files,
++        recommended_memory_mb=6144,
++        unsupported_actions=unsupported,
++    )
++
++
++def test_select_files_respects_optional_and_server_flags() -> None:
++    required = atl_file("required.jar")
++    optional = atl_file("optional.jar", optional=True, selected=True)
++    server = atl_file("server.jar", server_only=True)
++
++    selected, skipped_optional, skipped_server, manual = ATLauncherPackInstaller._select_files(atl_version((required, optional, server)), False)
++
++    assert selected == (required,)
++    assert skipped_optional == 1
++    assert skipped_server == 1
++    assert manual == ()
++
++
++def test_select_files_rejects_browser_and_unsafe_destinations() -> None:
++    browser = atl_file("manual.jar", download_type="browser")
++    selected, _, _, manual = ATLauncherPackInstaller._select_files(atl_version((browser,)), True)
++    assert selected == (browser,)
++    assert manual == (browser,)
++
++    unsafe = ATLauncherFile("bad", "bad.jar", "../bad.jar", ("https://example/bad.jar",), md5="a" * 32)
++    with pytest.raises(RuntimeError, match="Unsafe path"):
++        ATLauncherPackInstaller._select_files(atl_version((unsafe,)), True)
++
++
++def test_install_creates_deferred_registry(monkeypatch, tmp_path: Path) -> None:
++    project = ATLauncherPack("25", "ExamplePack", "Example Pack", icon_url="https://cdn.example/icon.png")
++    version = atl_version((atl_file("required.jar"),))
++    saved: list[dict] = []
++
++    monkeypatch.setattr(ATLauncherClient, "get_project", staticmethod(lambda *_args, **_kwargs: project))
++    monkeypatch.setattr(ATLauncherClient, "get_version", staticmethod(lambda *_args, **_kwargs: version))
++    monkeypatch.setattr(InstanceManager, "is_instance_exist", staticmethod(lambda _name: False))
++    monkeypatch.setattr(VersionManager, "load", staticmethod(lambda version_id: SimpleNamespace(id=version_id)))
++    monkeypatch.setattr(ModLoaderManager, "resolve", staticmethod(lambda *_args: ("forge", "47.4.0")))
++
++    def create_instance(**kwargs):
++        instance = Instance("id", kwargs["name"], "1.20.1", tmp_path / kwargs["name"], ("forge", "47.4.0"))
++        instance.instance_dir.mkdir(parents=True, exist_ok=True)
++        return instance
++
++    monkeypatch.setattr(InstanceManager, "create", staticmethod(create_instance))
++    monkeypatch.setattr(InstanceManager, "delete_instance", staticmethod(lambda _name: True))
++    monkeypatch.setattr(InstanceArtworkManager, "apply_provider_artwork", staticmethod(lambda *_args, **_kwargs: False))
++    settings: list[dict] = []
++    monkeypatch.setattr(ATLauncherPackRegistry, "save", staticmethod(lambda _instance, data: saved.append(data)))
++    monkeypatch.setattr(ModProvenanceRegistry, "synchronize", staticmethod(lambda _instance: {}))
++    monkeypatch.setattr(InstanceManager, "default_instance_settings", staticmethod(lambda: {"java": {"path": "", "min_memory": 1024, "max_memory": 2048, "arguments": []}, "window": {}, "launch": {}}))
++    monkeypatch.setattr(SettingsManager, "save_dict", staticmethod(lambda _instance, data: settings.append(data)))
++
++    result = ATLauncherPackInstaller.install("ExamplePack", "2.0.0", "Example Pack")
++
++    assert result.instance.name == "Example Pack"
++    assert saved[0]["safeName"] == "ExamplePack"
++    assert saved[0]["managedFiles"][0]["pendingDownload"] is True
++    assert settings[0]["java"]["max_memory"] == 6144
++    assert not (result.instance.instance_dir / "mods" / "required.jar").exists()
++
++
++def test_install_rejects_unsupported_pack_actions(monkeypatch) -> None:
++    project = ATLauncherPack("25", "ExamplePack", "Example Pack")
++    version = atl_version((), ("custom-main-class",))
++    monkeypatch.setattr(ATLauncherClient, "get_project", staticmethod(lambda *_args, **_kwargs: project))
++    monkeypatch.setattr(ATLauncherClient, "get_version", staticmethod(lambda *_args, **_kwargs: version))
++    monkeypatch.setattr(InstanceManager, "is_instance_exist", staticmethod(lambda _name: False))
++
++    with pytest.raises(RuntimeError, match="not supported in this beta"):
++        ATLauncherPackInstaller.install("ExamplePack", "2.0.0", "Example Pack")
+--- a/test/core/atlauncher/test_atlauncher_pack_registry.py
++++ b/test/core/atlauncher/test_atlauncher_pack_registry.py
+@@ -0,0 +1,32 @@
++from pathlib import Path
++
++from src.core.atlauncher.atlauncher_pack_registry import ATLauncherPackRegistry
++
++
++def test_registry_round_trip_normalizes_managed_files(tmp_path: Path) -> None:
++    ATLauncherPackRegistry.save(tmp_path, {
++        "packId": "25",
++        "safeName": "ExamplePack",
++        "versionId": "101",
++        "versionName": "2.0.0",
++        "managedFiles": [
++            {
++                "fileId": "b",
++                "fileName": "b.jar",
++                "path": "mods/b.jar",
++                "md5": "A" * 32,
++                "urls": ["https://one.example/b.jar", "https://one.example/b.jar"],
++                "pendingDownload": True,
++            },
++            {"fileId": "bad", "fileName": "bad.jar", "path": "../bad.jar"},
++        ],
++    })
++
++    data = ATLauncherPackRegistry.load(tmp_path)
++
++    assert data["source"] == "atlauncher"
++    assert data["safeName"] == "ExamplePack"
++    assert len(data["managedFiles"]) == 1
++    assert data["managedFiles"][0]["md5"] == "a" * 32
++    assert data["managedFiles"][0]["urls"] == ["https://one.example/b.jar"]
++    assert data["managedFiles"][0]["provider"] == "atlauncher"
+--- a/test/core/config/test_version_metadata.py
++++ b/test/core/config/test_version_metadata.py
+@@ -6,10 +6,10 @@
+ 
+ 
+ def test_launcher_version_metadata_has_one_source_of_truth() -> None:
+-    assert VERSION == "v1.1.0"
+-    assert VERSION_ID == "1.1.0"
+-    assert VERSION_TAG == "v1.1.0"
+-    assert UPDATE_CHANNEL == "stable"
++    assert VERSION == "v1.1.1-beta.1"
++    assert VERSION_ID == "1.1.1-beta.1"
++    assert VERSION_TAG == "v1.1.1-beta.1"
++    assert UPDATE_CHANNEL == "beta"
+     assert GUI_VERSION == VERSION
+     assert GUI_VERSION_ID == VERSION_ID
+     assert PackageManager.LAUNCHER_VERSION == VERSION_TAG
+--- a/test/core/gui/test_atlauncher_integration.py
++++ b/test/core/gui/test_atlauncher_integration.py
+@@ -0,0 +1,31 @@
++from pathlib import Path
++
++
++def read(path: str) -> str:
++    return Path(path).read_text(encoding="utf-8")
++
++
++def test_atlauncher_browser_reuses_rich_detail_panel() -> None:
++    source = read("src/gui/dialogs/atlauncher_browser_dialog.py")
++    assert "resize_dialog_to_screen(self, 1240, 620" in source
++    assert "ContentProjectDetailPanel" in source
++    assert "install_modpack_requested" in source
++    assert "set_show_project_descriptions" in source
++
++
++def test_atlauncher_is_wired_through_instance_creation_and_main_window() -> None:
++    main = read("src/gui/main_window_2.py")
++    workspace = read("src/gui/pages/instance_workspace_page.py")
++    create_dialog = read("src/gui/dialogs/create_instance_dialog.py")
++
++    assert "self.atlauncher_controller" in main
++    assert "self.atlauncher_modpack_dialog" in main
++    assert "self.atlauncher_controller," in main
++    assert "browse_atlauncher_modpacks_requested" in workspace
++    assert "browse_atlauncher_requested" in create_dialog
++
++
++def test_atlauncher_install_has_shared_progress_profile() -> None:
++    source = read("src/gui/task_progress.py")
++    assert 'task.startswith("atlauncher.install.modpack")' in source
++    assert "ProgressStage.DOWNLOADING_MODPACK" in source
+--- a/test/test_public_api.py
++++ b/test/test_public_api.py
+@@ -7,8 +7,8 @@
+ from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, derive_custom_text, is_readable_text
+ 
+ 
+-def test_bundled_core_runtime_version_follows_launcher_stable() -> None:
+-    assert mcw_core.__version__ == "1.1.0"
++def test_bundled_core_runtime_version_follows_launcher_beta() -> None:
++    assert mcw_core.__version__ == "1.1.1-beta.1"
+ 
+ 
+ def test_distribution_version_when_installed() -> None:
+@@ -16,7 +16,7 @@
+         installed = version("mcw-core")
+     except PackageNotFoundError:
+         return
+-    assert installed == "1.1.0"
++    assert installed == "1.1.1b1"
+ 
+ 
+ def test_new_public_api_defaults() -> None:

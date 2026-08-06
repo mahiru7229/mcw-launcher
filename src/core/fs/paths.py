@@ -495,6 +495,16 @@ class Paths:
         return Path(instance.instance_dir) / ".mcw" / "ftb-pack.json"
 
     @staticmethod
+    def atlauncher_root() -> Path:
+        directory = Paths.CACHE_ROOT / "content" / "atlauncher"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def atlauncher_pack_registry(instance: Instance) -> Path:
+        return Path(instance.instance_dir) / ".mcw" / "atlauncher-pack.json"
+
+    @staticmethod
     def curseforge_root() -> Path:
         directory = Paths.CACHE_ROOT / "content" / "curseforge"
         directory.mkdir(parents=True, exist_ok=True)

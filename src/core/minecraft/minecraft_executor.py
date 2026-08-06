@@ -26,6 +26,7 @@ from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManag
 from src.core.modloader.forge.compatibility_confirmation import CompatibilityConfirmationRequired
 from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
 from src.core.ftb.ftb_content_manager import FTBContentManager
+from src.core.atlauncher.atlauncher_content_manager import ATLauncherContentManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
 from src.core.network.download_pause import download_pause_controller
@@ -153,6 +154,7 @@ class MinecraftExecutor:
             modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
             curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
             ftb_warnings = FTBContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
+            atlauncher_warnings = ATLauncherContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
             PortableContentManager.finalize_disabled(instance)
 
             download_pause_controller.raise_if_requested()
@@ -254,7 +256,7 @@ class MinecraftExecutor:
                 and (forge_preflight_policy == ManagedContentPolicy.ALLOW or allow_compatibility_issues_once)
             )
             forge_warnings = tuple(issue.message for issue in forge_preflight.warnings) + bypassed_compatibility
-            warnings = tuple(modrinth_warnings) + tuple(curseforge_warnings) + tuple(ftb_warnings) + forge_warnings + tuple(java_recovery_warnings)
+            warnings = tuple(modrinth_warnings) + tuple(curseforge_warnings) + tuple(ftb_warnings) + tuple(atlauncher_warnings) + forge_warnings + tuple(java_recovery_warnings)
             if warnings:
                 result["warnings"] = warnings
             return result
