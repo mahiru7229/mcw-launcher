@@ -102,7 +102,11 @@ class ModManager:
 
     @staticmethod
     def _apply_trusted_curseforge_identity(instance: Instance, mod: ModInfo, entry: dict) -> ModInfo:
-        if mod.status in {"Broken JAR", "Not a mod"}:
+        # A CurseForge pack file with an exact provider SHA-1 may use a legacy
+        # archive layout that Python's generic ZIP parser cannot inspect even
+        # though Forge can load it.  "Not a mod" is still rejected, but an
+        # exact provider identity may recover a parser-level Broken JAR result.
+        if mod.status == "Not a mod":
             return mod
         expected = list(dict.fromkeys(str(value).strip().casefold() for value in entry.get("expectedModIds", []) if str(value).strip()))
         if not expected:
@@ -120,7 +124,7 @@ class ModManager:
             metadata_format = "CurseForge provider SHA-1 identity"
         elif "curseforge provider sha-1 identity" not in metadata_format.casefold():
             metadata_format = f"{metadata_format} + CurseForge provider SHA-1 identity"
-        restore_ready = mod.status in {"Unverified", "Broken metadata"}
+        restore_ready = mod.status in {"Unverified", "Broken metadata", "Broken JAR"}
         return dataclass_replace(
             mod,
             mod_id=primary,

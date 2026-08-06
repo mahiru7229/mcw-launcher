@@ -788,3 +788,86 @@ def test_manual_curseforge_provider_identity_preserves_parsed_primary_mod_id(tmp
     assert installed[0].mod_id == "parsedhelper"
     assert ("provideridentity", "1.0.0") in installed[0].provided_mods
     assert installed[0].metadata_format == "mcmod.info + CurseForge provider SHA-1 identity"
+
+
+def test_curseforge_sha1_identity_recovers_parser_broken_legacy_jar_for_dependency_audit(tmp_path):
+    from hashlib import sha1
+
+    from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
+    from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
+    from src.models.mod.mod_info import ModInfo
+
+    instance_dir = tmp_path / "legacy-broken-parser"
+    mods_dir = instance_dir / "mods"
+    mods_dir.mkdir(parents=True)
+    instance = Instance(instance_id="legacy-id", name="RLCraft", version_id="1.12.2", instance_dir=instance_dir, mod_loader=("forge", "14.23.5.2860"))
+    target = mods_dir / "Reskillable-1.12.2-1.13.0.jar"
+    target.write_bytes(b"provider fixture whose generic ZIP parser rejects it")
+    digest = sha1(target.read_bytes(), usedforsecurity=False).hexdigest()
+    CurseForgePackRegistry.save(instance, {"managedFiles": [{
+        "projectId": 286382,
+        "fileId": 2815686,
+        "fileName": target.name,
+        "path": f"mods/{target.name}",
+        "displayName": "Reskillable",
+        "projectName": "Reskillable",
+        "sha1": digest,
+        "size": target.stat().st_size,
+        "manualImport": True,
+        "expectedModIds": ["reskillable"],
+        "selectionReason": "pack_manifest",
+    }]})
+
+    raw = ModManager.read_mod(target, preferred_loader="forge")
+    assert raw.status == "Broken JAR"
+    assert raw.mod_id == "unknown"
+
+    installed = ModManager.list_mods(instance)
+
+    assert len(installed) == 1
+    assert installed[0].mod_id == "reskillable"
+    assert installed[0].status == "Ready"
+    assert installed[0].error == ""
+    assert installed[0].metadata_format == "CurseForge provider SHA-1 identity"
+    assert installed[0].managed_by_modpack is True
+
+    consumer = ModInfo(
+        path=mods_dir / "CompatSkills.jar",
+        file_name="CompatSkills.jar",
+        enabled=True,
+        mod_id="compatskills",
+        name="CompatSkills",
+        version="1.17.0",
+        loader="forge",
+        dependencies={"reskillable": "*"},
+        managed_by_modpack=True,
+        source_pack_provider="curseforge",
+    )
+    report = ModCompatibilityManager.scan(instance, installed + [consumer])
+
+    assert not any(issue.code in {"dependency-missing", "dependency-disabled", "dependency-version"} for issue in report.issues)
+
+
+def test_broken_jar_provider_identity_is_not_used_when_sha1_does_not_match(tmp_path):
+    from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
+
+    instance_dir = tmp_path / "legacy-broken-wrong-hash"
+    mods_dir = instance_dir / "mods"
+    mods_dir.mkdir(parents=True)
+    instance = Instance(instance_id="legacy-id", name="Legacy", version_id="1.12.2", instance_dir=instance_dir, mod_loader=("forge", "14.23.5.2860"))
+    target = mods_dir / "legacy-broken.jar"
+    target.write_bytes(b"not a zip")
+    CurseForgePackRegistry.save(instance, {"managedFiles": [{
+        "projectId": 1,
+        "fileId": 2,
+        "fileName": target.name,
+        "path": f"mods/{target.name}",
+        "sha1": "0" * 40,
+        "size": target.stat().st_size,
+        "expectedModIds": ["expectedmod"],
+    }]})
+
+    installed = ModManager.list_mods(instance)
+
+    assert installed[0].mod_id == "unknown"
+    assert installed[0].status == "Broken JAR"
