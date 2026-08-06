@@ -220,6 +220,100 @@ def test_normalize_legacy_platform_infers_windows_native_when_mapping_is_missing
     assert library["downloads"]["classifiers"]["natives-windows"]["path"] == "net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5-natives-windows.jar"
 
 
+def test_normalize_jna_platform_as_regular_artifact_without_native_classifier(monkeypatch, tmp_path: Path) -> None:
+    root = tmp_path / "libraries"
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))
+    calls = []
+
+    def fake_download_and_hash(**kwargs):
+        calls.append(kwargs)
+        target = kwargs["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"jna-platform")
+        return target, "9" * 40, len(b"jna-platform")
+
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
+        staticmethod(fake_download_and_hash),
+    )
+
+    normalized = ForgeVersionManager._normalize_libraries({"libraries": [{"name": "net.java.dev.jna:jna-platform:5.10.0"}]})
+    library = normalized["libraries"][0]
+
+    assert "natives" not in library
+    assert "classifiers" not in library["downloads"]
+    assert library["downloads"]["artifact"]["path"] == "net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar"
+    assert len(calls) == 1
+    assert calls[0]["url"].endswith("/net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar")
+
+
+def test_normalize_removes_spurious_jna_native_metadata_from_v4_cache(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: tmp_path / "libraries"))
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
+        staticmethod(lambda **kwargs: (_ for _ in ()).throw(AssertionError("The valid JNA artifact must be reused"))),
+    )
+    artifact = {
+        "path": "net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar",
+        "url": "https://libraries.minecraft.net/net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar",
+        "sha1": "8" * 40,
+        "size": 1,
+    }
+    profile = {
+        "libraries": [{
+            "name": "net.java.dev.jna:jna-platform:5.10.0",
+            "natives": {"windows": "natives-windows"},
+            "downloads": {"artifact": artifact},
+        }]
+    }
+
+    normalized = ForgeVersionManager._normalize_libraries(profile)
+    library = normalized["libraries"][0]
+
+    assert "natives" not in library
+    assert library["downloads"] == {"artifact": artifact}
+
+
+def test_polluted_jna_platform_cache_is_repaired_without_forge_installer(monkeypatch, tmp_path: Path) -> None:
+    import json
+
+    base = make_version(tmp_path)
+    cache = tmp_path / "forge-1.20.1-47.3.0.json"
+    artifact = {
+        "path": "net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar",
+        "url": "https://libraries.minecraft.net/net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar",
+        "sha1": "8" * 40,
+        "size": 1,
+    }
+    cached_profile = json.loads(json.dumps(base.raw_json))
+    cached_profile.update({
+        "id": "forge-1.20.1-47.3.0",
+        "mainClass": "cpw.mods.bootstraplauncher.BootstrapLauncher",
+        "arguments": {"game": ["--fml.forgeVersion", "47.3.0"], "jvm": []},
+        "libraries": [
+            {"name": "net.minecraftforge:forge:1.20.1-47.3.0", "downloads": {"artifact": {"path": "net/minecraftforge/forge/1.20.1-47.3.0/forge-1.20.1-47.3.0.jar", "url": "https://maven.minecraftforge.net/forge.jar", "sha1": "7" * 40, "size": 1}}},
+            {"name": "net.java.dev.jna:jna-platform:5.10.0", "natives": {"windows": "natives-windows"}, "downloads": {"artifact": artifact}},
+        ],
+        "forge": {"schemaVersion": 1, "gameVersion": "1.20.1", "loaderVersion": "47.3.0"},
+    })
+    cache.write_text(json.dumps(cached_profile), encoding="utf-8")
+
+    monkeypatch.setattr(Paths, "forge_version_json", staticmethod(lambda *_args: cache))
+    monkeypatch.setattr(ForgeVersionManager, "_download_installer", staticmethod(lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Forge installer must not run"))))
+    monkeypatch.setattr(
+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
+        staticmethod(lambda **kwargs: (_ for _ in ()).throw(AssertionError("No library download should be needed"))),
+    )
+
+    version = ForgeVersionManager.install(base, "47.3.0")
+    repaired = json.loads(cache.read_text(encoding="utf-8"))
+    jna = next(item for item in repaired["libraries"] if item["name"].startswith("net.java.dev.jna:jna-platform:"))
+
+    assert version.id == "forge-1.20.1-47.3.0"
+    assert "natives" not in jna
+    assert jna["downloads"] == {"artifact": artifact}
+
+
 def test_normalize_skips_osx_only_nightly_native_on_windows(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: tmp_path / "libraries"))
     monkeypatch.setattr(

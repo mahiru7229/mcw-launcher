@@ -1,17 +1,22 @@
-MCW Launcher v1.1.1-beta.5 final dependency and Forge cache hotfix v4
+MCW Launcher v1.1.1-beta.5 Forge JNA cache hotfix v5
+=====================================================
 
 Full regression:
-1391 passed, 88 skipped, 2 expected warnings
-
-Focused regression:
-- Dependency resolver, mod parser/provenance, Modrinth content, Forge loader: 141 passed
-- New targeted tests cover:
-  * Auto-removal of a standalone required dependency when another JAR embeds the same mod ID.
-  * CurseForge resolver skipping standalone Flywheel when Create provides `flywheel`.
-  * Refreshing an incomplete Forge cache without invoking the Forge installer.
-
-compileall:
-src, mcw_core, and test passed
+1394 passed, 88 skipped, 2 warnings
 
 Warnings:
-Two package-security fixtures intentionally contain duplicate ZIP members.
+- Two intentional duplicate-entry ZIP fixture warnings from package security tests.
+
+Targeted Forge regression:
+26 passed
+
+Added coverage:
+- jna-platform remains a regular Maven artifact.
+- no synthetic natives-windows classifier is created for jna-platform.
+- v4-polluted JNA cache metadata is removed safely.
+- cached Forge profile is repaired without invoking the Forge installer.
+- legacy lwjgl-platform and jinput-platform native handling remains active.
+
+Compile validation:
+python -m compileall -q src mcw_core test
+PASS

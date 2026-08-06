@@ -1,17 +1,29 @@
-Package: mcw-launcher-v1.1.1-beta.5-final-dependency-forge-cache-hotfix-v4.zip
-Baseline: MCW Launcher v1.1.1-beta.5
-Type: cumulative changed-files hotfix
+MCW Launcher v1.1.1-beta.5 Forge JNA cache hotfix v5
+=====================================================
 
-Included source changes:
-- Cumulative dependency/provider/JarJar fixes from hotfix v1-v3
-- Generic embedded dependency satisfaction and redundant auto-added dependency cleanup
-- Forge cached-profile metadata refresh without installer rerun
-- Complete normalization of newly generated Forge cache profiles
+Package type: cumulative changed-files overlay
+Apply target: MCW Launcher v1.1.1-beta.5 source root
+Also safe to apply over: dependency/Forge cache hotfix v4
 
-Included tests:
-- Existing dependency/provider/JarJar regressions
-- Embedded Flywheel provider regression
-- Redundant standalone dependency cleanup regression
-- Forge cache refresh/no-installer regression
+Runtime files:
+- src/core/mod/mod_manager.py
+- src/core/mod/modpack_dependency_resolver.py
+- src/core/mod/mod_compatibility_manager.py
+- src/core/mod/mod_provenance_registry.py
+- src/core/modloader/forge/forge_version_manager.py
+- src/core/modrinth/modrinth_content_manager.py
+- src/models/mod/mod_info.py
 
-Validation: 1391 passed, 88 skipped, 2 expected warnings; compileall passed
+Regression tests:
+- test/core/mod/test_mod_manager.py
+- test/core/mod/test_mod_provenance_registry.py
+- test/core/mod/test_mod_compatibility_manager.py
+- test/core/mod/test_modpack_dependency_resolver.py
+- test/core/modloader/forge/test_forge_version_manager.py
+- test/core/modrinth/test_modrinth_content_manager.py
+
+Documentation:
+- PATCH-README.md
+- DELIVERY-MANIFEST.txt
+- TEST-RESULTS.txt
+- CHANGES.diff

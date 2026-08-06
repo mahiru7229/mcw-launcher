@@ -30,6 +30,13 @@ class _ForgeInstallerDownload:
 
 class ForgeVersionManager:
     CACHE_SCHEMA_VERSION = 1
+    LEGACY_NATIVE_PLATFORM_COORDINATES = frozenset({
+        "org.lwjgl.lwjgl:lwjgl-platform",
+        "net.java.jinput:jinput-platform",
+        "tv.twitch:twitch-platform",
+        "tv.twitch:twitch-external-platform",
+    })
+    SPURIOUS_NATIVE_PLATFORM_COORDINATES = frozenset({"net.java.dev.jna:jna-platform"})
     _locks: dict[str, Lock] = {}
     _guard = Lock()
 
@@ -280,6 +287,8 @@ class ForgeVersionManager:
 
     @staticmethod
     def _normalize_windows_native(item: dict, coordinate: str, repository: str, downloads: dict, reporter: ProgressReporter | None) -> None:
+        if ForgeVersionManager._remove_spurious_native_platform_metadata(item, coordinate, downloads):
+            return
         natives = deepcopy(item.get("natives")) if isinstance(item.get("natives"), dict) else {}
         classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
         if not classifier and ForgeVersionManager._is_legacy_native_platform_coordinate(coordinate):
@@ -326,9 +335,50 @@ class ForgeVersionManager:
 
     @staticmethod
     def _is_legacy_native_platform_coordinate(coordinate: str) -> bool:
-        parts = str(coordinate).split(":")
-        artifact = parts[1].strip().casefold() if len(parts) >= 2 else ""
-        return artifact.endswith("-platform")
+        return ForgeVersionManager._coordinate_key(coordinate) in ForgeVersionManager.LEGACY_NATIVE_PLATFORM_COORDINATES
+
+    @staticmethod
+    def _remove_spurious_native_platform_metadata(item: dict, coordinate: str, downloads: dict) -> bool:
+        if ForgeVersionManager._coordinate_key(coordinate) not in ForgeVersionManager.SPURIOUS_NATIVE_PLATFORM_COORDINATES:
+            return False
+        natives = deepcopy(item.get("natives")) if isinstance(item.get("natives"), dict) else {}
+        classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
+        if classifier != "natives-windows":
+            return False
+        classifiers = deepcopy(downloads.get("classifiers")) if isinstance(downloads.get("classifiers"), dict) else {}
+        current = classifiers.get(classifier) if isinstance(classifiers.get(classifier), dict) else None
+        if ForgeVersionManager._download_entry_is_complete(current):
+            return False
+        natives.pop("windows", None)
+        if natives:
+            item["natives"] = natives
+        else:
+            item.pop("natives", None)
+        classifiers.pop(classifier, None)
+        if classifiers:
+            downloads["classifiers"] = classifiers
+        else:
+            downloads.pop("classifiers", None)
+        return True
+
+    @staticmethod
+    def _has_spurious_native_platform_metadata(item: dict, coordinate: str, downloads: dict) -> bool:
+        if ForgeVersionManager._coordinate_key(coordinate) not in ForgeVersionManager.SPURIOUS_NATIVE_PLATFORM_COORDINATES:
+            return False
+        natives = item.get("natives") if isinstance(item.get("natives"), dict) else {}
+        classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
+        if classifier != "natives-windows":
+            return False
+        classifiers = downloads.get("classifiers") if isinstance(downloads.get("classifiers"), dict) else {}
+        current = classifiers.get(classifier) if isinstance(classifiers.get(classifier), dict) else None
+        return not ForgeVersionManager._download_entry_is_complete(current)
+
+    @staticmethod
+    def _coordinate_key(coordinate: str) -> str:
+        parts = str(coordinate).strip().split(":")
+        if len(parts) < 2:
+            return ""
+        return f"{parts[0].strip().casefold()}:{parts[1].strip().casefold()}"
 
     @staticmethod
     def _maven_path(coordinate: str, classifier: str | None = None) -> Path:
@@ -446,13 +496,16 @@ class ForgeVersionManager:
         for item in libraries:
             if not isinstance(item, dict) or not LibraryRuleManager.is_allowed(item):
                 continue
+            coordinate = str(item.get("name") or "")
+            downloads = item.get("downloads") if isinstance(item.get("downloads"), dict) else {}
+            if ForgeVersionManager._has_spurious_native_platform_metadata(item, coordinate, downloads):
+                return False
             natives = item.get("natives") if isinstance(item.get("natives"), dict) else {}
             classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
             if not classifier and ForgeVersionManager._is_legacy_native_platform_coordinate(str(item.get("name") or "")):
                 classifier = "natives-windows"
             if not classifier:
                 continue
-            downloads = item.get("downloads") if isinstance(item.get("downloads"), dict) else {}
             classifiers = downloads.get("classifiers") if isinstance(downloads.get("classifiers"), dict) else {}
             entry = classifiers.get(classifier) if isinstance(classifiers.get(classifier), dict) else None
             if not ForgeVersionManager._download_entry_is_complete(entry):

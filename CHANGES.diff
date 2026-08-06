@@ -1,1340 +1,200 @@
---- a/src/models/mod/mod_info.py
-+++ b/src/models/mod/mod_info.py
-@@ -29,3 +29,4 @@
-     source_file_id: str = ""
-     managed_by_modpack: bool = False
-     source_pack_provider: str = ""
-+    provided_mods: tuple[tuple[str, str], ...] = ()
---- a/src/core/mod/mod_manager.py
-+++ b/src/core/mod/mod_manager.py
-@@ -3,6 +3,7 @@
- from dataclasses import replace as dataclass_replace
- from pathlib import Path
- from typing import Iterable
-+import io
- import json
- import re
- import shutil
-@@ -21,6 +22,9 @@
- class ModManager:
-     DISABLED_SUFFIX = ".disabled"
-     _INVALID_STATUSES = {"Broken JAR", "Not a mod", "Broken metadata", "Unverified"}
-+    MAX_EMBEDDED_MOD_JARS = 64
-+    MAX_EMBEDDED_MOD_JAR_SIZE = 32 * 1024 * 1024
-+    MAX_EMBEDDED_MOD_DEPTH = 2
- 
-     @staticmethod
-     def mods_dir(instance: Instance) -> Path:
-@@ -158,14 +162,23 @@
-             with zipfile.ZipFile(path, "r") as archive:
-                 names = set(archive.namelist())
-                 manifest = ModManager._manifest_attributes(archive.read("META-INF/MANIFEST.MF")) if "META-INF/MANIFEST.MF" in names else {}
-+                provided_mods = ModManager._embedded_mods(archive, provider_version=provider_version)
-+
-+                def finalize(mod: ModInfo) -> ModInfo:
-+                    if not provided_mods:
-+                        return mod
-+                    merged = {(mod_id.casefold(), version) for mod_id, version in mod.provided_mods if mod_id}
-+                    merged.update((mod_id.casefold(), version) for mod_id, version in provided_mods if mod_id and mod_id.casefold() != mod.mod_id.casefold())
-+                    return dataclass_replace(mod, provided_mods=tuple(sorted(merged)))
-+
-                 has_fabric = "fabric.mod.json" in names
-                 has_quilt = "quilt.mod.json" in names
-                 has_forge = "META-INF/mods.toml" in names
- 
-                 if has_quilt and (normalized_preference == ModLoaderManager.QUILT or not has_fabric):
--                    return ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version)
-+                    return finalize(ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version))
-                 if has_fabric and has_forge:
--                    return ModManager._read_universal_fabric_forge_mod(
-+                    return finalize(ModManager._read_universal_fabric_forge_mod(
-                         path,
-                         file_name,
-                         enabled,
-@@ -174,21 +187,21 @@
-                         normalized_preference,
-                         manifest,
-                         provider_version,
--                    )
-+                    ))
-                 if has_fabric:
-                     fabric = ModManager._read_fabric_mod(path, file_name, enabled, archive.read("fabric.mod.json"), manifest, provider_version)
-                     if normalized_preference == ModLoaderManager.QUILT:
--                        return dataclass_replace(fabric, loader="quilt", metadata_format="fabric.mod.json (Quilt compatibility)")
--                    return fabric
-+                        return finalize(dataclass_replace(fabric, loader="quilt", metadata_format="fabric.mod.json (Quilt compatibility)"))
-+                    return finalize(fabric)
-                 if has_quilt:
--                    return ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version)
-+                    return finalize(ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version))
-                 if "META-INF/neoforge.mods.toml" in names:
--                    return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/neoforge.mods.toml"), loader="neoforge", metadata_format="neoforge.mods.toml", manifest=manifest, provider_version=provider_version)
-+                    return finalize(ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/neoforge.mods.toml"), loader="neoforge", metadata_format="neoforge.mods.toml", manifest=manifest, provider_version=provider_version))
-                 if has_forge:
-                     loader = ModLoaderManager.NEOFORGE if normalized_preference == ModLoaderManager.NEOFORGE else ModLoaderManager.FORGE
--                    return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/mods.toml"), loader=loader, metadata_format="mods.toml", manifest=manifest, provider_version=provider_version)
-+                    return finalize(ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/mods.toml"), loader=loader, metadata_format="mods.toml", manifest=manifest, provider_version=provider_version))
-                 if "mcmod.info" in names:
--                    return ModManager._read_legacy_forge_mod(path, file_name, enabled, archive.read("mcmod.info"))
-+                    return finalize(ModManager._read_legacy_forge_mod(path, file_name, enabled, archive.read("mcmod.info")))
-                 fml_mod_type = str(manifest.get("fmlmodtype") or "").strip().upper()
-                 if fml_mod_type in {"LANGPROVIDER", "LIBRARY", "GAMELIBRARY"}:
-                     loader = normalized_preference if normalized_preference in ModLoaderManager.FORGE_FAMILY else ModLoaderManager.FORGE
-@@ -197,7 +210,7 @@
-                         "LIBRARY": f"{loader.title()} managed library",
-                         "GAMELIBRARY": f"{loader.title()} game library",
-                     }[fml_mod_type]
--                    return ModInfo(
-+                    return finalize(ModInfo(
-                         path=path,
-                         file_name=file_name,
-                         enabled=enabled,
-@@ -208,16 +221,16 @@
-                         metadata_format=f"MANIFEST.MF:FMLModType={fml_mod_type}",
-                         status="Ready",
-                         description=label,
--                    )
-+                    ))
-                 has_java_content = any(name.endswith(".class") for name in names)
-                 status = "Unverified" if manifest or has_java_content else "Not a mod"
--                return ModManager._invalid_mod(
-+                return finalize(ModManager._invalid_mod(
-                     path,
-                     file_name,
-                     enabled,
-                     status,
-                     "No quilt.mod.json, fabric.mod.json, Forge META-INF/mods.toml, NeoForge metadata, mcmod.info, or recognized Forge library metadata was found.",
--                )
-+                ))
-         except (OSError, zipfile.BadZipFile) as error:
-             return ModManager._invalid_mod(path, file_name, enabled, "Broken JAR", str(error))
- 
-@@ -519,6 +532,86 @@
-             raise RuntimeError(f"'{mod.file_name}' is a {actual} mod and cannot be added to this {expected} instance.")
- 
-     @staticmethod
-+    def _embedded_mods(archive: zipfile.ZipFile, provider_version: str = "", depth: int = 0) -> tuple[tuple[str, str], ...]:
-+        if depth >= ModManager.MAX_EMBEDDED_MOD_DEPTH:
-+            return ()
-+        names = set(archive.namelist())
-+        metadata_name = "META-INF/jarjar/metadata.json"
-+        if metadata_name not in names:
-+            return ()
-+        try:
-+            payload = json.loads(archive.read(metadata_name).decode("utf-8-sig"))
-+        except (KeyError, UnicodeError, json.JSONDecodeError):
-+            return ()
-+        jars = payload.get("jars") if isinstance(payload, dict) and isinstance(payload.get("jars"), list) else []
-+        paths: list[str] = []
-+        for item in jars[:ModManager.MAX_EMBEDDED_MOD_JARS]:
-+            path = str(item.get("path") or "").replace("\\", "/").lstrip("/") if isinstance(item, dict) else ""
-+            if path.startswith("META-INF/jarjar/") and path.endswith(".jar") and path in names:
-+                paths.append(path)
-+
-+        found: dict[str, str] = {}
-+        for path in paths:
-+            try:
-+                info = archive.getinfo(path)
-+                if info.file_size <= 0 or info.file_size > ModManager.MAX_EMBEDDED_MOD_JAR_SIZE:
-+                    continue
-+                raw = archive.read(info)
-+                with zipfile.ZipFile(io.BytesIO(raw), "r") as nested:
-+                    for mod_id, version in ModManager._declared_mods(nested, provider_version):
-+                        found.setdefault(mod_id.casefold(), version)
-+                    for mod_id, version in ModManager._embedded_mods(nested, provider_version, depth + 1):
-+                        found.setdefault(mod_id.casefold(), version)
-+            except (KeyError, OSError, zipfile.BadZipFile, RuntimeError):
-+                continue
-+        return tuple(sorted(found.items()))
-+
-+    @staticmethod
-+    def _declared_mods(archive: zipfile.ZipFile, provider_version: str = "") -> tuple[tuple[str, str], ...]:
-+        names = set(archive.namelist())
-+        manifest = ModManager._manifest_attributes(archive.read("META-INF/MANIFEST.MF")) if "META-INF/MANIFEST.MF" in names else {}
-+        found: dict[str, str] = {}
-+
-+        for metadata_name in ("META-INF/neoforge.mods.toml", "META-INF/mods.toml"):
-+            if metadata_name not in names:
-+                continue
-+            try:
-+                data = tomllib.loads(archive.read(metadata_name).decode("utf-8-sig"))
-+            except (UnicodeError, tomllib.TOMLDecodeError):
-+                continue
-+            mods = data.get("mods") if isinstance(data, dict) and isinstance(data.get("mods"), list) else []
-+            for metadata in mods:
-+                if not isinstance(metadata, dict):
-+                    continue
-+                mod_id = str(metadata.get("modId") or "").strip().casefold()
-+                if not mod_id:
-+                    continue
-+                version = ModManager._resolve_mod_version(metadata.get("version"), manifest, {**data, **metadata}, provider_version, Path(metadata_name).name)
-+                found.setdefault(mod_id, version)
-+
-+        if "fabric.mod.json" in names:
-+            try:
-+                data = json.loads(archive.read("fabric.mod.json").decode("utf-8-sig"))
-+            except (UnicodeError, json.JSONDecodeError):
-+                data = {}
-+            if isinstance(data, dict):
-+                mod_id = str(data.get("id") or "").strip().casefold()
-+                if mod_id:
-+                    found.setdefault(mod_id, ModManager._resolve_mod_version(data.get("version"), manifest, data, provider_version, "fabric.mod.json"))
-+
-+        if "quilt.mod.json" in names:
-+            try:
-+                data = json.loads(archive.read("quilt.mod.json").decode("utf-8-sig"))
-+            except (UnicodeError, json.JSONDecodeError):
-+                data = {}
-+            loader_data = data.get("quilt_loader") if isinstance(data, dict) and isinstance(data.get("quilt_loader"), dict) else {}
-+            mod_id = str(loader_data.get("id") or data.get("id") or "").strip().casefold() if isinstance(data, dict) else ""
-+            if mod_id:
-+                found.setdefault(mod_id, ModManager._resolve_mod_version(loader_data.get("version") or data.get("version"), manifest, {**data, **loader_data}, provider_version, "quilt.mod.json"))
-+
-+        return tuple(sorted(found.items()))
-+
-+    @staticmethod
-     def compatibility_warning(instance: Instance, mod: ModInfo) -> str:
-         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-         if mod.status in ModManager._INVALID_STATUSES:
---- a/src/core/mod/mod_compatibility_manager.py
-+++ b/src/core/mod/mod_compatibility_manager.py
-@@ -22,12 +22,22 @@
-         disabled_by_id: dict[str, list[ModInfo]] = defaultdict(list)
- 
-         for mod in enabled:
--            enabled_by_id[mod.mod_id.casefold()].append(mod)
-+            identities = {mod.mod_id.casefold()} | {mod_id.casefold() for mod_id, _version in mod.provided_mods if mod_id}
-+            for mod_id in identities:
-+                enabled_by_id[mod_id].append(mod)
-         for mod in disabled:
--            disabled_by_id[mod.mod_id.casefold()].append(mod)
-+            identities = {mod.mod_id.casefold()} | {mod_id.casefold() for mod_id, _version in mod.provided_mods if mod_id}
-+            for mod_id in identities:
-+                disabled_by_id[mod_id].append(mod)
- 
-         loader_name, loader_version = ModLoaderManager.normalize(instance.mod_loader)
--        installed_versions = {mod_id: entries[0].version for mod_id, entries in enabled_by_id.items() if entries}
-+        installed_versions: dict[str, str] = {}
-+        for mod in enabled:
-+            if mod.mod_id and mod.mod_id != "unknown":
-+                installed_versions.setdefault(mod.mod_id.casefold(), mod.version)
-+            for mod_id, version in mod.provided_mods:
-+                if mod_id:
-+                    installed_versions.setdefault(mod_id.casefold(), version or mod.version)
-         installed_versions["minecraft"] = instance.version_id
-         if loader_name == ModLoaderManager.FABRIC:
-             installed_versions["fabricloader"] = loader_version
-@@ -120,6 +130,16 @@
-                         ),
-                         mod_ids=(mod.mod_id, normalized_id),
-                     ))
-+                elif managed_by_modpack and ModCompatibilityManager._is_pack_managed_dependency(enabled_by_id, normalized_id):
-+                    issues.append(ModIssue(
-+                        severity="warning",
-+                        code="pack-pinned-dependency-requirement",
-+                        message=(
-+                            f"{mod.name} declares '{dependency_id}' {ModCompatibilityManager._format_requirement(requirement)}, "
-+                            f"but the modpack pins {installed_versions[normalized_id]}. The modpack selection was accepted."
-+                        ),
-+                        mod_ids=(mod.mod_id, normalized_id),
-+                    ))
-                 else:
-                     issues.append(ModIssue(severity="error", code="dependency-version", message=f"{mod.name} requires '{dependency_id}' {ModCompatibilityManager._format_requirement(requirement)}, but {installed_versions[normalized_id]} is installed.", mod_ids=(mod.mod_id, normalized_id)))
- 
-@@ -139,6 +159,10 @@
-                 if matches is not False:
-                     verb = "breaks with" if code == "breaks" else "conflicts with"
-                     issues.append(ModIssue(severity=severity, code=code, message=f"{mod.name} {verb} '{dependency_id}' ({ModCompatibilityManager._format_requirement(requirement)}).", mod_ids=(mod.mod_id, normalized_id)))
-+
-+    @staticmethod
-+    def _is_pack_managed_dependency(enabled_by_id: dict[str, list[ModInfo]], dependency_id: str) -> bool:
-+        return any(mod.managed_by_modpack for mod in enabled_by_id.get(dependency_id, ()))
- 
-     @staticmethod
-     def _matches_requirement(version: str, requirement: object) -> bool | None:
---- a/src/core/mod/mod_provenance_registry.py
-+++ b/src/core/mod/mod_provenance_registry.py
-@@ -80,6 +80,7 @@
-         for project_id, raw in ModrinthRegistry.load(instance).get("mods", {}).items():
-             if not isinstance(raw, dict):
-                 continue
-+            managed_by_modpack = bool(raw.get("managedByModpack", False))
-             merge({
-                 "fileName": raw.get("fileName"),
-                 "provider": "modrinth",
-@@ -90,7 +91,10 @@
-                 "sha512": raw.get("sha512"),
-                 "size": raw.get("size"),
-                 "downloadUrls": raw.get("downloadUrls", []),
--                "managedByModpack": False,
-+                "managedByModpack": managed_by_modpack,
-+                "selectionReason": raw.get("selectionReason"),
-+                "requiredBy": raw.get("requiredBy", []),
-+                "packProvider": raw.get("packProvider") if managed_by_modpack else "",
-             }, 30)
- 
-         for project_id, raw in CurseForgeRegistry.load(instance).get("mods", {}).items():
---- a/src/core/mod/modpack_dependency_resolver.py
-+++ b/src/core/mod/modpack_dependency_resolver.py
-@@ -1,6 +1,7 @@
- from __future__ import annotations
- 
- from collections import deque
-+import hashlib
- from datetime import datetime, timezone
- from pathlib import Path, PurePosixPath
- from time import sleep
-@@ -9,11 +10,13 @@
- from src.core.curseforge.curseforge_client import CurseForgeClient
- from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
- from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
-+from src.core.mod.mod_manager import ModManager
- from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
- from src.core.modloader.mod_loader_manager import ModLoaderManager
- from src.core.modrinth.modrinth_client import ModrinthClient
- from src.core.modrinth.modrinth_mod_installer import ModrinthModInstaller
- from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
-+from src.core.modrinth.modrinth_registry import ModrinthRegistry
- from src.core.network.download_pause import download_pause_controller
- from src.core.network.retry_policy import DownloadRetryPolicy
- from src.core.progress.progress_reporter import ProgressReporter
-@@ -49,6 +52,9 @@
-         warnings: list[str] = []
-         unresolved: list[str] = []
- 
-+        pruned = ModpackDependencyResolver._prune_redundant_embedded_dependencies(instance)
-+        warnings.extend(pruned)
-+
-         modrinth = ModrinthPackRegistry.load(instance)
-         if ModpackDependencyResolver._has_managed_mods(modrinth.get("managedFiles", [])):
-             result = ModpackDependencyResolver._resolve_modrinth(instance, modrinth, reporter)
-@@ -62,6 +68,15 @@
-             added.extend(result.added_files)
-             warnings.extend(result.warnings)
-             unresolved.extend(result.unresolved)
-+
-+        # CurseForge file relations are not always complete. Once the pack JARs
-+        # exist locally, use the exact file hash to find the same release on
-+        # Modrinth and recover required relations from that provider. This is
-+        # identity-based enrichment, not a name-only search or a hardcoded mod.
-+        result = ModpackDependencyResolver._resolve_cross_provider_missing(instance, reporter)
-+        added.extend(result.added_files)
-+        warnings.extend(result.warnings)
-+        unresolved.extend(result.unresolved)
- 
-         if added:
-             ModProvenanceRegistry.synchronize(instance)
-@@ -105,6 +120,7 @@
-         unresolved: list[str] = []
-         added: list[str] = []
-         changed = False
-+        installed_identities = ModpackDependencyResolver._installed_mod_identities(instance)
- 
-         ModpackDependencyResolver._report(reporter, "Resolving Modrinth modpack dependencies...", 0, max(1, len(mod_entries)))
-         for completed, entry in enumerate(mod_entries, start=1):
-@@ -182,6 +198,10 @@
-                     file = dependency_version.primary_file(".jar")
-                 except Exception as error:
-                     unresolved.append(f"{parent_label} dependency {dependency_version.project_id} is not installable: {error}")
-+                    continue
-+                project_identities = ModpackDependencyResolver._project_identities(project)
-+                if project_identities & installed_identities:
-+                    queue.append((dependency_version, depth + 1, project.title or dependency_version.project_id))
-                     continue
-                 if discovered >= ModpackDependencyResolver.MAX_DEPENDENCIES:
-                     unresolved.append(f"The Modrinth dependency graph exceeds {ModpackDependencyResolver.MAX_DEPENDENCIES} added files.")
-@@ -207,6 +227,7 @@
-                 }
-                 entries.append(target)
-                 selected[dependency_version.project_id] = target
-+                installed_identities.update(project_identities)
-                 added.append(project.title or target["fileName"])
-                 discovered += 1
-                 changed = True
-@@ -233,6 +254,7 @@
-         unresolved: list[str] = []
-         added: list[str] = []
-         changed = False
-+        installed_identities = ModpackDependencyResolver._installed_mod_identities(instance)
- 
-         unresolved_file_ids: list[int] = []
-         for entry in mod_entries:
-@@ -325,8 +347,14 @@
-                     project_name = str(getattr(project, "name", "") or dependency_file.display_name).strip()
-                     project_url = str(getattr(project, "project_url", "") or "").strip()
-                 except Exception:
-+                    project = None
-                     project_name = dependency_file.display_name
-                     project_url = ""
-+                project_identities = ModpackDependencyResolver._project_identities(project) if project is not None else {ModpackDependencyResolver._canonical_identity(project_name)}
-+                project_identities.discard("")
-+                if project_identities & installed_identities:
-+                    queue.append((dependency_file, depth + 1, project_name or dependency_file.file_name))
-+                    continue
-                 path = ModpackDependencyResolver._unique_mod_path(entries, dependency_file.file_name, str(dependency_file.project_id), dependency_file.sha1)
-                 target = {
-                     "projectId": dependency_file.project_id,
-@@ -353,6 +381,7 @@
-                 }
-                 entries.append(target)
-                 selected[dependency_file.project_id] = target
-+                installed_identities.update(project_identities)
-                 added.append(project_name or target["fileName"])
-                 discovered += 1
-                 changed = True
-@@ -363,6 +392,338 @@
-             registry["dependencyResolution"] = ModpackDependencyResolver._resolution_payload(added, unresolved)
-             CurseForgePackRegistry.save(Path(instance.instance_dir), registry)
-         return DependencyResolutionResult(tuple(added), tuple(warnings), tuple(unresolved))
-+
-+    @staticmethod
-+    def _resolve_cross_provider_missing(instance: Instance, reporter: ProgressReporter | None) -> DependencyResolutionResult:
-+        if not getattr(instance, "mod_loader", None) or not ModpackDependencyResolver._is_managed_modpack(instance):
-+            return DependencyResolutionResult()
-+        try:
-+            mods = ModManager.list_mods(instance)
-+        except (FileNotFoundError, OSError):
-+            return DependencyResolutionResult()
-+        report = ModCompatibilityManager.scan(instance, mods=mods)
-+        issues = [issue for issue in report.issues if issue.code == "dependency-missing" and len(issue.mod_ids) >= 2]
-+        if not issues:
-+            return DependencyResolutionResult()
-+
-+        enabled_by_id: dict[str, list] = {}
-+        for mod in mods:
-+            if mod.enabled:
-+                enabled_by_id.setdefault(mod.mod_id.casefold(), []).append(mod)
-+        provenance = ModProvenanceRegistry.entries_by_file(instance)
-+        registry = ModrinthRegistry.load(instance)
-+        registry_mods = registry.setdefault("mods", {})
-+        selected_projects = {str(project_id).strip() for project_id in registry_mods if str(project_id).strip()}
-+        pack_registry = ModrinthPackRegistry.load(instance)
-+        selected_projects.update(
-+            str(entry.get("projectId") or "").strip()
-+            for entry in pack_registry.get("managedFiles", [])
-+            if isinstance(entry, dict) and str(entry.get("projectId") or "").strip()
-+        )
-+        installed_identities = {
-+            ModpackDependencyResolver._canonical_identity(identity)
-+            for mod in mods
-+            if mod.enabled
-+            for identity in ([mod.mod_id] if mod.mod_id != "unknown" else []) + [mod_id for mod_id, _version in mod.provided_mods]
-+            if ModpackDependencyResolver._canonical_identity(identity)
-+        }
-+        added: list[str] = []
-+        warnings: list[str] = []
-+        changed = False
-+        processed: set[tuple[str, str]] = set()
-+
-+        ModpackDependencyResolver._report(reporter, "Resolving cross-provider mod dependencies...", 0, max(1, len(issues)))
-+        for completed, issue in enumerate(issues, start=1):
-+            parent_id = str(issue.mod_ids[0]).strip().casefold()
-+            dependency_id = str(issue.mod_ids[1]).strip().casefold()
-+            key = (parent_id, dependency_id)
-+            if not parent_id or not dependency_id or key in processed:
-+                ModpackDependencyResolver._report(reporter, "Resolving cross-provider mod dependencies...", completed, max(1, len(issues)))
-+                continue
-+            processed.add(key)
-+            parents = enabled_by_id.get(parent_id, [])
-+            for parent in parents:
-+                if not parent.managed_by_modpack or (parent.source_pack_provider or parent.source) != "curseforge":
-+                    continue
-+                source = provenance.get(parent.file_name.casefold(), {})
-+                sha1 = str(source.get("sha1") or "").strip().casefold() if isinstance(source, dict) else ""
-+                if not sha1:
-+                    sha1 = ModpackDependencyResolver._file_sha1(parent.path)
-+                if not sha1:
-+                    continue
-+                try:
-+                    mirror = ModpackDependencyResolver._retry(lambda sha1=sha1: ModrinthClient.get_version_from_hash(sha1, "sha1"))
-+                except Exception as error:
-+                    warnings.append(f"Could not enrich dependency metadata for {parent.name} through its exact file hash: {error}")
-+                    continue
-+                if mirror is None:
-+                    continue
-+                parent_label = parent.name or parent.file_name
-+                matched = False
-+                for dependency in mirror.dependencies:
-+                    if dependency.dependency_type != "required":
-+                        continue
-+                    try:
-+                        dependency_version = ModpackDependencyResolver._retry(
-+                            lambda dependency=dependency: ModrinthModInstaller._resolve_dependency(
-+                                dependency.version_id,
-+                                dependency.project_id,
-+                                instance.version_id,
-+                                str(ModLoaderManager.normalize(instance.mod_loader)[0]).strip().casefold(),
-+                                ("release", "beta", "alpha"),
-+                            )
-+                        )
-+                        if dependency_version is None:
-+                            continue
-+                        project = ModpackDependencyResolver._retry(lambda dependency_version=dependency_version: ModrinthClient.get_project(dependency_version.project_id))
-+                    except Exception as error:
-+                        warnings.append(f"Could not inspect a Modrinth mirror dependency for {parent_label}: {error}")
-+                        continue
-+                    if not ModpackDependencyResolver._project_matches_mod_id(project, dependency_id):
-+                        continue
-+                    matched = True
-+                    tree_result, tree_changed = ModpackDependencyResolver._append_modrinth_registry_tree(
-+                        instance=instance,
-+                        registry_mods=registry_mods,
-+                        selected_projects=selected_projects,
-+                        installed_identities=installed_identities,
-+                        root_version=dependency_version,
-+                        root_project=project,
-+                        parent_label=parent_label,
-+                        expected_mod_id=dependency_id,
-+                        pack_provider=parent.source_pack_provider or "curseforge",
-+                    )
-+                    added.extend(tree_result.added_files)
-+                    warnings.extend(tree_result.warnings)
-+                    changed |= tree_changed
-+                    break
-+                if matched:
-+                    break
-+            ModpackDependencyResolver._report(reporter, "Resolving cross-provider mod dependencies...", completed, max(1, len(issues)))
-+
-+        if changed:
-+            ModrinthRegistry.save(instance, registry)
-+        return DependencyResolutionResult(tuple(added), tuple(warnings), ())
-+
-+    @staticmethod
-+    def _append_modrinth_registry_tree(instance: Instance, registry_mods: dict, selected_projects: set[str], installed_identities: set[str], root_version: ModrinthVersion, root_project, parent_label: str, expected_mod_id: str, pack_provider: str) -> tuple[DependencyResolutionResult, bool]:
-+        queue: deque[tuple[ModrinthVersion, object, int, str, str]] = deque([(root_version, root_project, 0, parent_label, expected_mod_id)])
-+        visited: set[str] = set()
-+        added: list[str] = []
-+        warnings: list[str] = []
-+        changed = False
-+        discovered = 0
-+        loader_name = str(ModLoaderManager.normalize(instance.mod_loader)[0]).strip().casefold()
-+
-+        while queue:
-+            version, project, depth, required_by, expected_id = queue.popleft()
-+            if version.version_id in visited:
-+                continue
-+            visited.add(version.version_id)
-+            if depth > ModpackDependencyResolver.MAX_DEPTH:
-+                warnings.append(f"Cross-provider dependency depth exceeded {ModpackDependencyResolver.MAX_DEPTH} at {required_by}.")
-+                continue
-+            project_id = version.project_id
-+            identities = ModpackDependencyResolver._project_identities(project)
-+            already_installed = bool(identities & installed_identities)
-+            entry = registry_mods.get(project_id)
-+            if isinstance(entry, dict):
-+                changed |= ModpackDependencyResolver._mark_registry_dependency(entry, required_by, pack_provider, expected_id)
-+            elif project_id not in selected_projects and not already_installed:
-+                if discovered >= ModpackDependencyResolver.MAX_DEPENDENCIES:
-+                    warnings.append(f"The cross-provider dependency graph exceeds {ModpackDependencyResolver.MAX_DEPENDENCIES} added files.")
-+                    break
-+                try:
-+                    ModrinthModInstaller._validate_version(version, instance.version_id, loader_name)
-+                    file = version.primary_file(".jar")
-+                except Exception as error:
-+                    warnings.append(f"{required_by} dependency {project_id} is not installable: {error}")
-+                    continue
-+                title = str(getattr(project, "title", "") or file.filename).strip()
-+                entry = {
-+                    "projectId": project_id,
-+                    "versionId": version.version_id,
-+                    "versionNumber": version.version_number,
-+                    "versionType": version.version_type,
-+                    "fileName": file.filename,
-+                    "sha1": file.sha1,
-+                    "sha512": file.sha512,
-+                    "size": file.size,
-+                    "downloadUrls": [file.url] if file.url else [],
-+                    "title": title,
-+                    "datePublished": version.date_published,
-+                    "pendingDownload": True,
-+                    "locked": True,
-+                    "managedByModpack": True,
-+                    "selectionReason": "required_dependency",
-+                    "requiredBy": [required_by],
-+                    "packProvider": pack_provider,
-+                }
-+                if expected_id:
-+                    entry["expectedModId"] = expected_id
-+                registry_mods[project_id] = entry
-+                selected_projects.add(project_id)
-+                installed_identities.update(identities)
-+                added.append(title)
-+                discovered += 1
-+                changed = True
-+
-+            for dependency in version.dependencies:
-+                if dependency.dependency_type != "required":
-+                    continue
-+                try:
-+                    child_version = ModpackDependencyResolver._retry(
-+                        lambda dependency=dependency: ModrinthModInstaller._resolve_dependency(
-+                            dependency.version_id,
-+                            dependency.project_id,
-+                            instance.version_id,
-+                            loader_name,
-+                            ("release", "beta", "alpha"),
-+                        )
-+                    )
-+                    if child_version is None:
-+                        continue
-+                    child_project = ModpackDependencyResolver._retry(lambda child_version=child_version: ModrinthClient.get_project(child_version.project_id))
-+                except Exception as error:
-+                    warnings.append(f"Could not inspect required dependency metadata for {getattr(project, 'title', project_id)}: {error}")
-+                    continue
-+                queue.append((child_version, child_project, depth + 1, str(getattr(project, "title", "") or project_id), ""))
-+
-+        return DependencyResolutionResult(tuple(added), tuple(warnings), ()), changed
-+
-+    @staticmethod
-+    def _mark_registry_dependency(entry: dict, required_by: str, pack_provider: str, expected_mod_id: str = "") -> bool:
-+        before = dict(entry)
-+        entry["managedByModpack"] = True
-+        entry["selectionReason"] = "required_dependency"
-+        entry["packProvider"] = str(pack_provider or entry.get("packProvider") or "").strip().casefold()
-+        entry["locked"] = True
-+        if expected_mod_id:
-+            entry["expectedModId"] = expected_mod_id
-+        ModpackDependencyResolver._append_required_by(entry, required_by)
-+        return entry != before
-+
-+    @staticmethod
-+    def _project_identities(project) -> set[str]:
-+        return {
-+            identity
-+            for identity in (
-+                ModpackDependencyResolver._canonical_identity(getattr(project, "slug", "")),
-+                ModpackDependencyResolver._canonical_identity(getattr(project, "title", "")),
-+                ModpackDependencyResolver._canonical_identity(getattr(project, "name", "")),
-+            )
-+            if identity
-+        }
-+
-+    @staticmethod
-+    def _installed_mod_identities(instance: Instance) -> set[str]:
-+        try:
-+            mods = ModManager.list_mods(instance)
-+        except (AttributeError, FileNotFoundError, OSError):
-+            return set()
-+        return {
-+            identity
-+            for mod in mods
-+            if mod.enabled
-+            for raw in ([mod.mod_id] if mod.mod_id != "unknown" else []) + [mod_id for mod_id, _version in mod.provided_mods]
-+            if (identity := ModpackDependencyResolver._canonical_identity(raw))
-+        }
-+
-+    @staticmethod
-+    def _prune_redundant_embedded_dependencies(instance: Instance) -> tuple[str, ...]:
-+        try:
-+            mods = ModManager.list_mods(instance)
-+        except (AttributeError, FileNotFoundError, OSError):
-+            return ()
-+        embedded_providers: dict[str, list] = {}
-+        for mod in mods:
-+            if not mod.enabled:
-+                continue
-+            for mod_id, _version in mod.provided_mods:
-+                normalized = str(mod_id or "").strip().casefold()
-+                if normalized:
-+                    embedded_providers.setdefault(normalized, []).append(mod)
-+        if not embedded_providers:
-+            return ()
-+
-+        provenance = ModProvenanceRegistry.entries_by_file(instance)
-+        redundant = []
-+        for mod in mods:
-+            if not mod.enabled or mod.mod_id.casefold() not in embedded_providers:
-+                continue
-+            source = provenance.get(mod.file_name.casefold(), {})
-+            if not isinstance(source, dict) or str(source.get("selectionReason") or "").strip().casefold() != "required_dependency":
-+                continue
-+            providers = [provider for provider in embedded_providers[mod.mod_id.casefold()] if provider.path != mod.path]
-+            if providers:
-+                redundant.append((mod, providers[0]))
-+        if not redundant:
-+            return ()
-+
-+        mods_dir = ModManager.mods_dir(instance).resolve()
-+        messages: list[str] = []
-+        removed: list[tuple[object, object]] = []
-+        for mod, provider in redundant:
-+            try:
-+                candidate = mod.path.resolve()
-+                if candidate.parent != mods_dir:
-+                    continue
-+                candidate.unlink(missing_ok=True)
-+                removed.append((mod, provider))
-+                messages.append(f"Removed redundant standalone dependency {mod.name}; {provider.name} already provides mod ID '{mod.mod_id}'.")
-+            except OSError:
-+                continue
-+        if not removed:
-+            return ()
-+
-+        removed_names = [mod.file_name for mod, _provider in removed]
-+        filenames = {name.casefold() for name in removed_names}
-+        paths = {f"mods/{name}".replace("\\", "/").casefold() for name in removed_names}
-+
-+        modrinth_pack = ModrinthPackRegistry.load(instance)
-+        mr_entries = [entry for entry in modrinth_pack.get("managedFiles", []) if isinstance(entry, dict)]
-+        filtered_mr = [entry for entry in mr_entries if str(entry.get("fileName") or PurePosixPath(str(entry.get("path") or "")).name).casefold() not in filenames and str(entry.get("path") or "").replace("\\", "/").casefold() not in paths]
-+        if filtered_mr != mr_entries:
-+            modrinth_pack["managedFiles"] = filtered_mr
-+            modrinth_pack["verificationCache"] = ModrinthPackRegistry._normalize_verification_cache(modrinth_pack.get("verificationCache", {}), filtered_mr)
-+            ModrinthPackRegistry.save(instance.instance_dir, modrinth_pack)
-+
-+        curseforge_pack = CurseForgePackRegistry.load(Path(instance.instance_dir))
-+        cf_entries = [entry for entry in curseforge_pack.get("managedFiles", []) if isinstance(entry, dict)]
-+        filtered_cf = [entry for entry in cf_entries if str(entry.get("fileName") or PurePosixPath(str(entry.get("path") or "")).name).casefold() not in filenames and str(entry.get("path") or "").replace("\\", "/").casefold() not in paths]
-+        if filtered_cf != cf_entries:
-+            curseforge_pack["managedFiles"] = filtered_cf
-+            CurseForgePackRegistry.save(Path(instance.instance_dir), curseforge_pack)
-+
-+        direct_registry = ModrinthRegistry.load(instance)
-+        direct_mods = direct_registry.get("mods") if isinstance(direct_registry.get("mods"), dict) else {}
-+        filtered_direct = {project_id: entry for project_id, entry in direct_mods.items() if not isinstance(entry, dict) or str(entry.get("fileName") or "").casefold() not in filenames}
-+        if filtered_direct != direct_mods:
-+            direct_registry["mods"] = filtered_direct
-+            ModrinthRegistry.save(instance, direct_registry)
-+
-+        ModProvenanceRegistry.remove_by_filenames(instance, removed_names)
-+        return tuple(messages)
-+
-+    @staticmethod
-+    def _project_matches_mod_id(project, mod_id: str) -> bool:
-+        identity = ModpackDependencyResolver._canonical_identity(mod_id)
-+        return bool(identity and identity in ModpackDependencyResolver._project_identities(project))
-+
-+    @staticmethod
-+    def _canonical_identity(value: object) -> str:
-+        return "".join(character for character in str(value or "").casefold() if character.isalnum())
-+
-+    @staticmethod
-+    def _file_sha1(path: Path) -> str:
-+        try:
-+            digest = hashlib.sha1()
-+            with Path(path).open("rb") as stream:
-+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-+                    digest.update(chunk)
-+            return digest.hexdigest()
-+        except OSError:
-+            return ""
- 
-     @staticmethod
-     def _modrinth_version_for_entry(entry: dict) -> ModrinthVersion | None:
---- a/src/core/modrinth/modrinth_content_manager.py
-+++ b/src/core/modrinth/modrinth_content_manager.py
-@@ -288,6 +288,18 @@
-                     version_id=version_id,
-                 )
-                 metadata = ModManager.read_mod(downloaded_path, provider_version=str(entry.get("versionNumber") or ""))
-+                expected_mod_id = str(entry.get("expectedModId") or "").strip().casefold()
-+                provided_mod_ids = {metadata.mod_id.casefold()} | {mod_id.casefold() for mod_id, _version in getattr(metadata, "provided_mods", ()) if mod_id}
-+                if expected_mod_id and expected_mod_id not in provided_mod_ids:
-+                    provided_values = sorted(value for value in provided_mod_ids if value)
-+                    if len(provided_values) == 1:
-+                        provided_label = f"mod ID '{provided_values[0]}'"
-+                    else:
-+                        provided_label = f"mod IDs '{', '.join(provided_values) or 'unknown'}'"
-+                    raise RuntimeError(
-+                        f"Downloaded Modrinth project '{project_id}' provides {provided_label}, "
-+                        f"but dependency metadata requires '{expected_mod_id}'."
-+                    )
-                 if launch_lock_token is None:
-                     added = ModManager.add_mods(instance, [downloaded_path], replace=True)
-                 else:
 --- a/src/core/modloader/forge/forge_version_manager.py
 +++ b/src/core/modloader/forge/forge_version_manager.py
-@@ -55,6 +55,17 @@
-                     version = VersionManager._parse_version(cached, cache_path)
-                     if version is not None:
-                         return version
-+                repairable = ForgeVersionManager._load_structurally_valid_cache(cache_path, base_version.id, loader)
-+                if repairable is not None:
-+                    if reporter is not None:
-+                        reporter.status(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Refreshing cached Minecraft Forge {loader} metadata...")
-+                    refreshed = ForgeVersionManager._normalize_libraries(repairable, reporter)
-+                    ForgeVersionManager._write_json(cache_path, refreshed)
-+                    cached = ForgeVersionManager._load_cached(cache_path, base_version.id, loader)
-+                    if cached is not None:
-+                        version = VersionManager._parse_version(cached, cache_path)
-+                        if version is not None:
-+                            return version
-             if reporter is not None:
-                 reporter.status(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Preparing Minecraft Forge {loader}...")
-             installer = ForgeVersionManager._download_installer(base_version.id, loader, reporter)
-@@ -68,6 +79,7 @@
-             ForgeVersionManager._import_libraries(staging, reporter)
-             normalized = ForgeVersionManager._normalize_libraries(profile, reporter)
-             merged = ForgeVersionManager._merge_profiles(base_version.raw_json, normalized, base_version.id, loader)
-+            merged = ForgeVersionManager._normalize_libraries(merged, reporter)
-             ForgeVersionManager._write_json(cache_path, merged)
-             version = VersionManager._parse_version(merged, cache_path)
-             if version is None:
-@@ -393,6 +405,17 @@
+@@ -30,6 +30,13 @@
+ 
+ class ForgeVersionManager:
+     CACHE_SCHEMA_VERSION = 1
++    LEGACY_NATIVE_PLATFORM_COORDINATES = frozenset({
++        "org.lwjgl.lwjgl:lwjgl-platform",
++        "net.java.jinput:jinput-platform",
++        "tv.twitch:twitch-platform",
++        "tv.twitch:twitch-external-platform",
++    })
++    SPURIOUS_NATIVE_PLATFORM_COORDINATES = frozenset({"net.java.dev.jna:jna-platform"})
+     _locks: dict[str, Lock] = {}
+     _guard = Lock()
+ 
+@@ -280,6 +287,8 @@
  
      @staticmethod
-     def _load_cached(path: Path, game_version: str, forge_version: str) -> dict | None:
-+        data = ForgeVersionManager._load_structurally_valid_cache(path, game_version, forge_version)
-+        if data is None:
-+            return None
-+        if not ForgeVersionManager._legacy_launchwrapper_cache_is_complete(data):
-+            return None
-+        if not ForgeVersionManager._windows_native_cache_is_complete(data):
-+            return None
-+        return data
+     def _normalize_windows_native(item: dict, coordinate: str, repository: str, downloads: dict, reporter: ProgressReporter | None) -> None:
++        if ForgeVersionManager._remove_spurious_native_platform_metadata(item, coordinate, downloads):
++            return
+         natives = deepcopy(item.get("natives")) if isinstance(item.get("natives"), dict) else {}
+         classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
+         if not classifier and ForgeVersionManager._is_legacy_native_platform_coordinate(coordinate):
+@@ -326,9 +335,50 @@
+ 
+     @staticmethod
+     def _is_legacy_native_platform_coordinate(coordinate: str) -> bool:
+-        parts = str(coordinate).split(":")
+-        artifact = parts[1].strip().casefold() if len(parts) >= 2 else ""
+-        return artifact.endswith("-platform")
++        return ForgeVersionManager._coordinate_key(coordinate) in ForgeVersionManager.LEGACY_NATIVE_PLATFORM_COORDINATES
 +
 +    @staticmethod
-+    def _load_structurally_valid_cache(path: Path, game_version: str, forge_version: str) -> dict | None:
-         try:
-             data = json.loads(path.read_text(encoding="utf-8"))
-         except (FileNotFoundError, OSError, json.JSONDecodeError):
-@@ -401,10 +424,6 @@
-         if forge.get("schemaVersion") != ForgeVersionManager.CACHE_SCHEMA_VERSION or forge.get("gameVersion") != game_version or forge.get("loaderVersion") != forge_version:
-             return None
-         if not data.get("mainClass") or not data.get("libraries"):
--            return None
--        if not ForgeVersionManager._legacy_launchwrapper_cache_is_complete(data):
--            return None
--        if not ForgeVersionManager._windows_native_cache_is_complete(data):
-             return None
-         return data
++    def _remove_spurious_native_platform_metadata(item: dict, coordinate: str, downloads: dict) -> bool:
++        if ForgeVersionManager._coordinate_key(coordinate) not in ForgeVersionManager.SPURIOUS_NATIVE_PLATFORM_COORDINATES:
++            return False
++        natives = deepcopy(item.get("natives")) if isinstance(item.get("natives"), dict) else {}
++        classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
++        if classifier != "natives-windows":
++            return False
++        classifiers = deepcopy(downloads.get("classifiers")) if isinstance(downloads.get("classifiers"), dict) else {}
++        current = classifiers.get(classifier) if isinstance(classifiers.get(classifier), dict) else None
++        if ForgeVersionManager._download_entry_is_complete(current):
++            return False
++        natives.pop("windows", None)
++        if natives:
++            item["natives"] = natives
++        else:
++            item.pop("natives", None)
++        classifiers.pop(classifier, None)
++        if classifiers:
++            downloads["classifiers"] = classifiers
++        else:
++            downloads.pop("classifiers", None)
++        return True
++
++    @staticmethod
++    def _has_spurious_native_platform_metadata(item: dict, coordinate: str, downloads: dict) -> bool:
++        if ForgeVersionManager._coordinate_key(coordinate) not in ForgeVersionManager.SPURIOUS_NATIVE_PLATFORM_COORDINATES:
++            return False
++        natives = item.get("natives") if isinstance(item.get("natives"), dict) else {}
++        classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
++        if classifier != "natives-windows":
++            return False
++        classifiers = downloads.get("classifiers") if isinstance(downloads.get("classifiers"), dict) else {}
++        current = classifiers.get(classifier) if isinstance(classifiers.get(classifier), dict) else None
++        return not ForgeVersionManager._download_entry_is_complete(current)
++
++    @staticmethod
++    def _coordinate_key(coordinate: str) -> str:
++        parts = str(coordinate).strip().split(":")
++        if len(parts) < 2:
++            return ""
++        return f"{parts[0].strip().casefold()}:{parts[1].strip().casefold()}"
  
---- a/test/core/mod/test_mod_manager.py
-+++ b/test/core/mod/test_mod_manager.py
-@@ -1,4 +1,5 @@
- from pathlib import Path
-+import io
- import json
- import zipfile
- 
-@@ -561,3 +562,35 @@
-     assert quilt_mod.name == "Quilt View"
-     assert fabric_mod.loader == "fabric"
-     assert fabric_mod.name == "Fabric View"
-+
-+
-+def test_reads_mod_id_provided_by_forge_jarjar_library(tmp_path):
-+    nested_buffer = io.BytesIO()
-+    nested_metadata = (
-+        'modLoader="javafml"\n'
-+        'loaderVersion="[43,)"\n'
-+        'license="LGPL-2.1"\n\n'
-+        '[[mods]]\n'
-+        'modId="kotlinforforge"\n'
-+        'version="3.9.1"\n'
-+        'displayName="Kotlin for Forge"\n'
-+    )
-+    with zipfile.ZipFile(nested_buffer, "w") as nested:
-+        nested.writestr("META-INF/mods.toml", nested_metadata)
-+
-+    source = tmp_path / "kotlinforforge-3.9.1-all.jar"
-+    jarjar = {"jars": [{"path": "META-INF/jarjar/kffmod-3.9.1.jar"}]}
-+    with zipfile.ZipFile(source, "w") as archive:
-+        archive.writestr(
-+            "META-INF/MANIFEST.MF",
-+            "Manifest-Version: 1.0\nFMLModType: LIBRARY\nImplementation-Version: 3.9.1\n",
-+        )
-+        archive.writestr("META-INF/jarjar/metadata.json", json.dumps(jarjar))
-+        archive.writestr("META-INF/jarjar/kffmod-3.9.1.jar", nested_buffer.getvalue())
-+
-+    mod = ModManager.read_mod(source, preferred_loader="forge", provider_version="3.9.1")
-+
-+    assert mod.mod_id == "unknown"
-+    assert mod.status == "Ready"
-+    assert mod.metadata_format == "MANIFEST.MF:FMLModType=LIBRARY"
-+    assert mod.provided_mods == (("kotlinforforge", "3.9.1"),)
---- a/test/core/mod/test_mod_compatibility_manager.py
-+++ b/test/core/mod/test_mod_compatibility_manager.py
-@@ -2,9 +2,12 @@
- import json
- import zipfile
- 
-+import pytest
-+
- from src.core.instance.instance_run_lock import InstanceRunLock
- from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
- from src.models.instance.instance import Instance
-+from src.models.mod.mod_info import ModInfo
- 
- 
- def make_instance(tmp_path: Path) -> Instance:
-@@ -115,6 +118,83 @@
-     assert ModCompatibilityManager._matches_requirement("47.3.0", "[47,)") is True
-     assert ModCompatibilityManager._matches_requirement("1.21.0", "[1.20.1,1.21)") is False
- 
-+
-+@pytest.mark.parametrize(
-+    ("installed", "required"),
-+    (
-+        ("1.19.2-3.0.0.6", "[1.19-3.0.0.3,)"),
-+        ("1.19.2-5.1.4.3", "[1.19-5.1.0.0,)"),
-+        ("1.8.2-55", "[1.8-54,)"),
-+        ("1.19.2-4.2.8", "[1.19-4.0.7,)"),
-+        ("1.19.2-4.2.18", "[1.19-4.0.12,)"),
-+    ),
-+)
-+def test_forge_mod_versions_used_by_existing_modpacks_match(installed: str, required: str) -> None:
-+    assert ModCompatibilityManager._matches_requirement(installed, required) is True
-+
-+
-+def test_pack_managed_dependency_version_mismatch_is_non_blocking(tmp_path) -> None:
-+    instance_dir = tmp_path / "pack-instance"
-+    (instance_dir / "mods").mkdir(parents=True)
-+    instance = Instance(instance_id="pack", name="Pack", version_id="1.19.2", instance_dir=instance_dir, mod_loader=("forge", "43.4.0"))
-+    dependency = ModInfo(
-+        path=tmp_path / "curios.jar",
-+        file_name="curios.jar",
-+        enabled=True,
-+        mod_id="curios",
-+        name="Curios API",
-+        version="2.0.0",
-+        loader="forge",
-+        managed_by_modpack=True,
-+    )
-+    consumer = ModInfo(
-+        path=tmp_path / "elytra-slot.jar",
-+        file_name="elytra-slot.jar",
-+        enabled=True,
-+        mod_id="elytraslot",
-+        name="Elytra Slot",
-+        version="6.1.0",
-+        loader="forge",
-+        dependencies={"curios": "[3.0.0,)"},
-+        managed_by_modpack=True,
-+    )
-+
-+    report = ModCompatibilityManager.scan(instance, mods=[dependency, consumer])
-+
-+    assert not any(issue.code == "dependency-version" for issue in report.issues)
-+    assert any(issue.code == "pack-pinned-dependency-requirement" and issue.severity == "warning" for issue in report.issues)
-+
-+
-+def test_manual_dependency_version_mismatch_remains_blocking(tmp_path) -> None:
-+    instance_dir = tmp_path / "manual-instance"
-+    (instance_dir / "mods").mkdir(parents=True)
-+    instance = Instance(instance_id="manual", name="Manual", version_id="1.19.2", instance_dir=instance_dir, mod_loader=("forge", "43.4.0"))
-+    dependency = ModInfo(
-+        path=tmp_path / "curios.jar",
-+        file_name="curios.jar",
-+        enabled=True,
-+        mod_id="curios",
-+        name="Curios API",
-+        version="2.0.0",
-+        loader="forge",
-+        managed_by_modpack=False,
-+    )
-+    consumer = ModInfo(
-+        path=tmp_path / "elytra-slot.jar",
-+        file_name="elytra-slot.jar",
-+        enabled=True,
-+        mod_id="elytraslot",
-+        name="Elytra Slot",
-+        version="6.1.0",
-+        loader="forge",
-+        dependencies={"curios": "[3.0.0,)"},
-+        managed_by_modpack=True,
-+    )
-+
-+    report = ModCompatibilityManager.scan(instance, mods=[dependency, consumer])
-+
-+    assert any(issue.code == "dependency-version" and issue.severity == "error" for issue in report.issues)
-+
- def test_neoforge_loader_dependency_matches_installed_version(tmp_path):
-     instance_dir = tmp_path / "neoforge-instance"
-     mods = instance_dir / "mods"
-@@ -216,3 +296,36 @@
-     report = ModCompatibilityManager.scan(instance)
- 
-     assert any(issue.code == "loader-mismatch" for issue in report.issues)
-+
-+
-+def test_jarjar_provided_mod_satisfies_required_dependency(tmp_path) -> None:
-+    instance_dir = tmp_path / "jarjar-instance"
-+    (instance_dir / "mods").mkdir(parents=True)
-+    instance = Instance(instance_id="jarjar", name="JarJar", version_id="1.19.2", instance_dir=instance_dir, mod_loader=("forge", "43.4.0"))
-+    provider = ModInfo(
-+        path=instance_dir / "mods" / "kotlinforforge-3.9.1-all.jar",
-+        file_name="kotlinforforge-3.9.1-all.jar",
-+        enabled=True,
-+        mod_id="unknown",
-+        name="kotlinforforge-3.9.1-all",
-+        version="3.9.1",
-+        loader="forge",
-+        metadata_format="MANIFEST.MF:FMLModType=LIBRARY",
-+        provided_mods=(("kotlinforforge", "3.9.1"),),
-+        managed_by_modpack=True,
-+    )
-+    consumer = ModInfo(
-+        path=instance_dir / "mods" / "sliceanddice.jar",
-+        file_name="sliceanddice.jar",
-+        enabled=True,
-+        mod_id="sliceanddice",
-+        name="Create Slice & Dice",
-+        version="2.4.0",
-+        loader="forge",
-+        dependencies={"kotlinforforge": "[3.9.1,)"},
-+        managed_by_modpack=True,
-+    )
-+
-+    report = ModCompatibilityManager.scan(instance, mods=[provider, consumer])
-+
-+    assert not any(issue.code in {"dependency-missing", "dependency-version"} and "kotlinforforge" in issue.mod_ids for issue in report.issues)
---- a/test/core/mod/test_mod_provenance_registry.py
-+++ b/test/core/mod/test_mod_provenance_registry.py
-@@ -104,3 +104,34 @@
- 
-     assert mod.source == "local"
-     assert mod.managed_by_modpack is False
-+
-+
-+def test_cross_provider_modrinth_dependency_remains_pack_managed(tmp_path: Path) -> None:
-+    from src.core.modrinth.modrinth_registry import ModrinthRegistry
-+
-+    instance = make_instance(tmp_path, "CrossProvider")
-+    make_mod(instance.instance_dir / "mods" / "kotlinforforge.jar", "kotlinforforge")
-+    ModrinthRegistry.save(instance, {
-+        "mods": {
-+            "kff-project": {
-+                "projectId": "kff-project",
-+                "versionId": "kff-version",
-+                "versionNumber": "3.9.1",
-+                "fileName": "kotlinforforge.jar",
-+                "managedByModpack": True,
-+                "selectionReason": "required_dependency",
-+                "requiredBy": ["Create Slice & Dice"],
-+                "packProvider": "curseforge",
-+            },
-+        },
-+    })
-+
-+    mod = ModManager.list_mods(instance)[0]
-+    entry = ModProvenanceRegistry.entry_for_file(instance, "kotlinforforge.jar")
-+
-+    assert mod.source == "modrinth"
-+    assert mod.managed_by_modpack is True
-+    assert mod.source_pack_provider == "curseforge"
-+    assert entry is not None
-+    assert entry["selectionReason"] == "required_dependency"
-+    assert entry["requiredBy"] == ["Create Slice & Dice"]
---- a/test/core/mod/test_modpack_dependency_resolver.py
-+++ b/test/core/mod/test_modpack_dependency_resolver.py
-@@ -7,12 +7,14 @@
- from src.core.curseforge.curseforge_client import CurseForgeClient
- from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
- from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
-+from src.core.mod.mod_manager import ModManager
- from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
- from src.core.mod.modpack_dependency_resolver import ModpackDependencyResolver
- from src.core.modrinth.modrinth_client import ModrinthClient
- from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
-+from src.core.modrinth.modrinth_registry import ModrinthRegistry
- from src.models.curseforge.file import CurseForgeDependency, CurseForgeFile
--from src.models.mod.dependency_resolution import RequiredModDependenciesMissing
-+from src.models.mod.dependency_resolution import DependencyResolutionResult, RequiredModDependenciesMissing
- from src.models.mod.mod_info import ModInfo
- from src.models.mod.mod_issue import ModHealthReport, ModIssue
- from src.models.modrinth.project import ModrinthProject
-@@ -151,3 +153,194 @@
- 
-     with pytest.raises(RequiredModDependenciesMissing, match="konkrete"):
-         ModpackDependencyResolver.raise_for_required_dependencies(managed_instance)
-+
-+
-+def test_curseforge_mod_uses_exact_modrinth_mirror_to_recover_kotlinforforge(tmp_path, monkeypatch):
-+    managed_instance = instance(tmp_path, loader="forge")
-+    managed_instance.version_id = "1.19.2"
-+    managed_instance.instance_dir.mkdir(parents=True)
-+    parent = ModInfo(
-+        path=managed_instance.instance_dir / "mods" / "slice-and-dice.jar",
-+        file_name="slice-and-dice.jar",
-+        enabled=True,
-+        mod_id="sliceanddice",
-+        name="Create Slice & Dice",
-+        version="2.4.0",
-+        loader="forge",
-+        dependencies={"create": "*", "kotlinforforge": "[3.9.1,)"},
-+        source="curseforge",
-+        managed_by_modpack=True,
-+        source_pack_provider="curseforge",
-+    )
-+    create = ModInfo(
-+        path=managed_instance.instance_dir / "mods" / "create.jar",
-+        file_name="create.jar",
-+        enabled=True,
-+        mod_id="create",
-+        name="Create",
-+        version="0.5.1",
-+        loader="forge",
-+        managed_by_modpack=True,
-+        source="curseforge",
-+        source_pack_provider="curseforge",
-+    )
-+    mirror = ModrinthVersion(
-+        version_id="slice-mirror",
-+        project_id="slice-project",
-+        name="Create Slice & Dice 2.4.0",
-+        version_number="2.4.0",
-+        version_type="release",
-+        game_versions=("1.19.2",),
-+        loaders=("forge",),
-+        files=(ModrinthFile("https://cdn.modrinth.com/slice.jar", "slice-and-dice.jar", "a" * 40, "a" * 128, 10, True),),
-+        dependencies=(
-+            ModrinthDependency("required", project_id="create-project"),
-+            ModrinthDependency("required", project_id="kff-project"),
-+        ),
-+    )
-+    create_version = ModrinthVersion(
-+        version_id="create-version",
-+        project_id="create-project",
-+        name="Create",
-+        version_number="0.5.1",
-+        version_type="release",
-+        game_versions=("1.19.2",),
-+        loaders=("forge",),
-+        files=(ModrinthFile("https://cdn.modrinth.com/create.jar", "create.jar", "b" * 40, "b" * 128, 10, True),),
-+    )
-+    kff_version = ModrinthVersion(
-+        version_id="kff-version",
-+        project_id="kff-project",
-+        name="Kotlin for Forge 3.9.1",
-+        version_number="3.9.1",
-+        version_type="release",
-+        game_versions=("1.19.2",),
-+        loaders=("forge",),
-+        files=(ModrinthFile("https://cdn.modrinth.com/kff.jar", "kotlinforforge-3.9.1-all.jar", "c" * 40, "c" * 128, 10, True),),
-+    )
-+    projects = {
-+        "create-project": ModrinthProject("create-project", "create", "Create", "", "mod"),
-+        "kff-project": ModrinthProject("kff-project", "kotlin-for-forge", "Kotlin for Forge", "", "mod"),
-+    }
-+    direct_registry = {"mods": {}}
-+    saved = {}
-+
-+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
-+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: {"managedFiles": [{"path": "mods/slice-and-dice.jar"}]})
-+    monkeypatch.setattr(ModpackDependencyResolver, "_resolve_curseforge", staticmethod(lambda *_args, **_kwargs: DependencyResolutionResult()))
-+    monkeypatch.setattr(ModManager, "list_mods", lambda _instance: [parent, create])
-+    monkeypatch.setattr(ModProvenanceRegistry, "entries_by_file", lambda _instance: {"slice-and-dice.jar": {"sha1": "a" * 40}})
-+    monkeypatch.setattr(ModProvenanceRegistry, "synchronize", lambda _instance: {})
-+    monkeypatch.setattr(ModrinthRegistry, "load", lambda _instance: direct_registry)
-+    monkeypatch.setattr(ModrinthRegistry, "save", lambda _instance, payload: saved.update(payload))
-+    monkeypatch.setattr(ModrinthClient, "get_version_from_hash", lambda value, algorithm="sha512": mirror if value == "a" * 40 and algorithm == "sha1" else None)
-+    monkeypatch.setattr(ModrinthClient, "select_version", lambda project_id, **_kwargs: {"create-project": create_version, "kff-project": kff_version}[project_id])
-+    monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: projects[project_id])
-+
-+    result = ModpackDependencyResolver.resolve(managed_instance)
-+
-+    assert result.added_files == ("Kotlin for Forge",)
-+    assert set(saved["mods"]) == {"kff-project"}
-+    entry = saved["mods"]["kff-project"]
-+    assert entry["versionId"] == "kff-version"
-+    assert entry["expectedModId"] == "kotlinforforge"
-+    assert entry["managedByModpack"] is True
-+    assert entry["selectionReason"] == "required_dependency"
-+    assert entry["requiredBy"] == ["Create Slice & Dice"]
-+    assert entry["packProvider"] == "curseforge"
-+    assert entry["locked"] is True
-+
-+
-+def test_prunes_auto_added_standalone_dependency_when_another_mod_embeds_it(tmp_path, monkeypatch):
-+    managed_instance = instance(tmp_path, loader="forge")
-+    managed_instance.instance_dir.mkdir(parents=True)
-+    mods_dir = managed_instance.instance_dir / "mods"
-+    mods_dir.mkdir()
-+    create_path = mods_dir / "create.jar"
-+    flywheel_path = mods_dir / "flywheel-forge-1.19.2-0.6.8.a.jar"
-+    create_path.write_bytes(b"create")
-+    flywheel_path.write_bytes(b"old-flywheel")
-+    create = ModInfo(
-+        path=create_path,
-+        file_name=create_path.name,
-+        enabled=True,
-+        mod_id="create",
-+        name="Create",
-+        version="0.5.1.f",
-+        loader="forge",
-+        provided_mods=(("flywheel", "0.6.10-20"),),
-+        managed_by_modpack=True,
-+        source="curseforge",
-+        source_pack_provider="curseforge",
-+    )
-+    flywheel = ModInfo(
-+        path=flywheel_path,
-+        file_name=flywheel_path.name,
-+        enabled=True,
-+        mod_id="flywheel",
-+        name="Flywheel",
-+        version="0.6.8.a",
-+        loader="forge",
-+        managed_by_modpack=True,
-+        source="curseforge",
-+        source_pack_provider="curseforge",
-+    )
-+    curseforge_pack = {
-+        "managedFiles": [
-+            {"path": f"mods/{create.file_name}", "fileName": create.file_name, "selectionReason": "pack_manifest"},
-+            {"path": f"mods/{flywheel.file_name}", "fileName": flywheel.file_name, "selectionReason": "required_dependency"},
-+        ]
-+    }
-+    saved = {}
-+    removed = []
-+
-+    monkeypatch.setattr(ModManager, "list_mods", lambda _instance: [create, flywheel])
-+    monkeypatch.setattr(ModProvenanceRegistry, "entries_by_file", lambda _instance: {
-+        create.file_name.casefold(): {"selectionReason": "pack_manifest"},
-+        flywheel.file_name.casefold(): {"selectionReason": "required_dependency"},
-+    })
-+    monkeypatch.setattr(ModProvenanceRegistry, "remove_by_filenames", lambda _instance, names: removed.extend(names) or tuple(names))
-+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
-+    monkeypatch.setattr(ModrinthPackRegistry, "save", lambda *_args: None)
-+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: curseforge_pack)
-+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda _instance, payload: saved.update(payload))
-+    monkeypatch.setattr(ModrinthRegistry, "load", lambda _instance: {"mods": {}})
-+    monkeypatch.setattr(ModrinthRegistry, "save", lambda *_args: None)
-+
-+    messages = ModpackDependencyResolver._prune_redundant_embedded_dependencies(managed_instance)
-+
-+    assert not flywheel_path.exists()
-+    assert create_path.exists()
-+    assert removed == [flywheel.file_name]
-+    assert [entry["fileName"] for entry in saved["managedFiles"]] == [create.file_name]
-+    assert any("already provides mod ID 'flywheel'" in message for message in messages)
-+
-+
-+def test_curseforge_resolver_does_not_add_standalone_dependency_already_provided_by_embedded_mod(tmp_path, monkeypatch):
-+    managed_instance = instance(tmp_path, loader="forge")
-+    root = cf_file(10, 100, "addon.jar", (CurseForgeDependency(20, 3),))
-+    flywheel = cf_file(20, 200, "flywheel.jar")
-+    registry = {"managedFiles": [{"projectId": 10, "fileId": 100, "fileName": "addon.jar", "path": "mods/addon.jar", "provider": "curseforge", "required": True}]}
-+    create = ModInfo(
-+        path=tmp_path / "create.jar",
-+        file_name="create.jar",
-+        enabled=True,
-+        mod_id="create",
-+        name="Create",
-+        version="0.5.1.f",
-+        loader="forge",
-+        provided_mods=(("flywheel", "0.6.10-20"),),
-+    )
-+
-+    monkeypatch.setattr(ModManager, "list_mods", lambda _instance: [create])
-+    monkeypatch.setattr(CurseForgeClient, "get_files_batch", lambda _ids: {100: root})
-+    monkeypatch.setattr(CurseForgeClient, "latest_compatible_file", lambda project_id, *_args, **_kwargs: flywheel if project_id == 20 else pytest.fail("unexpected project"))
-+    monkeypatch.setattr(CurseForgeClient, "get_project", lambda project_id: SimpleNamespace(name="Flywheel", slug="flywheel", project_url="https://example/flywheel"))
-+    saved = {}
-+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda _instance, payload: saved.update(payload))
-+
-+    result = ModpackDependencyResolver._resolve_curseforge(managed_instance, registry, None)
-+
-+    assert result.added_files == ()
-+    assert len(registry["managedFiles"]) == 1
-+    assert len(saved["managedFiles"]) == 1
---- a/test/core/modrinth/test_modrinth_content_manager.py
-+++ b/test/core/modrinth/test_modrinth_content_manager.py
-@@ -334,3 +334,64 @@
-     assert requirement.failure_reason == "NO_DOWNLOAD_URL"
-     assert requirement.direct_url == ""
-     assert requirement.version_url.endswith("/version/pack-version")
-+
-+
-+def test_expected_dependency_mod_id_blocks_wrong_provider_file(tmp_path, monkeypatch):
-+    instance = make_instance(tmp_path)
-+    content = b"provider-file"
-+    save_mod_entry(instance, content, "dependency.jar")
-+    registry = ModrinthRegistry.load(instance)
-+    registry["mods"]["manual-project"]["expectedModId"] = "kotlinforforge"
-+    ModrinthRegistry.save(instance, registry)
-+
-+    cache = tmp_path / "cache" / "dependency.jar"
-+    monkeypatch.setattr(Paths, "modrinth_file_cache", lambda *_args: cache)
-+
-+    def fake_download(urls, destination, **_kwargs):
-+        destination.parent.mkdir(parents=True, exist_ok=True)
-+        destination.write_bytes(content)
-+        return destination
-+
-+    monkeypatch.setattr(ModrinthDownloader, "download_urls", fake_download)
-+    monkeypatch.setattr(ModManager, "read_mod", lambda *_args, **_kwargs: SimpleNamespace(mod_id="wrong_mod"))
-+    monkeypatch.setattr(ModManager, "add_mods", lambda *_args, **_kwargs: pytest.fail("wrong dependency must not be installed"))
-+
-+    warnings = ModrinthContentManager.ensure(instance, block_launch_on_failure=False)
-+
-+    assert any("requires 'kotlinforforge'" in warning for warning in warnings)
-+    saved = ModrinthRegistry.load(instance)["mods"]["manual-project"]
-+    assert saved["pendingDownload"] is True
-+    assert "provides mod ID 'wrong_mod'" in saved["lastDownloadError"]
-+
-+
-+def test_expected_dependency_mod_id_accepts_forge_jarjar_provided_mod(tmp_path, monkeypatch):
-+    instance = make_instance(tmp_path)
-+    content = b"provider-file"
-+    save_mod_entry(instance, content, "kotlinforforge-3.9.1-all.jar")
-+    registry = ModrinthRegistry.load(instance)
-+    registry["mods"]["manual-project"]["expectedModId"] = "kotlinforforge"
-+    ModrinthRegistry.save(instance, registry)
-+
-+    cache = tmp_path / "cache" / "kotlinforforge-3.9.1-all.jar"
-+    monkeypatch.setattr(Paths, "modrinth_file_cache", lambda *_args: cache)
-+
-+    def fake_download(urls, destination, **_kwargs):
-+        destination.parent.mkdir(parents=True, exist_ok=True)
-+        destination.write_bytes(content)
-+        return destination
-+
-+    def fake_add_mods(current_instance, source_paths, **_kwargs):
-+        source = next(iter(source_paths))
-+        target = current_instance.instance_dir / "mods" / source.name
-+        target.parent.mkdir(parents=True, exist_ok=True)
-+        target.write_bytes(source.read_bytes())
-+        return [SimpleNamespace(file_name=target.name)]
-+
-+    monkeypatch.setattr(ModrinthDownloader, "download_urls", fake_download)
-+    monkeypatch.setattr(ModManager, "read_mod", lambda *_args, **_kwargs: SimpleNamespace(mod_id="unknown", provided_mods=(("kotlinforforge", "3.9.1"),)))
-+    monkeypatch.setattr(ModManager, "add_mods", fake_add_mods)
-+
-+    assert ModrinthContentManager.ensure(instance) == ()
-+    saved = ModrinthRegistry.load(instance)["mods"]["manual-project"]
-+    assert saved["pendingDownload"] is False
-+    assert saved["lastDownloadError"] == ""
+     @staticmethod
+     def _maven_path(coordinate: str, classifier: str | None = None) -> Path:
+@@ -446,13 +496,16 @@
+         for item in libraries:
+             if not isinstance(item, dict) or not LibraryRuleManager.is_allowed(item):
+                 continue
++            coordinate = str(item.get("name") or "")
++            downloads = item.get("downloads") if isinstance(item.get("downloads"), dict) else {}
++            if ForgeVersionManager._has_spurious_native_platform_metadata(item, coordinate, downloads):
++                return False
+             natives = item.get("natives") if isinstance(item.get("natives"), dict) else {}
+             classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
+             if not classifier and ForgeVersionManager._is_legacy_native_platform_coordinate(str(item.get("name") or "")):
+                 classifier = "natives-windows"
+             if not classifier:
+                 continue
+-            downloads = item.get("downloads") if isinstance(item.get("downloads"), dict) else {}
+             classifiers = downloads.get("classifiers") if isinstance(downloads.get("classifiers"), dict) else {}
+             entry = classifiers.get(classifier) if isinstance(classifiers.get(classifier), dict) else None
+             if not ForgeVersionManager._download_entry_is_complete(entry):
 --- a/test/core/modloader/forge/test_forge_version_manager.py
 +++ b/test/core/modloader/forge/test_forge_version_manager.py
-@@ -559,3 +559,39 @@
-         ForgeVersionManager._run_installer(make_version(tmp_path), "47.3.0", installer, tmp_path / "staging", None)
+@@ -220,6 +220,100 @@
+     assert library["downloads"]["classifiers"]["natives-windows"]["path"] == "net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5-natives-windows.jar"
  
-     assert "final Forge detail" in (forge_root / "logs" / "forge-1.20.1-47.3.0.log").read_text(encoding="utf-8")
+ 
++def test_normalize_jna_platform_as_regular_artifact_without_native_classifier(monkeypatch, tmp_path: Path) -> None:
++    root = tmp_path / "libraries"
++    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))
++    calls = []
++
++    def fake_download_and_hash(**kwargs):
++        calls.append(kwargs)
++        target = kwargs["path"]
++        target.parent.mkdir(parents=True, exist_ok=True)
++        target.write_bytes(b"jna-platform")
++        return target, "9" * 40, len(b"jna-platform")
++
++    monkeypatch.setattr(
++        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
++        staticmethod(fake_download_and_hash),
++    )
++
++    normalized = ForgeVersionManager._normalize_libraries({"libraries": [{"name": "net.java.dev.jna:jna-platform:5.10.0"}]})
++    library = normalized["libraries"][0]
++
++    assert "natives" not in library
++    assert "classifiers" not in library["downloads"]
++    assert library["downloads"]["artifact"]["path"] == "net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar"
++    assert len(calls) == 1
++    assert calls[0]["url"].endswith("/net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar")
 +
 +
-+def test_incomplete_cached_profile_is_refreshed_without_rerunning_forge_installer(monkeypatch, tmp_path: Path) -> None:
++def test_normalize_removes_spurious_jna_native_metadata_from_v4_cache(monkeypatch, tmp_path: Path) -> None:
++    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: tmp_path / "libraries"))
++    monkeypatch.setattr(
++        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
++        staticmethod(lambda **kwargs: (_ for _ in ()).throw(AssertionError("The valid JNA artifact must be reused"))),
++    )
++    artifact = {
++        "path": "net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar",
++        "url": "https://libraries.minecraft.net/net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar",
++        "sha1": "8" * 40,
++        "size": 1,
++    }
++    profile = {
++        "libraries": [{
++            "name": "net.java.dev.jna:jna-platform:5.10.0",
++            "natives": {"windows": "natives-windows"},
++            "downloads": {"artifact": artifact},
++        }]
++    }
++
++    normalized = ForgeVersionManager._normalize_libraries(profile)
++    library = normalized["libraries"][0]
++
++    assert "natives" not in library
++    assert library["downloads"] == {"artifact": artifact}
++
++
++def test_polluted_jna_platform_cache_is_repaired_without_forge_installer(monkeypatch, tmp_path: Path) -> None:
 +    import json
 +
++    base = make_version(tmp_path)
 +    cache = tmp_path / "forge-1.20.1-47.3.0.json"
-+    raw = make_version(tmp_path).raw_json.copy()
-+    raw.update({
++    artifact = {
++        "path": "net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar",
++        "url": "https://libraries.minecraft.net/net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar",
++        "sha1": "8" * 40,
++        "size": 1,
++    }
++    cached_profile = json.loads(json.dumps(base.raw_json))
++    cached_profile.update({
 +        "id": "forge-1.20.1-47.3.0",
 +        "mainClass": "cpw.mods.bootstraplauncher.BootstrapLauncher",
++        "arguments": {"game": ["--fml.forgeVersion", "47.3.0"], "jvm": []},
 +        "libraries": [
-+            {"name": "net.minecraftforge:forge:1.20.1-47.3.0", "downloads": {"artifact": {"path": "net/minecraftforge/forge/1.20.1-47.3.0/forge-1.20.1-47.3.0.jar", "url": "https://maven.minecraftforge.net/forge.jar", "sha1": "a" * 40, "size": 1}}},
-+            {"name": "org.lwjgl:lwjgl:3.3.1", "natives": {"windows": "natives-windows"}, "downloads": {}},
++            {"name": "net.minecraftforge:forge:1.20.1-47.3.0", "downloads": {"artifact": {"path": "net/minecraftforge/forge/1.20.1-47.3.0/forge-1.20.1-47.3.0.jar", "url": "https://maven.minecraftforge.net/forge.jar", "sha1": "7" * 40, "size": 1}}},
++            {"name": "net.java.dev.jna:jna-platform:5.10.0", "natives": {"windows": "natives-windows"}, "downloads": {"artifact": artifact}},
 +        ],
 +        "forge": {"schemaVersion": 1, "gameVersion": "1.20.1", "loaderVersion": "47.3.0"},
 +    })
-+    cache.write_text(json.dumps(raw), encoding="utf-8")
++    cache.write_text(json.dumps(cached_profile), encoding="utf-8")
 +
 +    monkeypatch.setattr(Paths, "forge_version_json", staticmethod(lambda *_args: cache))
-+    monkeypatch.setattr("src.core.modloader.forge.forge_version_manager.VersionManager.load", staticmethod(lambda _version: make_version(tmp_path)))
 +    monkeypatch.setattr(ForgeVersionManager, "_download_installer", staticmethod(lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Forge installer must not run"))))
++    monkeypatch.setattr(
++        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
++        staticmethod(lambda **kwargs: (_ for _ in ()).throw(AssertionError("No library download should be needed"))),
++    )
 +
-+    def refresh(data, _reporter=None):
-+        refreshed = json.loads(json.dumps(data))
-+        refreshed["libraries"][1]["downloads"] = {
-+            "artifact": {"path": "org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1.jar", "url": "https://libraries.minecraft.net/lwjgl.jar", "sha1": "b" * 40, "size": 1},
-+            "classifiers": {"natives-windows": {"path": "org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-windows.jar", "url": "https://libraries.minecraft.net/lwjgl-native.jar", "sha1": "c" * 40, "size": 1}},
-+        }
-+        return refreshed
-+
-+    monkeypatch.setattr(ForgeVersionManager, "_normalize_libraries", staticmethod(refresh))
-+
-+    version = ForgeVersionManager.load("1.20.1", "47.3.0")
++    version = ForgeVersionManager.install(base, "47.3.0")
++    repaired = json.loads(cache.read_text(encoding="utf-8"))
++    jna = next(item for item in repaired["libraries"] if item["name"].startswith("net.java.dev.jna:jna-platform:"))
 +
 +    assert version.id == "forge-1.20.1-47.3.0"
-+    assert ForgeVersionManager._load_cached(cache, "1.20.1", "47.3.0") is not None
++    assert "natives" not in jna
++    assert jna["downloads"] == {"artifact": artifact}
++
++
+ def test_normalize_skips_osx_only_nightly_native_on_windows(monkeypatch, tmp_path: Path) -> None:
+     monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: tmp_path / "libraries"))
+     monkeypatch.setattr(
