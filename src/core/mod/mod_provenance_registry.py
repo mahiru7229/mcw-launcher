@@ -80,6 +80,7 @@ class ModProvenanceRegistry:
         for project_id, raw in ModrinthRegistry.load(instance).get("mods", {}).items():
             if not isinstance(raw, dict):
                 continue
+            managed_by_modpack = bool(raw.get("managedByModpack", False))
             merge({
                 "fileName": raw.get("fileName"),
                 "provider": "modrinth",
@@ -90,7 +91,10 @@ class ModProvenanceRegistry:
                 "sha512": raw.get("sha512"),
                 "size": raw.get("size"),
                 "downloadUrls": raw.get("downloadUrls", []),
-                "managedByModpack": False,
+                "managedByModpack": managed_by_modpack,
+                "selectionReason": raw.get("selectionReason"),
+                "requiredBy": raw.get("requiredBy", []),
+                "packProvider": raw.get("packProvider") if managed_by_modpack else "",
             }, 30)
 
         for project_id, raw in CurseForgeRegistry.load(instance).get("mods", {}).items():

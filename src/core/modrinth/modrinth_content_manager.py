@@ -288,6 +288,12 @@ class ModrinthContentManager:
                     version_id=version_id,
                 )
                 metadata = ModManager.read_mod(downloaded_path, provider_version=str(entry.get("versionNumber") or ""))
+                expected_mod_id = str(entry.get("expectedModId") or "").strip().casefold()
+                if expected_mod_id and metadata.mod_id.casefold() != expected_mod_id:
+                    raise RuntimeError(
+                        f"Downloaded Modrinth project '{project_id}' provides mod ID '{metadata.mod_id}', "
+                        f"but dependency metadata requires '{expected_mod_id}'."
+                    )
                 if launch_lock_token is None:
                     added = ModManager.add_mods(instance, [downloaded_path], replace=True)
                 else:

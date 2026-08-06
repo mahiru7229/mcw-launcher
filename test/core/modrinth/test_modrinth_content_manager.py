@@ -334,3 +334,31 @@ def test_missing_pack_artifact_without_url_exposes_no_download_url_manual_fallba
     assert requirement.failure_reason == "NO_DOWNLOAD_URL"
     assert requirement.direct_url == ""
     assert requirement.version_url.endswith("/version/pack-version")
+
+
+def test_expected_dependency_mod_id_blocks_wrong_provider_file(tmp_path, monkeypatch):
+    instance = make_instance(tmp_path)
+    content = b"provider-file"
+    save_mod_entry(instance, content, "dependency.jar")
+    registry = ModrinthRegistry.load(instance)
+    registry["mods"]["manual-project"]["expectedModId"] = "kotlinforforge"
+    ModrinthRegistry.save(instance, registry)
+
+    cache = tmp_path / "cache" / "dependency.jar"
+    monkeypatch.setattr(Paths, "modrinth_file_cache", lambda *_args: cache)
+
+    def fake_download(urls, destination, **_kwargs):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content)
+        return destination
+
+    monkeypatch.setattr(ModrinthDownloader, "download_urls", fake_download)
+    monkeypatch.setattr(ModManager, "read_mod", lambda *_args, **_kwargs: SimpleNamespace(mod_id="wrong_mod"))
+    monkeypatch.setattr(ModManager, "add_mods", lambda *_args, **_kwargs: pytest.fail("wrong dependency must not be installed"))
+
+    warnings = ModrinthContentManager.ensure(instance, block_launch_on_failure=False)
+
+    assert any("requires 'kotlinforforge'" in warning for warning in warnings)
+    saved = ModrinthRegistry.load(instance)["mods"]["manual-project"]
+    assert saved["pendingDownload"] is True
+    assert "provides mod ID 'wrong_mod'" in saved["lastDownloadError"]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from time import sleep
@@ -9,20 +10,19 @@ from typing import Callable, TypeVar
 from src.core.curseforge.curseforge_client import CurseForgeClient
 from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
 from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
-from src.core.mod.mod_capability_index import ModCapabilityIndex
 from src.core.mod.mod_manager import ModManager
 from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_mod_installer import ModrinthModInstaller
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
+from src.core.modrinth.modrinth_registry import ModrinthRegistry
 from src.core.network.download_pause import download_pause_controller
 from src.core.network.retry_policy import DownloadRetryPolicy
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.curseforge.file import CurseForgeDependency, CurseForgeFile
 from src.models.instance.instance import Instance
 from src.models.mod.dependency_resolution import DependencyResolutionResult, RequiredModDependenciesMissing
-from src.models.mod.mod_info import ModInfo
 from src.models.mod.mod_issue import ModIssue
 from src.models.modrinth.version import ModrinthVersion
 from src.models.progress.progress_stage import ProgressStage
@@ -66,17 +66,14 @@ class ModpackDependencyResolver:
             warnings.extend(result.warnings)
             unresolved.extend(result.unresolved)
 
-        # Provider-declared relations are resolved first, matching Prism's
-        # dependency flow. Once those files are present, use the downloaded
-        # JAR metadata as a second source of truth and search providers for
-        # still-missing required mod IDs. Avoid doing both in the same pass so
-        # a dependency already scheduled by project ID is not duplicated by a
-        # JAR-level search before it has been downloaded.
-        if not added and ModpackDependencyResolver._is_managed_modpack(instance):
-            recovery = ModpackDependencyResolver._recover_jar_declared_dependencies(instance, reporter)
-            added.extend(recovery.added_files)
-            warnings.extend(recovery.warnings)
-            unresolved.extend(recovery.unresolved)
+        # CurseForge file relations are not always complete. Once the pack JARs
+        # exist locally, use the exact file hash to find the same release on
+        # Modrinth and recover required relations from that provider. This is
+        # identity-based enrichment, not a name-only search or a hardcoded mod.
+        result = ModpackDependencyResolver._resolve_cross_provider_missing(instance, reporter)
+        added.extend(result.added_files)
+        warnings.extend(result.warnings)
+        unresolved.extend(result.unresolved)
 
         if added:
             ModProvenanceRegistry.synchronize(instance)
@@ -380,301 +377,239 @@ class ModpackDependencyResolver:
         return DependencyResolutionResult(tuple(added), tuple(warnings), tuple(unresolved))
 
     @staticmethod
-    def _recover_jar_declared_dependencies(instance: Instance, reporter: ProgressReporter | None) -> DependencyResolutionResult:
-        mods = ModManager.list_mods(instance)
-        if not mods:
+    def _resolve_cross_provider_missing(instance: Instance, reporter: ProgressReporter | None) -> DependencyResolutionResult:
+        if not getattr(instance, "mod_loader", None) or not ModpackDependencyResolver._is_managed_modpack(instance):
             return DependencyResolutionResult()
-
+        try:
+            mods = ModManager.list_mods(instance)
+        except (FileNotFoundError, OSError):
+            return DependencyResolutionResult()
         report = ModCompatibilityManager.scan(instance, mods=mods)
-        missing = [issue for issue in report.issues if issue.severity == "error" and issue.code == "dependency-missing" and len(issue.mod_ids) >= 2]
-        if not missing:
+        issues = [issue for issue in report.issues if issue.code == "dependency-missing" and len(issue.mod_ids) >= 2]
+        if not issues:
             return DependencyResolutionResult()
 
-        by_id = {mod.mod_id.casefold(): mod for mod in mods if mod.enabled and mod.mod_id.casefold() != "unknown"}
-        requests: dict[str, dict[str, object]] = {}
-        for issue in missing:
-            parent_id = str(issue.mod_ids[0]).strip().casefold()
-            dependency_id = str(issue.mod_ids[1]).strip().casefold()
-            if not dependency_id or dependency_id in ModCompatibilityManager.SYSTEM_DEPENDENCY_IDS:
-                continue
-            parent = by_id.get(parent_id)
-            requirement = parent.dependencies.get(dependency_id, "*") if parent is not None else "*"
-            entry = requests.setdefault(dependency_id, {"requiredBy": [], "requirements": []})
-            parent_label = parent.name if parent is not None else parent_id or "Unknown mod"
-            if parent_label not in entry["requiredBy"]:
-                entry["requiredBy"].append(parent_label)
-            requirement_text = ModCompatibilityManager._format_requirement(requirement)
-            if requirement_text not in entry["requirements"]:
-                entry["requirements"].append(requirement_text)
-
-        if not requests:
-            return DependencyResolutionResult()
-
+        enabled_by_id: dict[str, list] = {}
+        for mod in mods:
+            if mod.enabled:
+                enabled_by_id.setdefault(mod.mod_id.casefold(), []).append(mod)
+        provenance = ModProvenanceRegistry.entries_by_file(instance)
+        registry = ModrinthRegistry.load(instance)
+        registry_mods = registry.setdefault("mods", {})
+        selected_projects = {str(project_id).strip() for project_id in registry_mods if str(project_id).strip()}
+        pack_registry = ModrinthPackRegistry.load(instance)
+        selected_projects.update(
+            str(entry.get("projectId") or "").strip()
+            for entry in pack_registry.get("managedFiles", [])
+            if isinstance(entry, dict) and str(entry.get("projectId") or "").strip()
+        )
+        installed_identities = {ModpackDependencyResolver._canonical_identity(mod.mod_id) for mod in mods if mod.enabled and mod.mod_id != "unknown"}
         added: list[str] = []
         warnings: list[str] = []
-        unresolved: list[str] = []
-        total = len(requests)
-        ModpackDependencyResolver._report(reporter, "Searching for missing mod dependencies...", 0, total)
+        changed = False
+        processed: set[tuple[str, str]] = set()
 
-        for completed, (dependency_id, request) in enumerate(sorted(requests.items()), start=1):
-            download_pause_controller.raise_if_requested()
-            pending = ModpackDependencyResolver._pending_candidate(instance, dependency_id)
-            if pending:
-                ModpackDependencyResolver._report(reporter, "Searching for missing mod dependencies...", completed, total)
+        ModpackDependencyResolver._report(reporter, "Resolving cross-provider mod dependencies...", 0, max(1, len(issues)))
+        for completed, issue in enumerate(issues, start=1):
+            parent_id = str(issue.mod_ids[0]).strip().casefold()
+            dependency_id = str(issue.mod_ids[1]).strip().casefold()
+            key = (parent_id, dependency_id)
+            if not parent_id or not dependency_id or key in processed:
+                ModpackDependencyResolver._report(reporter, "Resolving cross-provider mod dependencies...", completed, max(1, len(issues)))
                 continue
-
-            excluded = ModpackDependencyResolver._rejected_or_installed_candidates(instance, dependency_id)
-            candidate, search_errors = ModpackDependencyResolver._find_dependency_candidate(instance, dependency_id, excluded)
-            if candidate is None:
-                requirement_text = " and ".join(str(value) for value in request["requirements"] if str(value).strip()) or "*"
-                detail = "; ".join(search_errors)
-                message = f"Could not resolve required dependency '{dependency_id}' ({requirement_text}) from Modrinth or CurseForge."
-                if detail:
-                    message += f" {detail}"
-                unresolved.append(message)
-                ModpackDependencyResolver._report(reporter, "Searching for missing mod dependencies...", completed, total)
-                continue
-
-            required_by = [str(value) for value in request["requiredBy"] if str(value).strip()]
-            requirements = [str(value) for value in request["requirements"] if str(value).strip()]
-            if candidate["provider"] == "modrinth":
-                ModpackDependencyResolver._append_modrinth_search_candidate(instance, candidate, dependency_id, required_by, requirements)
-            else:
-                ModpackDependencyResolver._append_curseforge_search_candidate(instance, candidate, dependency_id, required_by, requirements)
-            title = str(candidate.get("title") or dependency_id)
-            added.append(title)
-            warnings.append(f"Scheduled {title} from {candidate['provider'].title()} to satisfy missing dependency '{dependency_id}'.")
-            ModpackDependencyResolver._report(reporter, "Searching for missing mod dependencies...", completed, total)
-
-        return DependencyResolutionResult(tuple(added), tuple(warnings), tuple(unresolved))
-
-    @staticmethod
-    def _find_dependency_candidate(instance: Instance, dependency_id: str, excluded: dict[str, set[str]]) -> tuple[dict | None, list[str]]:
-        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        loader_name = str(loader_name).strip().casefold()
-        errors: list[str] = []
-        for provider in ModpackDependencyResolver._provider_priority(instance):
-            try:
-                if provider == "modrinth":
-                    candidate = ModpackDependencyResolver._search_modrinth_by_mod_id(instance, dependency_id, loader_name, excluded.get("modrinth", set()))
-                else:
-                    candidate = ModpackDependencyResolver._search_curseforge_by_mod_id(instance, dependency_id, loader_name, excluded.get("curseforge", set()))
-            except Exception as error:
-                errors.append(f"{provider.title()} search failed: {error}")
-                continue
-            if candidate is not None:
-                return candidate, errors
-        return None, errors
-
-    @staticmethod
-    def _search_modrinth_by_mod_id(instance: Instance, dependency_id: str, loader_name: str, excluded: set[str]) -> dict | None:
-        result = ModpackDependencyResolver._retry(
-            lambda: ModrinthClient.search_projects(
-                "mod",
-                query=dependency_id,
-                game_version=instance.version_id,
-                loader=loader_name,
-                index="relevance",
-                offset=0,
-                limit=10,
-                force_refresh=False,
-            )
-        )
-        projects = sorted(result.projects, key=lambda project: ModpackDependencyResolver._project_match_score(dependency_id, project.slug, project.title))
-        for project in projects:
-            score = ModpackDependencyResolver._project_match_score(dependency_id, project.slug, project.title)
-            if score > 1 or project.project_id in excluded:
-                continue
-            try:
-                version = ModpackDependencyResolver._retry(
-                    lambda project_id=project.project_id: ModrinthClient.select_version(
-                        project_id,
-                        game_version=instance.version_id,
-                        loader=loader_name,
-                        version_types=("release", "beta", "alpha"),
+            processed.add(key)
+            parents = enabled_by_id.get(parent_id, [])
+            for parent in parents:
+                if not parent.managed_by_modpack or (parent.source_pack_provider or parent.source) != "curseforge":
+                    continue
+                source = provenance.get(parent.file_name.casefold(), {})
+                sha1 = str(source.get("sha1") or "").strip().casefold() if isinstance(source, dict) else ""
+                if not sha1:
+                    sha1 = ModpackDependencyResolver._file_sha1(parent.path)
+                if not sha1:
+                    continue
+                try:
+                    mirror = ModpackDependencyResolver._retry(lambda sha1=sha1: ModrinthClient.get_version_from_hash(sha1, "sha1"))
+                except Exception as error:
+                    warnings.append(f"Could not enrich dependency metadata for {parent.name} through its exact file hash: {error}")
+                    continue
+                if mirror is None:
+                    continue
+                parent_label = parent.name or parent.file_name
+                matched = False
+                for dependency in mirror.dependencies:
+                    if dependency.dependency_type != "required":
+                        continue
+                    try:
+                        dependency_version = ModpackDependencyResolver._retry(
+                            lambda dependency=dependency: ModrinthModInstaller._resolve_dependency(
+                                dependency.version_id,
+                                dependency.project_id,
+                                instance.version_id,
+                                str(ModLoaderManager.normalize(instance.mod_loader)[0]).strip().casefold(),
+                                ("release", "beta", "alpha"),
+                            )
+                        )
+                        if dependency_version is None:
+                            continue
+                        project = ModpackDependencyResolver._retry(lambda dependency_version=dependency_version: ModrinthClient.get_project(dependency_version.project_id))
+                    except Exception as error:
+                        warnings.append(f"Could not inspect a Modrinth mirror dependency for {parent_label}: {error}")
+                        continue
+                    if not ModpackDependencyResolver._project_matches_mod_id(project, dependency_id):
+                        continue
+                    matched = True
+                    tree_result, tree_changed = ModpackDependencyResolver._append_modrinth_registry_tree(
+                        instance=instance,
+                        registry_mods=registry_mods,
+                        selected_projects=selected_projects,
+                        installed_identities=installed_identities,
+                        root_version=dependency_version,
+                        root_project=project,
+                        parent_label=parent_label,
+                        expected_mod_id=dependency_id,
+                        pack_provider=parent.source_pack_provider or "curseforge",
                     )
-                )
-                ModrinthModInstaller._validate_version(version, instance.version_id, loader_name)
-                file = version.primary_file(".jar")
-            except Exception:
-                continue
-            return {
-                "provider": "modrinth",
-                "project": project,
-                "version": version,
-                "file": file,
-                "title": project.title,
-            }
-        return None
+                    added.extend(tree_result.added_files)
+                    warnings.extend(tree_result.warnings)
+                    changed |= tree_changed
+                    break
+                if matched:
+                    break
+            ModpackDependencyResolver._report(reporter, "Resolving cross-provider mod dependencies...", completed, max(1, len(issues)))
+
+        if changed:
+            ModrinthRegistry.save(instance, registry)
+        return DependencyResolutionResult(tuple(added), tuple(warnings), ())
 
     @staticmethod
-    def _search_curseforge_by_mod_id(instance: Instance, dependency_id: str, loader_name: str, excluded: set[str]) -> dict | None:
-        result = ModpackDependencyResolver._retry(
-            lambda: CurseForgeClient.search_projects(
-                "mod",
-                query=dependency_id,
-                game_version=instance.version_id,
-                loader=loader_name,
-                index=0,
-                page_size=10,
-                sort="popularity",
-                force_refresh=False,
-            )
-        )
-        projects = sorted(result.projects, key=lambda project: ModpackDependencyResolver._project_match_score(dependency_id, project.slug, project.name))
-        for project in projects:
-            score = ModpackDependencyResolver._project_match_score(dependency_id, project.slug, project.name)
-            if score > 1 or str(project.project_id) in excluded:
+    def _append_modrinth_registry_tree(instance: Instance, registry_mods: dict, selected_projects: set[str], installed_identities: set[str], root_version: ModrinthVersion, root_project, parent_label: str, expected_mod_id: str, pack_provider: str) -> tuple[DependencyResolutionResult, bool]:
+        queue: deque[tuple[ModrinthVersion, object, int, str, str]] = deque([(root_version, root_project, 0, parent_label, expected_mod_id)])
+        visited: set[str] = set()
+        added: list[str] = []
+        warnings: list[str] = []
+        changed = False
+        discovered = 0
+        loader_name = str(ModLoaderManager.normalize(instance.mod_loader)[0]).strip().casefold()
+
+        while queue:
+            version, project, depth, required_by, expected_id = queue.popleft()
+            if version.version_id in visited:
                 continue
-            try:
-                file = ModpackDependencyResolver._retry(
-                    lambda project_id=project.project_id: CurseForgeClient.latest_compatible_file(
-                        project_id,
-                        instance.version_id,
-                        loader=loader_name,
-                        release_types=("release", "beta", "alpha"),
+            visited.add(version.version_id)
+            if depth > ModpackDependencyResolver.MAX_DEPTH:
+                warnings.append(f"Cross-provider dependency depth exceeded {ModpackDependencyResolver.MAX_DEPTH} at {required_by}.")
+                continue
+            project_id = version.project_id
+            identities = ModpackDependencyResolver._project_identities(project)
+            already_installed = bool(identities & installed_identities)
+            entry = registry_mods.get(project_id)
+            if isinstance(entry, dict):
+                changed |= ModpackDependencyResolver._mark_registry_dependency(entry, required_by, pack_provider, expected_id)
+            elif project_id not in selected_projects and not already_installed:
+                if discovered >= ModpackDependencyResolver.MAX_DEPENDENCIES:
+                    warnings.append(f"The cross-provider dependency graph exceeds {ModpackDependencyResolver.MAX_DEPENDENCIES} added files.")
+                    break
+                try:
+                    ModrinthModInstaller._validate_version(version, instance.version_id, loader_name)
+                    file = version.primary_file(".jar")
+                except Exception as error:
+                    warnings.append(f"{required_by} dependency {project_id} is not installable: {error}")
+                    continue
+                title = str(getattr(project, "title", "") or file.filename).strip()
+                entry = {
+                    "projectId": project_id,
+                    "versionId": version.version_id,
+                    "versionNumber": version.version_number,
+                    "versionType": version.version_type,
+                    "fileName": file.filename,
+                    "sha1": file.sha1,
+                    "sha512": file.sha512,
+                    "size": file.size,
+                    "downloadUrls": [file.url] if file.url else [],
+                    "title": title,
+                    "datePublished": version.date_published,
+                    "pendingDownload": True,
+                    "locked": True,
+                    "managedByModpack": True,
+                    "selectionReason": "required_dependency",
+                    "requiredBy": [required_by],
+                    "packProvider": pack_provider,
+                }
+                if expected_id:
+                    entry["expectedModId"] = expected_id
+                registry_mods[project_id] = entry
+                selected_projects.add(project_id)
+                installed_identities.update(identities)
+                added.append(title)
+                discovered += 1
+                changed = True
+
+            for dependency in version.dependencies:
+                if dependency.dependency_type != "required":
+                    continue
+                try:
+                    child_version = ModpackDependencyResolver._retry(
+                        lambda dependency=dependency: ModrinthModInstaller._resolve_dependency(
+                            dependency.version_id,
+                            dependency.project_id,
+                            instance.version_id,
+                            loader_name,
+                            ("release", "beta", "alpha"),
+                        )
                     )
-                )
-                if not file.file_name.casefold().endswith(".jar"):
+                    if child_version is None:
+                        continue
+                    child_project = ModpackDependencyResolver._retry(lambda child_version=child_version: ModrinthClient.get_project(child_version.project_id))
+                except Exception as error:
+                    warnings.append(f"Could not inspect required dependency metadata for {getattr(project, 'title', project_id)}: {error}")
                     continue
-            except Exception:
-                continue
-            return {
-                "provider": "curseforge",
-                "project": project,
-                "file": file,
-                "title": project.name,
-            }
-        return None
+                queue.append((child_version, child_project, depth + 1, str(getattr(project, "title", "") or project_id), ""))
+
+        return DependencyResolutionResult(tuple(added), tuple(warnings), ()), changed
 
     @staticmethod
-    def _append_modrinth_search_candidate(instance: Instance, candidate: dict, dependency_id: str, required_by: list[str], requirements: list[str]) -> None:
-        registry = ModrinthPackRegistry.load(instance)
-        entries = [entry for entry in registry.get("managedFiles", []) if isinstance(entry, dict)]
-        all_entries = entries + [entry for entry in CurseForgePackRegistry.load(Path(instance.instance_dir)).get("managedFiles", []) if isinstance(entry, dict)]
-        project = candidate["project"]
-        version = candidate["version"]
-        file = candidate["file"]
-        path = ModpackDependencyResolver._unique_mod_path(all_entries, file.filename, version.project_id, file.sha1)
-        entries.append({
-            "path": path,
-            "fileName": PurePosixPath(path).name,
-            "sha1": file.sha1,
-            "sha512": file.sha512,
-            "size": file.size,
-            "source": "download",
-            "provider": "modrinth",
-            "projectId": version.project_id,
-            "versionId": version.version_id,
-            "versionNumber": version.version_number,
-            "downloads": [file.url] if file.url else [],
-            "required": True,
-            "selectionReason": "jar_audit_dependency",
-            "requiredBy": required_by,
-            "displayName": project.title,
-            "providesModId": dependency_id,
-            "requestedVersionRanges": requirements,
-        })
-        registry["managedFiles"] = entries
-        registry["dependencyResolution"] = ModpackDependencyResolver._resolution_payload([project.title], [])
-        registry["verificationCache"] = ModrinthPackRegistry._normalize_verification_cache(registry.get("verificationCache", {}), entries)
-        ModrinthPackRegistry.save(instance.instance_dir, registry)
+    def _mark_registry_dependency(entry: dict, required_by: str, pack_provider: str, expected_mod_id: str = "") -> bool:
+        before = dict(entry)
+        entry["managedByModpack"] = True
+        entry["selectionReason"] = "required_dependency"
+        entry["packProvider"] = str(pack_provider or entry.get("packProvider") or "").strip().casefold()
+        entry["locked"] = True
+        if expected_mod_id:
+            entry["expectedModId"] = expected_mod_id
+        ModpackDependencyResolver._append_required_by(entry, required_by)
+        return entry != before
 
     @staticmethod
-    def _append_curseforge_search_candidate(instance: Instance, candidate: dict, dependency_id: str, required_by: list[str], requirements: list[str]) -> None:
-        registry = CurseForgePackRegistry.load(Path(instance.instance_dir))
-        entries = [entry for entry in registry.get("managedFiles", []) if isinstance(entry, dict)]
-        all_entries = entries + [entry for entry in ModrinthPackRegistry.load(instance).get("managedFiles", []) if isinstance(entry, dict)]
-        project = candidate["project"]
-        file = candidate["file"]
-        path = ModpackDependencyResolver._unique_mod_path(all_entries, file.file_name, str(file.project_id), file.sha1)
-        entries.append({
-            "projectId": file.project_id,
-            "fileId": file.file_id,
-            "fileName": PurePosixPath(path).name,
-            "path": path,
-            "displayName": project.name or file.display_name,
-            "sha1": file.sha1,
-            "size": file.file_length,
-            "downloadUrl": file.download_url,
-            "declaredLoaders": list(file.loaders),
-            "gameVersions": list(file.game_versions),
-            "releaseType": file.release_type,
-            "datePublished": file.file_date,
-            "required": True,
-            "provider": "curseforge",
-            "pendingDownload": True,
-            "resolvePathFromProvider": False,
-            "selectionReason": "jar_audit_dependency",
-            "requiredBy": required_by,
-            "projectUrl": project.project_url,
-            "dependencies": [{"projectId": dependency.project_id, "relationType": dependency.relation_type} for dependency in file.dependencies],
-            "dependencyMetadataResolved": True,
-            "providesModId": dependency_id,
-            "requestedVersionRanges": requirements,
-        })
-        registry["managedFiles"] = entries
-        registry["dependencyResolution"] = ModpackDependencyResolver._resolution_payload([project.name], [])
-        CurseForgePackRegistry.save(Path(instance.instance_dir), registry)
+    def _project_identities(project) -> set[str]:
+        return {
+            identity
+            for identity in (
+                ModpackDependencyResolver._canonical_identity(getattr(project, "slug", "")),
+                ModpackDependencyResolver._canonical_identity(getattr(project, "title", "")),
+            )
+            if identity
+        }
 
     @staticmethod
-    def _pending_candidate(instance: Instance, dependency_id: str) -> bool:
-        wanted = dependency_id.casefold()
-        for registry in (ModrinthPackRegistry.load(instance), CurseForgePackRegistry.load(Path(instance.instance_dir))):
-            for entry in registry.get("managedFiles", []):
-                if not isinstance(entry, dict) or str(entry.get("providesModId") or "").casefold() != wanted:
-                    continue
-                relative = str(entry.get("path") or "").replace("\\", "/").strip().lstrip("/")
-                target = Path(instance.instance_dir).joinpath(*PurePosixPath(relative).parts) if relative else None
-                if target is None or not target.is_file():
-                    return True
-        return False
+    def _project_matches_mod_id(project, mod_id: str) -> bool:
+        identity = ModpackDependencyResolver._canonical_identity(mod_id)
+        return bool(identity and identity in ModpackDependencyResolver._project_identities(project))
 
     @staticmethod
-    def _rejected_or_installed_candidates(instance: Instance, dependency_id: str) -> dict[str, set[str]]:
-        wanted = dependency_id.casefold()
-        excluded = {"modrinth": set(), "curseforge": set()}
-        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        for provider, registry in (
-            ("modrinth", ModrinthPackRegistry.load(instance)),
-            ("curseforge", CurseForgePackRegistry.load(Path(instance.instance_dir))),
-        ):
-            for entry in registry.get("managedFiles", []):
-                if not isinstance(entry, dict):
-                    continue
-                project_id = str(entry.get("projectId") or "").strip()
-                if project_id:
-                    excluded[provider].add(project_id)
-                if str(entry.get("providesModId") or "").casefold() != wanted:
-                    continue
-                relative = str(entry.get("path") or "").replace("\\", "/").strip().lstrip("/")
-                target = Path(instance.instance_dir).joinpath(*PurePosixPath(relative).parts) if relative else None
-                if target is not None and target.is_file() and ModCapabilityIndex.provides(target, dependency_id, str(loader_name)):
-                    # A valid candidate should already remove the compatibility
-                    # issue. Keep it excluded from repeated provider searches.
-                    continue
-        return excluded
-
-    @staticmethod
-    def _provider_priority(instance: Instance) -> tuple[str, str]:
-        modrinth_count = sum(1 for entry in ModrinthPackRegistry.load(instance).get("managedFiles", []) if isinstance(entry, dict) and ModpackDependencyResolver._is_mod_entry(entry))
-        curseforge_count = sum(1 for entry in CurseForgePackRegistry.load(Path(instance.instance_dir)).get("managedFiles", []) if isinstance(entry, dict) and ModpackDependencyResolver._is_mod_entry(entry))
-        return ("modrinth", "curseforge") if modrinth_count >= curseforge_count else ("curseforge", "modrinth")
-
-    @staticmethod
-    def _project_match_score(dependency_id: str, slug: str, title: str) -> int:
-        wanted = ModpackDependencyResolver._search_key(dependency_id)
-        slug_key = ModpackDependencyResolver._search_key(slug)
-        title_key = ModpackDependencyResolver._search_key(title)
-        if wanted and wanted in {slug_key, title_key}:
-            return 0
-        if wanted and any(wanted in value or value in wanted for value in (slug_key, title_key) if value):
-            return 1
-        return 99
-
-    @staticmethod
-    def _search_key(value: str) -> str:
+    def _canonical_identity(value: object) -> str:
         return "".join(character for character in str(value or "").casefold() if character.isalnum())
+
+    @staticmethod
+    def _file_sha1(path: Path) -> str:
+        try:
+            digest = hashlib.sha1()
+            with Path(path).open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            return digest.hexdigest()
+        except OSError:
+            return ""
 
     @staticmethod
     def _modrinth_version_for_entry(entry: dict) -> ModrinthVersion | None:
