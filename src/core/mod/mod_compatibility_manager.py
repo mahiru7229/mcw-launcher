@@ -270,14 +270,25 @@ class ModCompatibilityManager:
         without_build = normalized.split("+", 1)[0]
         numeric, separator, prerelease = without_build.partition("-")
         parts = numeric.split(".")
-        if not 1 <= len(parts) <= 4 or any(not part.isdigit() for part in parts):
+        if not 1 <= len(parts) <= 4:
             return None
-        numbers = [int(part) for part in parts[:3]]
+
+        core_parts = parts[:3]
+        if any(not part.isdigit() for part in core_parts):
+            return None
+
+        numbers = [int(part) for part in core_parts]
         while len(numbers) < 3:
             numbers.append(0)
-        release_rank = 0 if separator else 1
+
+        # Forge/Maven metadata occasionally uses a dotted qualifier instead of
+        # a hyphenated prerelease, for example ``0.6.8.a``. Treat that fourth
+        # non-numeric component as a qualifier so ranges such as
+        # ``[0.6.8.a,0.7)`` remain comparable instead of becoming unknown.
         extra = ".".join(parts[3:])
-        suffix = prerelease.casefold() if separator else extra
+        dotted_qualifier = bool(extra and not extra.isdigit())
+        release_rank = 0 if separator or dotted_qualifier else 1
+        suffix = prerelease.casefold() if separator else extra.casefold()
         return numbers[0], numbers[1], numbers[2], release_rank, suffix
 
     @staticmethod
