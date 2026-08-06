@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+import re
 
 
 class OptiFineCompatibilityState(StrEnum):
@@ -47,6 +48,29 @@ class OptiFineVersion:
     @property
     def forge_unavailable(self) -> bool:
         return self.forge_version.casefold() == "n/a"
+
+    @classmethod
+    def from_filename(cls, filename: str) -> "OptiFineVersion":
+        name = Path(str(filename or "")).name
+        match = re.fullmatch(
+            r"(?P<preview>preview_)?OptiFine_(?P<minecraft>[0-9]+(?:\.[0-9]+){1,3})_(?P<edition>[A-Za-z0-9]+_[A-Za-z0-9]+)_(?P<build>.+?)(?: \([0-9]+\))?\.jar",
+            name,
+            re.IGNORECASE,
+        )
+        if match is None:
+            raise ValueError("The selected file name does not contain a supported OptiFine version.")
+        build = match.group("build")
+        preview = bool(match.group("preview") or re.search(r"(?:^|_)pre[0-9]+(?:_|$)", build, re.IGNORECASE))
+        minecraft = match.group("minecraft")
+        edition = match.group("edition").upper()
+        canonical = f"{'preview_' if preview and match.group('preview') else ''}OptiFine_{minecraft}_{edition}_{build}.jar"
+        return cls(
+            minecraft_version=minecraft,
+            edition=edition,
+            build=build,
+            filename=canonical,
+            preview=preview,
+        )
 
 
 @dataclass(frozen=True, slots=True)

@@ -115,11 +115,11 @@ class InstanceService:
         ModLoaderManager.prepare(version, *resolved, reporter=ProgressReporter(request.on_progress))
         return InstanceManager.create(name=name, version=version, mod_loader=resolved)
 
-    def create_with_optifine(self, request: InstanceCreateRequest, optifine_version: OptiFineVersion, source_path: Path, mode: str | OptiFineInstallMode = OptiFineInstallMode.AUTO, on_optifine_progress: ProgressCallback | None = None) -> Instance:
+    def create_with_optifine(self, request: InstanceCreateRequest, source_path: Path, mode: str | OptiFineInstallMode = OptiFineInstallMode.AUTO, on_optifine_progress: ProgressCallback | None = None) -> Instance:
         created: Instance | None = None
         try:
             created = self.create(request)
-            OptiFineManager.install(created, optifine_version, Path(source_path), mode, ProgressReporter(on_optifine_progress))
+            OptiFineManager.install(created, Path(source_path), mode, ProgressReporter(on_optifine_progress))
             return created
         except Exception:
             if created is not None:
@@ -228,8 +228,8 @@ class OptiFineService:
     OFFICIAL_DOWNLOADS_URL = "https://optifine.net/downloads"
 
     @staticmethod
-    def list_versions(minecraft_version: str = "", include_preview: bool = False, force_refresh: bool = False) -> list[OptiFineVersion]:
-        return OptiFineManager.list_versions(minecraft_version, include_preview, force_refresh)
+    def inspect_file(source_path: Path) -> OptiFineVersion:
+        return OptiFineManager.inspect_file(Path(source_path))
 
     @staticmethod
     def state(instance: Instance | str) -> OptiFineState:
@@ -242,9 +242,9 @@ class OptiFineService:
         return OptiFineManager.compatibility(loaded, version, mode)
 
     @staticmethod
-    def install(instance: Instance | str, version: OptiFineVersion, source_path: Path, mode: str | OptiFineInstallMode = OptiFineInstallMode.AUTO, on_progress: ProgressCallback | None = None) -> OptiFineInstallResult:
+    def install(instance: Instance | str, source_path: Path, mode: str | OptiFineInstallMode = OptiFineInstallMode.AUTO, on_progress: ProgressCallback | None = None) -> OptiFineInstallResult:
         loaded = instance if isinstance(instance, Instance) else InstanceManager.load(str(instance))
-        return OptiFineManager.install(loaded, version, Path(source_path), mode, ProgressReporter(on_progress))
+        return OptiFineManager.install(loaded, Path(source_path), mode, ProgressReporter(on_progress))
 
     @staticmethod
     def repair(instance: Instance | str, on_progress: ProgressCallback | None = None) -> OptiFineInstallResult:

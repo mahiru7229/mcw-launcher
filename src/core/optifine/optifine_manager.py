@@ -8,7 +8,6 @@ from src.core.fs.paths import Paths
 from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.optifine.optifine_jar_inspector import OptiFineJarInspector
-from src.core.optifine.optifine_metadata_client import OptiFineMetadataClient
 from src.core.optifine.optifine_profile_installer import OptiFineProfileInstaller
 from src.core.optifine.optifine_registry import OptiFineRegistry
 from src.core.optifine.optifine_transaction import OptiFineTransaction
@@ -21,8 +20,8 @@ from src.models.progress.progress_stage import ProgressStage
 
 class OptiFineManager:
     @staticmethod
-    def list_versions(minecraft_version: str = "", include_preview: bool = False, force_refresh: bool = False) -> list[OptiFineVersion]:
-        return OptiFineMetadataClient.list_versions(minecraft_version, include_preview, force_refresh)
+    def inspect_file(source_jar: Path) -> OptiFineVersion:
+        return OptiFineJarInspector.inspect(Path(source_jar)).version
 
     @staticmethod
     def state(instance: Instance) -> OptiFineState:
@@ -31,29 +30,29 @@ class OptiFineManager:
 
     @staticmethod
     def compatibility(instance: Instance, selected: OptiFineVersion, requested: str | OptiFineInstallMode = OptiFineInstallMode.AUTO) -> OptiFineCompatibilityResult:
-        loader, loader_version = ModLoaderManager.normalize(instance.mod_loader)
+        loader, _loader_version = ModLoaderManager.normalize(instance.mod_loader)
         requested_value = str(getattr(requested, "value", requested) or OptiFineInstallMode.AUTO).casefold()
         if selected.minecraft_version != instance.version_id:
-            return OptiFineCompatibilityResult(OptiFineCompatibilityState.BLOCKED, requested_value, f"OptiFine {selected.display_name} targets Minecraft {selected.minecraft_version}, not {instance.version_id}.")
+            return OptiFineCompatibilityResult(
+                OptiFineCompatibilityState.BLOCKED,
+                requested_value,
+                f"OptiFine {selected.display_name} targets Minecraft {selected.minecraft_version}, not {instance.version_id}.",
+            )
         if requested_value == OptiFineInstallMode.AUTO:
             requested_value = OptiFineInstallMode.STANDALONE if loader == ModLoaderManager.VANILLA else OptiFineInstallMode.FORGE_MOD
         if requested_value == OptiFineInstallMode.STANDALONE:
             if loader != ModLoaderManager.VANILLA:
                 return OptiFineCompatibilityResult(OptiFineCompatibilityState.BLOCKED, requested_value, "Standalone OptiFine can only be installed on a Vanilla instance.")
-            return OptiFineCompatibilityResult(OptiFineCompatibilityState.COMPATIBLE, requested_value, "Compatible as a standalone OptiFine profile.")
+            return OptiFineCompatibilityResult(OptiFineCompatibilityState.COMPATIBLE, requested_value, "The imported OptiFine JAR matches this Minecraft version and can be installed as a standalone profile.")
         if requested_value != OptiFineInstallMode.FORGE_MOD:
             return OptiFineCompatibilityResult(OptiFineCompatibilityState.BLOCKED, requested_value, f"Unsupported OptiFine installation mode: {requested_value}")
         if loader != ModLoaderManager.FORGE:
             return OptiFineCompatibilityResult(OptiFineCompatibilityState.BLOCKED, requested_value, "OptiFine mod mode currently supports Minecraft Forge instances only.")
-        declared = str(selected.forge_version or "").strip().lstrip("#")
-        if declared.casefold() == "n/a":
-            return OptiFineCompatibilityResult(OptiFineCompatibilityState.BLOCKED, requested_value, "This OptiFine build is marked Forge N/A on the official downloads page.")
-        if not declared:
-            return OptiFineCompatibilityResult(OptiFineCompatibilityState.UNKNOWN, requested_value, "The official OptiFine page does not declare a Forge compatibility version for this build.")
-        actual = str(loader_version or "").strip().lstrip("#")
-        if actual == declared or actual.endswith(f".{declared}"):
-            return OptiFineCompatibilityResult(OptiFineCompatibilityState.COMPATIBLE, requested_value, f"Compatible with Forge {actual}.")
-        return OptiFineCompatibilityResult(OptiFineCompatibilityState.WARNING, requested_value, f"OptiFine declares Forge {declared}, while this instance uses Forge {actual}. Installation is allowed, but launch compatibility is not guaranteed.")
+        return OptiFineCompatibilityResult(
+            OptiFineCompatibilityState.COMPATIBLE,
+            requested_value,
+            "The imported OptiFine JAR matches this Minecraft version and can be installed as a Forge mod.",
+        )
 
     @staticmethod
     def resolve_mode(instance: Instance, requested: str | OptiFineInstallMode = OptiFineInstallMode.AUTO) -> OptiFineInstallMode:
@@ -72,12 +71,13 @@ class OptiFineManager:
         return mode
 
     @classmethod
-    def install(cls, instance: Instance, selected: OptiFineVersion, source_jar: Path, mode: str | OptiFineInstallMode = OptiFineInstallMode.AUTO, reporter: ProgressReporter | None = None) -> OptiFineInstallResult:
+    def install(cls, instance: Instance, source_jar: Path, mode: str | OptiFineInstallMode = OptiFineInstallMode.AUTO, reporter: ProgressReporter | None = None) -> OptiFineInstallResult:
+        inspected = OptiFineJarInspector.inspect(Path(source_jar), instance.version_id)
+        selected = inspected.version
         compatibility = cls.compatibility(instance, selected, mode)
         if compatibility.blocked:
             raise RuntimeError(compatibility.message)
         resolved_mode = cls.resolve_mode(instance, mode)
-        inspected = OptiFineJarInspector.inspect(Path(source_jar), selected)
         cached_source = Paths.optifine_source_cache(inspected.sha256, inspected.filename)
         cached_source.parent.mkdir(parents=True, exist_ok=True)
         if not cached_source.is_file() or cached_source.stat().st_size != inspected.size:
@@ -124,7 +124,7 @@ class OptiFineManager:
                 "installedPath": str(installed_path),
                 "profilePath": profile_path,
                 "preview": selected.preview,
-                "forgeVersion": selected.forge_version,
+                "forgeVersion": "",
                 "compatibilityState": compatibility.state.value,
                 "officialPage": selected.download_page_url,
             })
@@ -145,13 +145,7 @@ class OptiFineManager:
         source = Path(state.source_path)
         if not source.is_file() or cls._sha256(source) != state.sha256:
             raise RuntimeError("The cached OptiFine installer is missing or modified. Select the official OptiFine JAR again.")
-        selected = OptiFineVersion(
-            minecraft_version=state.minecraft_version,
-            edition=cls._edition_from_version_id(state.version_id),
-            build=cls._build_from_version_id(state.version_id),
-            filename=state.filename,
-        )
-        result = cls.install(instance, selected, source, state.mode, reporter)
+        result = cls.install(instance, source, state.mode, reporter)
         return OptiFineInstallResult(result.instance_name, result.mode, result.version_id, result.installed_path, repaired=True)
 
     @classmethod
@@ -195,7 +189,13 @@ class OptiFineManager:
         target = mods / filename
         if target.is_file() and target.name.casefold() not in allowed:
             raise RuntimeError("An unmanaged OptiFine JAR with the selected filename already exists. Remove it manually before installing a managed copy.")
-        unmanaged = [path for path in mods.glob("OptiFine_*.jar") if path.name.casefold() != filename.casefold() and path.name.casefold() not in allowed]
+        unmanaged = [
+            path
+            for path in mods.glob("*.jar")
+            if path.name.casefold().startswith(("optifine_", "preview_optifine_"))
+            and path.name.casefold() != filename.casefold()
+            and path.name.casefold() not in allowed
+        ]
         if unmanaged:
             raise RuntimeError("Another unmanaged OptiFine JAR already exists in this instance. Remove it manually before installing a managed OptiFine version.")
         target.parent.mkdir(parents=True, exist_ok=True)

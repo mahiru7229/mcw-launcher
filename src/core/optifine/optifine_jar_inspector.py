@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 import hashlib
+from pathlib import Path
 import zipfile
 
 from src.models.optifine.optifine_models import OptiFineVersion
@@ -15,6 +15,7 @@ class InspectedOptiFineJar:
     sha256: str
     sha1: str
     size: int
+    version: OptiFineVersion
 
 
 class OptiFineJarInspector:
@@ -22,7 +23,15 @@ class OptiFineJarInspector:
     REQUIRED_ANY = {"optifine/Installer.class", "optifine/Config.class", "net/optifine/Config.class"}
 
     @classmethod
-    def inspect(cls, path: Path, selected: OptiFineVersion | None = None) -> InspectedOptiFineJar:
+    def detect_version(cls, path: Path | str) -> OptiFineVersion:
+        source = Path(path)
+        try:
+            return OptiFineVersion.from_filename(source.name)
+        except ValueError as error:
+            raise RuntimeError("The selected file name does not contain a supported OptiFine version.") from error
+
+    @classmethod
+    def inspect(cls, path: Path, expected_minecraft_version: str = "") -> InspectedOptiFineJar:
         source = Path(path).expanduser().resolve(strict=False)
         if not source.is_file():
             raise FileNotFoundError(f"OptiFine JAR was not found: {source}")
@@ -31,10 +40,12 @@ class OptiFineJarInspector:
             raise RuntimeError("The selected OptiFine file is empty or unexpectedly large.")
         if source.suffix.casefold() != ".jar":
             raise RuntimeError("Select an official OptiFine .jar file.")
-        if not source.name.casefold().startswith("optifine_"):
-            raise RuntimeError("The selected file does not look like an OptiFine installer JAR.")
-        if selected is not None and source.name.casefold() != selected.filename.casefold():
-            raise RuntimeError(f"Selected OptiFine version expects '{selected.filename}', but '{source.name}' was provided.")
+        detected = cls.detect_version(source)
+        expected = str(expected_minecraft_version or "").strip()
+        if expected and detected.minecraft_version != expected:
+            raise RuntimeError(
+                f"The selected OptiFine JAR targets Minecraft {detected.minecraft_version}, not {expected}."
+            )
         try:
             with zipfile.ZipFile(source) as archive:
                 names = {name.replace("\\", "/") for name in archive.namelist()}
@@ -50,4 +61,4 @@ class OptiFineJarInspector:
             for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                 sha256.update(chunk)
                 sha1.update(chunk)
-        return InspectedOptiFineJar(source, source.name, sha256.hexdigest(), sha1.hexdigest(), size)
+        return InspectedOptiFineJar(source, detected.filename, sha256.hexdigest(), sha1.hexdigest(), size, detected)

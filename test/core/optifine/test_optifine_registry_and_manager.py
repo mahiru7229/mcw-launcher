@@ -34,7 +34,7 @@ def test_forge_mode_installs_records_and_uninstalls(tmp_path: Path) -> None:
     try:
         instance = _instance(tmp_path)
         source = _jar(tmp_path / _selected().filename)
-        result = OptiFineManager.install(instance, _selected(), source)
+        result = OptiFineManager.install(instance, source)
         assert result.mode == "forge_mod"
         assert result.installed_path.is_file()
         state = OptiFineRegistry.state(instance)
@@ -49,13 +49,33 @@ def test_forge_mode_installs_records_and_uninstalls(tmp_path: Path) -> None:
         Paths.restore(previous)
 
 
+
+def test_forge_modpack_instance_installs_imported_optifine_as_user_managed_mod(tmp_path: Path) -> None:
+    previous = Paths.configure(tmp_path)
+    try:
+        instance = _instance(tmp_path)
+        registry = instance.instance_dir / ".mcw" / "curseforge-pack.json"
+        registry.parent.mkdir(parents=True, exist_ok=True)
+        registry.write_text("{}", encoding="utf-8")
+        source = _jar(tmp_path / _selected().filename)
+
+        result = OptiFineManager.install(instance, source)
+
+        assert result.mode == "forge_mod"
+        provenance = json.loads((instance.instance_dir / ".mcw" / "mod-provenance.json").read_text(encoding="utf-8"))
+        entry = next(item for item in provenance["mods"].values() if item["provider"] == "optifine")
+        assert entry["managedByModpack"] is False
+        assert result.installed_path.parent == instance.instance_dir / "mods"
+    finally:
+        Paths.restore(previous)
+
 def test_manager_rejects_optifine_mod_on_fabric(tmp_path: Path) -> None:
     previous = Paths.configure(tmp_path)
     try:
         instance = _instance(tmp_path, "fabric")
         source = _jar(tmp_path / _selected().filename)
         with pytest.raises(RuntimeError, match="Forge"):
-            OptiFineManager.install(instance, _selected(), source)
+            OptiFineManager.install(instance, source)
     finally:
         Paths.restore(previous)
 
@@ -87,27 +107,43 @@ def test_apply_standalone_profile(tmp_path: Path) -> None:
         Paths.restore(previous)
 
 
-def test_compatibility_blocks_forge_na_and_warns_on_different_forge(tmp_path: Path) -> None:
+def test_compatibility_accepts_imported_file_when_minecraft_matches(tmp_path: Path) -> None:
     previous = Paths.configure(tmp_path)
     try:
         instance = _instance(tmp_path)
-        unavailable = OptiFineVersion("1.12.2", "HD_U", "C5", "OptiFine_1.12.2_HD_U_C5.jar", forge_version="N/A")
-        assert OptiFineManager.compatibility(instance, unavailable).state == "blocked"
-        declared = OptiFineVersion("1.12.2", "HD_U", "G5", "OptiFine_1.12.2_HD_U_G5.jar", forge_version="2847")
-        assert OptiFineManager.compatibility(instance, declared).state == "warning"
-    finally:
-        Paths.restore(previous)
-
-
-def test_compatibility_accepts_matching_legacy_forge_build(tmp_path: Path) -> None:
-    previous = Paths.configure(tmp_path)
-    try:
-        instance = _instance(tmp_path)
-        instance.mod_loader = ("forge", "14.23.5.2847")
-        selected = OptiFineVersion("1.12.2", "HD_U", "G5", "OptiFine_1.12.2_HD_U_G5.jar", forge_version="2847")
+        selected = OptiFineVersion("1.12.2", "HD_U", "G5", "OptiFine_1.12.2_HD_U_G5.jar")
         assert OptiFineManager.compatibility(instance, selected).state == "compatible"
     finally:
         Paths.restore(previous)
+
+
+def test_install_rejects_optifine_for_different_minecraft_version(tmp_path: Path) -> None:
+    previous = Paths.configure(tmp_path)
+    try:
+        instance = _instance(tmp_path)
+        source = _jar(tmp_path / "OptiFine_1.20.1_HD_U_I6.jar")
+        with pytest.raises(RuntimeError, match="targets Minecraft 1.20.1, not 1.12.2"):
+            OptiFineManager.install(instance, source)
+    finally:
+        Paths.restore(previous)
+
+
+def test_inspect_file_detects_stable_and_preview_names(tmp_path: Path) -> None:
+    stable = _jar(tmp_path / "OptiFine_1.12.2_HD_U_G5.jar")
+    preview = _jar(tmp_path / "preview_OptiFine_1.20.1_HD_U_I7_pre1.jar")
+
+    stable_version = OptiFineManager.inspect_file(stable)
+    preview_version = OptiFineManager.inspect_file(preview)
+
+    assert stable_version.minecraft_version == "1.12.2"
+    assert stable_version.version_id == "1.12.2_HD_U_G5"
+    assert stable_version.preview is False
+    assert preview_version.minecraft_version == "1.20.1"
+    assert preview_version.preview is True
+
+    duplicate = _jar(tmp_path / "OptiFine_1.12.2_HD_U_G5 (2).jar")
+    duplicate_version = OptiFineManager.inspect_file(duplicate)
+    assert duplicate_version.filename == "OptiFine_1.12.2_HD_U_G5.jar"
 
 
 def test_install_rolls_back_when_registry_commit_fails(tmp_path: Path, monkeypatch) -> None:
@@ -116,7 +152,7 @@ def test_install_rolls_back_when_registry_commit_fails(tmp_path: Path, monkeypat
         instance = _instance(tmp_path)
         first = _selected()
         first_source = _jar(tmp_path / first.filename)
-        first_result = OptiFineManager.install(instance, first, first_source)
+        first_result = OptiFineManager.install(instance, first_source)
         first_bytes = first_result.installed_path.read_bytes()
         second = OptiFineVersion("1.12.2", "HD_U", "G6", "OptiFine_1.12.2_HD_U_G6.jar")
         second_source = _jar(tmp_path / second.filename)
@@ -129,7 +165,7 @@ def test_install_rolls_back_when_registry_commit_fails(tmp_path: Path, monkeypat
 
         monkeypatch.setattr(OptiFineRegistry, "save", fail_for_second)
         with pytest.raises(OSError, match="simulated registry failure"):
-            OptiFineManager.install(instance, second, second_source)
+            OptiFineManager.install(instance, second_source)
         assert first_result.installed_path.read_bytes() == first_bytes
         assert not (instance.instance_dir / "mods" / second.filename).exists()
         assert OptiFineRegistry.state(instance).version_id == first.version_id

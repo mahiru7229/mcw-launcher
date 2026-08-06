@@ -48,11 +48,18 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.0 hỗ trợ nâng cấp
 
 ---
 
-## Có gì mới trong v1.1.1-beta.3
+## Có gì mới trong v1.1.1-beta.4
 
-**v1.1.1-beta.3** tích hợp OptiFine như một component tùy chọn: Vanilla có thể dùng profile standalone, Forge có thể cài OptiFine như mod, và cả hai đều có version selector, kiểm tra tương thích, journal rollback, registry, Repair/Uninstall cùng chính sách không phân phối lại JAR.
+**v1.1.1-beta.4** đơn giản hóa OptiFine thành luồng nhập file trực tiếp:
 
-Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.3.md`](docs/RELEASE-v1.1.1-beta.3.md).
+- Không còn tải hoặc hiển thị danh sách phiên bản OptiFine trực tuyến.
+- Chọn JAR OptiFine gốc; MCW nhận diện Minecraft version và build từ tên file.
+- Chặn file sai Minecraft version trước khi tạo hoặc cài instance.
+- Vanilla dùng standalone component/profile; Forge instance hoặc modpack dùng mod được quản lý trong `mods/`.
+- Core vẫn xác minh cấu trúc JAR, manifest, class OptiFine và hash trước khi commit.
+- Giữ nguyên Repair, Uninstall, rollback giao dịch và chính sách không nhúng OptiFine vào export.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.4.md`](docs/RELEASE-v1.1.1-beta.4.md).
 
 ## Có gì mới trong v1.1.1-beta.2
 

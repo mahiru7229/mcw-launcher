@@ -43,8 +43,7 @@ class InstanceWorkspacePage(BasePage):
     refresh_requested = Signal()
     selected_instance_changed = Signal(str)
     create_requested = Signal(str, str, str, str)
-    create_with_optifine_requested = Signal(str, str, str, str, object, object)
-    optifine_versions_requested = Signal(str, bool, bool)
+    create_with_optifine_requested = Signal(str, str, str, str, object)
     rename_requested = Signal(str, str)
     clone_requested = Signal(str, str, bool)
     delete_requested = Signal(str)
@@ -261,7 +260,6 @@ class InstanceWorkspacePage(BasePage):
     def _connect_dialogs(self) -> None:
         self.create_dialog.create_requested.connect(self.create_requested.emit)
         self.create_dialog.create_with_optifine_requested.connect(self.create_with_optifine_requested.emit)
-        self.create_dialog.optifine_versions_requested.connect(self.optifine_versions_requested.emit)
         self.create_dialog.fabric_versions_requested.connect(self.fabric_versions_requested.emit)
         self.create_dialog.quilt_versions_requested.connect(self.quilt_versions_requested.emit)
         self.create_dialog.forge_versions_requested.connect(self.forge_versions_requested.emit)
@@ -343,9 +341,6 @@ class InstanceWorkspacePage(BasePage):
     def set_neoforge_versions(self, game_version: str, versions: list[object]) -> None:
         self.advanced_page.set_neoforge_versions(game_version, versions)
         self.create_dialog.set_neoforge_versions(game_version, versions)
-
-    def set_optifine_versions(self, game_version: str, versions: list[object], include_preview: bool = False) -> None:
-        self.create_dialog.set_optifine_versions(game_version, versions, include_preview)
 
     def set_instances(self, instances: list[object], selected_name: str) -> None:
         self._instances = {str(instance.name): instance for instance in instances}
@@ -695,6 +690,7 @@ class InstanceWorkspacePage(BasePage):
         self.create_dialog.set_versions(self._versions)
         self.create_dialog.set_show_snapshots(self._show_snapshots)
         self.create_dialog.name_input.clear()
+        self.create_dialog.reset_optifine_selection()
         self.create_dialog.show()
         self.create_dialog.raise_()
         self.create_dialog.activateWindow()
