@@ -37,7 +37,7 @@ class ModManager:
         paths = ModManager._discover_mod_paths(instance, directory)
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         provenance = ModProvenanceRegistry.entries_by_file(instance)
-        trusted_manual_identities = ModManager._trusted_manual_curseforge_identities(instance)
+        trusted_provider_identities = ModManager._trusted_curseforge_pack_identities(instance)
         mods: list[ModInfo] = []
         for path in paths:
             mod = ModManager.read_mod(path, preferred_loader=loader_name)
@@ -52,20 +52,20 @@ class ModManager:
                     managed_by_modpack=bool(source.get("managedByModpack", False)),
                     source_pack_provider=str(source.get("packProvider") or "").strip().casefold(),
                 )
-            trusted_identity = trusted_manual_identities.get(path.resolve())
+            trusted_identity = trusted_provider_identities.get(path.resolve())
             if trusted_identity is not None:
-                mod = ModManager._apply_trusted_manual_identity(instance, mod, trusted_identity)
+                mod = ModManager._apply_trusted_curseforge_identity(instance, mod, trusted_identity)
             mods.append(mod)
         return sorted(mods, key=lambda mod: (not mod.enabled, mod.name.casefold(), mod.file_name.casefold()))
 
     @staticmethod
-    def _trusted_manual_curseforge_identities(instance: Instance) -> dict[Path, dict]:
+    def _trusted_curseforge_pack_identities(instance: Instance) -> dict[Path, dict]:
         from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
 
         identities: dict[Path, dict] = {}
         pack = CurseForgePackRegistry.load(instance)
         for raw in pack.get("managedFiles", []):
-            if not isinstance(raw, dict) or not bool(raw.get("manualImport", False)):
+            if not isinstance(raw, dict):
                 continue
             expected = list(dict.fromkeys(str(value).strip().casefold() for value in raw.get("expectedModIds", []) if str(value).strip()))
             expected_sha1 = str(raw.get("sha1") or "").strip().casefold()
@@ -87,7 +87,21 @@ class ModManager:
         return identities
 
     @staticmethod
-    def _apply_trusted_manual_identity(instance: Instance, mod: ModInfo, entry: dict) -> ModInfo:
+    def apply_verified_curseforge_identity(instance: Instance, mod: ModInfo, entry: dict) -> ModInfo:
+        expected = list(dict.fromkeys(str(value).strip().casefold() for value in entry.get("expectedModIds", []) if str(value).strip()))
+        expected_sha1 = str(entry.get("sha1") or "").strip().casefold()
+        path = Path(mod.path)
+        if not expected or not expected_sha1 or not path.is_file():
+            return mod
+        try:
+            if ModManager._sha1(path) != expected_sha1:
+                return mod
+        except OSError:
+            return mod
+        return ModManager._apply_trusted_curseforge_identity(instance, mod, {**entry, "expectedModIds": expected})
+
+    @staticmethod
+    def _apply_trusted_curseforge_identity(instance: Instance, mod: ModInfo, entry: dict) -> ModInfo:
         if mod.status in {"Broken JAR", "Not a mod"}:
             return mod
         expected = list(dict.fromkeys(str(value).strip().casefold() for value in entry.get("expectedModIds", []) if str(value).strip()))

@@ -42,6 +42,7 @@ class ModpackDependencyResolver:
     MAX_DEPTH = 20
     MAX_DEPENDENCIES = 256
     MAX_ATTEMPTS = 3
+    MAX_COMPLETION_PASSES = 8
     BLOCKING_CODES = {"dependency-missing", "dependency-disabled", "dependency-version"}
 
     @staticmethod
@@ -345,6 +346,7 @@ class ModpackDependencyResolver:
             if target.is_file():
                 loader_name = str(ModLoaderManager.normalize(instance.mod_loader)[0]).strip().casefold()
                 metadata = ModManager.read_mod(target, preferred_loader=loader_name, provider_version=str(entry.get("displayName") or ""))
+                metadata = ModManager.apply_verified_curseforge_identity(instance, metadata, entry)
                 identities = {metadata.mod_id.casefold()} | {mod_id.casefold() for mod_id, _version in metadata.provided_mods if mod_id}
                 provides_dependency = dependency_id in identities
             if not provides_dependency:

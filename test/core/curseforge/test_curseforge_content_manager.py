@@ -284,7 +284,7 @@ def test_manual_pack_jar_with_exact_sha1_accepts_provider_identity_when_legacy_m
     assert "Provider identity was accepted" in entry["compatibilityWarning"]
 
 
-def test_provider_identity_fallback_is_not_used_for_non_manual_pack_files(tmp_path):
+def test_verified_pack_identity_mismatch_does_not_trigger_redownload(tmp_path):
     from hashlib import sha1
     import zipfile
 
@@ -309,8 +309,10 @@ def test_provider_identity_fallback_is_not_used_for_non_manual_pack_files(tmp_pa
 
     missing = CurseForgeContentManager._check_all(instance, [entry], [], None, 1)
 
-    assert len(missing) == 1
-    assert entry["pendingDownload"] is True
+    assert missing == []
+    assert entry["pendingDownload"] is False
+    assert entry["acceptedUnverified"] is True
+    assert "Provider identity was accepted" in entry["compatibilityWarning"]
 
 
 def test_manual_pack_ready_forge_library_with_exact_sha1_accepts_provider_identity(tmp_path):

@@ -628,7 +628,7 @@ def test_legacy_forge_metadata_preserves_additional_declared_mod_ids(tmp_path):
     assert mod.provided_mods == (("bundledlibrary", "2.0.0"),)
 
 
-def test_manual_curseforge_pack_file_uses_verified_provider_identity_for_dependency_audit(tmp_path):
+def test_curseforge_pack_file_uses_verified_provider_identity_for_dependency_audit(tmp_path):
     from hashlib import sha1
 
     from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
@@ -653,7 +653,7 @@ def test_manual_curseforge_pack_file_uses_verified_provider_identity_for_depende
         "projectName": "Reskillable",
         "sha1": digest,
         "size": target.stat().st_size,
-        "manualImport": True,
+        "manualImport": False,
         "expectedModIds": ["reskillable"],
         "selectionReason": "pack_manifest",
     }]})
@@ -714,7 +714,7 @@ def test_manual_provider_identity_overlay_requires_matching_sha1(tmp_path):
     assert installed[0].status == "Unverified"
 
 
-def test_manual_curseforge_provider_identity_applies_to_ready_forge_library(tmp_path):
+def test_curseforge_provider_identity_applies_to_ready_forge_library(tmp_path):
     from hashlib import sha1
 
     from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
@@ -740,7 +740,7 @@ def test_manual_curseforge_provider_identity_applies_to_ready_forge_library(tmp_
         "projectName": "Reskillable",
         "sha1": digest,
         "size": target.stat().st_size,
-        "manualImport": True,
+        "manualImport": False,
         "expectedModIds": ["reskillable"],
         "selectionReason": "pack_manifest",
     }]})

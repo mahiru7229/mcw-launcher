@@ -447,11 +447,13 @@ class RepairService:
                 ModrinthPackRepairManager.repair(instance, reporter=reporter)
             if CurseForgePackRegistry.load(instance):
                 CurseForgeContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
-            resolution = ModpackDependencyResolver.resolve(instance, reporter)
-            if resolution.changed:
+            final_resolution = ModpackDependencyResolver.resolve(instance, reporter)
+            for _pass_number in range(ModpackDependencyResolver.MAX_COMPLETION_PASSES):
+                if not final_resolution.changed:
+                    break
                 ModrinthContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
                 CurseForgeContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
-            final_resolution = ModpackDependencyResolver.resolve(instance, reporter)
+                final_resolution = ModpackDependencyResolver.resolve(instance, reporter)
             if final_resolution.changed:
                 ModrinthContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
                 CurseForgeContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)

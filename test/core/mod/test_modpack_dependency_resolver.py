@@ -424,3 +424,66 @@ def test_pack_pinned_dependency_is_not_redownloaded_when_legacy_version_folder_i
 
     assert result.added_files == ()
     assert ModpackDependencyResolver.blocking_issues(managed_instance) == ()
+
+
+def test_pack_pinned_verified_provider_file_is_not_marked_for_download_when_metadata_hides_mod_id(tmp_path, monkeypatch):
+    from hashlib import sha1
+    import json
+    import zipfile
+
+    managed_instance = instance(tmp_path, loader="forge")
+    managed_instance.version_id = "1.12.2"
+    mods_dir = managed_instance.instance_dir / "mods"
+    mods_dir.mkdir(parents=True)
+    compat_path = mods_dir / "CompatSkills-1.12.2-1.17.0.jar"
+    reskillable_path = mods_dir / "Reskillable-1.12.2-1.13.0.jar"
+    with zipfile.ZipFile(compat_path, "w") as archive:
+        archive.writestr("mcmod.info", json.dumps([{
+            "modid": "compatskills",
+            "name": "CompatSkills",
+            "version": "1.17.0",
+            "requiredMods": ["required-after:reskillable"],
+        }]))
+    with zipfile.ZipFile(reskillable_path, "w") as archive:
+        archive.writestr(
+            "META-INF/MANIFEST.MF",
+            "Manifest-Version: 1.0\nFMLModType: LIBRARY\nImplementation-Version: 1.13.0\n",
+        )
+        archive.writestr("codersafterdark/reskillable/Reskillable.class", b"legacy bytecode placeholder")
+
+    registry = {
+        "managedFiles": [
+            {
+                "projectId": 290541,
+                "fileId": 2815687,
+                "fileName": compat_path.name,
+                "path": f"mods/{compat_path.name}",
+                "selectionReason": "pack_manifest",
+            },
+            {
+                "projectId": 286382,
+                "fileId": 2815686,
+                "fileName": reskillable_path.name,
+                "path": f"mods/{reskillable_path.name}",
+                "selectionReason": "pack_manifest",
+                "pendingDownload": False,
+                "projectName": "Reskillable",
+                "projectSlug": "reskillable",
+                "sha1": sha1(reskillable_path.read_bytes(), usedforsecurity=False).hexdigest(),
+                "size": reskillable_path.stat().st_size,
+            },
+        ]
+    }
+    saved = {}
+
+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: registry)
+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda _instance, payload: saved.update(payload))
+
+    result = ModpackDependencyResolver._reconcile_pack_pinned_dependencies(managed_instance, None)
+
+    assert result.added_files == ()
+    entry = next(item for item in saved["managedFiles"] if item["projectId"] == 286382)
+    assert entry["pendingDownload"] is False
+    assert entry["expectedModIds"] == ["reskillable"]
+    assert entry["requiredBy"] == ["CompatSkills"]

@@ -48,6 +48,26 @@ from src.models.runtime.game_exit_result import GameExitResult
 
 class MinecraftExecutor:
     @staticmethod
+    def _complete_managed_dependencies(instance: Instance, reporter: ProgressReporter, block_modrinth_failure: bool, block_curseforge_failure: bool, launch_lock_token: str | None, modrinth_warnings: tuple[str, ...] | list[str], curseforge_warnings: tuple[str, ...] | list[str]):
+        final_resolution = ModpackDependencyResolver.resolve(instance, reporter)
+        modrinth_result = tuple(modrinth_warnings)
+        curseforge_result = tuple(curseforge_warnings)
+
+        for _pass_number in range(ModpackDependencyResolver.MAX_COMPLETION_PASSES):
+            if not final_resolution.changed:
+                break
+            modrinth_result += tuple(ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token))
+            curseforge_result += tuple(CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token))
+            final_resolution = ModpackDependencyResolver.resolve(instance, reporter)
+
+        if final_resolution.changed:
+            modrinth_result += tuple(ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token))
+            curseforge_result += tuple(CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token))
+            final_resolution = ModpackDependencyResolver.resolve(instance, reporter)
+
+        return final_resolution, modrinth_result, curseforge_result
+
+    @staticmethod
     def _load_with_fast_verification(loader: Callable, version: object, reporter: ProgressReporter, verification_cache: VerificationCache):
         try:
             parameters = inspect.signature(loader).parameters.values()
@@ -161,17 +181,19 @@ class MinecraftExecutor:
             atlauncher_warnings = ATLauncherContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
             legacy_libloader_warnings = LegacyLibLoaderManager.ensure(instance, reporter)
 
-            # A second pass can identify provider versions after pack files have
-            # been hydrated/downloaded. Any newly discovered required files are
-            # downloaded before the compatibility preflight runs.
-            dependency_resolution_after_download = ModpackDependencyResolver.resolve(instance, reporter)
-            if dependency_resolution_after_download.changed:
-                modrinth_warnings = tuple(modrinth_warnings) + tuple(
-                    ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
-                )
-                curseforge_warnings = tuple(curseforge_warnings) + tuple(
-                    CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
-                )
+            # Some legacy/provider metadata only becomes available after the
+            # parent JAR is downloaded. Complete the graph to a fixed point so a
+            # newly installed dependency can reveal another automatic or manual
+            # dependency instead of falling straight through to the final error.
+            dependency_resolution_after_download, modrinth_warnings, curseforge_warnings = MinecraftExecutor._complete_managed_dependencies(
+                instance,
+                reporter,
+                block_modrinth_failure,
+                block_curseforge_failure,
+                launch_lock_token,
+                modrinth_warnings,
+                curseforge_warnings,
+            )
             ModpackDependencyResolver.raise_for_required_dependencies(instance, dependency_resolution_after_download.unresolved)
             PortableContentManager.finalize_disabled(instance)
 

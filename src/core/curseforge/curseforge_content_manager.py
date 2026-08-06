@@ -151,7 +151,12 @@ class CurseForgeContentManager:
             path = Path(instance.instance_dir) / item["path"]
             valid = path.is_file() and CurseForgeContentManager._verify(path, item["sha1"], item["size"])
             if valid and path.suffix.casefold() == ".jar" and item["entry"].get("expectedModIds"):
-                valid = CurseForgeContentManager._provides_expected_mod_ids(instance, path, item["entry"])
+                identity_warning = CurseForgeContentManager._expected_mod_identity_warning(instance, path, item["entry"])
+                if identity_warning:
+                    item["entry"]["acceptedUnverified"] = True
+                    item["entry"]["compatibilityWarning"] = CurseForgeContentManager._merge_warnings(
+                        str(item["entry"].get("compatibilityWarning") or ""), identity_warning
+                    )
             item["entry"]["pendingDownload"] = not valid
             if valid:
                 item["entry"]["lastDownloadError"] = ""
@@ -206,7 +211,10 @@ class CurseForgeContentManager:
                         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
                         metadata = ModManager.read_mod(target, preferred_loader=loader_name, provider_version=file.display_name)
                         compatibility_warning = ModManager.compatibility_warning(instance, metadata)
-                        CurseForgeContentManager._validate_expected_mod_ids(metadata, entry)
+                        compatibility_warning = CurseForgeContentManager._merge_warnings(
+                            compatibility_warning,
+                            CurseForgeContentManager._expected_mod_identity_warning_from_metadata(metadata, entry),
+                        )
                 else:
                     loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
                     metadata = ModManager.read_mod(cache, preferred_loader=loader_name, provider_version=file.display_name)
@@ -214,7 +222,10 @@ class CurseForgeContentManager:
                     added = ModManager.add_mods(instance, [cache], replace=True, launch_lock_token=launch_lock_token, allow_unverified=True)
                     if not added:
                         raise RuntimeError("Downloaded file could not be added to the instance.")
-                    CurseForgeContentManager._validate_expected_mod_ids(added[0], entry)
+                    compatibility_warning = CurseForgeContentManager._merge_warnings(
+                        compatibility_warning,
+                        CurseForgeContentManager._expected_mod_identity_warning_from_metadata(added[0], entry),
+                    )
                     entry["fileName"] = added[0].file_name
                     entry["path"] = f"mods/{added[0].file_name}"
 
@@ -263,32 +274,38 @@ class CurseForgeContentManager:
         return {"errors": errors, "downloaded": downloaded, "acceptedUnverified": accepted_unverified}
 
     @staticmethod
-    def _provides_expected_mod_ids(instance: Instance, path: Path, entry: dict) -> bool:
+    def _expected_mod_identity_warning(instance: Instance, path: Path, entry: dict) -> str:
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         metadata = ModManager.read_mod(path, preferred_loader=loader_name, provider_version=str(entry.get("displayName") or ""))
-        try:
-            CurseForgeContentManager._validate_expected_mod_ids(metadata, entry)
-        except RuntimeError:
-            if CurseForgeContentManager._can_trust_manual_provider_identity(metadata, entry):
-                expected = sorted({str(value).strip().casefold() for value in entry.get("expectedModIds", []) if str(value).strip()})
-                entry["acceptedUnverified"] = True
-                entry["compatibilityWarning"] = (
-                    "The manually imported CurseForge file matched the provider SHA-1, but its legacy metadata did not expose "
-                    f"the expected mod ID(s): {', '.join(expected)}. Provider identity was accepted for dependency audit."
-                )
-                return True
-            return False
-        return True
+        return CurseForgeContentManager._expected_mod_identity_warning_from_metadata(metadata, entry)
 
     @staticmethod
-    def _can_trust_manual_provider_identity(metadata, entry: dict) -> bool:
+    def _expected_mod_identity_warning_from_metadata(metadata, entry: dict) -> str:
+        try:
+            CurseForgeContentManager._validate_expected_mod_ids(metadata, entry)
+        except RuntimeError as error:
+            expected = sorted({str(value).strip().casefold() for value in entry.get("expectedModIds", []) if str(value).strip()})
+            if CurseForgeContentManager._can_trust_provider_identity(metadata, entry):
+                return (
+                    "The CurseForge file matched the provider SHA-1, but its loader metadata did not expose "
+                    f"the expected mod ID(s): {', '.join(expected)}. Provider identity was accepted for dependency audit."
+                )
+            return str(error)
+        return ""
+
+    @staticmethod
+    def _can_trust_provider_identity(metadata, entry: dict) -> bool:
         status = str(getattr(metadata, "status", "") or "").strip()
         return (
-            bool(entry.get("manualImport", False))
-            and bool(str(entry.get("sha1") or "").strip())
+            bool(str(entry.get("sha1") or "").strip())
             and bool(entry.get("expectedModIds"))
             and status not in {"Broken JAR", "Not a mod"}
         )
+
+    @staticmethod
+    def _merge_warnings(*warnings: str) -> str:
+        values = [str(value).strip() for value in warnings if str(value).strip()]
+        return "\n".join(dict.fromkeys(values))
 
     @staticmethod
     def _validate_expected_mod_ids(metadata, entry: dict) -> None:
