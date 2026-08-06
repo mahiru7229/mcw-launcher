@@ -712,3 +712,79 @@ def test_manual_provider_identity_overlay_requires_matching_sha1(tmp_path):
     assert len(installed) == 1
     assert installed[0].mod_id == "unknown"
     assert installed[0].status == "Unverified"
+
+
+def test_manual_curseforge_provider_identity_applies_to_ready_forge_library(tmp_path):
+    from hashlib import sha1
+
+    from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
+
+    instance_dir = tmp_path / "legacy-ready-library"
+    mods_dir = instance_dir / "mods"
+    mods_dir.mkdir(parents=True)
+    instance = Instance(instance_id="legacy-id", name="RLCraft", version_id="1.12.2", instance_dir=instance_dir, mod_loader=("forge", "14.23.5.2860"))
+    target = mods_dir / "Reskillable-1.12.2-1.13.0.jar"
+    with zipfile.ZipFile(target, "w") as archive:
+        archive.writestr(
+            "META-INF/MANIFEST.MF",
+            "Manifest-Version: 1.0\nFMLModType: LIBRARY\nImplementation-Version: 1.13.0\n",
+        )
+        archive.writestr("codersafterdark/reskillable/Reskillable.class", b"legacy bytecode placeholder")
+    digest = sha1(target.read_bytes(), usedforsecurity=False).hexdigest()
+    CurseForgePackRegistry.save(instance, {"managedFiles": [{
+        "projectId": 286382,
+        "fileId": 2815686,
+        "fileName": target.name,
+        "path": f"mods/{target.name}",
+        "displayName": "Reskillable",
+        "projectName": "Reskillable",
+        "sha1": digest,
+        "size": target.stat().st_size,
+        "manualImport": True,
+        "expectedModIds": ["reskillable"],
+        "selectionReason": "pack_manifest",
+    }]})
+
+    raw = ModManager.read_mod(target, preferred_loader="forge")
+    assert raw.status == "Ready"
+    assert raw.mod_id == "unknown"
+
+    installed = ModManager.list_mods(instance)
+
+    assert len(installed) == 1
+    assert installed[0].mod_id == "reskillable"
+    assert installed[0].status == "Ready"
+    assert installed[0].metadata_format == "CurseForge provider SHA-1 identity"
+    assert installed[0].version == "1.13.0"
+
+
+def test_manual_curseforge_provider_identity_preserves_parsed_primary_mod_id(tmp_path):
+    from hashlib import sha1
+
+    from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
+
+    instance_dir = tmp_path / "legacy-parsed-primary"
+    mods_dir = instance_dir / "mods"
+    mods_dir.mkdir(parents=True)
+    instance = Instance(instance_id="legacy-id", name="Legacy", version_id="1.12.2", instance_dir=instance_dir, mod_loader=("forge", "14.23.5.2860"))
+    target = mods_dir / "legacy-bundle.jar"
+    with zipfile.ZipFile(target, "w") as archive:
+        archive.writestr("mcmod.info", json.dumps([{"modid": "parsedhelper", "name": "Parsed Helper", "version": "1.0.0"}]))
+    digest = sha1(target.read_bytes(), usedforsecurity=False).hexdigest()
+    CurseForgePackRegistry.save(instance, {"managedFiles": [{
+        "projectId": 1,
+        "fileId": 2,
+        "fileName": target.name,
+        "path": f"mods/{target.name}",
+        "displayName": "Provider Project",
+        "sha1": digest,
+        "size": target.stat().st_size,
+        "manualImport": True,
+        "expectedModIds": ["provideridentity"],
+    }]})
+
+    installed = ModManager.list_mods(instance)
+
+    assert installed[0].mod_id == "parsedhelper"
+    assert ("provideridentity", "1.0.0") in installed[0].provided_mods
+    assert installed[0].metadata_format == "mcmod.info + CurseForge provider SHA-1 identity"

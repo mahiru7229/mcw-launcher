@@ -311,3 +311,42 @@ def test_provider_identity_fallback_is_not_used_for_non_manual_pack_files(tmp_pa
 
     assert len(missing) == 1
     assert entry["pendingDownload"] is True
+
+
+def test_manual_pack_ready_forge_library_with_exact_sha1_accepts_provider_identity(tmp_path):
+    from hashlib import sha1
+    import zipfile
+
+    instance_dir = tmp_path / "instance-manual-ready-library"
+    mods_dir = instance_dir / "mods"
+    mods_dir.mkdir(parents=True)
+    instance = Instance(instance_id="id", name="Legacy Pack", version_id="1.12.2", instance_dir=instance_dir, mod_loader=("forge", "14.23.5.2860"))
+    target = mods_dir / "Reskillable-1.12.2-1.13.0.jar"
+    with zipfile.ZipFile(target, "w") as archive:
+        archive.writestr(
+            "META-INF/MANIFEST.MF",
+            "Manifest-Version: 1.0\nFMLModType: LIBRARY\nImplementation-Version: 1.13.0\n",
+        )
+        archive.writestr("codersafterdark/reskillable/Reskillable.class", b"legacy bytecode placeholder")
+    digest = sha1(target.read_bytes(), usedforsecurity=False).hexdigest()
+    entry = {
+        "projectId": 286382,
+        "fileId": 2815686,
+        "fileName": target.name,
+        "path": f"mods/{target.name}",
+        "sha1": digest,
+        "size": target.stat().st_size,
+        "manualImport": True,
+        "expectedModIds": ["reskillable"],
+    }
+
+    parsed = ModManager.read_mod(target, preferred_loader="forge")
+    assert parsed.status == "Ready"
+    assert parsed.mod_id == "unknown"
+
+    missing = CurseForgeContentManager._check_all(instance, [entry], [], None, 1)
+
+    assert missing == []
+    assert entry["pendingDownload"] is False
+    assert entry["acceptedUnverified"] is True
+    assert "Provider identity was accepted" in entry["compatibilityWarning"]

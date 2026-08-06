@@ -282,11 +282,12 @@ class CurseForgeContentManager:
 
     @staticmethod
     def _can_trust_manual_provider_identity(metadata, entry: dict) -> bool:
+        status = str(getattr(metadata, "status", "") or "").strip()
         return (
             bool(entry.get("manualImport", False))
             and bool(str(entry.get("sha1") or "").strip())
             and bool(entry.get("expectedModIds"))
-            and str(getattr(metadata, "status", "") or "") in {"Unverified", "Broken metadata"}
+            and status not in {"Broken JAR", "Not a mod"}
         )
 
     @staticmethod

@@ -88,25 +88,33 @@ class ModManager:
 
     @staticmethod
     def _apply_trusted_manual_identity(instance: Instance, mod: ModInfo, entry: dict) -> ModInfo:
-        if mod.status not in {"Unverified", "Broken metadata"}:
+        if mod.status in {"Broken JAR", "Not a mod"}:
             return mod
         expected = list(dict.fromkeys(str(value).strip().casefold() for value in entry.get("expectedModIds", []) if str(value).strip()))
         if not expected:
             return mod
 
         loader_name, _loader_version = ModLoaderManager.normalize(instance.mod_loader)
-        primary = expected[0]
+        parsed_id = str(mod.mod_id or "").strip().casefold()
+        has_parsed_identity = parsed_id not in {"", "unknown"}
+        primary = parsed_id if has_parsed_identity else expected[0]
         version = mod.version if str(mod.version).strip() and str(mod.version).strip().casefold() != "unknown" else "Unknown"
         provided = {(str(mod_id).strip().casefold(), str(provided_version or version).strip() or version) for mod_id, provided_version in mod.provided_mods if str(mod_id).strip()}
-        provided.update((mod_id, version) for mod_id in expected[1:])
+        provided.update((mod_id, version) for mod_id in expected if mod_id != primary)
+        metadata_format = str(mod.metadata_format or "unknown").strip()
+        if metadata_format.casefold() in {"", "unknown"} or not has_parsed_identity:
+            metadata_format = "CurseForge provider SHA-1 identity"
+        elif "curseforge provider sha-1 identity" not in metadata_format.casefold():
+            metadata_format = f"{metadata_format} + CurseForge provider SHA-1 identity"
+        restore_ready = mod.status in {"Unverified", "Broken metadata"}
         return dataclass_replace(
             mod,
             mod_id=primary,
-            name=str(entry.get("projectName") or entry.get("displayName") or mod.name or primary).strip(),
+            name=str(entry.get("projectName") or entry.get("displayName") or mod.name or primary).strip() if not has_parsed_identity else mod.name,
             loader=loader_name if loader_name in ModLoaderManager.FORGE_FAMILY else mod.loader,
-            metadata_format="CurseForge provider SHA-1 identity",
-            status="Ready",
-            error="",
+            metadata_format=metadata_format,
+            status="Ready" if restore_ready else mod.status,
+            error="" if restore_ready else mod.error,
             source="curseforge",
             source_project_id=str(entry.get("projectId") or mod.source_project_id).strip(),
             source_file_id=str(entry.get("fileId") or mod.source_file_id).strip(),
