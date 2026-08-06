@@ -18,7 +18,7 @@ class ModProvenanceRegistry:
     so the UI and future MCWPack exporter can recover provenance consistently.
     """
 
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
     _MODRINTH_CDN_PATTERN = re.compile(r"^/data/([^/]+)/versions/([^/]+)/([^/]+)$", re.IGNORECASE)
     _PROVIDERS = {"modrinth", "curseforge", "ftb", "atlauncher", "optifine", "local", "manual", "unknown"}
 
@@ -192,6 +192,8 @@ class ModProvenanceRegistry:
                 "size": raw.get("size"),
                 "downloadUrls": downloads,
                 "managedByModpack": True,
+                "selectionReason": raw.get("selectionReason"),
+                "requiredBy": raw.get("requiredBy", []),
                 "packProvider": "modrinth",
                 "packProjectId": pack_project_id,
                 "packVersionId": pack_version_id,
@@ -218,6 +220,8 @@ class ModProvenanceRegistry:
                 "size": raw.get("size"),
                 "downloadUrls": [raw.get("downloadUrl")] if raw.get("downloadUrl") else [],
                 "managedByModpack": True,
+                "selectionReason": raw.get("selectionReason"),
+                "requiredBy": raw.get("requiredBy", []),
                 "packProvider": "curseforge",
                 "packProjectId": pack_project_id,
                 "packVersionId": pack_version_id,
@@ -318,6 +322,8 @@ class ModProvenanceRegistry:
             "licenseUrl": str(raw.get("licenseUrl") or "").strip(),
             "redistributionAllowed": bool(raw.get("redistributionAllowed", False)),
             "managedByModpack": bool(raw.get("managedByModpack", False)),
+            "selectionReason": str(raw.get("selectionReason") or ("pack_manifest" if raw.get("managedByModpack", False) else "direct_install")).strip().casefold(),
+            "requiredBy": list(dict.fromkeys(str(item).strip() for item in raw.get("requiredBy", []) if str(item).strip())) if isinstance(raw.get("requiredBy"), (list, tuple, set)) else [],
             "packProvider": str(raw.get("packProvider") or "").strip().casefold(),
             "packProjectId": str(raw.get("packProjectId") or "").strip(),
             "packVersionId": str(raw.get("packVersionId") or "").strip(),

@@ -4,233 +4,188 @@
  
  ---
  
-+## Có gì mới trong v1.1.1-beta.4
++## Có gì mới trong v1.1.1-beta.5
 +
-+**v1.1.1-beta.4** đơn giản hóa OptiFine thành luồng nhập file trực tiếp:
++**v1.1.1-beta.5** sửa pipeline dependency bắt buộc của modpack:
 +
-+- Không còn tải hoặc hiển thị danh sách phiên bản OptiFine trực tuyến.
-+- Chọn JAR OptiFine gốc; MCW nhận diện Minecraft version và build từ tên file.
-+- Chặn file sai Minecraft version trước khi tạo hoặc cài instance.
-+- Vanilla dùng standalone component/profile; Forge instance hoặc modpack dùng mod được quản lý trong `mods/`.
-+- Core vẫn xác minh cấu trúc JAR, manifest, class OptiFine và hash trước khi commit.
-+- Giữ nguyên Repair, Uninstall, rollback giao dịch và chính sách không nhúng OptiFine vào export.
++- Tự hoàn thiện dependency graph `required` cho modpack Modrinth và CurseForge trước khi Minecraft được tạo process.
++- Giữ nguyên file do tác giả pack ghim; dependency bổ sung được ghi `requiredBy` và `selectionReason`.
++- Không tự tải optional/embedded dependency và không tự thay file pack chỉ vì metadata system version quá chặt.
++- Tùy chọn chạy dù có lỗi tương thích không còn được phép bỏ qua dependency bắt buộc bị thiếu, disable hoặc sai version.
++- Repair modpack chạy lại resolver và tải các dependency mới tìm được.
++- Registry Modrinth, CurseForge và provenance được nâng schema với normalize tương thích dữ liệu cũ.
 +
-+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.4.md`](docs/RELEASE-v1.1.1-beta.4.md).
++Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.5.md`](docs/RELEASE-v1.1.1-beta.5.md).
 +
- ## Có gì mới trong v1.1.1-beta.2
+ ## Có gì mới trong v1.1.1-beta.4
  
- **v1.1.1-beta.2** là hotfix cho một số modpack Forge 1.12.2 dùng LibLoader và còn phụ thuộc vào thư viện từng được lưu trên JCenter:
---- a/docs/RELEASE-v1.1.1-beta.4.md
-+++ b/docs/RELEASE-v1.1.1-beta.4.md
-@@ -0,0 +1,67 @@
-+# MCW Launcher v1.1.1-beta.4
+ **v1.1.1-beta.4** đơn giản hóa OptiFine thành luồng nhập file trực tiếp:
+--- /dev/null
++++ b/docs/RELEASE-v1.1.1-beta.5.md
+@@ -0,0 +1,121 @@
++# MCW Launcher v1.1.1-beta.5
 +
 +## Tiếng Việt
 +
-+MCW Launcher **v1.1.1-beta.4** đơn giản hóa OptiFine thành luồng **chọn file và cài đặt**. Launcher không còn tải hoặc hiển thị danh sách phiên bản OptiFine trực tuyến.
++MCW Launcher **v1.1.1-beta.5** sửa một lỗi nghiêm trọng trong pipeline modpack: file của pack có thể được tải đầy đủ theo manifest nhưng các dependency bắt buộc do từng mod khai báo với Modrinth hoặc CurseForge lại không được bổ sung, khiến Minecraft được tạo process cùng nhiều cảnh báo và thường crash ngay sau đó.
 +
-+### Thay đổi chính
++### Dependency resolver cho modpack
 +
-+- Xóa version selector, tùy chọn preview, nút refresh và mọi request metadata OptiFine khỏi giao diện.
-+- Người dùng chỉ cần chọn file JAR OptiFine chính thức đã tải.
-+- MCW nhận diện Minecraft version, OptiFine edition/build và trạng thái preview từ tên file gốc, ví dụ `OptiFine_1.12.2_HD_U_G5.jar` hoặc `preview_OptiFine_1.20.1_HD_U_I7_pre1.jar`.
-+- File có Minecraft version khác instance bị chặn trước khi tạo/cài.
-+- Core xác minh lại phiên bản, kích thước, cấu trúc ZIP/JAR, Java manifest và class OptiFine trước khi commit.
-+- **Create Instance**:
-+  - Vanilla cài OptiFine dưới dạng standalone component/profile.
-+  - Forge cài OptiFine dưới dạng mod được quản lý.
-+- **Instance hoặc modpack Forge đã tồn tại** có thể dùng **Manage OptiFine** để chọn JAR và cài trực tiếp vào `mods/`.
-+- Fabric, Quilt và NeoForge vẫn không được cài trực tiếp trong flow này.
-+- Hỗ trợ Repair, Uninstall, transaction rollback, provenance và chính sách export thủ công của Beta 3 được giữ nguyên.
-+- Nhận diện cả file stable và file `preview_OptiFine_*`; không cần tra cứu catalog online.
++- Thêm `ModpackDependencyResolver` dùng chung cho modpack Modrinth và CurseForge.
++- Resolver duyệt đệ quy dependency loại **required** với giới hạn 20 tầng và tối đa 256 file bổ sung.
++- Dependency đã nằm trong manifest hoặc đã được chọn trước đó không bị tải lại.
++- Phát hiện vòng lặp bằng provider version/file identity.
++- Metadata provider được retry tối đa ba lần đối với lỗi mạng có khả năng phục hồi.
++- Modrinth có thể nhận diện file từ `versionId`, URL CDN hoặc SHA-512/SHA-1 lookup.
++- CurseForge lưu dependency metadata của file vào registry để các lần launch/repair sau không phải truy vấn lại không cần thiết.
 +
-+### Quy tắc an toàn
++### Manifest của modpack vẫn là nguồn sự thật
 +
-+- Tên file phải giữ nguyên định dạng OptiFine để MCW xác định Minecraft version.
-+- Một instance không thể có hai OptiFine JAR được quản lý cùng lúc.
-+- File JAR OptiFine không được nhúng vào portable/full-offline export.
-+- Repair chỉ dùng bản cache có SHA-256 đúng; nếu cache mất hoặc bị sửa, người dùng phải chọn lại JAR chính thức.
++- MCW không tự thay file mà tác giả modpack đã ghim.
++- Nếu một dependency yêu cầu version khác nhưng pack đã chọn sẵn một version của cùng project, MCW giữ file của pack và ghi warning giải thích.
++- Lỗi system requirement của file được pack ghim, ví dụ JEI khai báo Minecraft `[1.21, 1.21.1)` trong pack Minecraft `1.21.1`, được giữ ở mức warning thay vì tự động đổi JEI sang build khác.
++- Optional, embedded và incompatible relations không bị coi nhầm là dependency bắt buộc cần tự tải.
 +
-+### Phiên bản
++### Không còn bỏ qua dependency bắt buộc
 +
-+- Launcher runtime: `v1.1.1-beta.4`
-+- Python distribution metadata: `1.1.1b4`
++- Tùy chọn **Launch anyway / bỏ qua lỗi tương thích** không còn bỏ qua dependency bắt buộc bị thiếu, bị disable hoặc sai version.
++- MCW thử hoàn thiện dependency graph trước khi tải, tải các file mới được thêm, rồi audit lại sau download.
++- Nếu dependency bắt buộc vẫn chưa thể xác định hoặc tải, launcher chặn trước khi tạo process Minecraft và hiển thị lỗi rõ ràng.
++- Các warning còn lại được gộp dưới nhãn chung `Launch warning`, không còn gắn nhầm mọi cảnh báo với Modrinth.
++
++### Registry, Repair và provenance
++
++Dependency tự động thêm được ghi lại với:
++
++```json
++{
++  "selectionReason": "required_dependency",
++  "requiredBy": ["FancyMenu"],
++  "provider": "modrinth"
++}
++```
++
++- File gốc của pack dùng `selectionReason: pack_manifest`.
++- Provenance registry giữ nguyên `requiredBy` và lý do lựa chọn.
++- Repair modpack chạy lại resolver, tải dependency mới tìm được và chặn nếu vẫn còn dependency bắt buộc chưa giải quyết.
++- Modrinth registry nâng lên schema 6; CurseForge registry nâng lên schema 3; provenance registry nâng lên schema 2, có normalize tương thích dữ liệu cũ.
++
++### Ví dụ lỗi được xử lý
++
++Một pack có FancyMenu nhưng thiếu `drippyloadingscreen`, `fancy_entity_renderer`, `findme` và `konkrete` sẽ được MCW thử khôi phục tự động từ metadata provider trước khi launch. Nếu provider không cung cấp identity đáng tin cậy hoặc không có build tương thích với Minecraft/loader hiện tại, MCW dừng launch thay vì âm thầm chạy một pack chắc chắn thiếu dependency.
++
++### Phiên bản và xác thực
++
++- Launcher runtime: `v1.1.1-beta.5`
++- Python distribution metadata: `1.1.1b5`
 +- MCW Core source/wheel riêng: chưa phát hành lại; sẽ đồng bộ khi `v1.1.1` stable.
++- Toàn bộ test: **1375 passed, 88 skipped, 2 warnings**.
++- `compileall` đạt cho `src`, `mcw_core` và `test`.
++
++Hai warning đến từ fixture ZIP cố tình chứa entry trùng trong kiểm thử bảo mật, không phải lỗi dependency resolver.
 +
 +---
 +
 +## English
 +
-+MCW Launcher **v1.1.1-beta.4** simplifies OptiFine into an **import-and-install** workflow. The launcher no longer fetches or displays an online OptiFine version catalog.
++MCW Launcher **v1.1.1-beta.5** fixes a serious modpack pipeline issue: a pack manifest could download successfully while required dependencies declared by individual Modrinth or CurseForge mods were never added. Minecraft was then allowed to start with several warnings and would commonly fail immediately afterward.
 +
-+### Main changes
++### Modpack dependency resolver
 +
-+- Removes the OptiFine version selector, preview toggle, refresh button, and all OptiFine metadata requests from the UI.
-+- Users only select the official OptiFine JAR they already downloaded.
-+- MCW detects the Minecraft version, OptiFine edition/build, and preview state from the original filename, such as `OptiFine_1.12.2_HD_U_G5.jar` or `preview_OptiFine_1.20.1_HD_U_I7_pre1.jar`.
-+- A JAR targeting a different Minecraft version is rejected before creation or installation.
-+- Core validates the version again together with file size, ZIP/JAR structure, Java manifest, and expected OptiFine classes before committing changes.
-+- **Create Instance**:
-+  - Vanilla installs OptiFine as a standalone component/profile.
-+  - Forge installs OptiFine as a managed mod.
-+- Existing **Forge instances and modpacks** can use **Manage OptiFine** to import the JAR directly into `mods/`.
-+- Fabric, Quilt, and NeoForge remain unsupported by this direct workflow.
-+- Repair, Uninstall, transactional rollback, provenance, and manual-only export policy from Beta 3 remain intact.
-+- Both stable and `preview_OptiFine_*` files are recognized without an online catalog.
++- Adds a shared `ModpackDependencyResolver` for Modrinth and CurseForge managed packs.
++- Recursively follows **required** dependencies with a 20-level depth limit and a maximum of 256 added files.
++- Dependencies already present in the manifest or selected graph are not downloaded twice.
++- Cycles are stopped using provider version/file identities.
++- Recoverable provider metadata requests are retried up to three times.
++- Modrinth files can be identified through `versionId`, CDN URL identity, or SHA-512/SHA-1 lookup.
++- CurseForge dependency metadata is persisted in the pack registry so later launches and repairs avoid unnecessary repeated requests.
 +
-+### Safety rules
++### The pack manifest remains authoritative
 +
-+- The original OptiFine filename must be preserved so MCW can determine the Minecraft version.
-+- An instance cannot contain two MCW-managed OptiFine JARs at the same time.
-+- OptiFine JARs are never embedded in portable or full-offline exports.
-+- Repair only uses a cached source with a matching SHA-256; otherwise the user must select the official JAR again.
++- MCW never silently replaces a file pinned by the modpack author.
++- When a dependency requests another version of a project already pinned by the pack, the pinned file is kept and a warning explains the mismatch.
++- A system requirement mismatch on a pack-pinned file, such as JEI declaring Minecraft `[1.21, 1.21.1)` inside a Minecraft `1.21.1` pack, remains a warning instead of causing an automatic JEI replacement.
++- Optional, embedded, and incompatible relations are not mistaken for required dependencies that should be auto-installed.
 +
-+### Versions
++### Required dependencies can no longer be bypassed
 +
-+- Launcher runtime: `v1.1.1-beta.4`
-+- Python distribution metadata: `1.1.1b4`
++- **Launch anyway / compatibility override** no longer bypasses missing, disabled, or version-invalid required mod dependencies.
++- MCW completes the dependency graph before downloads, downloads newly added files, and audits the result again afterward.
++- If a required dependency still cannot be identified or installed, launch is blocked before a Minecraft process is created and a clear error is shown.
++- Remaining warnings use the generic `Launch warning` label instead of incorrectly labeling every warning as Modrinth-specific.
++
++### Registry, repair, and provenance
++
++Automatically added dependencies are recorded with:
++
++```json
++{
++  "selectionReason": "required_dependency",
++  "requiredBy": ["FancyMenu"],
++  "provider": "modrinth"
++}
++```
++
++- Original pack files use `selectionReason: pack_manifest`.
++- The provenance registry preserves `requiredBy` and selection reason.
++- Modpack Repair reruns dependency resolution, downloads newly discovered dependencies, and blocks completion if required dependencies remain unresolved.
++- Modrinth registry schema is upgraded to 6, CurseForge registry to 3, and provenance registry to 2, with backward-compatible normalization.
++
++### Example fixed scenario
++
++A pack containing FancyMenu but missing `drippyloadingscreen`, `fancy_entity_renderer`, `findme`, and `konkrete` is now repaired from trusted provider metadata before launch. If no trustworthy provider identity or compatible build can be found, MCW blocks launch rather than silently starting a predictably incomplete pack.
++
++### Versions and validation
++
++- Launcher runtime: `v1.1.1-beta.5`
++- Python distribution metadata: `1.1.1b5`
 +- Separate MCW Core source/wheel: not republished until `v1.1.1` stable.
++- Full test suite: **1375 passed, 88 skipped, 2 warnings**.
++- `compileall` passes for `src`, `mcw_core`, and `test`.
++
++The two warnings come from security-test ZIP fixtures that intentionally contain duplicate entries; they are unrelated to dependency resolution.
 --- a/lang/en-US.json
 +++ b/lang/en-US.json
-@@ -1943,7 +1943,7 @@
-     "common.uninstall": "Uninstall",
-     "workspace.action.optifine": "Manage OptiFine",
-     "optifine.title": "OptiFine",
--    "optifine.description": "Install OptiFine as a managed Forge mod or as a standalone profile for Vanilla. MCW does not redistribute OptiFine; select the official JAR you downloaded.",
-+    "optifine.description": "Import an official OptiFine JAR. MCW detects its Minecraft version, then installs it as a standalone Vanilla component or as a managed mod for a Forge instance or modpack.",
-     "optifine.instance": "Instance",
-     "optifine.install_mode": "Installation mode",
-     "optifine.version": "OptiFine version",
-@@ -1954,7 +1954,7 @@
-     "optifine.install": "Install OptiFine",
-     "optifine.file.choose_title": "Choose the official OptiFine JAR",
-     "optifine.file.not_selected": "No file selected",
--    "optifine.file.required": "Select an OptiFine version and its matching official JAR first.",
-+    "optifine.file.required": "Select an official OptiFine JAR that matches the instance Minecraft version.",
-     "optifine.mode.standalone": "Standalone profile",
-     "optifine.mode.forge_mod": "Forge mod",
-     "optifine.mode.unsupported": "Unsupported loader",
-@@ -1965,7 +1965,7 @@
-     "optifine.state.installed": "Installed: {version} ({mode})",
-     "optifine.uninstall.confirm": "Remove the MCW-managed OptiFine installation from this instance?",
-     "optifine.create.checkbox": "Install OptiFine",
--    "optifine.create.mode": "Installation mode: {mode}. Download the matching JAR from the official OptiFine page, then select it here.",
-+    "optifine.create.mode": "Installation mode: {mode}. Select the original OptiFine JAR downloaded from the official page.",
-     "task.optifine.load_versions": "Loading OptiFine versions for {version}...",
-     "task.optifine.install": "Installing OptiFine for {name}...",
-     "task.optifine.repair": "Repairing OptiFine for {name}...",
-@@ -1980,7 +1980,16 @@
-     "optifine.progress.profile_ready": "The OptiFine standalone profile is ready.",
-     "optifine.progress.installing": "Installing OptiFine...",
-     "optifine.progress.installed": "OptiFine installation completed.",
--    "optifine.compatibility.forge_unavailable": "This OptiFine build is marked Forge N/A on the official downloads page and cannot be installed as a Forge mod."
-+    "optifine.compatibility.forge_unavailable": "This OptiFine build is marked Forge N/A on the official downloads page and cannot be installed as a Forge mod.",
-+    "optifine.detected_version": "Detected version",
-+    "optifine.file.not_detected": "No OptiFine version detected",
-+    "optifine.file.invalid_name": "The selected file name is not a supported OptiFine JAR. Keep the original OptiFine file name.",
-+    "optifine.file.version_mismatch": "This OptiFine JAR targets Minecraft {actual}, but the instance uses {expected}.",
-+    "optifine.file.detected": "{version} for Minecraft {minecraft}",
-+    "optifine.file.ready": "The file name matches this instance. MCW will verify the JAR contents before installing it.",
-+    "optifine.file.select_hint": "Select the official OptiFine JAR. Its Minecraft version will be detected from the original file name and verified again during installation.",
-+    "optifine.create.import_mode": "Installation mode: {mode}. Select the original OptiFine JAR; no online version list is used.",
-+    "optifine.create.file_ready": "Ready to install {version} for Minecraft {minecraft} as {mode}."
+@@ -1989,7 +1989,13 @@
+     "optifine.file.ready": "The file name matches this instance. MCW will verify the JAR contents before installing it.",
+     "optifine.file.select_hint": "Select the official OptiFine JAR. Its Minecraft version will be detected from the original file name and verified again during installation.",
+     "optifine.create.import_mode": "Installation mode: {mode}. Select the original OptiFine JAR; no online version list is used.",
+-    "optifine.create.file_ready": "Ready to install {version} for Minecraft {minecraft} as {mode}."
++    "optifine.create.file_ready": "Ready to install {version} for Minecraft {minecraft} as {mode}.",
++    "Launch warning: {warning}": "Launch warning: {warning}",
++    "Required mod dependencies are missing": "Required mod dependencies are missing",
++    "MCW Launcher could not restore every required mod dependency. Retry while online or repair the modpack. The compatibility override cannot bypass missing required dependencies because the game is likely to crash or corrupt the pack state.": "MCW Launcher could not restore every required mod dependency. Retry while online or repair the modpack. The compatibility override cannot bypass missing required dependencies because the game is likely to crash or corrupt the pack state.",
++    "Required dependencies missing": "Required dependencies missing",
++    "Resolving Modrinth modpack dependencies...": "Resolving Modrinth modpack dependencies...",
++    "Resolving CurseForge modpack dependencies...": "Resolving CurseForge modpack dependencies..."
    },
    "aliases": {
      "MCW Launcher": "app.name",
 --- a/lang/vi-VN.json
 +++ b/lang/vi-VN.json
-@@ -1943,7 +1943,7 @@
-     "common.uninstall": "Gỡ cài đặt",
-     "workspace.action.optifine": "Quản lý OptiFine",
-     "optifine.title": "OptiFine",
--    "optifine.description": "Cài OptiFine dưới dạng mod Forge được quản lý hoặc profile độc lập cho Vanilla. MCW không phân phối lại OptiFine; hãy chọn file JAR chính thức bạn đã tải.",
-+    "optifine.description": "Nhập file JAR OptiFine chính thức. MCW sẽ nhận diện phiên bản Minecraft rồi cài dưới dạng component độc lập cho Vanilla hoặc mod được quản lý cho instance/modpack Forge.",
-     "optifine.instance": "Instance",
-     "optifine.install_mode": "Chế độ cài đặt",
-     "optifine.version": "Phiên bản OptiFine",
-@@ -1954,7 +1954,7 @@
-     "optifine.install": "Cài OptiFine",
-     "optifine.file.choose_title": "Chọn file JAR OptiFine chính thức",
-     "optifine.file.not_selected": "Chưa chọn file",
--    "optifine.file.required": "Hãy chọn phiên bản OptiFine và file JAR chính thức khớp với phiên bản đó.",
-+    "optifine.file.required": "Hãy chọn file JAR OptiFine chính thức khớp với phiên bản Minecraft của instance.",
-     "optifine.mode.standalone": "Profile độc lập",
-     "optifine.mode.forge_mod": "Mod Forge",
-     "optifine.mode.unsupported": "Loader chưa được hỗ trợ",
-@@ -1965,7 +1965,7 @@
-     "optifine.state.installed": "Đã cài: {version} ({mode})",
-     "optifine.uninstall.confirm": "Gỡ bản OptiFine do MCW quản lý khỏi instance này?",
-     "optifine.create.checkbox": "Cài OptiFine",
--    "optifine.create.mode": "Chế độ cài: {mode}. Hãy tải đúng file JAR từ trang OptiFine chính thức rồi chọn file tại đây.",
-+    "optifine.create.mode": "Chế độ cài: {mode}. Hãy chọn file JAR OptiFine gốc đã tải từ trang chính thức.",
-     "task.optifine.load_versions": "Đang tải phiên bản OptiFine cho {version}...",
-     "task.optifine.install": "Đang cài OptiFine cho {name}...",
-     "task.optifine.repair": "Đang sửa OptiFine cho {name}...",
-@@ -1980,7 +1980,16 @@
-     "optifine.progress.profile_ready": "Profile OptiFine độc lập đã sẵn sàng.",
-     "optifine.progress.installing": "Đang cài OptiFine...",
-     "optifine.progress.installed": "Đã cài OptiFine xong.",
--    "optifine.compatibility.forge_unavailable": "Bản OptiFine này được đánh dấu Forge N/A trên trang tải chính thức nên không thể cài dưới dạng mod Forge."
-+    "optifine.compatibility.forge_unavailable": "Bản OptiFine này được đánh dấu Forge N/A trên trang tải chính thức nên không thể cài dưới dạng mod Forge.",
-+    "optifine.detected_version": "Phiên bản nhận diện",
-+    "optifine.file.not_detected": "Chưa nhận diện phiên bản OptiFine",
-+    "optifine.file.invalid_name": "Tên file đã chọn không phải định dạng OptiFine được hỗ trợ. Hãy giữ nguyên tên file OptiFine gốc.",
-+    "optifine.file.version_mismatch": "File OptiFine này dành cho Minecraft {actual}, nhưng instance đang dùng {expected}.",
-+    "optifine.file.detected": "{version} cho Minecraft {minecraft}",
-+    "optifine.file.ready": "Tên file khớp với instance. MCW sẽ kiểm tra cấu trúc JAR thêm một lần trước khi cài.",
-+    "optifine.file.select_hint": "Hãy chọn file JAR OptiFine chính thức. Phiên bản Minecraft sẽ được nhận diện từ tên file gốc và xác minh lại khi cài.",
-+    "optifine.create.import_mode": "Chế độ cài: {mode}. Chỉ cần chọn file JAR OptiFine gốc; launcher không tải danh sách phiên bản trực tuyến.",
-+    "optifine.create.file_ready": "Sẵn sàng cài {version} cho Minecraft {minecraft} dưới dạng {mode}."
+@@ -1989,7 +1989,13 @@
+     "optifine.file.ready": "Tên file khớp với instance. MCW sẽ kiểm tra cấu trúc JAR thêm một lần trước khi cài.",
+     "optifine.file.select_hint": "Hãy chọn file JAR OptiFine chính thức. Phiên bản Minecraft sẽ được nhận diện từ tên file gốc và xác minh lại khi cài.",
+     "optifine.create.import_mode": "Chế độ cài: {mode}. Chỉ cần chọn file JAR OptiFine gốc; launcher không tải danh sách phiên bản trực tuyến.",
+-    "optifine.create.file_ready": "Sẵn sàng cài {version} cho Minecraft {minecraft} dưới dạng {mode}."
++    "optifine.create.file_ready": "Sẵn sàng cài {version} cho Minecraft {minecraft} dưới dạng {mode}.",
++    "Launch warning: {warning}": "Cảnh báo khi khởi chạy: {warning}",
++    "Required mod dependencies are missing": "Thiếu dependency bắt buộc của mod",
++    "MCW Launcher could not restore every required mod dependency. Retry while online or repair the modpack. The compatibility override cannot bypass missing required dependencies because the game is likely to crash or corrupt the pack state.": "MCW Launcher không thể khôi phục đầy đủ dependency bắt buộc của mod. Hãy thử lại khi có mạng hoặc Repair modpack. Tùy chọn bỏ qua tương thích không thể bỏ qua dependency bắt buộc vì game rất dễ crash hoặc làm trạng thái modpack sai lệch.",
++    "Required dependencies missing": "Thiếu dependency bắt buộc",
++    "Resolving Modrinth modpack dependencies...": "Đang xử lý dependency của modpack Modrinth...",
++    "Resolving CurseForge modpack dependencies...": "Đang xử lý dependency của modpack CurseForge..."
    },
    "aliases": {
      "Show static text over themed controls": "launcher_settings.theme.show_static_text",
---- a/mcw_core/services.py
-+++ b/mcw_core/services.py
-@@ -115,11 +115,11 @@
-         ModLoaderManager.prepare(version, *resolved, reporter=ProgressReporter(request.on_progress))
-         return InstanceManager.create(name=name, version=version, mod_loader=resolved)
- 
--    def create_with_optifine(self, request: InstanceCreateRequest, optifine_version: OptiFineVersion, source_path: Path, mode: str | OptiFineInstallMode = OptiFineInstallMode.AUTO, on_optifine_progress: ProgressCallback | None = None) -> Instance:
-+    def create_with_optifine(self, request: InstanceCreateRequest, source_path: Path, mode: str | OptiFineInstallMode = OptiFineInstallMode.AUTO, on_optifine_progress: ProgressCallback | None = None) -> Instance:
-         created: Instance | None = None
-         try:
-             created = self.create(request)
--            OptiFineManager.install(created, optifine_version, Path(source_path), mode, ProgressReporter(on_optifine_progress))
-+            OptiFineManager.install(created, Path(source_path), mode, ProgressReporter(on_optifine_progress))
-             return created
-         except Exception:
-             if created is not None:
-@@ -228,8 +228,8 @@
-     OFFICIAL_DOWNLOADS_URL = "https://optifine.net/downloads"
- 
-     @staticmethod
--    def list_versions(minecraft_version: str = "", include_preview: bool = False, force_refresh: bool = False) -> list[OptiFineVersion]:
--        return OptiFineManager.list_versions(minecraft_version, include_preview, force_refresh)
-+    def inspect_file(source_path: Path) -> OptiFineVersion:
-+        return OptiFineManager.inspect_file(Path(source_path))
- 
-     @staticmethod
-     def state(instance: Instance | str) -> OptiFineState:
-@@ -242,9 +242,9 @@
-         return OptiFineManager.compatibility(loaded, version, mode)
- 
-     @staticmethod
--    def install(instance: Instance | str, version: OptiFineVersion, source_path: Path, mode: str | OptiFineInstallMode = OptiFineInstallMode.AUTO, on_progress: ProgressCallback | None = None) -> OptiFineInstallResult:
-+    def install(instance: Instance | str, source_path: Path, mode: str | OptiFineInstallMode = OptiFineInstallMode.AUTO, on_progress: ProgressCallback | None = None) -> OptiFineInstallResult:
-         loaded = instance if isinstance(instance, Instance) else InstanceManager.load(str(instance))
--        return OptiFineManager.install(loaded, version, Path(source_path), mode, ProgressReporter(on_progress))
-+        return OptiFineManager.install(loaded, Path(source_path), mode, ProgressReporter(on_progress))
- 
-     @staticmethod
-     def repair(instance: Instance | str, on_progress: ProgressCallback | None = None) -> OptiFineInstallResult:
 --- a/pyproject.toml
 +++ b/pyproject.toml
 @@ -4,7 +4,7 @@
  
  [project]
  name = "mcw-core"
--version = "1.1.1b3"
-+version = "1.1.1b4"
+-version = "1.1.1b4"
++version = "1.1.1b5"
  description = "Headless Minecraft runtime, instance, loader, modpack, repair, and launch core used by MCW Launcher"
  readme = "docs/MCW_CORE_LIBRARY.md"
  requires-python = ">=3.12"
@@ -239,1103 +194,1174 @@
 @@ -1,7 +1,7 @@
  from __future__ import annotations
  
--VERSION = "v1.1.1-beta.3"
--VERSION_ID = "1.1.1-beta.3"
-+VERSION = "v1.1.1-beta.4"
-+VERSION_ID = "1.1.1-beta.4"
+-VERSION = "v1.1.1-beta.4"
+-VERSION_ID = "1.1.1-beta.4"
++VERSION = "v1.1.1-beta.5"
++VERSION_ID = "1.1.1-beta.5"
  VERSION_TAG = f"v{VERSION_ID}"
  UPDATE_CHANNEL = "beta"
  GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
---- a/src/core/optifine/__init__.py
-+++ b/src/core/optifine/__init__.py
-@@ -1,5 +1,4 @@
- from src.core.optifine.optifine_manager import OptiFineManager
--from src.core.optifine.optifine_metadata_client import OptiFineMetadataClient
- from src.core.optifine.optifine_registry import OptiFineRegistry
- 
--__all__ = ["OptiFineManager", "OptiFineMetadataClient", "OptiFineRegistry"]
-+__all__ = ["OptiFineManager", "OptiFineRegistry"]
---- a/src/core/optifine/optifine_jar_inspector.py
-+++ b/src/core/optifine/optifine_jar_inspector.py
-@@ -1,8 +1,8 @@
- from __future__ import annotations
- 
- from dataclasses import dataclass
--from pathlib import Path
- import hashlib
-+from pathlib import Path
- import zipfile
- 
- from src.models.optifine.optifine_models import OptiFineVersion
-@@ -15,6 +15,7 @@
-     sha256: str
-     sha1: str
-     size: int
-+    version: OptiFineVersion
- 
- 
- class OptiFineJarInspector:
-@@ -22,7 +23,15 @@
-     REQUIRED_ANY = {"optifine/Installer.class", "optifine/Config.class", "net/optifine/Config.class"}
- 
-     @classmethod
--    def inspect(cls, path: Path, selected: OptiFineVersion | None = None) -> InspectedOptiFineJar:
-+    def detect_version(cls, path: Path | str) -> OptiFineVersion:
-+        source = Path(path)
-+        try:
-+            return OptiFineVersion.from_filename(source.name)
-+        except ValueError as error:
-+            raise RuntimeError("The selected file name does not contain a supported OptiFine version.") from error
-+
-+    @classmethod
-+    def inspect(cls, path: Path, expected_minecraft_version: str = "") -> InspectedOptiFineJar:
-         source = Path(path).expanduser().resolve(strict=False)
-         if not source.is_file():
-             raise FileNotFoundError(f"OptiFine JAR was not found: {source}")
-@@ -31,10 +40,12 @@
-             raise RuntimeError("The selected OptiFine file is empty or unexpectedly large.")
-         if source.suffix.casefold() != ".jar":
-             raise RuntimeError("Select an official OptiFine .jar file.")
--        if not source.name.casefold().startswith("optifine_"):
--            raise RuntimeError("The selected file does not look like an OptiFine installer JAR.")
--        if selected is not None and source.name.casefold() != selected.filename.casefold():
--            raise RuntimeError(f"Selected OptiFine version expects '{selected.filename}', but '{source.name}' was provided.")
-+        detected = cls.detect_version(source)
-+        expected = str(expected_minecraft_version or "").strip()
-+        if expected and detected.minecraft_version != expected:
-+            raise RuntimeError(
-+                f"The selected OptiFine JAR targets Minecraft {detected.minecraft_version}, not {expected}."
-+            )
-         try:
-             with zipfile.ZipFile(source) as archive:
-                 names = {name.replace("\\", "/") for name in archive.namelist()}
-@@ -50,4 +61,4 @@
-             for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                 sha256.update(chunk)
-                 sha1.update(chunk)
--        return InspectedOptiFineJar(source, source.name, sha256.hexdigest(), sha1.hexdigest(), size)
-+        return InspectedOptiFineJar(source, detected.filename, sha256.hexdigest(), sha1.hexdigest(), size, detected)
---- a/src/core/optifine/optifine_manager.py
-+++ b/src/core/optifine/optifine_manager.py
-@@ -8,7 +8,6 @@
- from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
- from src.core.modloader.mod_loader_manager import ModLoaderManager
- from src.core.optifine.optifine_jar_inspector import OptiFineJarInspector
--from src.core.optifine.optifine_metadata_client import OptiFineMetadataClient
- from src.core.optifine.optifine_profile_installer import OptiFineProfileInstaller
- from src.core.optifine.optifine_registry import OptiFineRegistry
- from src.core.optifine.optifine_transaction import OptiFineTransaction
-@@ -21,8 +20,8 @@
- 
- class OptiFineManager:
-     @staticmethod
--    def list_versions(minecraft_version: str = "", include_preview: bool = False, force_refresh: bool = False) -> list[OptiFineVersion]:
--        return OptiFineMetadataClient.list_versions(minecraft_version, include_preview, force_refresh)
-+    def inspect_file(source_jar: Path) -> OptiFineVersion:
-+        return OptiFineJarInspector.inspect(Path(source_jar)).version
- 
-     @staticmethod
-     def state(instance: Instance) -> OptiFineState:
-@@ -31,29 +30,29 @@
- 
-     @staticmethod
-     def compatibility(instance: Instance, selected: OptiFineVersion, requested: str | OptiFineInstallMode = OptiFineInstallMode.AUTO) -> OptiFineCompatibilityResult:
--        loader, loader_version = ModLoaderManager.normalize(instance.mod_loader)
-+        loader, _loader_version = ModLoaderManager.normalize(instance.mod_loader)
-         requested_value = str(getattr(requested, "value", requested) or OptiFineInstallMode.AUTO).casefold()
-         if selected.minecraft_version != instance.version_id:
--            return OptiFineCompatibilityResult(OptiFineCompatibilityState.BLOCKED, requested_value, f"OptiFine {selected.display_name} targets Minecraft {selected.minecraft_version}, not {instance.version_id}.")
-+            return OptiFineCompatibilityResult(
-+                OptiFineCompatibilityState.BLOCKED,
-+                requested_value,
-+                f"OptiFine {selected.display_name} targets Minecraft {selected.minecraft_version}, not {instance.version_id}.",
-+            )
-         if requested_value == OptiFineInstallMode.AUTO:
-             requested_value = OptiFineInstallMode.STANDALONE if loader == ModLoaderManager.VANILLA else OptiFineInstallMode.FORGE_MOD
-         if requested_value == OptiFineInstallMode.STANDALONE:
-             if loader != ModLoaderManager.VANILLA:
-                 return OptiFineCompatibilityResult(OptiFineCompatibilityState.BLOCKED, requested_value, "Standalone OptiFine can only be installed on a Vanilla instance.")
--            return OptiFineCompatibilityResult(OptiFineCompatibilityState.COMPATIBLE, requested_value, "Compatible as a standalone OptiFine profile.")
-+            return OptiFineCompatibilityResult(OptiFineCompatibilityState.COMPATIBLE, requested_value, "The imported OptiFine JAR matches this Minecraft version and can be installed as a standalone profile.")
-         if requested_value != OptiFineInstallMode.FORGE_MOD:
-             return OptiFineCompatibilityResult(OptiFineCompatibilityState.BLOCKED, requested_value, f"Unsupported OptiFine installation mode: {requested_value}")
-         if loader != ModLoaderManager.FORGE:
-             return OptiFineCompatibilityResult(OptiFineCompatibilityState.BLOCKED, requested_value, "OptiFine mod mode currently supports Minecraft Forge instances only.")
--        declared = str(selected.forge_version or "").strip().lstrip("#")
--        if declared.casefold() == "n/a":
--            return OptiFineCompatibilityResult(OptiFineCompatibilityState.BLOCKED, requested_value, "This OptiFine build is marked Forge N/A on the official downloads page.")
--        if not declared:
--            return OptiFineCompatibilityResult(OptiFineCompatibilityState.UNKNOWN, requested_value, "The official OptiFine page does not declare a Forge compatibility version for this build.")
--        actual = str(loader_version or "").strip().lstrip("#")
--        if actual == declared or actual.endswith(f".{declared}"):
--            return OptiFineCompatibilityResult(OptiFineCompatibilityState.COMPATIBLE, requested_value, f"Compatible with Forge {actual}.")
--        return OptiFineCompatibilityResult(OptiFineCompatibilityState.WARNING, requested_value, f"OptiFine declares Forge {declared}, while this instance uses Forge {actual}. Installation is allowed, but launch compatibility is not guaranteed.")
-+        return OptiFineCompatibilityResult(
-+            OptiFineCompatibilityState.COMPATIBLE,
-+            requested_value,
-+            "The imported OptiFine JAR matches this Minecraft version and can be installed as a Forge mod.",
-+        )
- 
-     @staticmethod
-     def resolve_mode(instance: Instance, requested: str | OptiFineInstallMode = OptiFineInstallMode.AUTO) -> OptiFineInstallMode:
-@@ -72,12 +71,13 @@
-         return mode
- 
-     @classmethod
--    def install(cls, instance: Instance, selected: OptiFineVersion, source_jar: Path, mode: str | OptiFineInstallMode = OptiFineInstallMode.AUTO, reporter: ProgressReporter | None = None) -> OptiFineInstallResult:
-+    def install(cls, instance: Instance, source_jar: Path, mode: str | OptiFineInstallMode = OptiFineInstallMode.AUTO, reporter: ProgressReporter | None = None) -> OptiFineInstallResult:
-+        inspected = OptiFineJarInspector.inspect(Path(source_jar), instance.version_id)
-+        selected = inspected.version
-         compatibility = cls.compatibility(instance, selected, mode)
-         if compatibility.blocked:
-             raise RuntimeError(compatibility.message)
-         resolved_mode = cls.resolve_mode(instance, mode)
--        inspected = OptiFineJarInspector.inspect(Path(source_jar), selected)
-         cached_source = Paths.optifine_source_cache(inspected.sha256, inspected.filename)
-         cached_source.parent.mkdir(parents=True, exist_ok=True)
-         if not cached_source.is_file() or cached_source.stat().st_size != inspected.size:
-@@ -124,7 +124,7 @@
-                 "installedPath": str(installed_path),
-                 "profilePath": profile_path,
-                 "preview": selected.preview,
--                "forgeVersion": selected.forge_version,
-+                "forgeVersion": "",
-                 "compatibilityState": compatibility.state.value,
-                 "officialPage": selected.download_page_url,
+--- a/src/core/curseforge/curseforge_pack_installer.py
++++ b/src/core/curseforge/curseforge_pack_installer.py
+@@ -401,6 +401,8 @@
+                 "downloadUrl": file.download_url,
+                 "declaredLoaders": list(file.loaders),
+                 "gameVersions": list(file.game_versions),
++                "dependencies": [{"projectId": dependency.project_id, "relationType": dependency.relation_type} for dependency in file.dependencies],
++                "dependencyMetadataResolved": True,
+                 "required": required,
+                 "provider": "curseforge",
              })
-@@ -145,13 +145,7 @@
-         source = Path(state.source_path)
-         if not source.is_file() or cls._sha256(source) != state.sha256:
-             raise RuntimeError("The cached OptiFine installer is missing or modified. Select the official OptiFine JAR again.")
--        selected = OptiFineVersion(
--            minecraft_version=state.minecraft_version,
--            edition=cls._edition_from_version_id(state.version_id),
--            build=cls._build_from_version_id(state.version_id),
--            filename=state.filename,
--        )
--        result = cls.install(instance, selected, source, state.mode, reporter)
-+        result = cls.install(instance, source, state.mode, reporter)
-         return OptiFineInstallResult(result.instance_name, result.mode, result.version_id, result.installed_path, repaired=True)
- 
-     @classmethod
-@@ -195,7 +189,13 @@
-         target = mods / filename
-         if target.is_file() and target.name.casefold() not in allowed:
-             raise RuntimeError("An unmanaged OptiFine JAR with the selected filename already exists. Remove it manually before installing a managed copy.")
--        unmanaged = [path for path in mods.glob("OptiFine_*.jar") if path.name.casefold() != filename.casefold() and path.name.casefold() not in allowed]
-+        unmanaged = [
-+            path
-+            for path in mods.glob("*.jar")
-+            if path.name.casefold().startswith(("optifine_", "preview_optifine_"))
-+            and path.name.casefold() != filename.casefold()
-+            and path.name.casefold() not in allowed
-+        ]
-         if unmanaged:
-             raise RuntimeError("Another unmanaged OptiFine JAR already exists in this instance. Remove it manually before installing a managed OptiFine version.")
-         target.parent.mkdir(parents=True, exist_ok=True)
---- a/src/gui/controllers/instance_controller.py
-+++ b/src/gui/controllers/instance_controller.py
-@@ -128,7 +128,7 @@
- 
-         return self._task_runner.run(self.CREATE_TASK_ID, task, tr("task.instance.create", name=name))
- 
--    def create_with_optifine(self, name: str, version_id: str, loader_name: str, loader_version: str, optifine_version: object, source_path: object) -> bool:
-+    def create_with_optifine(self, name: str, version_id: str, loader_name: str, loader_version: str, source_path: object) -> bool:
-         name = self._validated_name(name)
-         version_id = str(version_id or "").strip()
-         loader_name, loader_version = self._core.loaders.normalize((loader_name, loader_version))
-@@ -146,7 +146,6 @@
-                     loader_version=loader_version,
-                     on_progress=self._on_loader_progress,
-                 ),
--                optifine_version,
-                 Path(source_path),
-                 "auto",
-                 self._on_loader_progress,
---- a/src/gui/controllers/optifine_controller.py
-+++ b/src/gui/controllers/optifine_controller.py
-@@ -11,14 +11,12 @@
+--- a/src/core/curseforge/curseforge_pack_registry.py
++++ b/src/core/curseforge/curseforge_pack_registry.py
+@@ -9,7 +9,7 @@
  
  
- class OptiFineController(BaseController):
--    versions_ready = Signal(str, object, bool)
-     state_ready = Signal(str, object)
-     install_finished = Signal(object)
-     repair_finished = Signal(object)
-     uninstall_finished = Signal(str)
-     progress = Signal(object)
+ class CurseForgePackRegistry:
+-    SCHEMA_VERSION = 2
++    SCHEMA_VERSION = 3
  
--    VERSION_TASK_ID = "optifine.versions"
-     INSTALL_TASK_ID = "optifine.install"
-     REPAIR_TASK_ID = "optifine.repair"
-     UNINSTALL_TASK_ID = "optifine.uninstall"
-@@ -27,21 +25,9 @@
-         super().__init__()
-         self._task_runner = task_runner
-         self._core = get_default_core()
--        self._version_request: tuple[str, bool] = ("", False)
-         task_runner.task_succeeded.connect(self._on_succeeded)
-         task_runner.task_failed.connect(self._on_failed)
- 
--    def load_versions(self, minecraft_version: str, include_preview: bool = False, force_refresh: bool = False) -> bool:
--        game = str(minecraft_version or "").strip()
--        self._version_request = (game, bool(include_preview))
--        return self._run_network_task(
--            self._task_runner,
--            self.VERSION_TASK_ID,
--            lambda: self._core.optifine.list_versions(game, include_preview, force_refresh),
--            tr("task.optifine.load_versions", version=game or tr("common.all")),
--            blocking=False,
--        )
--
-     def load_state(self, instance_name: str) -> None:
-         name = str(instance_name or "").strip()
-         if not name:
-@@ -51,13 +37,15 @@
-         except Exception as error:
-             self._emit_error(tr("optifine.title"), error)
- 
--    def install(self, instance_name: str, version: object, source_path: Path, mode: str = "auto") -> bool:
-+    def install(self, instance_name: str, source_path: Path, mode: str = "auto") -> bool:
-         name = str(instance_name or "").strip()
-         source = Path(source_path)
-         if not name:
-             return False
+     @staticmethod
+     def load(instance: Instance | Path) -> dict:
+@@ -86,9 +86,36 @@
+                 "manualImport": bool(raw.get("manualImport", False)),
+                 "resolvePathFromProvider": bool(raw.get("resolvePathFromProvider", False)),
+                 "provider": "curseforge",
++                "selectionReason": str(raw.get("selectionReason") or "pack_manifest").strip().casefold(),
++                "requiredBy": list(dict.fromkeys(str(item).strip() for item in raw.get("requiredBy", []) if str(item).strip())) if isinstance(raw.get("requiredBy"), (list, tuple, set)) else [],
++                "projectUrl": str(raw.get("projectUrl") or "").strip(),
++                "releaseType": str(raw.get("releaseType") or "release").strip().casefold(),
++                "datePublished": str(raw.get("datePublished") or "").strip(),
++                "declaredLoaders": [str(item).strip().casefold() for item in raw.get("declaredLoaders", []) if str(item).strip()] if isinstance(raw.get("declaredLoaders"), (list, tuple, set)) else [],
++                "gameVersions": [str(item).strip() for item in raw.get("gameVersions", []) if str(item).strip()] if isinstance(raw.get("gameVersions"), (list, tuple, set)) else [],
++                "dependencies": CurseForgePackRegistry._normalize_dependencies(raw.get("dependencies", [])),
++                "dependencyMetadataResolved": bool(raw.get("dependencyMetadataResolved", False)),
+             })
+         output = dict(data)
+         output["schemaVersion"] = CurseForgePackRegistry.SCHEMA_VERSION
+         output["managedFiles"] = managed
+         output["source"] = "curseforge"
+         return output
 +
-         def task():
--            return self._core.optifine.install(name, version, source, mode, self.progress.emit)
-+            return self._core.optifine.install(name, source, mode, self.progress.emit)
++    @staticmethod
++    def _normalize_dependencies(value: object) -> list[dict]:
++        if not isinstance(value, (list, tuple)):
++            return []
++        normalized: dict[tuple[int, int], dict] = {}
++        for raw in value:
++            if not isinstance(raw, dict):
++                continue
++            try:
++                project_id = int(raw.get("projectId") or raw.get("modId") or 0)
++                relation_type = int(raw.get("relationType") or 0)
++            except (TypeError, ValueError):
++                continue
++            if project_id <= 0 or relation_type <= 0:
++                continue
++            normalized[(project_id, relation_type)] = {"projectId": project_id, "relationType": relation_type}
++        return list(normalized.values())
+--- a/src/core/minecraft/minecraft_executor.py
++++ b/src/core/minecraft/minecraft_executor.py
+@@ -21,6 +21,7 @@
+ from src.core.minecraft.launcher_manager import LauncherManager
+ from src.core.minecraft.library_manager import DownloadLibraryManager
+ from src.core.modloader.mod_loader_manager import ModLoaderManager
++from src.core.mod.modpack_dependency_resolver import ModpackDependencyResolver
+ from src.core.optifine.optifine_manager import OptiFineManager
+ from src.core.modloader.forge.forge_launch_command_manager import ForgeLaunchCommandManager
+ from src.core.modloader.forge.legacy_libloader_manager import LegacyLibLoaderManager
+@@ -153,11 +154,25 @@
+             launch_lock_token = getattr(run_lock, "token", None)
+             PortableContentManager.ensure(instance)
+             PortableContentManager.prefetch_referenced(instance, reporter)
++            dependency_resolution = ModpackDependencyResolver.resolve(instance, reporter)
+             modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
+             curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
+             ftb_warnings = FTBContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
+             atlauncher_warnings = ATLauncherContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
+             legacy_libloader_warnings = LegacyLibLoaderManager.ensure(instance, reporter)
 +
-         return self._task_runner.run(self.INSTALL_TASK_ID, task, tr("task.optifine.install", name=name))
- 
-     def repair(self, instance_name: str) -> bool:
-@@ -82,11 +70,7 @@
- 
-     @Slot(str, object)
-     def _on_succeeded(self, task_id: str, result: object) -> None:
--        if task_id == self.VERSION_TASK_ID:
--            game, previews = self._version_request
--            self.versions_ready.emit(game, result, previews)
--            self.status_changed.emit(tr("status.optifine.versions_loaded", count=len(result)))
--        elif task_id == self.INSTALL_TASK_ID:
-+        if task_id == self.INSTALL_TASK_ID:
-             self.install_finished.emit(result)
-             self.status_changed.emit(tr("status.optifine.installed", name=result.instance_name))
-             self.load_state(result.instance_name)
-@@ -101,7 +85,5 @@
- 
-     @Slot(str, object)
-     def _on_failed(self, task_id: str, error: Exception) -> None:
--        if task_id == self.VERSION_TASK_ID and self._offer_network_retry(task_id, tr("optifine.title"), error):
--            return
-         if task_id.startswith("optifine."):
-             self._emit_error(tr("optifine.title"), error)
---- a/src/gui/dialogs/create_instance_dialog.py
-+++ b/src/gui/dialogs/create_instance_dialog.py
-@@ -24,12 +24,12 @@
- from src.gui.loader_version_options import loader_title, loader_version_entries
- from src.gui.theme.runtime import set_theme_icon
- from src.gui.window_sizing import resize_dialog_to_screen
-+from src.models.optifine.optifine_models import OptiFineVersion
- 
- 
- class CreateInstanceDialog(QDialog):
-     create_requested = Signal(str, str, str, str)
--    create_with_optifine_requested = Signal(str, str, str, str, object, object)
--    optifine_versions_requested = Signal(str, bool, bool)
-+    create_with_optifine_requested = Signal(str, str, str, str, object)
-     fabric_versions_requested = Signal(str)
-     quilt_versions_requested = Signal(str)
-     forge_versions_requested = Signal(str)
-@@ -48,8 +48,8 @@
-         self._versions: list[object] = []
-         self._loader_versions: dict[tuple[str, str], list[object]] = {}
-         self._pending_loader_requests: set[tuple[str, str]] = set()
--        self._optifine_versions: dict[tuple[str, bool], list[object]] = {}
-         self._optifine_source_path: Path | None = None
-+        self._detected_optifine_version: OptiFineVersion | None = None
-         self._build_ui()
-         self.retranslate_dynamic()
- 
-@@ -127,16 +127,13 @@
-         layout.addWidget(self.optifine_checkbox)
-         optifine_form = QFormLayout()
-         optifine_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
--        self.optifine_version_label = QLabel()
--        self.optifine_version_combo = QComboBox()
--        self.optifine_version_combo.currentIndexChanged.connect(self._optifine_selection_changed)
--        self.optifine_preview_checkbox = QCheckBox()
--        self.optifine_preview_checkbox.toggled.connect(lambda _checked: self._request_optifine_versions(force=False))
-+        self.optifine_detected_label = QLabel()
-+        self.optifine_detected_value = QLabel()
-+        self.optifine_detected_value.setWordWrap(True)
-         self.optifine_file_label = QLabel()
-         self.optifine_file_button = QPushButton()
-         self.optifine_file_button.clicked.connect(self._choose_optifine_file)
--        optifine_form.addRow(self.optifine_version_label, self.optifine_version_combo)
--        optifine_form.addRow("", self.optifine_preview_checkbox)
-+        optifine_form.addRow(self.optifine_detected_label, self.optifine_detected_value)
-         optifine_form.addRow(self.optifine_file_label, self.optifine_file_button)
-         layout.addLayout(optifine_form)
-         self.optifine_status = QLabel()
-@@ -202,14 +199,17 @@
-     def set_neoforge_versions(self, game_version: str, versions: list[object]) -> None:
-         self._set_loader_versions("neoforge", game_version, versions)
- 
--    def set_optifine_versions(self, game_version: str, versions: list[object], include_preview: bool = False) -> None:
--        key = (str(game_version).strip(), bool(include_preview))
--        self._optifine_versions[key] = list(versions)
--        if self.optifine_checkbox.isChecked() and key == (self.version_combo.currentText().strip(), self.optifine_preview_checkbox.isChecked()):
--            self._render_optifine_versions(list(versions))
-+    def selected_optifine_version(self) -> OptiFineVersion | None:
-+        return self._detected_optifine_version if self.optifine_checkbox.isChecked() else None
- 
--    def selected_optifine_version(self) -> object | None:
--        return self.optifine_version_combo.currentData() if self.optifine_checkbox.isChecked() else None
-+    def reset_optifine_selection(self) -> None:
-+        self._optifine_source_path = None
-+        self._detected_optifine_version = None
-+        self.optifine_checkbox.setChecked(False)
-+        self.optifine_file_button.setText(tr("optifine.choose_file"))
-+        self.optifine_detected_value.setText(tr("optifine.file.not_detected"))
-+        self._refresh_optifine_status()
-+        self._update_create_state()
- 
-     def _set_loader_versions(self, loader: str, game_version: str, versions: list[object]) -> None:
-         key = (loader, str(game_version).strip())
-@@ -303,9 +303,16 @@
-         game_version = self.version_combo.currentText().strip()
-         loader = self.selected_loader()
-         loader_ready = loader == "vanilla" or bool(self.selected_loader_version())
--        selected_optifine = self.selected_optifine_version()
--        forge_unavailable = loader == "forge" and bool(getattr(selected_optifine, "forge_unavailable", False))
--        optifine_ready = (not self.optifine_checkbox.isChecked()) or (selected_optifine is not None and self._optifine_source_path is not None and loader in {"vanilla", "forge"} and not forge_unavailable)
-+        detected = self.selected_optifine_version()
-+        optifine_ready = (
-+            not self.optifine_checkbox.isChecked()
-+            or (
-+                detected is not None
-+                and self._optifine_source_path is not None
-+                and loader in {"vanilla", "forge"}
-+                and detected.minecraft_version == game_version
-+            )
-+        )
-         self.create_button.setEnabled(bool(game_version) and loader_ready and optifine_ready)
- 
-     def _request_create(self) -> None:
-@@ -323,11 +330,18 @@
-             QMessageBox.information(self, tr("workspace.create.title"), tr("workspace.create.loader_version.required", loader=loader_title(loader), version=version_id))
-             return
-         if self.optifine_checkbox.isChecked():
--            selected_optifine = self.selected_optifine_version()
--            if selected_optifine is None or self._optifine_source_path is None:
-+            detected = self.selected_optifine_version()
-+            if detected is None or self._optifine_source_path is None:
-                 QMessageBox.information(self, tr("workspace.create.title"), tr("optifine.file.required"))
-                 return
--            self.create_with_optifine_requested.emit(name, version_id, loader, loader_version, selected_optifine, self._optifine_source_path)
-+            if detected.minecraft_version != version_id:
-+                QMessageBox.warning(
-+                    self,
-+                    tr("workspace.create.title"),
-+                    tr("optifine.file.version_mismatch", actual=detected.minecraft_version, expected=version_id),
++            # A second pass can identify provider versions after pack files have
++            # been hydrated/downloaded. Any newly discovered required files are
++            # downloaded before the compatibility preflight runs.
++            dependency_resolution_after_download = ModpackDependencyResolver.resolve(instance, reporter)
++            if dependency_resolution_after_download.changed:
++                modrinth_warnings = tuple(modrinth_warnings) + tuple(
++                    ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
 +                )
-+                return
-+            self.create_with_optifine_requested.emit(name, version_id, loader, loader_version, self._optifine_source_path)
-         else:
-             self.create_requested.emit(name, version_id, loader, loader_version)
-         self.accept()
-@@ -337,69 +351,64 @@
-         self.optifine_checkbox.setEnabled(supported)
-         if not supported and self.optifine_checkbox.isChecked():
-             self.optifine_checkbox.setChecked(False)
--        if not supported:
--            self.optifine_status.setText(tr("optifine.mode.unsupported_detail"))
--        elif self.optifine_checkbox.isChecked():
--            mode_key = "optifine.mode.standalone" if loader == "vanilla" else "optifine.mode.forge_mod"
--            self.optifine_status.setText(tr("optifine.create.mode", mode=tr(mode_key)))
-+        self._refresh_optifine_status()
++                curseforge_warnings = tuple(curseforge_warnings) + tuple(
++                    CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
++                )
++            ModpackDependencyResolver.raise_for_required_dependencies(instance, dependency_resolution_after_download.unresolved)
+             PortableContentManager.finalize_disabled(instance)
  
-     def _optifine_toggled(self, checked: bool) -> None:
--        for widget in (self.optifine_version_combo, self.optifine_preview_checkbox, self.optifine_file_button):
--            widget.setEnabled(bool(checked))
--        if checked:
--            self._request_optifine_versions(force=False)
--        self._update_create_state()
--
--    def _request_optifine_versions(self, force: bool = False) -> None:
--        game = self.version_combo.currentText().strip()
--        previews = self.optifine_preview_checkbox.isChecked()
--        if not self.optifine_checkbox.isChecked() or not game:
--            return
--        cached = self._optifine_versions.get((game, previews))
--        if cached is not None and not force:
--            self._render_optifine_versions(cached)
--            return
--        self.optifine_version_combo.clear()
--        self.optifine_status.setText(tr("optifine.metadata.loading"))
--        self.optifine_versions_requested.emit(game, previews, bool(force))
-+        self.optifine_file_button.setEnabled(bool(checked))
-+        self.optifine_detected_value.setEnabled(bool(checked))
-+        self._refresh_optifine_status()
-         self._update_create_state()
- 
--    def _render_optifine_versions(self, versions: list[object]) -> None:
--        self.optifine_version_combo.blockSignals(True)
--        self.optifine_version_combo.clear()
--        for item in versions:
--            label = str(getattr(item, "display_name", getattr(item, "version_id", "OptiFine")))
--            forge = str(getattr(item, "forge_version", ""))
--            if forge:
--                label += f" · Forge {forge}"
--            self.optifine_version_combo.addItem(label, item)
--        self.optifine_version_combo.blockSignals(False)
--        if versions:
--            mode_key = "optifine.mode.standalone" if self.selected_loader() == "vanilla" else "optifine.mode.forge_mod"
--            selected = self.selected_optifine_version()
--            if self.selected_loader() == "forge" and bool(getattr(selected, "forge_unavailable", False)):
--                self.optifine_status.setText(tr("optifine.compatibility.forge_unavailable"))
--            else:
--                self.optifine_status.setText(tr("optifine.create.mode", mode=tr(mode_key)))
--        else:
--            self.optifine_status.setText(tr("optifine.metadata.none"))
--        self._update_create_state()
--
--    def _optifine_selection_changed(self, *_args) -> None:
--        if self.optifine_checkbox.isChecked() and self.selected_loader() == "forge" and bool(getattr(self.selected_optifine_version(), "forge_unavailable", False)):
--            self.optifine_status.setText(tr("optifine.compatibility.forge_unavailable"))
--        elif self.optifine_checkbox.isChecked() and self.selected_optifine_version() is not None:
--            mode_key = "optifine.mode.standalone" if self.selected_loader() == "vanilla" else "optifine.mode.forge_mod"
--            self.optifine_status.setText(tr("optifine.create.mode", mode=tr(mode_key)))
--        self._update_create_state()
-+    def _refresh_optifine_status(self) -> None:
-+        loader = self.selected_loader()
-+        game_version = self.version_combo.currentText().strip()
-+        if loader not in {"vanilla", "forge"} or not game_version:
-+            self.optifine_status.setText(tr("optifine.mode.unsupported_detail"))
-+            return
-+        if not self.optifine_checkbox.isChecked():
-+            self.optifine_status.setText("")
-+            return
-+        mode_key = "optifine.mode.standalone" if loader == "vanilla" else "optifine.mode.forge_mod"
-+        detected = self._detected_optifine_version
-+        if detected is None or self._optifine_source_path is None:
-+            self.optifine_status.setText(tr("optifine.create.import_mode", mode=tr(mode_key)))
-+            return
-+        if detected.minecraft_version != game_version:
-+            self.optifine_status.setText(tr("optifine.file.version_mismatch", actual=detected.minecraft_version, expected=game_version))
-+            return
-+        self.optifine_status.setText(
-+            tr(
-+                "optifine.create.file_ready",
-+                version=detected.display_name,
-+                minecraft=detected.minecraft_version,
-+                mode=tr(mode_key),
+             download_pause_controller.raise_if_requested()
+@@ -260,7 +275,14 @@
+                 and (forge_preflight_policy == ManagedContentPolicy.ALLOW or allow_compatibility_issues_once)
+             )
+             forge_warnings = tuple(issue.message for issue in forge_preflight.warnings) + bypassed_compatibility
+-            warnings = tuple(modrinth_warnings) + tuple(curseforge_warnings) + tuple(ftb_warnings) + tuple(atlauncher_warnings) + tuple(legacy_libloader_warnings) + forge_warnings + tuple(java_recovery_warnings)
++            # Only surface the final dependency state. The first pass may
++            # temporarily fail before pack files are hydrated, while the second
++            # pass can resolve the same dependency successfully after download.
++            dependency_warnings = (
++                tuple(dependency_resolution_after_download.warnings)
++                + tuple(dependency_resolution_after_download.unresolved)
 +            )
-+        )
++            warnings = dependency_warnings + tuple(modrinth_warnings) + tuple(curseforge_warnings) + tuple(ftb_warnings) + tuple(atlauncher_warnings) + tuple(legacy_libloader_warnings) + forge_warnings + tuple(java_recovery_warnings)
+             if warnings:
+                 result["warnings"] = warnings
+             return result
+--- a/src/core/mod/mod_compatibility_manager.py
++++ b/src/core/mod/mod_compatibility_manager.py
+@@ -11,6 +11,8 @@
  
-     def _choose_optifine_file(self) -> None:
--        selected = self.selected_optifine_version()
--        expected = str(getattr(selected, "filename", "OptiFine_*.jar"))
--        path, _filter = QFileDialog.getOpenFileName(self, tr("optifine.file.choose_title"), "", f"{expected} (*.jar);;Java Archive (*.jar)")
--        if path:
--            self._optifine_source_path = Path(path)
--            self.optifine_file_button.setText(self._optifine_source_path.name)
-+        path, _filter = QFileDialog.getOpenFileName(self, tr("optifine.file.choose_title"), "", "OptiFine (*.jar);;Java Archive (*.jar)")
-+        if not path:
+ 
+ class ModCompatibilityManager:
++    SYSTEM_DEPENDENCY_IDS = {"minecraft", "forge", "neoforge", "javafml", "fml", "fabricloader", "quilt_loader", "quiltloader"}
++
+     @staticmethod
+     def scan(instance: Instance, mods: list[ModInfo] | None = None) -> ModHealthReport:
+         mods = list(mods) if mods is not None else ModManager.list_mods(instance)
+@@ -55,7 +57,7 @@
+         ModCompatibilityManager._append_duplicate_issues(enabled_by_id, issues)
+ 
+         for mod in enabled:
+-            ModCompatibilityManager._append_dependency_issues(mod, enabled_by_id, disabled_by_id, installed_versions, issues)
++            ModCompatibilityManager._append_dependency_issues(mod, enabled_by_id, disabled_by_id, installed_versions, issues, managed_by_modpack=mod.managed_by_modpack)
+             ModCompatibilityManager._append_conflict_issues(mod, enabled_by_id, installed_versions, issues)
+ 
+         issues.sort(key=lambda item: ({"error": 0, "warning": 1, "info": 2}.get(item.severity, 3), item.message.casefold()))
+@@ -92,7 +94,7 @@
+             issues.append(ModIssue(severity="error", code="duplicate-mod-id", message=f"Duplicate enabled mod ID '{mod_id}': {files}", mod_ids=(mod_id,)))
+ 
+     @staticmethod
+-    def _append_dependency_issues(mod: ModInfo, enabled_by_id: dict[str, list[ModInfo]], disabled_by_id: dict[str, list[ModInfo]], installed_versions: dict[str, str], issues: list[ModIssue]) -> None:
++    def _append_dependency_issues(mod: ModInfo, enabled_by_id: dict[str, list[ModInfo]], disabled_by_id: dict[str, list[ModInfo]], installed_versions: dict[str, str], issues: list[ModIssue], managed_by_modpack: bool = False) -> None:
+         for dependency_id, requirement in mod.dependencies.items():
+             normalized_id = str(dependency_id).strip().casefold()
+             if not normalized_id:
+@@ -108,7 +110,18 @@
+                 continue
+             matches = ModCompatibilityManager._matches_requirement(installed_versions[normalized_id], requirement)
+             if matches is False:
+-                issues.append(ModIssue(severity="error", code="dependency-version", message=f"{mod.name} requires '{dependency_id}' {ModCompatibilityManager._format_requirement(requirement)}, but {installed_versions[normalized_id]} is installed.", mod_ids=(mod.mod_id, normalized_id)))
++                if managed_by_modpack and normalized_id in ModCompatibilityManager.SYSTEM_DEPENDENCY_IDS:
++                    issues.append(ModIssue(
++                        severity="warning",
++                        code="pack-pinned-system-requirement",
++                        message=(
++                            f"{mod.name} requires '{dependency_id}' {ModCompatibilityManager._format_requirement(requirement)}, "
++                            f"but {installed_versions[normalized_id]} is installed. The modpack-pinned file was kept."
++                        ),
++                        mod_ids=(mod.mod_id, normalized_id),
++                    ))
++                else:
++                    issues.append(ModIssue(severity="error", code="dependency-version", message=f"{mod.name} requires '{dependency_id}' {ModCompatibilityManager._format_requirement(requirement)}, but {installed_versions[normalized_id]} is installed.", mod_ids=(mod.mod_id, normalized_id)))
+ 
+         for dependency_id, requirement in mod.recommends.items():
+             normalized_id = str(dependency_id).strip().casefold()
+--- a/src/core/mod/mod_provenance_registry.py
++++ b/src/core/mod/mod_provenance_registry.py
+@@ -18,7 +18,7 @@
+     so the UI and future MCWPack exporter can recover provenance consistently.
+     """
+ 
+-    SCHEMA_VERSION = 1
++    SCHEMA_VERSION = 2
+     _MODRINTH_CDN_PATTERN = re.compile(r"^/data/([^/]+)/versions/([^/]+)/([^/]+)$", re.IGNORECASE)
+     _PROVIDERS = {"modrinth", "curseforge", "ftb", "atlauncher", "optifine", "local", "manual", "unknown"}
+ 
+@@ -192,6 +192,8 @@
+                 "size": raw.get("size"),
+                 "downloadUrls": downloads,
+                 "managedByModpack": True,
++                "selectionReason": raw.get("selectionReason"),
++                "requiredBy": raw.get("requiredBy", []),
+                 "packProvider": "modrinth",
+                 "packProjectId": pack_project_id,
+                 "packVersionId": pack_version_id,
+@@ -218,6 +220,8 @@
+                 "size": raw.get("size"),
+                 "downloadUrls": [raw.get("downloadUrl")] if raw.get("downloadUrl") else [],
+                 "managedByModpack": True,
++                "selectionReason": raw.get("selectionReason"),
++                "requiredBy": raw.get("requiredBy", []),
+                 "packProvider": "curseforge",
+                 "packProjectId": pack_project_id,
+                 "packVersionId": pack_version_id,
+@@ -318,6 +322,8 @@
+             "licenseUrl": str(raw.get("licenseUrl") or "").strip(),
+             "redistributionAllowed": bool(raw.get("redistributionAllowed", False)),
+             "managedByModpack": bool(raw.get("managedByModpack", False)),
++            "selectionReason": str(raw.get("selectionReason") or ("pack_manifest" if raw.get("managedByModpack", False) else "direct_install")).strip().casefold(),
++            "requiredBy": list(dict.fromkeys(str(item).strip() for item in raw.get("requiredBy", []) if str(item).strip())) if isinstance(raw.get("requiredBy"), (list, tuple, set)) else [],
+             "packProvider": str(raw.get("packProvider") or "").strip().casefold(),
+             "packProjectId": str(raw.get("packProjectId") or "").strip(),
+             "packVersionId": str(raw.get("packVersionId") or "").strip(),
+--- /dev/null
++++ b/src/core/mod/modpack_dependency_resolver.py
+@@ -0,0 +1,531 @@
++from __future__ import annotations
++
++from collections import deque
++from datetime import datetime, timezone
++from pathlib import Path, PurePosixPath
++from time import sleep
++from typing import Callable, TypeVar
++
++from src.core.curseforge.curseforge_client import CurseForgeClient
++from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
++from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
++from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
++from src.core.modloader.mod_loader_manager import ModLoaderManager
++from src.core.modrinth.modrinth_client import ModrinthClient
++from src.core.modrinth.modrinth_mod_installer import ModrinthModInstaller
++from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
++from src.core.network.download_pause import download_pause_controller
++from src.core.network.retry_policy import DownloadRetryPolicy
++from src.core.progress.progress_reporter import ProgressReporter
++from src.models.curseforge.file import CurseForgeDependency, CurseForgeFile
++from src.models.instance.instance import Instance
++from src.models.mod.dependency_resolution import DependencyResolutionResult, RequiredModDependenciesMissing
++from src.models.mod.mod_issue import ModIssue
++from src.models.modrinth.version import ModrinthVersion
++from src.models.progress.progress_stage import ProgressStage
++
++
++T = TypeVar("T")
++
++
++class ModpackDependencyResolver:
++    """Completes required provider dependency graphs for managed modpacks.
++
++    A provider manifest remains authoritative for files it explicitly pins.
++    This resolver only appends missing *required* dependencies and never
++    replaces a pack-pinned version.
++    """
++
++    MAX_DEPTH = 20
++    MAX_DEPENDENCIES = 256
++    MAX_ATTEMPTS = 3
++    BLOCKING_CODES = {"dependency-missing", "dependency-disabled", "dependency-version"}
++
++    @staticmethod
++    def resolve(instance: Instance, reporter: ProgressReporter | None = None) -> DependencyResolutionResult:
++        if getattr(instance, "instance_dir", None) is None:
++            return DependencyResolutionResult()
++        added: list[str] = []
++        warnings: list[str] = []
++        unresolved: list[str] = []
++
++        modrinth = ModrinthPackRegistry.load(instance)
++        if ModpackDependencyResolver._has_managed_mods(modrinth.get("managedFiles", [])):
++            result = ModpackDependencyResolver._resolve_modrinth(instance, modrinth, reporter)
++            added.extend(result.added_files)
++            warnings.extend(result.warnings)
++            unresolved.extend(result.unresolved)
++
++        curseforge = CurseForgePackRegistry.load(Path(instance.instance_dir))
++        if ModpackDependencyResolver._has_managed_mods(curseforge.get("managedFiles", [])):
++            result = ModpackDependencyResolver._resolve_curseforge(instance, curseforge, reporter)
++            added.extend(result.added_files)
++            warnings.extend(result.warnings)
++            unresolved.extend(result.unresolved)
++
++        if added:
++            ModProvenanceRegistry.synchronize(instance)
++        return DependencyResolutionResult(
++            added_files=tuple(dict.fromkeys(added)),
++            warnings=tuple(dict.fromkeys(warnings)),
++            unresolved=tuple(dict.fromkeys(unresolved)),
++        )
++
++    @staticmethod
++    def blocking_issues(instance: Instance) -> tuple:
++        report = ModCompatibilityManager.scan(instance)
++        return tuple(
++            issue
++            for issue in report.issues
++            if issue.severity == "error" and issue.code in ModpackDependencyResolver.BLOCKING_CODES
++        )
++
++    @staticmethod
++    def raise_for_required_dependencies(instance: Instance, unresolved: tuple[str, ...] | list[str] = ()) -> None:
++        if not ModpackDependencyResolver._is_managed_modpack(instance):
 +            return
++        issues = list(ModpackDependencyResolver.blocking_issues(instance))
++        issues.extend(
++            ModIssue(severity="error", code="dependency-unresolved", message=str(message), mod_ids=())
++            for message in unresolved
++            if str(message).strip()
++        )
++        if issues:
++            raise RequiredModDependenciesMissing(instance.name, tuple(issues))
++
++    @staticmethod
++    def _resolve_modrinth(instance: Instance, registry: dict, reporter: ProgressReporter | None) -> DependencyResolutionResult:
++        entries = [entry for entry in registry.get("managedFiles", []) if isinstance(entry, dict)]
++        mod_entries = [entry for entry in entries if ModpackDependencyResolver._is_mod_entry(entry)]
++        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
++        loader_name = str(loader_name).strip().casefold()
++        selected: dict[str, dict] = {}
++        versions: dict[str, ModrinthVersion] = {}
++        warnings: list[str] = []
++        unresolved: list[str] = []
++        added: list[str] = []
++        changed = False
++
++        ModpackDependencyResolver._report(reporter, "Resolving Modrinth modpack dependencies...", 0, max(1, len(mod_entries)))
++        for completed, entry in enumerate(mod_entries, start=1):
++            download_pause_controller.raise_if_requested()
++            entry.setdefault("selectionReason", "pack_manifest")
++            entry.setdefault("requiredBy", [])
++            try:
++                version = ModpackDependencyResolver._modrinth_version_for_entry(entry)
++            except Exception as error:
++                warnings.append(f"Could not identify Modrinth dependency metadata for {entry.get('fileName') or entry.get('path')}: {error}")
++                ModpackDependencyResolver._report(reporter, "Resolving Modrinth modpack dependencies...", completed, max(1, len(mod_entries)))
++                continue
++            if version is None:
++                warnings.append(f"Modrinth file identity is unavailable: {entry.get('fileName') or entry.get('path')}")
++                ModpackDependencyResolver._report(reporter, "Resolving Modrinth modpack dependencies...", completed, max(1, len(mod_entries)))
++                continue
++            changed |= ModpackDependencyResolver._hydrate_modrinth_entry(entry, version)
++            selected.setdefault(version.project_id, entry)
++            versions[version.version_id] = version
++            ModpackDependencyResolver._report(reporter, "Resolving Modrinth modpack dependencies...", completed, max(1, len(mod_entries)))
++
++        queue: deque[tuple[ModrinthVersion, int, str]] = deque(
++            (version, 0, ModpackDependencyResolver._entry_label(selected.get(version.project_id, {}), version.project_id))
++            for version in versions.values()
++        )
++        visited_versions: set[str] = set()
++        discovered = 0
++
++        while queue:
++            version, depth, parent_label = queue.popleft()
++            if version.version_id in visited_versions:
++                continue
++            if depth > ModpackDependencyResolver.MAX_DEPTH:
++                unresolved.append(f"Modrinth dependency depth exceeded {ModpackDependencyResolver.MAX_DEPTH} at {parent_label}.")
++                continue
++            visited_versions.add(version.version_id)
++            for dependency in version.dependencies:
++                if dependency.dependency_type != "required":
++                    continue
++                download_pause_controller.raise_if_requested()
++                if dependency.project_id and dependency.project_id in selected:
++                    target = selected[dependency.project_id]
++                    changed |= ModpackDependencyResolver._append_required_by(target, parent_label)
++                    if dependency.version_id and str(target.get("versionId") or "") not in {"", dependency.version_id}:
++                        warnings.append(
++                            f"{parent_label} requests Modrinth version {dependency.version_id}, but the modpack pins "
++                            f"{target.get('versionId')}; the pack-pinned file was kept."
++                        )
++                    continue
++                try:
++                    dependency_version = ModpackDependencyResolver._retry(
++                        lambda dependency=dependency: ModrinthModInstaller._resolve_dependency(
++                            dependency.version_id,
++                            dependency.project_id,
++                            instance.version_id,
++                            loader_name,
++                            ("release", "beta", "alpha"),
++                        )
++                    )
++                except Exception as error:
++                    label = dependency.file_name or dependency.project_id or dependency.version_id or "unknown dependency"
++                    unresolved.append(f"{parent_label} requires Modrinth dependency {label}: {error}")
++                    continue
++                if dependency_version is None:
++                    label = dependency.file_name or dependency.project_id or dependency.version_id or "unknown dependency"
++                    unresolved.append(f"{parent_label} requires external dependency {label}, which has no provider project/version ID.")
++                    continue
++                if dependency_version.project_id in selected:
++                    target = selected[dependency_version.project_id]
++                    changed |= ModpackDependencyResolver._append_required_by(target, parent_label)
++                    continue
++                try:
++                    ModrinthModInstaller._validate_version(dependency_version, instance.version_id, loader_name)
++                    project = ModpackDependencyResolver._retry(lambda: ModrinthClient.get_project(dependency_version.project_id))
++                    file = dependency_version.primary_file(".jar")
++                except Exception as error:
++                    unresolved.append(f"{parent_label} dependency {dependency_version.project_id} is not installable: {error}")
++                    continue
++                if discovered >= ModpackDependencyResolver.MAX_DEPENDENCIES:
++                    unresolved.append(f"The Modrinth dependency graph exceeds {ModpackDependencyResolver.MAX_DEPENDENCIES} added files.")
++                    queue.clear()
++                    break
++                path = ModpackDependencyResolver._unique_mod_path(entries, file.filename, dependency_version.project_id, file.sha1)
++                target = {
++                    "path": path,
++                    "fileName": PurePosixPath(path).name,
++                    "sha1": file.sha1,
++                    "sha512": file.sha512,
++                    "size": file.size,
++                    "source": "download",
++                    "provider": "modrinth",
++                    "projectId": dependency_version.project_id,
++                    "versionId": dependency_version.version_id,
++                    "versionNumber": dependency_version.version_number,
++                    "downloads": [file.url] if file.url else [],
++                    "required": True,
++                    "selectionReason": "required_dependency",
++                    "requiredBy": [parent_label],
++                    "displayName": project.title,
++                }
++                entries.append(target)
++                selected[dependency_version.project_id] = target
++                added.append(project.title or target["fileName"])
++                discovered += 1
++                changed = True
++                queue.append((dependency_version, depth + 1, project.title or target["fileName"]))
++
++        if changed or unresolved:
++            registry["managedFiles"] = entries
++            registry["dependencyResolution"] = ModpackDependencyResolver._resolution_payload(added, unresolved)
++            registry["verificationCache"] = ModrinthPackRegistry._normalize_verification_cache(
++                registry.get("verificationCache", {}), entries
++            )
++            ModrinthPackRegistry.save(instance.instance_dir, registry)
++        return DependencyResolutionResult(tuple(added), tuple(warnings), tuple(unresolved))
++
++    @staticmethod
++    def _resolve_curseforge(instance: Instance, registry: dict, reporter: ProgressReporter | None) -> DependencyResolutionResult:
++        entries = [entry for entry in registry.get("managedFiles", []) if isinstance(entry, dict)]
++        mod_entries = [entry for entry in entries if ModpackDependencyResolver._is_mod_entry(entry)]
++        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
++        loader_name = str(loader_name).strip().casefold()
++        selected: dict[int, dict] = {}
++        files: dict[int, CurseForgeFile] = {}
++        warnings: list[str] = []
++        unresolved: list[str] = []
++        added: list[str] = []
++        changed = False
++
++        unresolved_file_ids: list[int] = []
++        for entry in mod_entries:
++            try:
++                file_id = int(entry.get("fileId") or 0)
++            except (TypeError, ValueError):
++                file_id = 0
++            if file_id > 0 and not bool(entry.get("dependencyMetadataResolved", False)):
++                unresolved_file_ids.append(file_id)
++        batch_files: dict[int, CurseForgeFile] = {}
++        if unresolved_file_ids:
++            try:
++                batch_files = ModpackDependencyResolver._retry(lambda: CurseForgeClient.get_files_batch(unresolved_file_ids))
++            except Exception as error:
++                warnings.append(f"Could not batch-load CurseForge dependency metadata: {error}")
++
++        ModpackDependencyResolver._report(reporter, "Resolving CurseForge modpack dependencies...", 0, max(1, len(mod_entries)))
++        for completed, entry in enumerate(mod_entries, start=1):
++            download_pause_controller.raise_if_requested()
++            try:
++                project_id = int(entry.get("projectId") or 0)
++                file_id = int(entry.get("fileId") or 0)
++            except (TypeError, ValueError):
++                project_id = file_id = 0
++            entry.setdefault("selectionReason", "pack_manifest")
++            entry.setdefault("requiredBy", [])
++            if project_id <= 0 or file_id <= 0:
++                warnings.append(f"CurseForge file identity is unavailable: {entry.get('fileName') or entry.get('path')}")
++                ModpackDependencyResolver._report(reporter, "Resolving CurseForge modpack dependencies...", completed, max(1, len(mod_entries)))
++                continue
++            try:
++                if bool(entry.get("dependencyMetadataResolved", False)):
++                    file = ModpackDependencyResolver._curseforge_file_from_entry(entry)
++                else:
++                    file = batch_files.get(file_id)
++                    if file is None or file.project_id != project_id:
++                        file = ModpackDependencyResolver._retry(lambda project_id=project_id, file_id=file_id: CurseForgeClient.get_file(project_id, file_id))
++            except Exception as error:
++                warnings.append(f"Could not load CurseForge dependency metadata for {entry.get('fileName')}: {error}")
++                ModpackDependencyResolver._report(reporter, "Resolving CurseForge modpack dependencies...", completed, max(1, len(mod_entries)))
++                continue
++            changed |= ModpackDependencyResolver._hydrate_curseforge_entry(entry, file)
++            selected.setdefault(project_id, entry)
++            files[file_id] = file
++            ModpackDependencyResolver._report(reporter, "Resolving CurseForge modpack dependencies...", completed, max(1, len(mod_entries)))
++
++        queue: deque[tuple[CurseForgeFile, int, str]] = deque(
++            (file, 0, ModpackDependencyResolver._entry_label(selected.get(file.project_id, {}), str(file.project_id)))
++            for file in files.values()
++        )
++        visited_files: set[int] = set()
++        discovered = 0
++
++        while queue:
++            file, depth, parent_label = queue.popleft()
++            if file.file_id in visited_files:
++                continue
++            if depth > ModpackDependencyResolver.MAX_DEPTH:
++                unresolved.append(f"CurseForge dependency depth exceeded {ModpackDependencyResolver.MAX_DEPTH} at {parent_label}.")
++                continue
++            visited_files.add(file.file_id)
++            for dependency in file.dependencies:
++                if not dependency.required:
++                    continue
++                download_pause_controller.raise_if_requested()
++                if dependency.project_id in selected:
++                    changed |= ModpackDependencyResolver._append_required_by(selected[dependency.project_id], parent_label)
++                    continue
++                try:
++                    dependency_file = ModpackDependencyResolver._retry(
++                        lambda dependency=dependency: CurseForgeClient.latest_compatible_file(
++                            dependency.project_id,
++                            instance.version_id,
++                            loader=loader_name,
++                            release_types=("release", "beta", "alpha"),
++                        )
++                    )
++                except Exception as error:
++                    unresolved.append(f"{parent_label} requires CurseForge project {dependency.project_id}: {error}")
++                    continue
++                if dependency_file.project_id in selected:
++                    changed |= ModpackDependencyResolver._append_required_by(selected[dependency_file.project_id], parent_label)
++                    continue
++                if discovered >= ModpackDependencyResolver.MAX_DEPENDENCIES:
++                    unresolved.append(f"The CurseForge dependency graph exceeds {ModpackDependencyResolver.MAX_DEPENDENCIES} added files.")
++                    queue.clear()
++                    break
++                try:
++                    project = ModpackDependencyResolver._retry(lambda: CurseForgeClient.get_project(dependency_file.project_id))
++                    project_name = str(getattr(project, "name", "") or dependency_file.display_name).strip()
++                    project_url = str(getattr(project, "project_url", "") or "").strip()
++                except Exception:
++                    project_name = dependency_file.display_name
++                    project_url = ""
++                path = ModpackDependencyResolver._unique_mod_path(entries, dependency_file.file_name, str(dependency_file.project_id), dependency_file.sha1)
++                target = {
++                    "projectId": dependency_file.project_id,
++                    "fileId": dependency_file.file_id,
++                    "fileName": PurePosixPath(path).name,
++                    "path": path,
++                    "displayName": project_name or dependency_file.file_name,
++                    "sha1": dependency_file.sha1,
++                    "size": dependency_file.file_length,
++                    "downloadUrl": dependency_file.download_url,
++                    "declaredLoaders": list(dependency_file.loaders),
++                    "gameVersions": list(dependency_file.game_versions),
++                    "releaseType": dependency_file.release_type,
++                    "datePublished": dependency_file.file_date,
++                    "required": True,
++                    "provider": "curseforge",
++                    "pendingDownload": True,
++                    "resolvePathFromProvider": False,
++                    "selectionReason": "required_dependency",
++                    "requiredBy": [parent_label],
++                    "projectUrl": project_url,
++                    "dependencies": [{"projectId": dependency.project_id, "relationType": dependency.relation_type} for dependency in dependency_file.dependencies],
++                    "dependencyMetadataResolved": True,
++                }
++                entries.append(target)
++                selected[dependency_file.project_id] = target
++                added.append(project_name or target["fileName"])
++                discovered += 1
++                changed = True
++                queue.append((dependency_file, depth + 1, project_name or target["fileName"]))
++
++        if changed or unresolved:
++            registry["managedFiles"] = entries
++            registry["dependencyResolution"] = ModpackDependencyResolver._resolution_payload(added, unresolved)
++            CurseForgePackRegistry.save(Path(instance.instance_dir), registry)
++        return DependencyResolutionResult(tuple(added), tuple(warnings), tuple(unresolved))
++
++    @staticmethod
++    def _modrinth_version_for_entry(entry: dict) -> ModrinthVersion | None:
++        version_id = str(entry.get("versionId") or "").strip()
++        if not version_id:
++            downloads = entry.get("downloads") if isinstance(entry.get("downloads"), list) else []
++            for url in downloads:
++                identity = ModProvenanceRegistry._modrinth_identity_from_url(str(url))
++                if identity is None:
++                    continue
++                project_id, version_id, remote_name = identity
++                entry["projectId"] = str(entry.get("projectId") or project_id)
++                entry["versionId"] = version_id
++                entry["fileName"] = str(entry.get("fileName") or remote_name)
++                break
++        if version_id:
++            return ModpackDependencyResolver._retry(lambda: ModrinthClient.get_version(version_id))
++        for algorithm in ("sha512", "sha1"):
++            value = str(entry.get(algorithm) or "").strip().casefold()
++            if not value:
++                continue
++            version = ModpackDependencyResolver._retry(lambda value=value, algorithm=algorithm: ModrinthClient.get_version_from_hash(value, algorithm))
++            if version is not None:
++                return version
++        return None
++
++    @staticmethod
++    def _hydrate_modrinth_entry(entry: dict, version: ModrinthVersion) -> bool:
++        file = version.primary_file(".jar")
++        updates = {
++            "projectId": version.project_id,
++            "versionId": version.version_id,
++            "versionNumber": version.version_number,
++            "sha1": str(entry.get("sha1") or file.sha1).casefold(),
++            "sha512": str(entry.get("sha512") or file.sha512).casefold(),
++            "size": max(0, int(entry.get("size", 0) or file.size)),
++            "downloads": list(entry.get("downloads") or ([file.url] if file.url else [])),
++        }
++        changed = False
++        for key, value in updates.items():
++            if entry.get(key) != value:
++                entry[key] = value
++                changed = True
++        return changed
++
++    @staticmethod
++    def _hydrate_curseforge_entry(entry: dict, file: CurseForgeFile) -> bool:
++        updates = {
++            "fileName": Path(str(entry.get("fileName") or file.file_name)).name,
++            "displayName": str(entry.get("displayName") or file.display_name),
++            "sha1": str(entry.get("sha1") or file.sha1).casefold(),
++            "size": max(0, int(entry.get("size", 0) or file.file_length)),
++            "downloadUrl": str(entry.get("downloadUrl") or file.download_url),
++            "declaredLoaders": list(entry.get("declaredLoaders") or file.loaders),
++            "gameVersions": list(entry.get("gameVersions") or file.game_versions),
++            "releaseType": str(entry.get("releaseType") or file.release_type),
++            "datePublished": str(entry.get("datePublished") or file.file_date),
++            "dependencies": [{"projectId": dependency.project_id, "relationType": dependency.relation_type} for dependency in file.dependencies],
++            "dependencyMetadataResolved": True,
++        }
++        changed = False
++        for key, value in updates.items():
++            if entry.get(key) != value:
++                entry[key] = value
++                changed = True
++        return changed
++
++    @staticmethod
++    def _curseforge_file_from_entry(entry: dict) -> CurseForgeFile:
++        dependencies = tuple(
++            CurseForgeDependency(
++                project_id=int(raw.get("projectId") or 0),
++                relation_type=int(raw.get("relationType") or 0),
++            )
++            for raw in entry.get("dependencies", [])
++            if isinstance(raw, dict) and int(raw.get("projectId") or 0) > 0 and int(raw.get("relationType") or 0) > 0
++        )
++        return CurseForgeFile(
++            file_id=int(entry.get("fileId") or 0),
++            project_id=int(entry.get("projectId") or 0),
++            display_name=str(entry.get("displayName") or entry.get("fileName") or "Unknown file").strip(),
++            file_name=Path(str(entry.get("fileName") or "download.jar")).name,
++            release_type=str(entry.get("releaseType") or "release").strip().casefold(),
++            file_date=str(entry.get("datePublished") or "").strip(),
++            file_length=max(0, int(entry.get("size", 0) or 0)),
++            download_url=str(entry.get("downloadUrl") or "").strip(),
++            sha1=str(entry.get("sha1") or "").strip().casefold(),
++            game_versions=tuple(str(value) for value in entry.get("gameVersions", []) if str(value).strip()),
++            dependencies=dependencies,
++            is_available=True,
++            loaders=tuple(str(value).strip().casefold() for value in entry.get("declaredLoaders", []) if str(value).strip()),
++        )
++
++    @staticmethod
++    def _append_required_by(entry: dict, parent: str) -> bool:
++        existing = entry.get("requiredBy") if isinstance(entry.get("requiredBy"), list) else []
++        normalized = list(dict.fromkeys(str(value).strip() for value in existing if str(value).strip()))
++        if parent and parent not in normalized:
++            normalized.append(parent)
++        changed = entry.get("requiredBy") != normalized
++        entry["requiredBy"] = normalized
++        return changed
++
++    @staticmethod
++    def _unique_mod_path(entries: list[dict], filename: str, project_id: str, sha1: str) -> str:
++        safe_name = Path(str(filename or "dependency.jar")).name or "dependency.jar"
++        candidate = f"mods/{safe_name}"
++        existing = {str(entry.get("path") or "").replace("\\", "/").casefold(): entry for entry in entries if isinstance(entry, dict)}
++        current = existing.get(candidate.casefold())
++        if current is None or (sha1 and str(current.get("sha1") or "").casefold() == sha1.casefold()):
++            return candidate
++        prefix = "".join(character if character.isalnum() or character in {"-", "_"} else "-" for character in str(project_id)).strip("-") or "dependency"
++        return f"mods/{prefix}-{safe_name}"
++
++    @staticmethod
++    def _entry_label(entry: dict, fallback: str) -> str:
++        return str(entry.get("displayName") or entry.get("title") or entry.get("fileName") or fallback).strip()
++
++    @staticmethod
++    def _resolution_payload(added: list[str], unresolved: list[str]) -> dict:
++        return {
++            "status": "unresolved" if unresolved else "complete",
++            "added": list(dict.fromkeys(added)),
++            "unresolved": list(dict.fromkeys(unresolved)),
++            "resolvedAt": datetime.now(timezone.utc).isoformat(),
++        }
++
++    @staticmethod
++    def _retry(call: Callable[[], T]) -> T:
++        last_error: Exception | None = None
++        for attempt in range(1, ModpackDependencyResolver.MAX_ATTEMPTS + 1):
++            download_pause_controller.raise_if_requested()
++            try:
++                return call()
++            except Exception as error:
++                last_error = error
++                lowered = str(error).casefold()
++                if any(marker in lowered for marker in ("http 400", "http 401", "http 403", "http 404", "not available", "no allowed", "invalid", "unsupported")):
++                    break
++                decision = DownloadRetryPolicy.decide(error, attempt, ModpackDependencyResolver.MAX_ATTEMPTS)
++                if not decision.retry:
++                    break
++                sleep(min(max(decision.delay_seconds, 0.0), 1.0))
++        assert last_error is not None
++        raise last_error
++
++    @staticmethod
++    def _is_mod_entry(entry: dict) -> bool:
++        path = str(entry.get("path") or "").replace("\\", "/").strip().lstrip("/")
++        pure = PurePosixPath(path)
++        return len(pure.parts) >= 2 and pure.parts[0].casefold() == "mods" and pure.name.casefold().endswith(".jar")
++
++    @staticmethod
++    def _has_managed_mods(value: object) -> bool:
++        return isinstance(value, list) and any(isinstance(entry, dict) and ModpackDependencyResolver._is_mod_entry(entry) for entry in value)
++
++    @staticmethod
++    def _is_managed_modpack(instance: Instance) -> bool:
++        if getattr(instance, "instance_dir", None) is None:
++            return False
++        return bool(ModrinthPackRegistry.load(instance).get("managedFiles") or CurseForgePackRegistry.load(Path(instance.instance_dir)).get("managedFiles"))
++
++    @staticmethod
++    def _report(reporter: ProgressReporter | None, message: str, current: int, total: int) -> None:
++        if reporter is not None:
++            reporter.files(stage=ProgressStage.CHECKING_MODPACK, message=message, current=current, total=total)
+--- a/src/core/modrinth/modrinth_client.py
++++ b/src/core/modrinth/modrinth_client.py
+@@ -177,6 +177,27 @@
+         payload = ModrinthClient._get_json(f"/version/{quote(identifier, safe='')}", ttl=ModrinthClient.VERSIONS_TTL_SECONDS, force_refresh=force_refresh)
+         if not isinstance(payload, dict):
+             raise RuntimeError(f"Modrinth version '{identifier}' is unavailable.")
++        return ModrinthClient._parse_version(payload)
++
++    @staticmethod
++    def get_version_from_hash(file_hash: str, algorithm: str = "sha512", force_refresh: bool = False) -> ModrinthVersion | None:
++        digest = ModrinthClient._required(file_hash, "File hash").casefold()
++        normalized_algorithm = str(algorithm or "sha512").strip().casefold()
++        if normalized_algorithm not in {"sha1", "sha512"}:
++            raise ValueError("Modrinth hash lookup supports SHA-1 or SHA-512.")
 +        try:
-+            detected = OptiFineVersion.from_filename(Path(path).name)
-+        except ValueError:
-+            QMessageBox.warning(self, tr("workspace.create.title"), tr("optifine.file.invalid_name"))
-+            return
-+        expected = self.version_combo.currentText().strip()
-+        if expected and detected.minecraft_version != expected:
-+            QMessageBox.warning(
-+                self,
-+                tr("workspace.create.title"),
-+                tr("optifine.file.version_mismatch", actual=detected.minecraft_version, expected=expected),
++            payload = ModrinthClient._get_json(
++                f"/version_file/{quote(digest, safe='')}",
++                params={"algorithm": normalized_algorithm},
++                ttl=ModrinthClient.VERSIONS_TTL_SECONDS,
++                force_refresh=force_refresh,
 +            )
-+            return
-+        self._optifine_source_path = Path(path)
-+        self._detected_optifine_version = detected
-+        self.optifine_file_button.setText(self._optifine_source_path.name)
-+        self.optifine_detected_value.setText(
-+            tr("optifine.file.detected", version=detected.display_name, minecraft=detected.minecraft_version)
-+        )
-+        self._refresh_optifine_status()
-         self._update_create_state()
++        except RuntimeError as error:
++            if "HTTP 404" in str(error):
++                return None
++            raise
++        if not isinstance(payload, dict):
++            return None
+         return ModrinthClient._parse_version(payload)
  
-     def _browse_modrinth(self) -> None:
-@@ -435,8 +444,12 @@
-         self.snapshots_checkbox.setText(tr("workspace.create.show_snapshots"))
-         self.loader_hint.setText(tr("workspace.create.loader_hint"))
-         self.optifine_checkbox.setText(tr("optifine.create.checkbox"))
--        self.optifine_version_label.setText(tr("optifine.version"))
--        self.optifine_preview_checkbox.setText(tr("optifine.show_previews"))
-+        self.optifine_detected_label.setText(tr("optifine.detected_version"))
-+        self.optifine_detected_value.setText(
-+            tr("optifine.file.detected", version=self._detected_optifine_version.display_name, minecraft=self._detected_optifine_version.minecraft_version)
-+            if self._detected_optifine_version is not None
-+            else tr("optifine.file.not_detected")
-+        )
-         self.optifine_file_label.setText(tr("optifine.file"))
-         self.optifine_file_button.setText(self._optifine_source_path.name if self._optifine_source_path else tr("optifine.choose_file"))
-         self.modpack_hint.setText(tr("workspace.create.modpack_hint"))
---- a/src/gui/dialogs/optifine_dialog.py
-+++ b/src/gui/dialogs/optifine_dialog.py
-@@ -5,8 +5,6 @@
- from PySide6.QtCore import QUrl, Signal
- from PySide6.QtGui import QDesktopServices
- from PySide6.QtWidgets import (
--    QCheckBox,
--    QComboBox,
-     QDialog,
-     QFileDialog,
-     QFormLayout,
-@@ -19,13 +17,13 @@
+     @staticmethod
+--- a/src/core/modrinth/modrinth_pack_registry.py
++++ b/src/core/modrinth/modrinth_pack_registry.py
+@@ -11,7 +11,7 @@
+ 
+ 
+ class ModrinthPackRegistry:
+-    SCHEMA_VERSION = 5
++    SCHEMA_VERSION = 6
+     FILE_NAME = "modrinth-pack.json"
+ 
+     @staticmethod
+@@ -197,6 +197,10 @@
+                 "fileName": Path(str(item.get("fileName") or relative.name)).name,
+                 "downloads": ModrinthPackRegistry._normalize_downloads(item.get("downloads", [])),
+                 "required": bool(item.get("required", True)),
++                "selectionReason": str(item.get("selectionReason") or "pack_manifest").strip().casefold(),
++                "requiredBy": ModrinthPackRegistry._normalize_required_by(item.get("requiredBy", [])),
++                "displayName": str(item.get("displayName") or item.get("title") or relative.name).strip(),
++                "versionNumber": str(item.get("versionNumber") or "").strip(),
+             }
+         return sorted(normalized.values(), key=lambda item: item["path"].casefold())
+ 
+@@ -205,6 +209,12 @@
+         if not isinstance(value, (list, tuple)):
+             return []
+         return list(dict.fromkeys(str(url).strip() for url in value if str(url).strip()))
++
++    @staticmethod
++    def _normalize_required_by(value: object) -> list[str]:
++        if not isinstance(value, (list, tuple, set)):
++            return []
++        return list(dict.fromkeys(str(item).strip() for item in value if str(item).strip()))
+ 
+     @staticmethod
+     def _normalize_preserved_files(value: object) -> list[dict]:
+--- a/src/core/repair/repair_service.py
++++ b/src/core/repair/repair_service.py
+@@ -23,6 +23,8 @@
+ from src.core.minecraft.library_manager import DownloadLibraryManager
+ from src.core.minecraft.version_manager import VersionManager
+ from src.core.modloader.mod_loader_manager import ModLoaderManager
++from src.core.mod.modpack_dependency_resolver import ModpackDependencyResolver
++from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
+ from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
+ from src.core.modrinth.modrinth_pack_repair_manager import ModrinthPackRepairManager
+ from src.core.progress.progress_reporter import ProgressReporter
+@@ -445,6 +447,16 @@
+                 ModrinthPackRepairManager.repair(instance, reporter=reporter)
+             if CurseForgePackRegistry.load(instance):
+                 CurseForgeContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
++            resolution = ModpackDependencyResolver.resolve(instance, reporter)
++            if resolution.changed:
++                ModrinthContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
++                CurseForgeContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
++            final_resolution = ModpackDependencyResolver.resolve(instance, reporter)
++            if final_resolution.changed:
++                ModrinthContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
++                CurseForgeContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
++                final_resolution = ModpackDependencyResolver.resolve(instance, reporter)
++            ModpackDependencyResolver.raise_for_required_dependencies(instance, final_resolution.unresolved)
+             return
+ 
+         # Core Minecraft repairs share one resolved runtime profile. The loader
+--- a/src/gui/controllers/launch_controller.py
++++ b/src/gui/controllers/launch_controller.py
+@@ -158,7 +158,7 @@
+             self.status_changed.emit(tr("Minecraft {version} launched with warnings", version=version))
+             self.log_created.emit(tr("Minecraft process created with {count} warning(s): {version}", count=len(warnings), version=version))
+             for warning in warnings:
+-                self.log_created.emit(f"Modrinth warning: {warning}")
++                self.log_created.emit(tr("Launch warning: {warning}", warning=warning))
+             return
+ 
+         self.status_changed.emit(tr("Minecraft {version} launched", version=version))
+--- a/src/gui/presenters/launch_error_presenter.py
++++ b/src/gui/presenters/launch_error_presenter.py
+@@ -4,6 +4,7 @@
  
  from mcw_core.api.language.language_manager import tr
- from src.gui.window_sizing import resize_dialog_to_screen
-+from src.models.optifine.optifine_models import OptiFineVersion
+ from mcw_core.api.instance.errors import InstanceAlreadyRunningError
++from src.models.mod.dependency_resolution import RequiredModDependenciesMissing
  
- 
- class OptiFineDialog(QDialog):
-     OFFICIAL_DOWNLOADS_URL = "https://optifine.net/downloads"
--    versions_requested = Signal(str, bool, bool)
-     state_requested = Signal(str)
--    install_requested = Signal(str, object, object, str)
-+    install_requested = Signal(str, object, str)
-     repair_requested = Signal(str)
-     uninstall_requested = Signal(str)
- 
-@@ -33,14 +31,14 @@
-         super().__init__(parent)
-         self.setModal(False)
-         self._instance = None
--        self._versions: list[object] = []
-         self._state = None
-         self._source_path: Path | None = None
-+        self._detected_version: OptiFineVersion | None = None
-         self._build_ui()
-         self.retranslate_dynamic()
- 
-     def _build_ui(self) -> None:
--        resize_dialog_to_screen(self, 660, 520, 540, 440)
-+        resize_dialog_to_screen(self, 660, 470, 540, 400)
-         root = QVBoxLayout(self)
-         root.setContentsMargins(18, 18, 18, 18)
-         root.setSpacing(12)
-@@ -54,10 +52,8 @@
-         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
-         self.instance_value = QLabel()
-         self.mode_value = QLabel()
--        self.version_combo = QComboBox()
--        self.version_combo.currentIndexChanged.connect(self._update_state)
--        self.preview_checkbox = QCheckBox()
--        self.preview_checkbox.toggled.connect(lambda _checked: self.refresh_versions())
-+        self.version_value = QLabel()
-+        self.version_value.setWordWrap(True)
-         self.source_value = QLabel()
-         self.source_value.setWordWrap(True)
-         self.instance_label = QLabel()
-@@ -66,21 +62,18 @@
-         self.source_label = QLabel()
-         form.addRow(self.instance_label, self.instance_value)
-         form.addRow(self.mode_label, self.mode_value)
--        form.addRow(self.version_label, self.version_combo)
--        form.addRow("", self.preview_checkbox)
-+        form.addRow(self.version_label, self.version_value)
-         form.addRow(self.source_label, self.source_value)
-         root.addLayout(form)
- 
-         source_row = QHBoxLayout()
-         self.open_official_button = QPushButton()
-         self.choose_file_button = QPushButton()
--        self.refresh_button = QPushButton()
-         self.open_official_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(self.OFFICIAL_DOWNLOADS_URL)))
-         self.choose_file_button.clicked.connect(self._choose_file)
--        self.refresh_button.clicked.connect(lambda: self.refresh_versions(force=True))
-         source_row.addWidget(self.open_official_button)
-         source_row.addWidget(self.choose_file_button)
--        source_row.addWidget(self.refresh_button)
-+        source_row.addStretch(1)
-         root.addLayout(source_row)
- 
-         self.status_label = QLabel()
-@@ -108,71 +101,55 @@
- 
-     def open_for_instance(self, instance: object) -> None:
-         self._instance = instance
-+        self._state = None
-         self._source_path = None
-+        self._detected_version = None
-         self.source_value.setText(tr("optifine.file.not_selected"))
-+        self.version_value.setText(tr("optifine.file.not_detected"))
-         self.instance_value.setText(str(getattr(instance, "name", "")))
--        loader = str((getattr(instance, "mod_loader", ("vanilla", "-1")) or ("vanilla", "-1"))[0]).casefold()
-+        loader = self._loader()
-         self.mode_value.setText(tr("optifine.mode.standalone") if loader == "vanilla" else tr("optifine.mode.forge_mod") if loader == "forge" else tr("optifine.mode.unsupported"))
-         self.state_requested.emit(str(getattr(instance, "name", "")))
--        self.refresh_versions()
-         self._update_state()
-         self.show()
-         self.raise_()
-         self.activateWindow()
- 
--    def refresh_versions(self, force: bool = False) -> None:
--        if self._instance is None:
--            return
--        game = str(getattr(self._instance, "version_id", ""))
--        self.status_label.setText(tr("optifine.metadata.loading"))
--        self.versions_requested.emit(game, self.preview_checkbox.isChecked(), bool(force))
--
--    def set_versions(self, game_version: str, versions: list[object], include_preview: bool = False) -> None:
--        if self._instance is None or str(getattr(self._instance, "version_id", "")) != str(game_version):
--            return
--        self._versions = list(versions)
--        selected_id = str(getattr(self.version_combo.currentData(), "version_id", ""))
--        self.version_combo.blockSignals(True)
--        self.version_combo.clear()
--        for item in self._versions:
--            details = str(getattr(item, "display_name", getattr(item, "version_id", "OptiFine")))
--            forge = str(getattr(item, "forge_version", ""))
--            if forge:
--                details += f" · Forge {forge}"
--            self.version_combo.addItem(details, item)
--        if selected_id:
--            for index in range(self.version_combo.count()):
--                if str(getattr(self.version_combo.itemData(index), "version_id", "")) == selected_id:
--                    self.version_combo.setCurrentIndex(index)
--                    break
--        self.version_combo.blockSignals(False)
--        self.status_label.setText(tr("optifine.metadata.available", count=len(self._versions)) if self._versions else tr("optifine.metadata.none"))
--        self._update_state()
--
-     def set_state(self, instance_name: str, state: object) -> None:
-         if self._instance is None or str(getattr(self._instance, "name", "")) != str(instance_name):
-             return
-         self._state = state
--        installed = bool(getattr(state, "installed", False))
--        if installed:
--            self.status_label.setText(tr("optifine.state.installed", version=getattr(state, "version_id", ""), mode=getattr(state, "mode", "")))
-         self._update_state()
- 
-     def _choose_file(self) -> None:
--        selected = self.version_combo.currentData()
--        expected = str(getattr(selected, "filename", "OptiFine_*.jar"))
--        path, _filter = QFileDialog.getOpenFileName(self, tr("optifine.file.choose_title"), "", f"{expected} (*.jar);;Java Archive (*.jar)")
--        if path:
--            self._source_path = Path(path)
--            self.source_value.setText(str(self._source_path))
--            self._update_state()
-+        path, _filter = QFileDialog.getOpenFileName(self, tr("optifine.file.choose_title"), "", "OptiFine (*.jar);;Java Archive (*.jar)")
-+        if not path:
-+            return
-+        try:
-+            detected = OptiFineVersion.from_filename(Path(path).name)
-+        except ValueError:
-+            QMessageBox.warning(self, tr("optifine.title"), tr("optifine.file.invalid_name"))
-+            return
-+        expected = str(getattr(self._instance, "version_id", "")) if self._instance is not None else ""
-+        if expected and detected.minecraft_version != expected:
-+            QMessageBox.warning(
-+                self,
-+                tr("optifine.title"),
-+                tr("optifine.file.version_mismatch", actual=detected.minecraft_version, expected=expected),
-+            )
-+            return
-+        self._source_path = Path(path)
-+        self._detected_version = detected
-+        self.source_value.setText(str(self._source_path))
-+        self.version_value.setText(tr("optifine.file.detected", version=detected.display_name, minecraft=detected.minecraft_version))
-+        self.status_label.setText(tr("optifine.file.ready"))
-+        self._update_state()
- 
-     def _install(self) -> None:
--        if self._instance is None or self.version_combo.currentData() is None or self._source_path is None:
-+        if self._instance is None or self._source_path is None or self._detected_version is None:
-             QMessageBox.information(self, tr("optifine.title"), tr("optifine.file.required"))
-             return
--        name = str(getattr(self._instance, "name", ""))
--        self.install_requested.emit(name, self.version_combo.currentData(), self._source_path, "auto")
-+        self.install_requested.emit(str(getattr(self._instance, "name", "")), self._source_path, "auto")
- 
-     def _repair(self) -> None:
-         if self._instance is not None:
-@@ -184,31 +161,35 @@
-         if QMessageBox.question(self, tr("optifine.title"), tr("optifine.uninstall.confirm")) == QMessageBox.StandardButton.Yes:
-             self.uninstall_requested.emit(str(getattr(self._instance, "name", "")))
- 
-+    def _loader(self) -> str:
-+        if self._instance is None:
-+            return ""
-+        loader = getattr(self._instance, "mod_loader", ("", "")) or ("", "")
-+        return str(loader[0]).casefold()
-+
-     def _update_state(self, *_args) -> None:
--        loader = str((getattr(self._instance, "mod_loader", ("", "")) or ("", ""))[0]).casefold() if self._instance is not None else ""
-+        loader = self._loader()
-         supported = loader in {"vanilla", "forge"}
--        selected = self.version_combo.currentData()
--        forge_unavailable = loader == "forge" and bool(getattr(selected, "forge_unavailable", False))
-         installed = bool(getattr(self._state, "installed", False))
--        self.install_button.setEnabled(supported and selected is not None and self._source_path is not None and not forge_unavailable)
-+        self.install_button.setEnabled(supported and self._source_path is not None and self._detected_version is not None)
-         self.repair_button.setEnabled(installed and bool(getattr(self._state, "managed", False)))
-         self.uninstall_button.setEnabled(installed and bool(getattr(self._state, "managed", False)))
-         if not supported:
-             self.status_label.setText(tr("optifine.mode.unsupported_detail"))
--        elif forge_unavailable:
--            self.status_label.setText(tr("optifine.compatibility.forge_unavailable"))
-+        elif self._source_path is None and installed:
-+            self.status_label.setText(tr("optifine.state.installed", version=getattr(self._state, "version_id", ""), mode=getattr(self._state, "mode", "")))
-+        elif self._source_path is None:
-+            self.status_label.setText(tr("optifine.file.select_hint"))
- 
-     def retranslate_dynamic(self) -> None:
-         self.setWindowTitle(tr("optifine.title"))
-         self.description_label.setText(tr("optifine.description"))
-         self.instance_label.setText(tr("optifine.instance"))
-         self.mode_label.setText(tr("optifine.install_mode"))
--        self.version_label.setText(tr("optifine.version"))
-+        self.version_label.setText(tr("optifine.detected_version"))
-         self.source_label.setText(tr("optifine.file"))
--        self.preview_checkbox.setText(tr("optifine.show_previews"))
-         self.open_official_button.setText(tr("optifine.open_official"))
-         self.choose_file_button.setText(tr("optifine.choose_file"))
--        self.refresh_button.setText(tr("common.refresh"))
-         self.install_button.setText(tr("optifine.install"))
-         self.repair_button.setText(tr("workspace.action.repair"))
-         self.uninstall_button.setText(tr("common.uninstall"))
---- a/src/gui/main_window_2.py
-+++ b/src/gui/main_window_2.py
-@@ -329,7 +329,6 @@
-         self.instances_page.selected_instance_changed.connect(self.instance_controller.select)
-         self.instances_page.create_requested.connect(self.instance_controller.create)
-         self.instances_page.create_with_optifine_requested.connect(self.instance_controller.create_with_optifine)
--        self.instances_page.optifine_versions_requested.connect(self.optifine_controller.load_versions)
-         self.instances_page.fabric_versions_requested.connect(self.mod_loader_controller.load_fabric_versions)
-         self.instances_page.quilt_versions_requested.connect(self.mod_loader_controller.load_quilt_versions)
-         self.instances_page.forge_versions_requested.connect(self.mod_loader_controller.load_forge_versions)
-@@ -627,13 +626,10 @@
-         self.instance_controller.repair_execution_finished.connect(self.repair_center_dialog.set_repair_result)
-         self.instance_controller.repair_center_failed.connect(self.repair_center_dialog.set_error)
- 
--        self.optifine_dialog.versions_requested.connect(self.optifine_controller.load_versions)
-         self.optifine_dialog.state_requested.connect(self.optifine_controller.load_state)
-         self.optifine_dialog.install_requested.connect(self.optifine_controller.install)
-         self.optifine_dialog.repair_requested.connect(self.optifine_controller.repair)
-         self.optifine_dialog.uninstall_requested.connect(self.optifine_controller.uninstall)
--        self.optifine_controller.versions_ready.connect(self.instances_page.set_optifine_versions)
--        self.optifine_controller.versions_ready.connect(self.optifine_dialog.set_versions)
-         self.optifine_controller.state_ready.connect(self.optifine_dialog.set_state)
-         self.optifine_controller.progress.connect(self._on_progress)
-         self.optifine_controller.install_finished.connect(lambda result: self.instance_controller.refresh(result.instance_name))
---- a/src/gui/pages/instance_workspace_page.py
-+++ b/src/gui/pages/instance_workspace_page.py
-@@ -43,8 +43,7 @@
-     refresh_requested = Signal()
-     selected_instance_changed = Signal(str)
-     create_requested = Signal(str, str, str, str)
--    create_with_optifine_requested = Signal(str, str, str, str, object, object)
--    optifine_versions_requested = Signal(str, bool, bool)
-+    create_with_optifine_requested = Signal(str, str, str, str, object)
-     rename_requested = Signal(str, str)
-     clone_requested = Signal(str, str, bool)
-     delete_requested = Signal(str)
-@@ -261,7 +260,6 @@
-     def _connect_dialogs(self) -> None:
-         self.create_dialog.create_requested.connect(self.create_requested.emit)
-         self.create_dialog.create_with_optifine_requested.connect(self.create_with_optifine_requested.emit)
--        self.create_dialog.optifine_versions_requested.connect(self.optifine_versions_requested.emit)
-         self.create_dialog.fabric_versions_requested.connect(self.fabric_versions_requested.emit)
-         self.create_dialog.quilt_versions_requested.connect(self.quilt_versions_requested.emit)
-         self.create_dialog.forge_versions_requested.connect(self.forge_versions_requested.emit)
-@@ -344,9 +342,6 @@
-         self.advanced_page.set_neoforge_versions(game_version, versions)
-         self.create_dialog.set_neoforge_versions(game_version, versions)
- 
--    def set_optifine_versions(self, game_version: str, versions: list[object], include_preview: bool = False) -> None:
--        self.create_dialog.set_optifine_versions(game_version, versions, include_preview)
--
-     def set_instances(self, instances: list[object], selected_name: str) -> None:
-         self._instances = {str(instance.name): instance for instance in instances}
-         self.advanced_page.set_instances(instances, selected_name)
-@@ -695,6 +690,7 @@
-         self.create_dialog.set_versions(self._versions)
-         self.create_dialog.set_show_snapshots(self._show_snapshots)
-         self.create_dialog.name_input.clear()
-+        self.create_dialog.reset_optifine_selection()
-         self.create_dialog.show()
-         self.create_dialog.raise_()
-         self.create_dialog.activateWindow()
---- a/src/models/optifine/optifine_models.py
-+++ b/src/models/optifine/optifine_models.py
-@@ -3,6 +3,7 @@
- from dataclasses import dataclass
- from enum import StrEnum
- from pathlib import Path
-+import re
- 
- 
- class OptiFineCompatibilityState(StrEnum):
-@@ -48,6 +49,29 @@
-     def forge_unavailable(self) -> bool:
-         return self.forge_version.casefold() == "n/a"
- 
-+    @classmethod
-+    def from_filename(cls, filename: str) -> "OptiFineVersion":
-+        name = Path(str(filename or "")).name
-+        match = re.fullmatch(
-+            r"(?P<preview>preview_)?OptiFine_(?P<minecraft>[0-9]+(?:\.[0-9]+){1,3})_(?P<edition>[A-Za-z0-9]+_[A-Za-z0-9]+)_(?P<build>.+?)(?: \([0-9]+\))?\.jar",
-+            name,
-+            re.IGNORECASE,
-+        )
-+        if match is None:
-+            raise ValueError("The selected file name does not contain a supported OptiFine version.")
-+        build = match.group("build")
-+        preview = bool(match.group("preview") or re.search(r"(?:^|_)pre[0-9]+(?:_|$)", build, re.IGNORECASE))
-+        minecraft = match.group("minecraft")
-+        edition = match.group("edition").upper()
-+        canonical = f"{'preview_' if preview and match.group('preview') else ''}OptiFine_{minecraft}_{edition}_{build}.jar"
-+        return cls(
-+            minecraft_version=minecraft,
-+            edition=edition,
-+            build=build,
-+            filename=canonical,
-+            preview=preview,
-+        )
-+
  
  @dataclass(frozen=True, slots=True)
- class OptiFineCompatibilityResult:
+@@ -25,6 +26,14 @@
+                 title="Instance already running",
+                 summary="This instance is already being used by Minecraft. Close that game before launching the same instance again.",
+                 status="Instance already running",
++                technical_message=technical_message,
++            )
++
++        if isinstance(error, RequiredModDependenciesMissing):
++            return cls._build(
++                title="Required mod dependencies are missing",
++                summary="MCW Launcher could not restore every required mod dependency. Retry while online or repair the modpack. The compatibility override cannot bypass missing required dependencies because the game is likely to crash or corrupt the pack state.",
++                status="Required dependencies missing",
+                 technical_message=technical_message,
+             )
+ 
+--- /dev/null
++++ b/src/models/mod/dependency_resolution.py
+@@ -0,0 +1,30 @@
++from __future__ import annotations
++
++from dataclasses import dataclass
++
++from src.models.mod.mod_issue import ModIssue
++
++
++@dataclass(frozen=True, slots=True)
++class DependencyResolutionResult:
++    added_files: tuple[str, ...] = ()
++    warnings: tuple[str, ...] = ()
++    unresolved: tuple[str, ...] = ()
++
++    @property
++    def changed(self) -> bool:
++        return bool(self.added_files)
++
++
++class RequiredModDependenciesMissing(RuntimeError):
++    """Raised when required mod dependencies remain unresolved before launch."""
++
++    def __init__(self, instance_name: str, issues: tuple[ModIssue, ...]) -> None:
++        self.instance_name = str(instance_name)
++        self.issues = tuple(issues)
++        details = "\n".join(f"- {issue.message}" for issue in self.issues)
++        super().__init__(
++            f"Required mod dependencies are unresolved for '{self.instance_name}'.\n"
++            f"{len(self.issues)} blocking dependency issue(s) remain.\n"
++            f"{details}"
++        )
 --- a/test/core/config/test_version_metadata.py
 +++ b/test/core/config/test_version_metadata.py
 @@ -6,9 +6,9 @@
  
  
  def test_launcher_version_metadata_has_one_source_of_truth() -> None:
--    assert VERSION == "v1.1.1-beta.3"
--    assert VERSION_ID == "1.1.1-beta.3"
--    assert VERSION_TAG == "v1.1.1-beta.3"
-+    assert VERSION == "v1.1.1-beta.4"
-+    assert VERSION_ID == "1.1.1-beta.4"
-+    assert VERSION_TAG == "v1.1.1-beta.4"
+-    assert VERSION == "v1.1.1-beta.4"
+-    assert VERSION_ID == "1.1.1-beta.4"
+-    assert VERSION_TAG == "v1.1.1-beta.4"
++    assert VERSION == "v1.1.1-beta.5"
++    assert VERSION_ID == "1.1.1-beta.5"
++    assert VERSION_TAG == "v1.1.1-beta.5"
      assert UPDATE_CHANNEL == "beta"
      assert GUI_VERSION == VERSION
      assert GUI_VERSION_ID == VERSION_ID
---- a/test/core/optifine/test_optifine_registry_and_manager.py
-+++ b/test/core/optifine/test_optifine_registry_and_manager.py
-@@ -34,7 +34,7 @@
-     try:
-         instance = _instance(tmp_path)
-         source = _jar(tmp_path / _selected().filename)
--        result = OptiFineManager.install(instance, _selected(), source)
-+        result = OptiFineManager.install(instance, source)
-         assert result.mode == "forge_mod"
-         assert result.installed_path.is_file()
-         state = OptiFineRegistry.state(instance)
-@@ -49,13 +49,33 @@
-         Paths.restore(previous)
- 
- 
+--- /dev/null
++++ b/test/core/mod/test_modpack_dependency_resolver.py
+@@ -0,0 +1,153 @@
++from __future__ import annotations
 +
-+def test_forge_modpack_instance_installs_imported_optifine_as_user_managed_mod(tmp_path: Path) -> None:
-+    previous = Paths.configure(tmp_path)
-+    try:
-+        instance = _instance(tmp_path)
-+        registry = instance.instance_dir / ".mcw" / "curseforge-pack.json"
-+        registry.parent.mkdir(parents=True, exist_ok=True)
-+        registry.write_text("{}", encoding="utf-8")
-+        source = _jar(tmp_path / _selected().filename)
-+
-+        result = OptiFineManager.install(instance, source)
-+
-+        assert result.mode == "forge_mod"
-+        provenance = json.loads((instance.instance_dir / ".mcw" / "mod-provenance.json").read_text(encoding="utf-8"))
-+        entry = next(item for item in provenance["mods"].values() if item["provider"] == "optifine")
-+        assert entry["managedByModpack"] is False
-+        assert result.installed_path.parent == instance.instance_dir / "mods"
-+    finally:
-+        Paths.restore(previous)
-+
- def test_manager_rejects_optifine_mod_on_fabric(tmp_path: Path) -> None:
-     previous = Paths.configure(tmp_path)
-     try:
-         instance = _instance(tmp_path, "fabric")
-         source = _jar(tmp_path / _selected().filename)
-         with pytest.raises(RuntimeError, match="Forge"):
--            OptiFineManager.install(instance, _selected(), source)
-+            OptiFineManager.install(instance, source)
-     finally:
-         Paths.restore(previous)
- 
-@@ -87,36 +107,52 @@
-         Paths.restore(previous)
- 
- 
--def test_compatibility_blocks_forge_na_and_warns_on_different_forge(tmp_path: Path) -> None:
-+def test_compatibility_accepts_imported_file_when_minecraft_matches(tmp_path: Path) -> None:
-     previous = Paths.configure(tmp_path)
-     try:
-         instance = _instance(tmp_path)
--        unavailable = OptiFineVersion("1.12.2", "HD_U", "C5", "OptiFine_1.12.2_HD_U_C5.jar", forge_version="N/A")
--        assert OptiFineManager.compatibility(instance, unavailable).state == "blocked"
--        declared = OptiFineVersion("1.12.2", "HD_U", "G5", "OptiFine_1.12.2_HD_U_G5.jar", forge_version="2847")
--        assert OptiFineManager.compatibility(instance, declared).state == "warning"
-+        selected = OptiFineVersion("1.12.2", "HD_U", "G5", "OptiFine_1.12.2_HD_U_G5.jar")
-+        assert OptiFineManager.compatibility(instance, selected).state == "compatible"
-     finally:
-         Paths.restore(previous)
- 
- 
--def test_compatibility_accepts_matching_legacy_forge_build(tmp_path: Path) -> None:
-+def test_install_rejects_optifine_for_different_minecraft_version(tmp_path: Path) -> None:
-     previous = Paths.configure(tmp_path)
-     try:
-         instance = _instance(tmp_path)
--        instance.mod_loader = ("forge", "14.23.5.2847")
--        selected = OptiFineVersion("1.12.2", "HD_U", "G5", "OptiFine_1.12.2_HD_U_G5.jar", forge_version="2847")
--        assert OptiFineManager.compatibility(instance, selected).state == "compatible"
-+        source = _jar(tmp_path / "OptiFine_1.20.1_HD_U_I6.jar")
-+        with pytest.raises(RuntimeError, match="targets Minecraft 1.20.1, not 1.12.2"):
-+            OptiFineManager.install(instance, source)
-     finally:
-         Paths.restore(previous)
- 
- 
-+def test_inspect_file_detects_stable_and_preview_names(tmp_path: Path) -> None:
-+    stable = _jar(tmp_path / "OptiFine_1.12.2_HD_U_G5.jar")
-+    preview = _jar(tmp_path / "preview_OptiFine_1.20.1_HD_U_I7_pre1.jar")
-+
-+    stable_version = OptiFineManager.inspect_file(stable)
-+    preview_version = OptiFineManager.inspect_file(preview)
-+
-+    assert stable_version.minecraft_version == "1.12.2"
-+    assert stable_version.version_id == "1.12.2_HD_U_G5"
-+    assert stable_version.preview is False
-+    assert preview_version.minecraft_version == "1.20.1"
-+    assert preview_version.preview is True
-+
-+    duplicate = _jar(tmp_path / "OptiFine_1.12.2_HD_U_G5 (2).jar")
-+    duplicate_version = OptiFineManager.inspect_file(duplicate)
-+    assert duplicate_version.filename == "OptiFine_1.12.2_HD_U_G5.jar"
-+
-+
- def test_install_rolls_back_when_registry_commit_fails(tmp_path: Path, monkeypatch) -> None:
-     previous_paths = Paths.configure(tmp_path)
-     try:
-         instance = _instance(tmp_path)
-         first = _selected()
-         first_source = _jar(tmp_path / first.filename)
--        first_result = OptiFineManager.install(instance, first, first_source)
-+        first_result = OptiFineManager.install(instance, first_source)
-         first_bytes = first_result.installed_path.read_bytes()
-         second = OptiFineVersion("1.12.2", "HD_U", "G6", "OptiFine_1.12.2_HD_U_G6.jar")
-         second_source = _jar(tmp_path / second.filename)
-@@ -129,7 +165,7 @@
- 
-         monkeypatch.setattr(OptiFineRegistry, "save", fail_for_second)
-         with pytest.raises(OSError, match="simulated registry failure"):
--            OptiFineManager.install(instance, second, second_source)
-+            OptiFineManager.install(instance, second_source)
-         assert first_result.installed_path.read_bytes() == first_bytes
-         assert not (instance.instance_dir / "mods" / second.filename).exists()
-         assert OptiFineRegistry.state(instance).version_id == first.version_id
---- a/test/gui/dialogs/test_optifine_import_only_dialogs.py
-+++ b/test/gui/dialogs/test_optifine_import_only_dialogs.py
-@@ -0,0 +1,59 @@
-+import os
-+from pathlib import Path
 +from types import SimpleNamespace
 +
 +import pytest
 +
-+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-+pytest.importorskip("PySide6")
-+
-+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
-+
-+from src.gui.dialogs.create_instance_dialog import CreateInstanceDialog
-+from src.gui.dialogs.optifine_dialog import OptiFineDialog
-+
-+
-+@pytest.fixture(scope="module")
-+def app():
-+    return QApplication.instance() or QApplication([])
-+
-+
-+def test_create_dialog_uses_import_only_optifine_flow(app, monkeypatch, tmp_path: Path) -> None:
-+    dialog = CreateInstanceDialog()
-+    dialog.set_versions([SimpleNamespace(id="1.12.2", type="release")])
-+    dialog.optifine_checkbox.setChecked(True)
-+    source = tmp_path / "OptiFine_1.12.2_HD_U_G5.jar"
-+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(source), ""))
-+
-+    dialog._choose_optifine_file()
-+
-+    assert not hasattr(dialog, "optifine_version_combo")
-+    assert not hasattr(dialog, "optifine_preview_checkbox")
-+    assert not hasattr(dialog, "optifine_versions_requested")
-+    assert dialog.selected_optifine_version().minecraft_version == "1.12.2"
-+    assert dialog._optifine_source_path == source
++from src.core.curseforge.curseforge_client import CurseForgeClient
++from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
++from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
++from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
++from src.core.mod.modpack_dependency_resolver import ModpackDependencyResolver
++from src.core.modrinth.modrinth_client import ModrinthClient
++from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
++from src.models.curseforge.file import CurseForgeDependency, CurseForgeFile
++from src.models.mod.dependency_resolution import RequiredModDependenciesMissing
++from src.models.mod.mod_info import ModInfo
++from src.models.mod.mod_issue import ModHealthReport, ModIssue
++from src.models.modrinth.project import ModrinthProject
++from src.models.modrinth.version import ModrinthDependency, ModrinthFile, ModrinthVersion
 +
 +
-+def test_create_dialog_rejects_wrong_optifine_minecraft_version(app, monkeypatch, tmp_path: Path) -> None:
-+    dialog = CreateInstanceDialog()
-+    dialog.set_versions([SimpleNamespace(id="1.12.2", type="release")])
-+    dialog.optifine_checkbox.setChecked(True)
-+    source = tmp_path / "OptiFine_1.20.1_HD_U_I6.jar"
-+    warnings = []
-+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(source), ""))
-+    monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: warnings.append(args[2]))
-+
-+    dialog._choose_optifine_file()
-+
-+    assert warnings
-+    assert dialog._optifine_source_path is None
-+    assert dialog.selected_optifine_version() is None
++def instance(tmp_path, loader="neoforge"):
++    return SimpleNamespace(name="Pack", version_id="1.21.1", mod_loader=(loader, "21.1.200"), instance_dir=tmp_path / "Pack")
 +
 +
-+def test_manage_dialog_has_no_online_version_controls(app) -> None:
-+    dialog = OptiFineDialog()
++def mr_version(version_id: str, project_id: str, filename: str, dependencies=()):
++    return ModrinthVersion(
++        version_id=version_id,
++        project_id=project_id,
++        name=version_id,
++        version_number=version_id,
++        version_type="release",
++        game_versions=("1.21.1",),
++        loaders=("neoforge",),
++        files=(ModrinthFile(url=f"https://cdn.modrinth.com/data/{project_id}/versions/{version_id}/{filename}", filename=filename, sha1=(project_id[0] * 40), sha512=(project_id[0] * 128), size=10, primary=True),),
++        dependencies=tuple(dependencies),
++    )
 +
-+    assert not hasattr(dialog, "version_combo")
-+    assert not hasattr(dialog, "preview_checkbox")
-+    assert not hasattr(dialog, "refresh_button")
-+    assert not hasattr(dialog, "versions_requested")
++
++def cf_file(project_id: int, file_id: int, filename: str, dependencies=()):
++    return CurseForgeFile(
++        file_id=file_id,
++        project_id=project_id,
++        display_name=filename,
++        file_name=filename,
++        release_type="release",
++        file_date="2026-01-01T00:00:00Z",
++        file_length=10,
++        download_url=f"https://edge.forgecdn.net/files/{file_id}/{filename}",
++        sha1=(str(project_id)[0] * 40),
++        game_versions=("1.21.1",),
++        dependencies=tuple(dependencies),
++        loaders=("neoforge",),
++    )
++
++
++def test_modrinth_resolver_adds_recursive_required_dependencies(tmp_path, monkeypatch):
++    root = mr_version("root-v", "root", "root.jar", (ModrinthDependency("required", project_id="dep-a"),))
++    dep_a = mr_version("a-v", "dep-a", "a.jar", (ModrinthDependency("required", project_id="dep-b"),))
++    dep_b = mr_version("b-v", "dep-b", "b.jar")
++    versions = {item.version_id: item for item in (root, dep_a, dep_b)}
++    projects = {project_id: ModrinthProject(project_id=project_id, slug=project_id, title=project_id.title(), description="", project_type="mod") for project_id in ("root", "dep-a", "dep-b")}
++    registry = {"projectId": "pack", "versionId": "pack-v", "managedFiles": [{"path": "mods/root.jar", "fileName": "root.jar", "source": "download", "provider": "modrinth", "projectId": "root", "versionId": "root-v", "sha1": "r" * 40, "sha512": "r" * 128, "size": 10, "downloads": ["https://cdn.modrinth.com/root.jar"]}]}
++    saved = {}
++
++    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: registry)
++    monkeypatch.setattr(ModrinthPackRegistry, "save", lambda _dir, payload: saved.update(payload))
++    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: {})
++    monkeypatch.setattr(ModProvenanceRegistry, "synchronize", lambda _instance: {})
++    monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: versions[version_id])
++    monkeypatch.setattr(ModrinthClient, "select_version", lambda project_id, **_kwargs: {"dep-a": dep_a, "dep-b": dep_b}[project_id])
++    monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: projects[project_id])
++
++    result = ModpackDependencyResolver.resolve(instance(tmp_path))
++
++    assert result.added_files == ("Dep-A", "Dep-B")
++    by_project = {entry.get("projectId"): entry for entry in saved["managedFiles"]}
++    assert by_project["dep-a"]["selectionReason"] == "required_dependency"
++    assert by_project["dep-a"]["requiredBy"] == ["root.jar"]
++    assert by_project["dep-b"]["requiredBy"] == ["Dep-A"]
++
++
++def test_modrinth_resolver_keeps_pack_pinned_dependency_version(tmp_path, monkeypatch):
++    root = mr_version("root-v", "root", "root.jar", (ModrinthDependency("required", project_id="dep", version_id="new-v"),))
++    old = mr_version("old-v", "dep", "dep-old.jar")
++    registry = {"managedFiles": [
++        {"path": "mods/root.jar", "fileName": "root.jar", "source": "download", "provider": "modrinth", "projectId": "root", "versionId": "root-v", "sha1": "r" * 40, "sha512": "r" * 128, "size": 10, "downloads": []},
++        {"path": "mods/dep-old.jar", "fileName": "dep-old.jar", "source": "download", "provider": "modrinth", "projectId": "dep", "versionId": "old-v", "sha1": "d" * 40, "sha512": "d" * 128, "size": 10, "downloads": []},
++    ]}
++    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: registry)
++    monkeypatch.setattr(ModrinthPackRegistry, "save", lambda *_args: None)
++    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: {})
++    monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: {"root-v": root, "old-v": old}[version_id])
++
++    result = ModpackDependencyResolver.resolve(instance(tmp_path))
++
++    assert not result.added_files
++    assert any("pack-pinned file was kept" in warning for warning in result.warnings)
++    assert registry["managedFiles"][1]["requiredBy"] == ["root.jar"]
++
++
++def test_curseforge_resolver_adds_only_required_dependencies(tmp_path, monkeypatch):
++    root = cf_file(10, 100, "root.jar", (CurseForgeDependency(20, 3), CurseForgeDependency(30, 2)))
++    required = cf_file(20, 200, "required.jar")
++    registry = {"managedFiles": [{"projectId": 10, "fileId": 100, "fileName": "root.jar", "path": "mods/root.jar", "provider": "curseforge", "required": True}]}
++    saved = {}
++
++    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
++    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: registry)
++    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda _instance, payload: saved.update(payload))
++    monkeypatch.setattr(ModProvenanceRegistry, "synchronize", lambda _instance: {})
++    monkeypatch.setattr(CurseForgeClient, "get_files_batch", lambda _file_ids: {100: root})
++    monkeypatch.setattr(CurseForgeClient, "get_file", lambda project_id, file_id: root if project_id == 10 else required)
++    monkeypatch.setattr(CurseForgeClient, "latest_compatible_file", lambda project_id, *_args, **_kwargs: required if project_id == 20 else pytest.fail("optional dependency must not be resolved"))
++    monkeypatch.setattr(CurseForgeClient, "get_project", lambda project_id: SimpleNamespace(name="Required", project_url="https://www.curseforge.com/minecraft/mc-mods/required"))
++
++    result = ModpackDependencyResolver.resolve(instance(tmp_path))
++
++    assert result.added_files == ("Required",)
++    added = next(entry for entry in saved["managedFiles"] if entry["projectId"] == 20)
++    assert added["selectionReason"] == "required_dependency"
++    assert added["requiredBy"] == ["root.jar"]
++
++
++def test_pack_pinned_system_requirement_mismatch_is_warning(tmp_path):
++    mod = ModInfo(
++        path=tmp_path / "jei.jar",
++        file_name="jei.jar",
++        enabled=True,
++        mod_id="jei",
++        name="Just Enough Items",
++        version="19.0.0",
++        loader="neoforge",
++        dependencies={"minecraft": "[1.21, 1.21.1)"},
++        managed_by_modpack=True,
++    )
++
++    report = ModCompatibilityManager.scan(instance(tmp_path), mods=[mod])
++
++    assert report.error_count == 0
++    assert report.warning_count == 1
++    assert report.issues[0].code == "pack-pinned-system-requirement"
++
++
++def test_required_dependency_errors_cannot_be_bypassed_for_managed_pack(tmp_path, monkeypatch):
++    managed_instance = instance(tmp_path)
++    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {"managedFiles": [{"path": "mods/root.jar"}]})
++    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: {})
++    issue = ModIssue("error", "dependency-missing", "FancyMenu requires missing dependency 'konkrete'.", ("fancymenu", "konkrete"))
++    monkeypatch.setattr(ModCompatibilityManager, "scan", lambda _instance: ModHealthReport((issue,), 1, 0))
++
++    with pytest.raises(RequiredModDependenciesMissing, match="konkrete"):
++        ModpackDependencyResolver.raise_for_required_dependencies(managed_instance)
+--- /dev/null
++++ b/test/core/modrinth/test_modrinth_hash_lookup.py
+@@ -0,0 +1,22 @@
++from src.core.modrinth.modrinth_client import ModrinthClient
++
++
++def test_get_version_from_hash_uses_version_file_endpoint(monkeypatch):
++    seen = {}
++
++    def fake_get(path, params=None, **_kwargs):
++        seen["path"] = path
++        seen["params"] = params
++        return {"id": "version", "project_id": "project", "version_number": "1.0", "files": []}
++
++    monkeypatch.setattr(ModrinthClient, "_get_json", fake_get)
++    version = ModrinthClient.get_version_from_hash("A" * 128, "sha512")
++
++    assert version is not None
++    assert version.version_id == "version"
++    assert seen == {"path": "/version_file/" + "a" * 128, "params": {"algorithm": "sha512"}}
++
++
++def test_get_version_from_hash_returns_none_for_404(monkeypatch):
++    monkeypatch.setattr(ModrinthClient, "_get_json", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("Modrinth API request failed with HTTP 404.")))
++    assert ModrinthClient.get_version_from_hash("b" * 40, "sha1") is None
+--- a/test/core/modrinth/test_modrinth_pack_installer.py
++++ b/test/core/modrinth/test_modrinth_pack_installer.py
+@@ -81,7 +81,7 @@
+     metadata_path = instance_dir / ".mcw" / "modrinth-pack.json"
+     assert metadata_path.is_file()
+     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+-    assert metadata["schemaVersion"] == 5
++    assert metadata["schemaVersion"] == 6
+     assert {item["path"] for item in metadata["managedFiles"]} == {"mods/example.jar", "config/example.json", "options.txt"}
+     queued = next(item for item in metadata["managedFiles"] if item["path"] == "mods/example.jar")
+     assert queued["downloads"] == ["https://cdn.modrinth.com/data/project/example.jar"]
+--- a/test/core/modrinth/test_modrinth_pack_repair_manager.py
++++ b/test/core/modrinth/test_modrinth_pack_repair_manager.py
+@@ -100,6 +100,6 @@
+     assert result.repaired_files == 2
+     assert result.backup_path is not None and result.backup_path.is_file()
+     registry = ModrinthPackRegistry.load_from_dir(instance_dir)
+-    assert registry["schemaVersion"] == 5
++    assert registry["schemaVersion"] == 6
+     assert registry["preservedFiles"] == []
+     assert len(registry["verificationCache"]) == 2
+--- a/test/core/modrinth/test_modrinth_pack_update_manager.py
++++ b/test/core/modrinth/test_modrinth_pack_update_manager.py
+@@ -33,7 +33,7 @@
+ def test_pack_registry_schema_four_preserves_conflict_metadata(tmp_path: Path) -> None:
+     ModrinthPackRegistry.save(tmp_path, {"projectId": "pack", "managedFiles": [], "preservedFiles": [{"path": "config/demo.json", "reason": "modified-by-user", "previousSha1": "AA", "targetSha1": "BB"}]})
+     data = ModrinthPackRegistry.load_from_dir(tmp_path)
+-    assert data["schemaVersion"] == 5
++    assert data["schemaVersion"] == 6
+     assert data["preservedFiles"] == [{"path": "config/demo.json", "reason": "modified-by-user", "previousSha1": "aa", "targetSha1": "bb"}]
+ 
+ 
+--- a/test/gui/presenters/test_launch_error_presenter.py
++++ b/test/gui/presenters/test_launch_error_presenter.py
+@@ -1,5 +1,7 @@
+ from src.core.instance.errors import InstanceAlreadyRunningError
+ from src.gui.presenters.launch_error_presenter import LaunchErrorPresenter
++from src.models.mod.dependency_resolution import RequiredModDependenciesMissing
++from src.models.mod.mod_issue import ModIssue
+ 
+ 
+ def test_presents_checksum_error():
+@@ -34,6 +36,20 @@
+     assert "Close that game" in view.message
+     assert "Survival" in view.message
+ 
++
++def test_presents_required_mod_dependency_error_as_non_bypassable():
++    error = RequiredModDependenciesMissing(
++        "Dependency Test",
++        (ModIssue(severity="error", code="dependency-missing", message="FancyMenu requires Konkrete.", mod_ids=("fancymenu", "konkrete")),),
++    )
++
++    view = LaunchErrorPresenter.present(error)
++
++    assert view.title == "Required mod dependencies are missing"
++    assert view.status == "Required dependencies missing"
++    assert "cannot bypass missing required dependencies" in view.message
++    assert "FancyMenu requires Konkrete" in view.message
++
+ def test_presents_modrinth_missing_files_with_instance_setting_hint():
+     error = RuntimeError(
+         "Could not download 2 required Modrinth file(s) after 3 rounds. "
 --- a/test/test_public_api.py
 +++ b/test/test_public_api.py
-@@ -1,14 +1,14 @@
- from importlib.metadata import PackageNotFoundError, version
- 
- import mcw_core
--from mcw_core import LaunchRequest
-+from mcw_core import LaunchRequest, get_default_core
- from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
- from mcw_core.api.hardware.first_run_recommendation_service import FirstRunRecommendationService
- from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, derive_custom_text, is_readable_text
+@@ -8,7 +8,7 @@
  
  
  def test_bundled_core_runtime_version_follows_launcher_beta() -> None:
--    assert mcw_core.__version__ == "1.1.1-beta.3"
-+    assert mcw_core.__version__ == "1.1.1-beta.4"
+-    assert mcw_core.__version__ == "1.1.1-beta.4"
++    assert mcw_core.__version__ == "1.1.1-beta.5"
  
  
  def test_distribution_version_when_installed() -> None:
-@@ -16,7 +16,13 @@
-         installed = version("mcw-core")
-     except PackageNotFoundError:
-         return
--    assert installed == "1.1.1b3"
-+    assert installed == "1.1.1b4"
-+
-+
-+def test_optifine_public_api_is_import_only() -> None:
-+    service = get_default_core().optifine
-+    assert callable(service.inspect_file)
-+    assert not hasattr(service, "list_versions")
- 
- 
- def test_new_public_api_defaults() -> None:

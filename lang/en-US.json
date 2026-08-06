@@ -1989,7 +1989,13 @@
     "optifine.file.ready": "The file name matches this instance. MCW will verify the JAR contents before installing it.",
     "optifine.file.select_hint": "Select the official OptiFine JAR. Its Minecraft version will be detected from the original file name and verified again during installation.",
     "optifine.create.import_mode": "Installation mode: {mode}. Select the original OptiFine JAR; no online version list is used.",
-    "optifine.create.file_ready": "Ready to install {version} for Minecraft {minecraft} as {mode}."
+    "optifine.create.file_ready": "Ready to install {version} for Minecraft {minecraft} as {mode}.",
+    "Launch warning: {warning}": "Launch warning: {warning}",
+    "Required mod dependencies are missing": "Required mod dependencies are missing",
+    "MCW Launcher could not restore every required mod dependency. Retry while online or repair the modpack. The compatibility override cannot bypass missing required dependencies because the game is likely to crash or corrupt the pack state.": "MCW Launcher could not restore every required mod dependency. Retry while online or repair the modpack. The compatibility override cannot bypass missing required dependencies because the game is likely to crash or corrupt the pack state.",
+    "Required dependencies missing": "Required dependencies missing",
+    "Resolving Modrinth modpack dependencies...": "Resolving Modrinth modpack dependencies...",
+    "Resolving CurseForge modpack dependencies...": "Resolving CurseForge modpack dependencies..."
   },
   "aliases": {
     "MCW Launcher": "app.name",

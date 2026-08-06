@@ -11,6 +11,8 @@ from src.models.mod.mod_issue import ModHealthReport, ModIssue
 
 
 class ModCompatibilityManager:
+    SYSTEM_DEPENDENCY_IDS = {"minecraft", "forge", "neoforge", "javafml", "fml", "fabricloader", "quilt_loader", "quiltloader"}
+
     @staticmethod
     def scan(instance: Instance, mods: list[ModInfo] | None = None) -> ModHealthReport:
         mods = list(mods) if mods is not None else ModManager.list_mods(instance)
@@ -55,7 +57,7 @@ class ModCompatibilityManager:
         ModCompatibilityManager._append_duplicate_issues(enabled_by_id, issues)
 
         for mod in enabled:
-            ModCompatibilityManager._append_dependency_issues(mod, enabled_by_id, disabled_by_id, installed_versions, issues)
+            ModCompatibilityManager._append_dependency_issues(mod, enabled_by_id, disabled_by_id, installed_versions, issues, managed_by_modpack=mod.managed_by_modpack)
             ModCompatibilityManager._append_conflict_issues(mod, enabled_by_id, installed_versions, issues)
 
         issues.sort(key=lambda item: ({"error": 0, "warning": 1, "info": 2}.get(item.severity, 3), item.message.casefold()))
@@ -92,7 +94,7 @@ class ModCompatibilityManager:
             issues.append(ModIssue(severity="error", code="duplicate-mod-id", message=f"Duplicate enabled mod ID '{mod_id}': {files}", mod_ids=(mod_id,)))
 
     @staticmethod
-    def _append_dependency_issues(mod: ModInfo, enabled_by_id: dict[str, list[ModInfo]], disabled_by_id: dict[str, list[ModInfo]], installed_versions: dict[str, str], issues: list[ModIssue]) -> None:
+    def _append_dependency_issues(mod: ModInfo, enabled_by_id: dict[str, list[ModInfo]], disabled_by_id: dict[str, list[ModInfo]], installed_versions: dict[str, str], issues: list[ModIssue], managed_by_modpack: bool = False) -> None:
         for dependency_id, requirement in mod.dependencies.items():
             normalized_id = str(dependency_id).strip().casefold()
             if not normalized_id:
@@ -108,7 +110,18 @@ class ModCompatibilityManager:
                 continue
             matches = ModCompatibilityManager._matches_requirement(installed_versions[normalized_id], requirement)
             if matches is False:
-                issues.append(ModIssue(severity="error", code="dependency-version", message=f"{mod.name} requires '{dependency_id}' {ModCompatibilityManager._format_requirement(requirement)}, but {installed_versions[normalized_id]} is installed.", mod_ids=(mod.mod_id, normalized_id)))
+                if managed_by_modpack and normalized_id in ModCompatibilityManager.SYSTEM_DEPENDENCY_IDS:
+                    issues.append(ModIssue(
+                        severity="warning",
+                        code="pack-pinned-system-requirement",
+                        message=(
+                            f"{mod.name} requires '{dependency_id}' {ModCompatibilityManager._format_requirement(requirement)}, "
+                            f"but {installed_versions[normalized_id]} is installed. The modpack-pinned file was kept."
+                        ),
+                        mod_ids=(mod.mod_id, normalized_id),
+                    ))
+                else:
+                    issues.append(ModIssue(severity="error", code="dependency-version", message=f"{mod.name} requires '{dependency_id}' {ModCompatibilityManager._format_requirement(requirement)}, but {installed_versions[normalized_id]} is installed.", mod_ids=(mod.mod_id, normalized_id)))
 
         for dependency_id, requirement in mod.recommends.items():
             normalized_id = str(dependency_id).strip().casefold()

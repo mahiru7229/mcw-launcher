@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.instance.errors import InstanceAlreadyRunningError
+from src.models.mod.dependency_resolution import RequiredModDependenciesMissing
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +26,14 @@ class LaunchErrorPresenter:
                 title="Instance already running",
                 summary="This instance is already being used by Minecraft. Close that game before launching the same instance again.",
                 status="Instance already running",
+                technical_message=technical_message,
+            )
+
+        if isinstance(error, RequiredModDependenciesMissing):
+            return cls._build(
+                title="Required mod dependencies are missing",
+                summary="MCW Launcher could not restore every required mod dependency. Retry while online or repair the modpack. The compatibility override cannot bypass missing required dependencies because the game is likely to crash or corrupt the pack state.",
+                status="Required dependencies missing",
                 technical_message=technical_message,
             )
 

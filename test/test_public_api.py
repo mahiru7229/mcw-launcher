@@ -8,7 +8,7 @@ from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, derive_custo
 
 
 def test_bundled_core_runtime_version_follows_launcher_beta() -> None:
-    assert mcw_core.__version__ == "1.1.1-beta.4"
+    assert mcw_core.__version__ == "1.1.1-beta.5"
 
 
 def test_distribution_version_when_installed() -> None:

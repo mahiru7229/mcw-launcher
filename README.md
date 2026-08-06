@@ -48,6 +48,19 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.0 hỗ trợ nâng cấp
 
 ---
 
+## Có gì mới trong v1.1.1-beta.5
+
+**v1.1.1-beta.5** sửa pipeline dependency bắt buộc của modpack:
+
+- Tự hoàn thiện dependency graph `required` cho modpack Modrinth và CurseForge trước khi Minecraft được tạo process.
+- Giữ nguyên file do tác giả pack ghim; dependency bổ sung được ghi `requiredBy` và `selectionReason`.
+- Không tự tải optional/embedded dependency và không tự thay file pack chỉ vì metadata system version quá chặt.
+- Tùy chọn chạy dù có lỗi tương thích không còn được phép bỏ qua dependency bắt buộc bị thiếu, disable hoặc sai version.
+- Repair modpack chạy lại resolver và tải các dependency mới tìm được.
+- Registry Modrinth, CurseForge và provenance được nâng schema với normalize tương thích dữ liệu cũ.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.5.md`](docs/RELEASE-v1.1.1-beta.5.md).
+
 ## Có gì mới trong v1.1.1-beta.4
 
 **v1.1.1-beta.4** đơn giản hóa OptiFine thành luồng nhập file trực tiếp:

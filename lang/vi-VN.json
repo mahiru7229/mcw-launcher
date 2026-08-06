@@ -1989,7 +1989,13 @@
     "optifine.file.ready": "Tên file khớp với instance. MCW sẽ kiểm tra cấu trúc JAR thêm một lần trước khi cài.",
     "optifine.file.select_hint": "Hãy chọn file JAR OptiFine chính thức. Phiên bản Minecraft sẽ được nhận diện từ tên file gốc và xác minh lại khi cài.",
     "optifine.create.import_mode": "Chế độ cài: {mode}. Chỉ cần chọn file JAR OptiFine gốc; launcher không tải danh sách phiên bản trực tuyến.",
-    "optifine.create.file_ready": "Sẵn sàng cài {version} cho Minecraft {minecraft} dưới dạng {mode}."
+    "optifine.create.file_ready": "Sẵn sàng cài {version} cho Minecraft {minecraft} dưới dạng {mode}.",
+    "Launch warning: {warning}": "Cảnh báo khi khởi chạy: {warning}",
+    "Required mod dependencies are missing": "Thiếu dependency bắt buộc của mod",
+    "MCW Launcher could not restore every required mod dependency. Retry while online or repair the modpack. The compatibility override cannot bypass missing required dependencies because the game is likely to crash or corrupt the pack state.": "MCW Launcher không thể khôi phục đầy đủ dependency bắt buộc của mod. Hãy thử lại khi có mạng hoặc Repair modpack. Tùy chọn bỏ qua tương thích không thể bỏ qua dependency bắt buộc vì game rất dễ crash hoặc làm trạng thái modpack sai lệch.",
+    "Required dependencies missing": "Thiếu dependency bắt buộc",
+    "Resolving Modrinth modpack dependencies...": "Đang xử lý dependency của modpack Modrinth...",
+    "Resolving CurseForge modpack dependencies...": "Đang xử lý dependency của modpack CurseForge..."
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

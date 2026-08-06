@@ -21,6 +21,7 @@ from src.core.minecraft.download_manager import DownloadClientManager
 from src.core.minecraft.launcher_manager import LauncherManager
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.mod.modpack_dependency_resolver import ModpackDependencyResolver
 from src.core.optifine.optifine_manager import OptiFineManager
 from src.core.modloader.forge.forge_launch_command_manager import ForgeLaunchCommandManager
 from src.core.modloader.forge.legacy_libloader_manager import LegacyLibLoaderManager
@@ -153,11 +154,25 @@ class MinecraftExecutor:
             launch_lock_token = getattr(run_lock, "token", None)
             PortableContentManager.ensure(instance)
             PortableContentManager.prefetch_referenced(instance, reporter)
+            dependency_resolution = ModpackDependencyResolver.resolve(instance, reporter)
             modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
             curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
             ftb_warnings = FTBContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
             atlauncher_warnings = ATLauncherContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
             legacy_libloader_warnings = LegacyLibLoaderManager.ensure(instance, reporter)
+
+            # A second pass can identify provider versions after pack files have
+            # been hydrated/downloaded. Any newly discovered required files are
+            # downloaded before the compatibility preflight runs.
+            dependency_resolution_after_download = ModpackDependencyResolver.resolve(instance, reporter)
+            if dependency_resolution_after_download.changed:
+                modrinth_warnings = tuple(modrinth_warnings) + tuple(
+                    ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
+                )
+                curseforge_warnings = tuple(curseforge_warnings) + tuple(
+                    CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
+                )
+            ModpackDependencyResolver.raise_for_required_dependencies(instance, dependency_resolution_after_download.unresolved)
             PortableContentManager.finalize_disabled(instance)
 
             download_pause_controller.raise_if_requested()
@@ -260,7 +275,14 @@ class MinecraftExecutor:
                 and (forge_preflight_policy == ManagedContentPolicy.ALLOW or allow_compatibility_issues_once)
             )
             forge_warnings = tuple(issue.message for issue in forge_preflight.warnings) + bypassed_compatibility
-            warnings = tuple(modrinth_warnings) + tuple(curseforge_warnings) + tuple(ftb_warnings) + tuple(atlauncher_warnings) + tuple(legacy_libloader_warnings) + forge_warnings + tuple(java_recovery_warnings)
+            # Only surface the final dependency state. The first pass may
+            # temporarily fail before pack files are hydrated, while the second
+            # pass can resolve the same dependency successfully after download.
+            dependency_warnings = (
+                tuple(dependency_resolution_after_download.warnings)
+                + tuple(dependency_resolution_after_download.unresolved)
+            )
+            warnings = dependency_warnings + tuple(modrinth_warnings) + tuple(curseforge_warnings) + tuple(ftb_warnings) + tuple(atlauncher_warnings) + tuple(legacy_libloader_warnings) + forge_warnings + tuple(java_recovery_warnings)
             if warnings:
                 result["warnings"] = warnings
             return result
