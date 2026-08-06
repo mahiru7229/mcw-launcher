@@ -48,17 +48,28 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.0 hỗ trợ nâng cấp
 
 ---
 
+## Có gì mới trong v1.1.1-beta.6
+
+**v1.1.1-beta.6** sửa bước kiểm tra dependency của các modpack Forge cũ như RLCraft:
+
+- Quét cả thư mục mod chính và thư mục legacy chính xác `mods/<minecraft-version>/`, thay vì bỏ sót mod Forge 1.12.2 được loader chấp nhận.
+- Khi dependency đã được tác giả modpack ghim nhưng file local bị thiếu hoặc không cung cấp đúng mod ID, launcher đưa đúng file ghim trở lại hàng đợi tải/repair thay vì tìm một version thay thế.
+- Lưu `projectName`, `projectSlug` và `expectedModIds` trong CurseForge pack registry để các lần audit sau đối chiếu bằng identity ổn định.
+- Xác minh JAR sau download thực sự cung cấp mod ID mong đợi trước khi cho dependency audit vượt qua.
+- Giữ nguyên version/file ID của manifest và chỉ dùng provider bridge khi pack thật sự không có dependency đó.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.6.md`](docs/RELEASE-v1.1.1-beta.6.md).
+
 ## Có gì mới trong v1.1.1-beta.5
 
-**v1.1.1-beta.5 revision 2** gia cố toàn bộ pipeline dependency bắt buộc của modpack:
+**v1.1.1-beta.5** sửa pipeline dependency bắt buộc của modpack:
 
-- Hoàn thiện dependency graph `required` từ Modrinth và CurseForge trước khi tạo process Minecraft.
-- Đọc Forge/NeoForge Jar-in-Jar, Fabric/Quilt nested JAR và legacy `ContainedDeps`, nên dependency được nhúng như Flywheel trong Create không còn bị báo thiếu giả.
-- Khi provider relation không có project ID, tìm project theo mod ID trên provider của pack rồi fallback sang provider còn lại; candidate được audit lại từ JAR thật.
-- Hỗ trợ range version Forge/Maven như `0.6.8.a` và `[0.6.10,0.6.11)`.
-- Giữ nguyên file do tác giả pack ghim; dependency bổ sung lưu `requiredBy`, `providesModId`, `requestedVersionRanges` và `selectionReason`.
-- Tùy chọn chạy dù có lỗi tương thích không thể bỏ qua dependency bắt buộc bị thiếu, disable hoặc sai version.
-- Repair modpack chạy lại provider resolver và capability audit.
+- Tự hoàn thiện dependency graph `required` cho modpack Modrinth và CurseForge trước khi Minecraft được tạo process.
+- Giữ nguyên file do tác giả pack ghim; dependency bổ sung được ghi `requiredBy` và `selectionReason`.
+- Không tự tải optional/embedded dependency và không tự thay file pack chỉ vì metadata system version quá chặt.
+- Tùy chọn chạy dù có lỗi tương thích không còn được phép bỏ qua dependency bắt buộc bị thiếu, disable hoặc sai version.
+- Repair modpack chạy lại resolver và tải các dependency mới tìm được.
+- Registry Modrinth, CurseForge và provenance được nâng schema với normalize tương thích dữ liệu cũ.
 
 Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.5.md`](docs/RELEASE-v1.1.1-beta.5.md).
 

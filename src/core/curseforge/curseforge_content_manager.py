@@ -150,6 +150,8 @@ class CurseForgeContentManager:
         for index, item in enumerate(combined, start=1):
             path = Path(instance.instance_dir) / item["path"]
             valid = path.is_file() and CurseForgeContentManager._verify(path, item["sha1"], item["size"])
+            if valid and path.suffix.casefold() == ".jar" and item["entry"].get("expectedModIds"):
+                valid = CurseForgeContentManager._provides_expected_mod_ids(instance, path, item["entry"])
             item["entry"]["pendingDownload"] = not valid
             if valid:
                 item["entry"]["lastDownloadError"] = ""
@@ -204,6 +206,7 @@ class CurseForgeContentManager:
                         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
                         metadata = ModManager.read_mod(target, preferred_loader=loader_name, provider_version=file.display_name)
                         compatibility_warning = ModManager.compatibility_warning(instance, metadata)
+                        CurseForgeContentManager._validate_expected_mod_ids(metadata, entry)
                 else:
                     loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
                     metadata = ModManager.read_mod(cache, preferred_loader=loader_name, provider_version=file.display_name)
@@ -211,6 +214,7 @@ class CurseForgeContentManager:
                     added = ModManager.add_mods(instance, [cache], replace=True, launch_lock_token=launch_lock_token, allow_unverified=True)
                     if not added:
                         raise RuntimeError("Downloaded file could not be added to the instance.")
+                    CurseForgeContentManager._validate_expected_mod_ids(added[0], entry)
                     entry["fileName"] = added[0].file_name
                     entry["path"] = f"mods/{added[0].file_name}"
 
@@ -257,6 +261,45 @@ class CurseForgeContentManager:
             finally:
                 batch_progress.complete(token)
         return {"errors": errors, "downloaded": downloaded, "acceptedUnverified": accepted_unverified}
+
+    @staticmethod
+    def _provides_expected_mod_ids(instance: Instance, path: Path, entry: dict) -> bool:
+        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
+        metadata = ModManager.read_mod(path, preferred_loader=loader_name, provider_version=str(entry.get("displayName") or ""))
+        try:
+            CurseForgeContentManager._validate_expected_mod_ids(metadata, entry)
+        except RuntimeError:
+            if CurseForgeContentManager._can_trust_manual_provider_identity(metadata, entry):
+                expected = sorted({str(value).strip().casefold() for value in entry.get("expectedModIds", []) if str(value).strip()})
+                entry["acceptedUnverified"] = True
+                entry["compatibilityWarning"] = (
+                    "The manually imported CurseForge file matched the provider SHA-1, but its legacy metadata did not expose "
+                    f"the expected mod ID(s): {', '.join(expected)}. Provider identity was accepted for dependency audit."
+                )
+                return True
+            return False
+        return True
+
+    @staticmethod
+    def _can_trust_manual_provider_identity(metadata, entry: dict) -> bool:
+        return (
+            bool(entry.get("manualImport", False))
+            and bool(str(entry.get("sha1") or "").strip())
+            and bool(entry.get("expectedModIds"))
+            and str(getattr(metadata, "status", "") or "") in {"Unverified", "Broken metadata"}
+        )
+
+    @staticmethod
+    def _validate_expected_mod_ids(metadata, entry: dict) -> None:
+        expected = {str(value).strip().casefold() for value in entry.get("expectedModIds", []) if str(value).strip()}
+        if not expected:
+            return
+        provided = {str(metadata.mod_id).strip().casefold()} | {str(mod_id).strip().casefold() for mod_id, _version in metadata.provided_mods if str(mod_id).strip()}
+        missing = sorted(expected - provided)
+        if missing:
+            raise RuntimeError(
+                f"Downloaded CurseForge file '{metadata.file_name}' does not provide expected mod ID(s): {', '.join(missing)}."
+            )
 
     @staticmethod
     def _artifact_request(file: CurseForgeFile, destination: Path, item: dict):

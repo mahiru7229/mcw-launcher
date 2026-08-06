@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace as dataclass_replace
 from pathlib import Path
 from typing import Iterable
+import hashlib
 import io
 import json
 import re
@@ -33,9 +34,10 @@ class ModManager:
     @staticmethod
     def list_mods(instance: Instance) -> list[ModInfo]:
         directory = ModManager.mods_dir(instance)
-        paths = [path for path in directory.iterdir() if path.is_file() and ModManager._is_mod_file(path)]
+        paths = ModManager._discover_mod_paths(instance, directory)
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         provenance = ModProvenanceRegistry.entries_by_file(instance)
+        trusted_manual_identities = ModManager._trusted_manual_curseforge_identities(instance)
         mods: list[ModInfo] = []
         for path in paths:
             mod = ModManager.read_mod(path, preferred_loader=loader_name)
@@ -50,8 +52,76 @@ class ModManager:
                     managed_by_modpack=bool(source.get("managedByModpack", False)),
                     source_pack_provider=str(source.get("packProvider") or "").strip().casefold(),
                 )
+            trusted_identity = trusted_manual_identities.get(path.resolve())
+            if trusted_identity is not None:
+                mod = ModManager._apply_trusted_manual_identity(instance, mod, trusted_identity)
             mods.append(mod)
         return sorted(mods, key=lambda mod: (not mod.enabled, mod.name.casefold(), mod.file_name.casefold()))
+
+    @staticmethod
+    def _trusted_manual_curseforge_identities(instance: Instance) -> dict[Path, dict]:
+        from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
+
+        identities: dict[Path, dict] = {}
+        pack = CurseForgePackRegistry.load(instance)
+        for raw in pack.get("managedFiles", []):
+            if not isinstance(raw, dict) or not bool(raw.get("manualImport", False)):
+                continue
+            expected = list(dict.fromkeys(str(value).strip().casefold() for value in raw.get("expectedModIds", []) if str(value).strip()))
+            expected_sha1 = str(raw.get("sha1") or "").strip().casefold()
+            if not expected or not expected_sha1:
+                continue
+            try:
+                target, _relative = CurseForgePackRegistry.managed_path(instance, str(raw.get("path") or ""), str(raw.get("fileName") or "download.jar"))
+            except RuntimeError:
+                continue
+            if target.suffix.casefold() != ".jar" or not target.is_file():
+                continue
+            try:
+                digest = ModManager._sha1(target)
+            except OSError:
+                continue
+            if digest != expected_sha1:
+                continue
+            identities[target.resolve()] = {**raw, "expectedModIds": expected}
+        return identities
+
+    @staticmethod
+    def _apply_trusted_manual_identity(instance: Instance, mod: ModInfo, entry: dict) -> ModInfo:
+        if mod.status not in {"Unverified", "Broken metadata"}:
+            return mod
+        expected = list(dict.fromkeys(str(value).strip().casefold() for value in entry.get("expectedModIds", []) if str(value).strip()))
+        if not expected:
+            return mod
+
+        loader_name, _loader_version = ModLoaderManager.normalize(instance.mod_loader)
+        primary = expected[0]
+        version = mod.version if str(mod.version).strip() and str(mod.version).strip().casefold() != "unknown" else "Unknown"
+        provided = {(str(mod_id).strip().casefold(), str(provided_version or version).strip() or version) for mod_id, provided_version in mod.provided_mods if str(mod_id).strip()}
+        provided.update((mod_id, version) for mod_id in expected[1:])
+        return dataclass_replace(
+            mod,
+            mod_id=primary,
+            name=str(entry.get("projectName") or entry.get("displayName") or mod.name or primary).strip(),
+            loader=loader_name if loader_name in ModLoaderManager.FORGE_FAMILY else mod.loader,
+            metadata_format="CurseForge provider SHA-1 identity",
+            status="Ready",
+            error="",
+            source="curseforge",
+            source_project_id=str(entry.get("projectId") or mod.source_project_id).strip(),
+            source_file_id=str(entry.get("fileId") or mod.source_file_id).strip(),
+            managed_by_modpack=True,
+            source_pack_provider="curseforge",
+            provided_mods=tuple(sorted(provided)),
+        )
+
+    @staticmethod
+    def _sha1(path: Path) -> str:
+        digest = hashlib.sha1(usedforsecurity=False)
+        with Path(path).open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest().casefold()
 
     @staticmethod
     def add_mods(instance: Instance, source_paths: Iterable[Path], replace: bool = False, launch_lock_token: str | None = None, allow_unverified: bool = False) -> list[ModInfo]:
@@ -115,11 +185,12 @@ class ModManager:
     def remove_mods(instance: Instance, paths: Iterable[Path]) -> None:
         ModManager._ensure_modifiable(instance)
         directory = ModManager.mods_dir(instance).resolve()
+        allowed_directories = ModManager._allowed_mod_directories(instance, directory)
 
         removed_names: list[str] = []
         for path in paths:
             candidate = Path(path).resolve()
-            if candidate.parent != directory:
+            if candidate.parent not in allowed_directories:
                 raise RuntimeError("Refusing to remove a file outside the instance mods folder.")
             removed_names.append(candidate.name)
             candidate.unlink(missing_ok=True)
@@ -129,12 +200,13 @@ class ModManager:
     def set_enabled(instance: Instance, paths: Iterable[Path], enabled: bool) -> list[ModInfo]:
         ModManager._ensure_modifiable(instance)
         directory = ModManager.mods_dir(instance).resolve()
+        allowed_directories = ModManager._allowed_mod_directories(instance, directory)
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         changed: list[ModInfo] = []
 
         for path in paths:
             source = Path(path).resolve()
-            if source.parent != directory or not source.exists():
+            if source.parent not in allowed_directories or not source.exists():
                 raise RuntimeError("Mod file no longer exists in this instance.")
 
             currently_enabled = not source.name.endswith(ModManager.DISABLED_SUFFIX)
@@ -444,7 +516,8 @@ class ModManager:
             entries = data
         else:
             entries = []
-        metadata = next((item for item in entries if isinstance(item, dict)), {})
+        normalized_entries = [item for item in entries if isinstance(item, dict)]
+        metadata = next((item for item in normalized_entries if str(item.get("modid") or item.get("modId") or "").strip()), {})
         mod_id = str(metadata.get("modid") or metadata.get("modId") or "").strip()
         if not mod_id:
             return ModManager._invalid_mod(path, file_name, enabled, "Broken metadata", "Legacy Forge mod id is missing.", loader="forge", metadata_format="mcmod.info")
@@ -453,6 +526,13 @@ class ModManager:
         minecraft_version = str(metadata.get("mcversion") or "").strip()
         if minecraft_version and minecraft_version.casefold() not in {"unknown", "*"}:
             dependencies.setdefault("minecraft", minecraft_version)
+
+        provided: dict[str, str] = {}
+        for item in normalized_entries:
+            item_id = str(item.get("modid") or item.get("modId") or "").strip().casefold()
+            if not item_id or item_id == mod_id.casefold():
+                continue
+            provided.setdefault(item_id, str(item.get("version") or "Unknown").strip())
 
         return ModInfo(
             path=path,
@@ -474,7 +554,30 @@ class ModManager:
             breaks={},
             status="Ready",
             error="",
+            provided_mods=tuple(sorted(provided.items())),
         )
+
+    @staticmethod
+    def _discover_mod_paths(instance: Instance, directory: Path) -> list[Path]:
+        paths: list[Path] = []
+        for candidate_directory in ModManager._allowed_mod_directories(instance, directory.resolve()):
+            try:
+                paths.extend(path for path in candidate_directory.iterdir() if path.is_file() and ModManager._is_mod_file(path))
+            except (FileNotFoundError, NotADirectoryError, PermissionError, OSError):
+                continue
+        unique = {path.resolve(): path for path in paths}
+        return sorted(unique.values(), key=lambda path: (len(path.parts), path.name.casefold(), str(path).casefold()))
+
+    @staticmethod
+    def _allowed_mod_directories(instance: Instance, directory: Path) -> set[Path]:
+        allowed = {Path(directory).resolve()}
+        loader_name, _loader_version = ModLoaderManager.normalize(getattr(instance, "mod_loader", None))
+        if loader_name not in ModLoaderManager.FORGE_FAMILY:
+            return allowed
+        version_id = str(getattr(instance, "version_id", "") or "").strip()
+        if version_id and version_id not in {".", ".."} and "/" not in version_id and "\\" not in version_id:
+            allowed.add((Path(directory) / version_id).resolve())
+        return allowed
 
     @staticmethod
     def _forge_dependencies(data: dict, mod_id: str) -> tuple[dict[str, object], dict[str, object]]:

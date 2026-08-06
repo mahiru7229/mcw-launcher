@@ -69,6 +69,15 @@ class ModpackDependencyResolver:
             warnings.extend(result.warnings)
             unresolved.extend(result.unresolved)
 
+        # Legacy packs can pin a dependency in their manifest while storing it
+        # in a version-specific mods directory or leaving a stale/missing local
+        # file behind. Reconcile the dependency audit with the authoritative
+        # pack registry before attempting a cross-provider replacement.
+        result = ModpackDependencyResolver._reconcile_pack_pinned_dependencies(instance, reporter)
+        added.extend(result.added_files)
+        warnings.extend(result.warnings)
+        unresolved.extend(result.unresolved)
+
         # CurseForge file relations are not always complete. Once the pack JARs
         # exist locally, use the exact file hash to find the same release on
         # Modrinth and recover required relations from that provider. This is
@@ -241,6 +250,133 @@ class ModpackDependencyResolver:
             )
             ModrinthPackRegistry.save(instance.instance_dir, registry)
         return DependencyResolutionResult(tuple(added), tuple(warnings), tuple(unresolved))
+
+    @staticmethod
+    def _reconcile_pack_pinned_dependencies(instance: Instance, reporter: ProgressReporter | None) -> DependencyResolutionResult:
+        if not getattr(instance, "instance_dir", None):
+            return DependencyResolutionResult()
+        registry = CurseForgePackRegistry.load(Path(instance.instance_dir))
+        entries = [entry for entry in registry.get("managedFiles", []) if isinstance(entry, dict) and ModpackDependencyResolver._is_mod_entry(entry)]
+        if not entries:
+            return DependencyResolutionResult()
+        try:
+            mods = ModManager.list_mods(instance)
+        except (AttributeError, FileNotFoundError, OSError):
+            return DependencyResolutionResult()
+        report = ModCompatibilityManager.scan(instance, mods=mods)
+        issues = [issue for issue in report.issues if issue.code == "dependency-missing" and len(issue.mod_ids) >= 2]
+        if not issues:
+            return DependencyResolutionResult()
+
+        entries_by_identity: dict[str, list[dict]] = {}
+        changed = False
+        for entry in entries:
+            ModpackDependencyResolver._index_curseforge_entry_identities(entries_by_identity, entry)
+
+        required_identities = {
+            ModpackDependencyResolver._canonical_identity(issue.mod_ids[1])
+            for issue in issues
+            if len(issue.mod_ids) >= 2 and ModpackDependencyResolver._canonical_identity(issue.mod_ids[1])
+        }
+        missing_identities = required_identities - set(entries_by_identity)
+        metadata_warning = ""
+        if missing_identities:
+            project_ids: set[int] = set()
+            for entry in entries:
+                try:
+                    project_id = int(entry.get("projectId") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if project_id > 0:
+                    project_ids.add(project_id)
+            try:
+                projects = ModpackDependencyResolver._retry(lambda: CurseForgeClient.get_projects_batch(project_ids)) if project_ids else {}
+            except Exception as error:
+                projects = {}
+                metadata_warning = f"Could not refresh CurseForge project identities while reconciling pack-pinned dependencies: {error}"
+            if projects:
+                entries_by_identity.clear()
+                for entry in entries:
+                    try:
+                        project_id = int(entry.get("projectId") or 0)
+                    except (TypeError, ValueError):
+                        project_id = 0
+                    project = projects.get(project_id)
+                    if project is not None:
+                        project_name = str(getattr(project, "name", "") or "").strip()
+                        project_slug = str(getattr(project, "slug", "") or "").strip().casefold()
+                        if entry.get("projectName") != project_name:
+                            entry["projectName"] = project_name
+                            changed = True
+                        if entry.get("projectSlug") != project_slug:
+                            entry["projectSlug"] = project_slug
+                            changed = True
+                    ModpackDependencyResolver._index_curseforge_entry_identities(entries_by_identity, entry)
+
+        parents_by_id = {mod.mod_id.casefold(): mod for mod in mods if mod.enabled and mod.mod_id and mod.mod_id != "unknown"}
+        added: list[str] = []
+        warnings: list[str] = [metadata_warning] if metadata_warning else []
+        processed: set[tuple[str, str]] = set()
+        ModpackDependencyResolver._report(reporter, "Reconciling pack-pinned mod dependencies...", 0, max(1, len(issues)))
+        for completed, issue in enumerate(issues, start=1):
+            parent_id = str(issue.mod_ids[0]).strip().casefold()
+            dependency_id = str(issue.mod_ids[1]).strip().casefold()
+            key = (parent_id, dependency_id)
+            if not dependency_id or key in processed:
+                ModpackDependencyResolver._report(reporter, "Reconciling pack-pinned mod dependencies...", completed, max(1, len(issues)))
+                continue
+            processed.add(key)
+            candidates = entries_by_identity.get(ModpackDependencyResolver._canonical_identity(dependency_id), [])
+            if len(candidates) != 1:
+                ModpackDependencyResolver._report(reporter, "Reconciling pack-pinned mod dependencies...", completed, max(1, len(issues)))
+                continue
+            entry = candidates[0]
+            expected = list(dict.fromkeys(str(value).strip().casefold() for value in entry.get("expectedModIds", []) if str(value).strip()))
+            if dependency_id not in expected:
+                expected.append(dependency_id)
+                entry["expectedModIds"] = expected
+                changed = True
+            parent = parents_by_id.get(parent_id)
+            parent_label = parent.name if parent is not None else parent_id
+            changed |= ModpackDependencyResolver._append_required_by(entry, parent_label)
+
+            target, _relative = CurseForgePackRegistry.managed_path(instance, str(entry.get("path") or ""), str(entry.get("fileName") or "dependency.jar"))
+            provides_dependency = False
+            if target.is_file():
+                loader_name = str(ModLoaderManager.normalize(instance.mod_loader)[0]).strip().casefold()
+                metadata = ModManager.read_mod(target, preferred_loader=loader_name, provider_version=str(entry.get("displayName") or ""))
+                identities = {metadata.mod_id.casefold()} | {mod_id.casefold() for mod_id, _version in metadata.provided_mods if mod_id}
+                provides_dependency = dependency_id in identities
+            if not provides_dependency:
+                before = (bool(entry.get("pendingDownload", False)), bool(entry.get("retryableDownload", True)), str(entry.get("lastDownloadError") or ""))
+                entry["pendingDownload"] = True
+                entry["retryableDownload"] = True
+                entry["lastDownloadError"] = f"Pack-pinned dependency '{dependency_id}' is missing or does not provide the expected mod ID."
+                changed |= before != (True, True, entry["lastDownloadError"])
+                label = str(entry.get("projectName") or entry.get("displayName") or entry.get("fileName") or dependency_id).strip()
+                added.append(label)
+            ModpackDependencyResolver._report(reporter, "Reconciling pack-pinned mod dependencies...", completed, max(1, len(issues)))
+
+        if changed:
+            registry["managedFiles"] = entries
+            CurseForgePackRegistry.save(Path(instance.instance_dir), registry)
+        return DependencyResolutionResult(tuple(dict.fromkeys(added)), tuple(dict.fromkeys(warnings)), ())
+
+    @staticmethod
+    def _index_curseforge_entry_identities(index: dict[str, list[dict]], entry: dict) -> None:
+        expected = entry.get("expectedModIds", [])
+        if isinstance(expected, str):
+            expected = [expected]
+        identities = {
+            ModpackDependencyResolver._canonical_identity(entry.get("projectName")),
+            ModpackDependencyResolver._canonical_identity(entry.get("projectSlug")),
+            ModpackDependencyResolver._canonical_identity(entry.get("displayName")),
+        }
+        if isinstance(expected, (list, tuple, set)):
+            identities.update(ModpackDependencyResolver._canonical_identity(value) for value in expected if str(value).strip())
+        for identity in identities:
+            if identity and entry not in index.setdefault(identity, []):
+                index[identity].append(entry)
 
     @staticmethod
     def _resolve_curseforge(instance: Instance, registry: dict, reporter: ProgressReporter | None) -> DependencyResolutionResult:

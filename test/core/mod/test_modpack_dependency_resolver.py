@@ -344,3 +344,83 @@ def test_curseforge_resolver_does_not_add_standalone_dependency_already_provided
     assert result.added_files == ()
     assert len(registry["managedFiles"]) == 1
     assert len(saved["managedFiles"]) == 1
+
+
+def test_repairs_pack_pinned_curseforge_dependency_missing_from_disk(tmp_path, monkeypatch):
+    managed_instance = instance(tmp_path, loader="forge")
+    managed_instance.version_id = "1.12.2"
+    managed_instance.instance_dir.mkdir(parents=True)
+    compat = ModInfo(
+        path=managed_instance.instance_dir / "mods" / "CompatSkills-1.12.2-1.17.0.jar",
+        file_name="CompatSkills-1.12.2-1.17.0.jar",
+        enabled=True,
+        mod_id="compatskills",
+        name="CompatSkills",
+        version="1.17.0",
+        loader="forge",
+        dependencies={"reskillable": "*"},
+        managed_by_modpack=True,
+        source="curseforge",
+        source_project_id="290541",
+        source_file_id="2815687",
+        source_pack_provider="curseforge",
+    )
+    registry = {
+        "managedFiles": [
+            {"projectId": 290541, "fileId": 2815687, "fileName": compat.file_name, "path": f"mods/{compat.file_name}", "selectionReason": "pack_manifest"},
+            {"projectId": 286382, "fileId": 2815686, "fileName": "Reskillable-1.12.2-1.13.0.jar", "path": "mods/Reskillable-1.12.2-1.13.0.jar", "selectionReason": "pack_manifest", "pendingDownload": False},
+        ]
+    }
+    projects = {
+        290541: SimpleNamespace(project_id=290541, name="CompatSkills", slug="compatskills"),
+        286382: SimpleNamespace(project_id=286382, name="Reskillable", slug="reskillable"),
+    }
+    saved = {}
+
+    monkeypatch.setattr(ModManager, "list_mods", lambda _instance: [compat])
+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: registry)
+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda _instance, payload: saved.update(payload))
+    monkeypatch.setattr(CurseForgeClient, "get_projects_batch", lambda project_ids: {project_id: projects[project_id] for project_id in project_ids})
+
+    result = ModpackDependencyResolver._reconcile_pack_pinned_dependencies(managed_instance, None)
+
+    assert result.added_files == ("Reskillable",)
+    entry = next(item for item in saved["managedFiles"] if item["projectId"] == 286382)
+    assert entry["pendingDownload"] is True
+    assert entry["retryableDownload"] is True
+    assert entry["expectedModIds"] == ["reskillable"]
+    assert entry["requiredBy"] == ["CompatSkills"]
+    assert entry["projectSlug"] == "reskillable"
+
+
+def test_pack_pinned_dependency_is_not_redownloaded_when_legacy_version_folder_is_scanned(tmp_path, monkeypatch):
+    managed_instance = instance(tmp_path, loader="forge")
+    managed_instance.version_id = "1.12.2"
+    mods_dir = managed_instance.instance_dir / "mods"
+    version_dir = mods_dir / "1.12.2"
+    version_dir.mkdir(parents=True)
+    compat_path = mods_dir / "CompatSkills-1.12.2-1.17.0.jar"
+    compat_metadata = [{"modid": "compatskills", "name": "CompatSkills", "version": "1.17.0", "requiredMods": ["required-after:reskillable"]}]
+    reskillable_path = version_dir / "Reskillable-1.12.2-1.13.0.jar"
+    reskillable_metadata = [{"modid": "reskillable", "name": "Reskillable", "version": "1.13.0", "mcversion": "1.12.2"}]
+    import json
+    import zipfile
+    with zipfile.ZipFile(compat_path, "w") as archive:
+        archive.writestr("mcmod.info", json.dumps(compat_metadata))
+    with zipfile.ZipFile(reskillable_path, "w") as archive:
+        archive.writestr("mcmod.info", json.dumps(reskillable_metadata))
+    registry = {
+        "managedFiles": [
+            {"projectId": 290541, "fileId": 2815687, "fileName": compat_path.name, "path": f"mods/{compat_path.name}", "selectionReason": "pack_manifest"},
+            {"projectId": 286382, "fileId": 2815686, "fileName": reskillable_path.name, "path": f"mods/1.12.2/{reskillable_path.name}", "selectionReason": "pack_manifest", "pendingDownload": False, "projectSlug": "reskillable", "expectedModIds": ["reskillable"]},
+        ]
+    }
+
+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: registry)
+
+    result = ModpackDependencyResolver._reconcile_pack_pinned_dependencies(managed_instance, None)
+
+    assert result.added_files == ()
+    assert ModpackDependencyResolver.blocking_issues(managed_instance) == ()
