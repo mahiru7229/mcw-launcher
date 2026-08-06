@@ -296,3 +296,36 @@ def test_quilt_instance_rejects_forge_only_mod(tmp_path):
     report = ModCompatibilityManager.scan(instance)
 
     assert any(issue.code == "loader-mismatch" for issue in report.issues)
+
+
+def test_jarjar_provided_mod_satisfies_required_dependency(tmp_path) -> None:
+    instance_dir = tmp_path / "jarjar-instance"
+    (instance_dir / "mods").mkdir(parents=True)
+    instance = Instance(instance_id="jarjar", name="JarJar", version_id="1.19.2", instance_dir=instance_dir, mod_loader=("forge", "43.4.0"))
+    provider = ModInfo(
+        path=instance_dir / "mods" / "kotlinforforge-3.9.1-all.jar",
+        file_name="kotlinforforge-3.9.1-all.jar",
+        enabled=True,
+        mod_id="unknown",
+        name="kotlinforforge-3.9.1-all",
+        version="3.9.1",
+        loader="forge",
+        metadata_format="MANIFEST.MF:FMLModType=LIBRARY",
+        provided_mods=(("kotlinforforge", "3.9.1"),),
+        managed_by_modpack=True,
+    )
+    consumer = ModInfo(
+        path=instance_dir / "mods" / "sliceanddice.jar",
+        file_name="sliceanddice.jar",
+        enabled=True,
+        mod_id="sliceanddice",
+        name="Create Slice & Dice",
+        version="2.4.0",
+        loader="forge",
+        dependencies={"kotlinforforge": "[3.9.1,)"},
+        managed_by_modpack=True,
+    )
+
+    report = ModCompatibilityManager.scan(instance, mods=[provider, consumer])
+
+    assert not any(issue.code in {"dependency-missing", "dependency-version"} and "kotlinforforge" in issue.mod_ids for issue in report.issues)

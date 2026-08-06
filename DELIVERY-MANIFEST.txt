@@ -1,19 +1,17 @@
-Package: mcw-launcher-v1.1.1-beta.5-dependency-provider-bridge-hotfix-v2.zip
+Package: mcw-launcher-v1.1.1-beta.5-final-dependency-forge-cache-hotfix-v4.zip
 Baseline: MCW Launcher v1.1.1-beta.5
 Type: cumulative changed-files hotfix
 
-Included files:
-CHANGES.diff
-DELIVERY-MANIFEST.txt
-PATCH-README.md
-TEST-RESULTS.txt
-src/core/mod/mod_compatibility_manager.py
-src/core/mod/mod_provenance_registry.py
-src/core/mod/modpack_dependency_resolver.py
-src/core/modrinth/modrinth_content_manager.py
-test/core/mod/test_mod_compatibility_manager.py
-test/core/mod/test_mod_provenance_registry.py
-test/core/mod/test_modpack_dependency_resolver.py
-test/core/modrinth/test_modrinth_content_manager.py
+Included source changes:
+- Cumulative dependency/provider/JarJar fixes from hotfix v1-v3
+- Generic embedded dependency satisfaction and redundant auto-added dependency cleanup
+- Forge cached-profile metadata refresh without installer rerun
+- Complete normalization of newly generated Forge cache profiles
 
-Validation: 1385 passed, 88 skipped, 2 expected warnings; compileall passed
+Included tests:
+- Existing dependency/provider/JarJar regressions
+- Embedded Flywheel provider regression
+- Redundant standalone dependency cleanup regression
+- Forge cache refresh/no-installer regression
+
+Validation: 1391 passed, 88 skipped, 2 expected warnings; compileall passed

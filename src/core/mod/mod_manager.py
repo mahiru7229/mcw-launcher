@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace as dataclass_replace
 from pathlib import Path
 from typing import Iterable
+import io
 import json
 import re
 import shutil
@@ -21,6 +22,9 @@ from src.models.mod.mod_info import ModInfo
 class ModManager:
     DISABLED_SUFFIX = ".disabled"
     _INVALID_STATUSES = {"Broken JAR", "Not a mod", "Broken metadata", "Unverified"}
+    MAX_EMBEDDED_MOD_JARS = 64
+    MAX_EMBEDDED_MOD_JAR_SIZE = 32 * 1024 * 1024
+    MAX_EMBEDDED_MOD_DEPTH = 2
 
     @staticmethod
     def mods_dir(instance: Instance) -> Path:
@@ -158,14 +162,23 @@ class ModManager:
             with zipfile.ZipFile(path, "r") as archive:
                 names = set(archive.namelist())
                 manifest = ModManager._manifest_attributes(archive.read("META-INF/MANIFEST.MF")) if "META-INF/MANIFEST.MF" in names else {}
+                provided_mods = ModManager._embedded_mods(archive, provider_version=provider_version)
+
+                def finalize(mod: ModInfo) -> ModInfo:
+                    if not provided_mods:
+                        return mod
+                    merged = {(mod_id.casefold(), version) for mod_id, version in mod.provided_mods if mod_id}
+                    merged.update((mod_id.casefold(), version) for mod_id, version in provided_mods if mod_id and mod_id.casefold() != mod.mod_id.casefold())
+                    return dataclass_replace(mod, provided_mods=tuple(sorted(merged)))
+
                 has_fabric = "fabric.mod.json" in names
                 has_quilt = "quilt.mod.json" in names
                 has_forge = "META-INF/mods.toml" in names
 
                 if has_quilt and (normalized_preference == ModLoaderManager.QUILT or not has_fabric):
-                    return ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version)
+                    return finalize(ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version))
                 if has_fabric and has_forge:
-                    return ModManager._read_universal_fabric_forge_mod(
+                    return finalize(ModManager._read_universal_fabric_forge_mod(
                         path,
                         file_name,
                         enabled,
@@ -174,21 +187,21 @@ class ModManager:
                         normalized_preference,
                         manifest,
                         provider_version,
-                    )
+                    ))
                 if has_fabric:
                     fabric = ModManager._read_fabric_mod(path, file_name, enabled, archive.read("fabric.mod.json"), manifest, provider_version)
                     if normalized_preference == ModLoaderManager.QUILT:
-                        return dataclass_replace(fabric, loader="quilt", metadata_format="fabric.mod.json (Quilt compatibility)")
-                    return fabric
+                        return finalize(dataclass_replace(fabric, loader="quilt", metadata_format="fabric.mod.json (Quilt compatibility)"))
+                    return finalize(fabric)
                 if has_quilt:
-                    return ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version)
+                    return finalize(ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version))
                 if "META-INF/neoforge.mods.toml" in names:
-                    return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/neoforge.mods.toml"), loader="neoforge", metadata_format="neoforge.mods.toml", manifest=manifest, provider_version=provider_version)
+                    return finalize(ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/neoforge.mods.toml"), loader="neoforge", metadata_format="neoforge.mods.toml", manifest=manifest, provider_version=provider_version))
                 if has_forge:
                     loader = ModLoaderManager.NEOFORGE if normalized_preference == ModLoaderManager.NEOFORGE else ModLoaderManager.FORGE
-                    return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/mods.toml"), loader=loader, metadata_format="mods.toml", manifest=manifest, provider_version=provider_version)
+                    return finalize(ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/mods.toml"), loader=loader, metadata_format="mods.toml", manifest=manifest, provider_version=provider_version))
                 if "mcmod.info" in names:
-                    return ModManager._read_legacy_forge_mod(path, file_name, enabled, archive.read("mcmod.info"))
+                    return finalize(ModManager._read_legacy_forge_mod(path, file_name, enabled, archive.read("mcmod.info")))
                 fml_mod_type = str(manifest.get("fmlmodtype") or "").strip().upper()
                 if fml_mod_type in {"LANGPROVIDER", "LIBRARY", "GAMELIBRARY"}:
                     loader = normalized_preference if normalized_preference in ModLoaderManager.FORGE_FAMILY else ModLoaderManager.FORGE
@@ -197,7 +210,7 @@ class ModManager:
                         "LIBRARY": f"{loader.title()} managed library",
                         "GAMELIBRARY": f"{loader.title()} game library",
                     }[fml_mod_type]
-                    return ModInfo(
+                    return finalize(ModInfo(
                         path=path,
                         file_name=file_name,
                         enabled=enabled,
@@ -208,16 +221,16 @@ class ModManager:
                         metadata_format=f"MANIFEST.MF:FMLModType={fml_mod_type}",
                         status="Ready",
                         description=label,
-                    )
+                    ))
                 has_java_content = any(name.endswith(".class") for name in names)
                 status = "Unverified" if manifest or has_java_content else "Not a mod"
-                return ModManager._invalid_mod(
+                return finalize(ModManager._invalid_mod(
                     path,
                     file_name,
                     enabled,
                     status,
                     "No quilt.mod.json, fabric.mod.json, Forge META-INF/mods.toml, NeoForge metadata, mcmod.info, or recognized Forge library metadata was found.",
-                )
+                ))
         except (OSError, zipfile.BadZipFile) as error:
             return ModManager._invalid_mod(path, file_name, enabled, "Broken JAR", str(error))
 
@@ -517,6 +530,86 @@ class ModManager:
             expected = loader_name.title()
             actual = mod.loader.title()
             raise RuntimeError(f"'{mod.file_name}' is a {actual} mod and cannot be added to this {expected} instance.")
+
+    @staticmethod
+    def _embedded_mods(archive: zipfile.ZipFile, provider_version: str = "", depth: int = 0) -> tuple[tuple[str, str], ...]:
+        if depth >= ModManager.MAX_EMBEDDED_MOD_DEPTH:
+            return ()
+        names = set(archive.namelist())
+        metadata_name = "META-INF/jarjar/metadata.json"
+        if metadata_name not in names:
+            return ()
+        try:
+            payload = json.loads(archive.read(metadata_name).decode("utf-8-sig"))
+        except (KeyError, UnicodeError, json.JSONDecodeError):
+            return ()
+        jars = payload.get("jars") if isinstance(payload, dict) and isinstance(payload.get("jars"), list) else []
+        paths: list[str] = []
+        for item in jars[:ModManager.MAX_EMBEDDED_MOD_JARS]:
+            path = str(item.get("path") or "").replace("\\", "/").lstrip("/") if isinstance(item, dict) else ""
+            if path.startswith("META-INF/jarjar/") and path.endswith(".jar") and path in names:
+                paths.append(path)
+
+        found: dict[str, str] = {}
+        for path in paths:
+            try:
+                info = archive.getinfo(path)
+                if info.file_size <= 0 or info.file_size > ModManager.MAX_EMBEDDED_MOD_JAR_SIZE:
+                    continue
+                raw = archive.read(info)
+                with zipfile.ZipFile(io.BytesIO(raw), "r") as nested:
+                    for mod_id, version in ModManager._declared_mods(nested, provider_version):
+                        found.setdefault(mod_id.casefold(), version)
+                    for mod_id, version in ModManager._embedded_mods(nested, provider_version, depth + 1):
+                        found.setdefault(mod_id.casefold(), version)
+            except (KeyError, OSError, zipfile.BadZipFile, RuntimeError):
+                continue
+        return tuple(sorted(found.items()))
+
+    @staticmethod
+    def _declared_mods(archive: zipfile.ZipFile, provider_version: str = "") -> tuple[tuple[str, str], ...]:
+        names = set(archive.namelist())
+        manifest = ModManager._manifest_attributes(archive.read("META-INF/MANIFEST.MF")) if "META-INF/MANIFEST.MF" in names else {}
+        found: dict[str, str] = {}
+
+        for metadata_name in ("META-INF/neoforge.mods.toml", "META-INF/mods.toml"):
+            if metadata_name not in names:
+                continue
+            try:
+                data = tomllib.loads(archive.read(metadata_name).decode("utf-8-sig"))
+            except (UnicodeError, tomllib.TOMLDecodeError):
+                continue
+            mods = data.get("mods") if isinstance(data, dict) and isinstance(data.get("mods"), list) else []
+            for metadata in mods:
+                if not isinstance(metadata, dict):
+                    continue
+                mod_id = str(metadata.get("modId") or "").strip().casefold()
+                if not mod_id:
+                    continue
+                version = ModManager._resolve_mod_version(metadata.get("version"), manifest, {**data, **metadata}, provider_version, Path(metadata_name).name)
+                found.setdefault(mod_id, version)
+
+        if "fabric.mod.json" in names:
+            try:
+                data = json.loads(archive.read("fabric.mod.json").decode("utf-8-sig"))
+            except (UnicodeError, json.JSONDecodeError):
+                data = {}
+            if isinstance(data, dict):
+                mod_id = str(data.get("id") or "").strip().casefold()
+                if mod_id:
+                    found.setdefault(mod_id, ModManager._resolve_mod_version(data.get("version"), manifest, data, provider_version, "fabric.mod.json"))
+
+        if "quilt.mod.json" in names:
+            try:
+                data = json.loads(archive.read("quilt.mod.json").decode("utf-8-sig"))
+            except (UnicodeError, json.JSONDecodeError):
+                data = {}
+            loader_data = data.get("quilt_loader") if isinstance(data, dict) and isinstance(data.get("quilt_loader"), dict) else {}
+            mod_id = str(loader_data.get("id") or data.get("id") or "").strip().casefold() if isinstance(data, dict) else ""
+            if mod_id:
+                found.setdefault(mod_id, ModManager._resolve_mod_version(loader_data.get("version") or data.get("version"), manifest, {**data, **loader_data}, provider_version, "quilt.mod.json"))
+
+        return tuple(sorted(found.items()))
 
     @staticmethod
     def compatibility_warning(instance: Instance, mod: ModInfo) -> str:

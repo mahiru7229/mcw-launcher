@@ -55,6 +55,17 @@ class ForgeVersionManager:
                     version = VersionManager._parse_version(cached, cache_path)
                     if version is not None:
                         return version
+                repairable = ForgeVersionManager._load_structurally_valid_cache(cache_path, base_version.id, loader)
+                if repairable is not None:
+                    if reporter is not None:
+                        reporter.status(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Refreshing cached Minecraft Forge {loader} metadata...")
+                    refreshed = ForgeVersionManager._normalize_libraries(repairable, reporter)
+                    ForgeVersionManager._write_json(cache_path, refreshed)
+                    cached = ForgeVersionManager._load_cached(cache_path, base_version.id, loader)
+                    if cached is not None:
+                        version = VersionManager._parse_version(cached, cache_path)
+                        if version is not None:
+                            return version
             if reporter is not None:
                 reporter.status(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Preparing Minecraft Forge {loader}...")
             installer = ForgeVersionManager._download_installer(base_version.id, loader, reporter)
@@ -68,6 +79,7 @@ class ForgeVersionManager:
             ForgeVersionManager._import_libraries(staging, reporter)
             normalized = ForgeVersionManager._normalize_libraries(profile, reporter)
             merged = ForgeVersionManager._merge_profiles(base_version.raw_json, normalized, base_version.id, loader)
+            merged = ForgeVersionManager._normalize_libraries(merged, reporter)
             ForgeVersionManager._write_json(cache_path, merged)
             version = VersionManager._parse_version(merged, cache_path)
             if version is None:
@@ -393,6 +405,17 @@ class ForgeVersionManager:
 
     @staticmethod
     def _load_cached(path: Path, game_version: str, forge_version: str) -> dict | None:
+        data = ForgeVersionManager._load_structurally_valid_cache(path, game_version, forge_version)
+        if data is None:
+            return None
+        if not ForgeVersionManager._legacy_launchwrapper_cache_is_complete(data):
+            return None
+        if not ForgeVersionManager._windows_native_cache_is_complete(data):
+            return None
+        return data
+
+    @staticmethod
+    def _load_structurally_valid_cache(path: Path, game_version: str, forge_version: str) -> dict | None:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (FileNotFoundError, OSError, json.JSONDecodeError):
@@ -401,10 +424,6 @@ class ForgeVersionManager:
         if forge.get("schemaVersion") != ForgeVersionManager.CACHE_SCHEMA_VERSION or forge.get("gameVersion") != game_version or forge.get("loaderVersion") != forge_version:
             return None
         if not data.get("mainClass") or not data.get("libraries"):
-            return None
-        if not ForgeVersionManager._legacy_launchwrapper_cache_is_complete(data):
-            return None
-        if not ForgeVersionManager._windows_native_cache_is_complete(data):
             return None
         return data
 

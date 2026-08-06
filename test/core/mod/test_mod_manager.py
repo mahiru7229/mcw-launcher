@@ -1,4 +1,5 @@
 from pathlib import Path
+import io
 import json
 import zipfile
 
@@ -561,3 +562,35 @@ def test_dual_quilt_and_fabric_metadata_prefers_instance_loader(tmp_path):
     assert quilt_mod.name == "Quilt View"
     assert fabric_mod.loader == "fabric"
     assert fabric_mod.name == "Fabric View"
+
+
+def test_reads_mod_id_provided_by_forge_jarjar_library(tmp_path):
+    nested_buffer = io.BytesIO()
+    nested_metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[43,)"\n'
+        'license="LGPL-2.1"\n\n'
+        '[[mods]]\n'
+        'modId="kotlinforforge"\n'
+        'version="3.9.1"\n'
+        'displayName="Kotlin for Forge"\n'
+    )
+    with zipfile.ZipFile(nested_buffer, "w") as nested:
+        nested.writestr("META-INF/mods.toml", nested_metadata)
+
+    source = tmp_path / "kotlinforforge-3.9.1-all.jar"
+    jarjar = {"jars": [{"path": "META-INF/jarjar/kffmod-3.9.1.jar"}]}
+    with zipfile.ZipFile(source, "w") as archive:
+        archive.writestr(
+            "META-INF/MANIFEST.MF",
+            "Manifest-Version: 1.0\nFMLModType: LIBRARY\nImplementation-Version: 3.9.1\n",
+        )
+        archive.writestr("META-INF/jarjar/metadata.json", json.dumps(jarjar))
+        archive.writestr("META-INF/jarjar/kffmod-3.9.1.jar", nested_buffer.getvalue())
+
+    mod = ModManager.read_mod(source, preferred_loader="forge", provider_version="3.9.1")
+
+    assert mod.mod_id == "unknown"
+    assert mod.status == "Ready"
+    assert mod.metadata_format == "MANIFEST.MF:FMLModType=LIBRARY"
+    assert mod.provided_mods == (("kotlinforforge", "3.9.1"),)

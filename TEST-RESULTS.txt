@@ -1,15 +1,17 @@
-MCW Launcher v1.1.1-beta.5 dependency provider bridge hotfix v2
+MCW Launcher v1.1.1-beta.5 final dependency and Forge cache hotfix v4
 
-pytest:
-1385 passed, 88 skipped, 2 warnings
+Full regression:
+1391 passed, 88 skipped, 2 expected warnings
+
+Focused regression:
+- Dependency resolver, mod parser/provenance, Modrinth content, Forge loader: 141 passed
+- New targeted tests cover:
+  * Auto-removal of a standalone required dependency when another JAR embeds the same mod ID.
+  * CurseForge resolver skipping standalone Flywheel when Create provides `flywheel`.
+  * Refreshing an incomplete Forge cache without invoking the Forge installer.
 
 compileall:
-passed for src, mcw_core and test
+src, mcw_core, and test passed
 
-New regression coverage:
-- CurseForge file-level dependency metadata can be empty.
-- Exact SHA-1 lookup recovers the same release from Modrinth.
-- Create Slice & Dice resolves Kotlin for Forge without hardcoding.
-- Existing Create is not downloaded twice.
-- Cross-provider dependencies remain managed by the modpack.
-- A downloaded provider file with the wrong mod ID is rejected.
+Warnings:
+Two package-security fixtures intentionally contain duplicate ZIP members.

@@ -52,6 +52,9 @@ class ModpackDependencyResolver:
         warnings: list[str] = []
         unresolved: list[str] = []
 
+        pruned = ModpackDependencyResolver._prune_redundant_embedded_dependencies(instance)
+        warnings.extend(pruned)
+
         modrinth = ModrinthPackRegistry.load(instance)
         if ModpackDependencyResolver._has_managed_mods(modrinth.get("managedFiles", [])):
             result = ModpackDependencyResolver._resolve_modrinth(instance, modrinth, reporter)
@@ -117,6 +120,7 @@ class ModpackDependencyResolver:
         unresolved: list[str] = []
         added: list[str] = []
         changed = False
+        installed_identities = ModpackDependencyResolver._installed_mod_identities(instance)
 
         ModpackDependencyResolver._report(reporter, "Resolving Modrinth modpack dependencies...", 0, max(1, len(mod_entries)))
         for completed, entry in enumerate(mod_entries, start=1):
@@ -195,6 +199,10 @@ class ModpackDependencyResolver:
                 except Exception as error:
                     unresolved.append(f"{parent_label} dependency {dependency_version.project_id} is not installable: {error}")
                     continue
+                project_identities = ModpackDependencyResolver._project_identities(project)
+                if project_identities & installed_identities:
+                    queue.append((dependency_version, depth + 1, project.title or dependency_version.project_id))
+                    continue
                 if discovered >= ModpackDependencyResolver.MAX_DEPENDENCIES:
                     unresolved.append(f"The Modrinth dependency graph exceeds {ModpackDependencyResolver.MAX_DEPENDENCIES} added files.")
                     queue.clear()
@@ -219,6 +227,7 @@ class ModpackDependencyResolver:
                 }
                 entries.append(target)
                 selected[dependency_version.project_id] = target
+                installed_identities.update(project_identities)
                 added.append(project.title or target["fileName"])
                 discovered += 1
                 changed = True
@@ -245,6 +254,7 @@ class ModpackDependencyResolver:
         unresolved: list[str] = []
         added: list[str] = []
         changed = False
+        installed_identities = ModpackDependencyResolver._installed_mod_identities(instance)
 
         unresolved_file_ids: list[int] = []
         for entry in mod_entries:
@@ -337,8 +347,14 @@ class ModpackDependencyResolver:
                     project_name = str(getattr(project, "name", "") or dependency_file.display_name).strip()
                     project_url = str(getattr(project, "project_url", "") or "").strip()
                 except Exception:
+                    project = None
                     project_name = dependency_file.display_name
                     project_url = ""
+                project_identities = ModpackDependencyResolver._project_identities(project) if project is not None else {ModpackDependencyResolver._canonical_identity(project_name)}
+                project_identities.discard("")
+                if project_identities & installed_identities:
+                    queue.append((dependency_file, depth + 1, project_name or dependency_file.file_name))
+                    continue
                 path = ModpackDependencyResolver._unique_mod_path(entries, dependency_file.file_name, str(dependency_file.project_id), dependency_file.sha1)
                 target = {
                     "projectId": dependency_file.project_id,
@@ -365,6 +381,7 @@ class ModpackDependencyResolver:
                 }
                 entries.append(target)
                 selected[dependency_file.project_id] = target
+                installed_identities.update(project_identities)
                 added.append(project_name or target["fileName"])
                 discovered += 1
                 changed = True
@@ -403,7 +420,13 @@ class ModpackDependencyResolver:
             for entry in pack_registry.get("managedFiles", [])
             if isinstance(entry, dict) and str(entry.get("projectId") or "").strip()
         )
-        installed_identities = {ModpackDependencyResolver._canonical_identity(mod.mod_id) for mod in mods if mod.enabled and mod.mod_id != "unknown"}
+        installed_identities = {
+            ModpackDependencyResolver._canonical_identity(identity)
+            for mod in mods
+            if mod.enabled
+            for identity in ([mod.mod_id] if mod.mod_id != "unknown" else []) + [mod_id for mod_id, _version in mod.provided_mods]
+            if ModpackDependencyResolver._canonical_identity(identity)
+        }
         added: list[str] = []
         warnings: list[str] = []
         changed = False
@@ -587,9 +610,100 @@ class ModpackDependencyResolver:
             for identity in (
                 ModpackDependencyResolver._canonical_identity(getattr(project, "slug", "")),
                 ModpackDependencyResolver._canonical_identity(getattr(project, "title", "")),
+                ModpackDependencyResolver._canonical_identity(getattr(project, "name", "")),
             )
             if identity
         }
+
+    @staticmethod
+    def _installed_mod_identities(instance: Instance) -> set[str]:
+        try:
+            mods = ModManager.list_mods(instance)
+        except (AttributeError, FileNotFoundError, OSError):
+            return set()
+        return {
+            identity
+            for mod in mods
+            if mod.enabled
+            for raw in ([mod.mod_id] if mod.mod_id != "unknown" else []) + [mod_id for mod_id, _version in mod.provided_mods]
+            if (identity := ModpackDependencyResolver._canonical_identity(raw))
+        }
+
+    @staticmethod
+    def _prune_redundant_embedded_dependencies(instance: Instance) -> tuple[str, ...]:
+        try:
+            mods = ModManager.list_mods(instance)
+        except (AttributeError, FileNotFoundError, OSError):
+            return ()
+        embedded_providers: dict[str, list] = {}
+        for mod in mods:
+            if not mod.enabled:
+                continue
+            for mod_id, _version in mod.provided_mods:
+                normalized = str(mod_id or "").strip().casefold()
+                if normalized:
+                    embedded_providers.setdefault(normalized, []).append(mod)
+        if not embedded_providers:
+            return ()
+
+        provenance = ModProvenanceRegistry.entries_by_file(instance)
+        redundant = []
+        for mod in mods:
+            if not mod.enabled or mod.mod_id.casefold() not in embedded_providers:
+                continue
+            source = provenance.get(mod.file_name.casefold(), {})
+            if not isinstance(source, dict) or str(source.get("selectionReason") or "").strip().casefold() != "required_dependency":
+                continue
+            providers = [provider for provider in embedded_providers[mod.mod_id.casefold()] if provider.path != mod.path]
+            if providers:
+                redundant.append((mod, providers[0]))
+        if not redundant:
+            return ()
+
+        mods_dir = ModManager.mods_dir(instance).resolve()
+        messages: list[str] = []
+        removed: list[tuple[object, object]] = []
+        for mod, provider in redundant:
+            try:
+                candidate = mod.path.resolve()
+                if candidate.parent != mods_dir:
+                    continue
+                candidate.unlink(missing_ok=True)
+                removed.append((mod, provider))
+                messages.append(f"Removed redundant standalone dependency {mod.name}; {provider.name} already provides mod ID '{mod.mod_id}'.")
+            except OSError:
+                continue
+        if not removed:
+            return ()
+
+        removed_names = [mod.file_name for mod, _provider in removed]
+        filenames = {name.casefold() for name in removed_names}
+        paths = {f"mods/{name}".replace("\\", "/").casefold() for name in removed_names}
+
+        modrinth_pack = ModrinthPackRegistry.load(instance)
+        mr_entries = [entry for entry in modrinth_pack.get("managedFiles", []) if isinstance(entry, dict)]
+        filtered_mr = [entry for entry in mr_entries if str(entry.get("fileName") or PurePosixPath(str(entry.get("path") or "")).name).casefold() not in filenames and str(entry.get("path") or "").replace("\\", "/").casefold() not in paths]
+        if filtered_mr != mr_entries:
+            modrinth_pack["managedFiles"] = filtered_mr
+            modrinth_pack["verificationCache"] = ModrinthPackRegistry._normalize_verification_cache(modrinth_pack.get("verificationCache", {}), filtered_mr)
+            ModrinthPackRegistry.save(instance.instance_dir, modrinth_pack)
+
+        curseforge_pack = CurseForgePackRegistry.load(Path(instance.instance_dir))
+        cf_entries = [entry for entry in curseforge_pack.get("managedFiles", []) if isinstance(entry, dict)]
+        filtered_cf = [entry for entry in cf_entries if str(entry.get("fileName") or PurePosixPath(str(entry.get("path") or "")).name).casefold() not in filenames and str(entry.get("path") or "").replace("\\", "/").casefold() not in paths]
+        if filtered_cf != cf_entries:
+            curseforge_pack["managedFiles"] = filtered_cf
+            CurseForgePackRegistry.save(Path(instance.instance_dir), curseforge_pack)
+
+        direct_registry = ModrinthRegistry.load(instance)
+        direct_mods = direct_registry.get("mods") if isinstance(direct_registry.get("mods"), dict) else {}
+        filtered_direct = {project_id: entry for project_id, entry in direct_mods.items() if not isinstance(entry, dict) or str(entry.get("fileName") or "").casefold() not in filenames}
+        if filtered_direct != direct_mods:
+            direct_registry["mods"] = filtered_direct
+            ModrinthRegistry.save(instance, direct_registry)
+
+        ModProvenanceRegistry.remove_by_filenames(instance, removed_names)
+        return tuple(messages)
 
     @staticmethod
     def _project_matches_mod_id(project, mod_id: str) -> bool:

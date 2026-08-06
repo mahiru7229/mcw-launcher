@@ -559,3 +559,39 @@ def test_run_installer_reports_java_runner_output_on_failure(monkeypatch, tmp_pa
         ForgeVersionManager._run_installer(make_version(tmp_path), "47.3.0", installer, tmp_path / "staging", None)
 
     assert "final Forge detail" in (forge_root / "logs" / "forge-1.20.1-47.3.0.log").read_text(encoding="utf-8")
+
+
+def test_incomplete_cached_profile_is_refreshed_without_rerunning_forge_installer(monkeypatch, tmp_path: Path) -> None:
+    import json
+
+    cache = tmp_path / "forge-1.20.1-47.3.0.json"
+    raw = make_version(tmp_path).raw_json.copy()
+    raw.update({
+        "id": "forge-1.20.1-47.3.0",
+        "mainClass": "cpw.mods.bootstraplauncher.BootstrapLauncher",
+        "libraries": [
+            {"name": "net.minecraftforge:forge:1.20.1-47.3.0", "downloads": {"artifact": {"path": "net/minecraftforge/forge/1.20.1-47.3.0/forge-1.20.1-47.3.0.jar", "url": "https://maven.minecraftforge.net/forge.jar", "sha1": "a" * 40, "size": 1}}},
+            {"name": "org.lwjgl:lwjgl:3.3.1", "natives": {"windows": "natives-windows"}, "downloads": {}},
+        ],
+        "forge": {"schemaVersion": 1, "gameVersion": "1.20.1", "loaderVersion": "47.3.0"},
+    })
+    cache.write_text(json.dumps(raw), encoding="utf-8")
+
+    monkeypatch.setattr(Paths, "forge_version_json", staticmethod(lambda *_args: cache))
+    monkeypatch.setattr("src.core.modloader.forge.forge_version_manager.VersionManager.load", staticmethod(lambda _version: make_version(tmp_path)))
+    monkeypatch.setattr(ForgeVersionManager, "_download_installer", staticmethod(lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Forge installer must not run"))))
+
+    def refresh(data, _reporter=None):
+        refreshed = json.loads(json.dumps(data))
+        refreshed["libraries"][1]["downloads"] = {
+            "artifact": {"path": "org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1.jar", "url": "https://libraries.minecraft.net/lwjgl.jar", "sha1": "b" * 40, "size": 1},
+            "classifiers": {"natives-windows": {"path": "org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-windows.jar", "url": "https://libraries.minecraft.net/lwjgl-native.jar", "sha1": "c" * 40, "size": 1}},
+        }
+        return refreshed
+
+    monkeypatch.setattr(ForgeVersionManager, "_normalize_libraries", staticmethod(refresh))
+
+    version = ForgeVersionManager.load("1.20.1", "47.3.0")
+
+    assert version.id == "forge-1.20.1-47.3.0"
+    assert ForgeVersionManager._load_cached(cache, "1.20.1", "47.3.0") is not None

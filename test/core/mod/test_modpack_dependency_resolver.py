@@ -249,3 +249,98 @@ def test_curseforge_mod_uses_exact_modrinth_mirror_to_recover_kotlinforforge(tmp
     assert entry["requiredBy"] == ["Create Slice & Dice"]
     assert entry["packProvider"] == "curseforge"
     assert entry["locked"] is True
+
+
+def test_prunes_auto_added_standalone_dependency_when_another_mod_embeds_it(tmp_path, monkeypatch):
+    managed_instance = instance(tmp_path, loader="forge")
+    managed_instance.instance_dir.mkdir(parents=True)
+    mods_dir = managed_instance.instance_dir / "mods"
+    mods_dir.mkdir()
+    create_path = mods_dir / "create.jar"
+    flywheel_path = mods_dir / "flywheel-forge-1.19.2-0.6.8.a.jar"
+    create_path.write_bytes(b"create")
+    flywheel_path.write_bytes(b"old-flywheel")
+    create = ModInfo(
+        path=create_path,
+        file_name=create_path.name,
+        enabled=True,
+        mod_id="create",
+        name="Create",
+        version="0.5.1.f",
+        loader="forge",
+        provided_mods=(("flywheel", "0.6.10-20"),),
+        managed_by_modpack=True,
+        source="curseforge",
+        source_pack_provider="curseforge",
+    )
+    flywheel = ModInfo(
+        path=flywheel_path,
+        file_name=flywheel_path.name,
+        enabled=True,
+        mod_id="flywheel",
+        name="Flywheel",
+        version="0.6.8.a",
+        loader="forge",
+        managed_by_modpack=True,
+        source="curseforge",
+        source_pack_provider="curseforge",
+    )
+    curseforge_pack = {
+        "managedFiles": [
+            {"path": f"mods/{create.file_name}", "fileName": create.file_name, "selectionReason": "pack_manifest"},
+            {"path": f"mods/{flywheel.file_name}", "fileName": flywheel.file_name, "selectionReason": "required_dependency"},
+        ]
+    }
+    saved = {}
+    removed = []
+
+    monkeypatch.setattr(ModManager, "list_mods", lambda _instance: [create, flywheel])
+    monkeypatch.setattr(ModProvenanceRegistry, "entries_by_file", lambda _instance: {
+        create.file_name.casefold(): {"selectionReason": "pack_manifest"},
+        flywheel.file_name.casefold(): {"selectionReason": "required_dependency"},
+    })
+    monkeypatch.setattr(ModProvenanceRegistry, "remove_by_filenames", lambda _instance, names: removed.extend(names) or tuple(names))
+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
+    monkeypatch.setattr(ModrinthPackRegistry, "save", lambda *_args: None)
+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: curseforge_pack)
+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda _instance, payload: saved.update(payload))
+    monkeypatch.setattr(ModrinthRegistry, "load", lambda _instance: {"mods": {}})
+    monkeypatch.setattr(ModrinthRegistry, "save", lambda *_args: None)
+
+    messages = ModpackDependencyResolver._prune_redundant_embedded_dependencies(managed_instance)
+
+    assert not flywheel_path.exists()
+    assert create_path.exists()
+    assert removed == [flywheel.file_name]
+    assert [entry["fileName"] for entry in saved["managedFiles"]] == [create.file_name]
+    assert any("already provides mod ID 'flywheel'" in message for message in messages)
+
+
+def test_curseforge_resolver_does_not_add_standalone_dependency_already_provided_by_embedded_mod(tmp_path, monkeypatch):
+    managed_instance = instance(tmp_path, loader="forge")
+    root = cf_file(10, 100, "addon.jar", (CurseForgeDependency(20, 3),))
+    flywheel = cf_file(20, 200, "flywheel.jar")
+    registry = {"managedFiles": [{"projectId": 10, "fileId": 100, "fileName": "addon.jar", "path": "mods/addon.jar", "provider": "curseforge", "required": True}]}
+    create = ModInfo(
+        path=tmp_path / "create.jar",
+        file_name="create.jar",
+        enabled=True,
+        mod_id="create",
+        name="Create",
+        version="0.5.1.f",
+        loader="forge",
+        provided_mods=(("flywheel", "0.6.10-20"),),
+    )
+
+    monkeypatch.setattr(ModManager, "list_mods", lambda _instance: [create])
+    monkeypatch.setattr(CurseForgeClient, "get_files_batch", lambda _ids: {100: root})
+    monkeypatch.setattr(CurseForgeClient, "latest_compatible_file", lambda project_id, *_args, **_kwargs: flywheel if project_id == 20 else pytest.fail("unexpected project"))
+    monkeypatch.setattr(CurseForgeClient, "get_project", lambda project_id: SimpleNamespace(name="Flywheel", slug="flywheel", project_url="https://example/flywheel"))
+    saved = {}
+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda _instance, payload: saved.update(payload))
+
+    result = ModpackDependencyResolver._resolve_curseforge(managed_instance, registry, None)
+
+    assert result.added_files == ()
+    assert len(registry["managedFiles"]) == 1
+    assert len(saved["managedFiles"]) == 1

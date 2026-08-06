@@ -22,12 +22,22 @@ class ModCompatibilityManager:
         disabled_by_id: dict[str, list[ModInfo]] = defaultdict(list)
 
         for mod in enabled:
-            enabled_by_id[mod.mod_id.casefold()].append(mod)
+            identities = {mod.mod_id.casefold()} | {mod_id.casefold() for mod_id, _version in mod.provided_mods if mod_id}
+            for mod_id in identities:
+                enabled_by_id[mod_id].append(mod)
         for mod in disabled:
-            disabled_by_id[mod.mod_id.casefold()].append(mod)
+            identities = {mod.mod_id.casefold()} | {mod_id.casefold() for mod_id, _version in mod.provided_mods if mod_id}
+            for mod_id in identities:
+                disabled_by_id[mod_id].append(mod)
 
         loader_name, loader_version = ModLoaderManager.normalize(instance.mod_loader)
-        installed_versions = {mod_id: entries[0].version for mod_id, entries in enabled_by_id.items() if entries}
+        installed_versions: dict[str, str] = {}
+        for mod in enabled:
+            if mod.mod_id and mod.mod_id != "unknown":
+                installed_versions.setdefault(mod.mod_id.casefold(), mod.version)
+            for mod_id, version in mod.provided_mods:
+                if mod_id:
+                    installed_versions.setdefault(mod_id.casefold(), version or mod.version)
         installed_versions["minecraft"] = instance.version_id
         if loader_name == ModLoaderManager.FABRIC:
             installed_versions["fabricloader"] = loader_version
