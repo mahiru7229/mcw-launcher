@@ -43,6 +43,8 @@ class InstanceWorkspacePage(BasePage):
     refresh_requested = Signal()
     selected_instance_changed = Signal(str)
     create_requested = Signal(str, str, str, str)
+    create_with_optifine_requested = Signal(str, str, str, str, object, object)
+    optifine_versions_requested = Signal(str, bool, bool)
     rename_requested = Signal(str, str)
     clone_requested = Signal(str, str, bool)
     delete_requested = Signal(str)
@@ -63,6 +65,7 @@ class InstanceWorkspacePage(BasePage):
     manage_mods_requested = Signal(str)
     manage_content_packs_requested = Signal(str)
     manage_content_library_requested = Signal(str)
+    manage_optifine_requested = Signal(str)
     browse_modpacks_requested = Signal()
     browse_curseforge_modpacks_requested = Signal()
     browse_ftb_modpacks_requested = Signal()
@@ -205,6 +208,7 @@ class InstanceWorkspacePage(BasePage):
         self.manage_mods_button = set_theme_icon(QPushButton(), "icon.action.mods")
         self.manage_content_packs_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.manage_content_library_button = set_theme_icon(QPushButton(), "icon.action.search")
+        self.optifine_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.settings_button = set_theme_icon(QPushButton(), "icon.action.settings")
         self.change_icon_button = set_theme_icon(QPushButton(), "icon.action.edit")
         self.open_folder_button = set_theme_icon(QPushButton(), "icon.action.folder")
@@ -219,6 +223,7 @@ class InstanceWorkspacePage(BasePage):
         self.manage_mods_button.clicked.connect(lambda: self.manage_mods_requested.emit(self.current_instance_name()))
         self.manage_content_packs_button.clicked.connect(lambda: self.manage_content_packs_requested.emit(self.current_instance_name()))
         self.manage_content_library_button.clicked.connect(lambda: self.manage_content_library_requested.emit(self.current_instance_name()))
+        self.optifine_button.clicked.connect(lambda: self.manage_optifine_requested.emit(self.current_instance_name()))
         self.settings_button.clicked.connect(lambda: self.instance_settings_requested.emit(self.current_instance_name()))
         self.change_icon_button.clicked.connect(self._choose_icon)
         self.open_folder_button.clicked.connect(lambda: self.open_instance_folder_requested.emit(self.current_instance_name()))
@@ -238,6 +243,7 @@ class InstanceWorkspacePage(BasePage):
         self.action_panel.layout.addWidget(self.manage_content_library_button)
         self.action_panel.layout.addWidget(self.manage_mods_button)
         self.action_panel.layout.addWidget(self.manage_content_packs_button)
+        self.action_panel.layout.addWidget(self.optifine_button)
         self.action_panel.layout.addWidget(self.settings_button)
         self.action_panel.layout.addWidget(self.change_icon_button)
         self.action_panel.layout.addWidget(self.open_folder_button)
@@ -254,6 +260,8 @@ class InstanceWorkspacePage(BasePage):
 
     def _connect_dialogs(self) -> None:
         self.create_dialog.create_requested.connect(self.create_requested.emit)
+        self.create_dialog.create_with_optifine_requested.connect(self.create_with_optifine_requested.emit)
+        self.create_dialog.optifine_versions_requested.connect(self.optifine_versions_requested.emit)
         self.create_dialog.fabric_versions_requested.connect(self.fabric_versions_requested.emit)
         self.create_dialog.quilt_versions_requested.connect(self.quilt_versions_requested.emit)
         self.create_dialog.forge_versions_requested.connect(self.forge_versions_requested.emit)
@@ -335,6 +343,9 @@ class InstanceWorkspacePage(BasePage):
     def set_neoforge_versions(self, game_version: str, versions: list[object]) -> None:
         self.advanced_page.set_neoforge_versions(game_version, versions)
         self.create_dialog.set_neoforge_versions(game_version, versions)
+
+    def set_optifine_versions(self, game_version: str, versions: list[object], include_preview: bool = False) -> None:
+        self.create_dialog.set_optifine_versions(game_version, versions, include_preview)
 
     def set_instances(self, instances: list[object], selected_name: str) -> None:
         self._instances = {str(instance.name): instance for instance in instances}
@@ -866,6 +877,7 @@ class InstanceWorkspacePage(BasePage):
         self.manage_content_library_button.setText(tr("workspace.action.manage_content_library"))
         self.manage_mods_button.setText(tr("workspace.action.manage_mods"))
         self.manage_content_packs_button.setText(tr("workspace.action.manage_content_packs"))
+        self.optifine_button.setText(tr("workspace.action.optifine"))
         self.settings_button.setText(tr("workspace.action.instance_settings"))
         self.change_icon_button.setText(tr("workspace.action.change_icon"))
         self.open_folder_button.setText(tr("workspace.action.open_folder"))

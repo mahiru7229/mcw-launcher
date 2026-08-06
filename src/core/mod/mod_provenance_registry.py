@@ -20,7 +20,7 @@ class ModProvenanceRegistry:
 
     SCHEMA_VERSION = 1
     _MODRINTH_CDN_PATTERN = re.compile(r"^/data/([^/]+)/versions/([^/]+)/([^/]+)$", re.IGNORECASE)
-    _PROVIDERS = {"modrinth", "curseforge", "ftb", "atlauncher", "local", "manual", "unknown"}
+    _PROVIDERS = {"modrinth", "curseforge", "ftb", "atlauncher", "optifine", "local", "manual", "unknown"}
 
     @staticmethod
     def empty() -> dict:

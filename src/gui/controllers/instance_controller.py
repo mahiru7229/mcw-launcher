@@ -128,6 +128,32 @@ class InstanceController(BaseController):
 
         return self._task_runner.run(self.CREATE_TASK_ID, task, tr("task.instance.create", name=name))
 
+    def create_with_optifine(self, name: str, version_id: str, loader_name: str, loader_version: str, optifine_version: object, source_path: object) -> bool:
+        name = self._validated_name(name)
+        version_id = str(version_id or "").strip()
+        loader_name, loader_version = self._core.loaders.normalize((loader_name, loader_version))
+        if name is None or not version_id:
+            if not version_id:
+                self._emit_error("Create instance", "Select a Minecraft version first.")
+            return False
+
+        def task() -> Any:
+            return self._core.instances.create_with_optifine(
+                InstanceCreateRequest(
+                    name=name,
+                    version_id=version_id,
+                    loader_name=loader_name,
+                    loader_version=loader_version,
+                    on_progress=self._on_loader_progress,
+                ),
+                optifine_version,
+                Path(source_path),
+                "auto",
+                self._on_loader_progress,
+            )
+
+        return self._task_runner.run(self.CREATE_TASK_ID, task, tr("task.instance.create_optifine", name=name))
+
     def change_loader(self, name: str, loader_name: str, loader_version: str) -> None:
         name = name.strip()
         loader_name, loader_version = self._core.loaders.normalize((loader_name, loader_version))

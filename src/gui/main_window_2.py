@@ -48,6 +48,7 @@ from src.gui.controllers.mod_catalog_controller import ModCatalogController
 from src.gui.controllers.mod_controller import ModController
 from src.gui.controllers.mod_loader_controller import ModLoaderController
 from src.gui.controllers.modrinth_controller import ModrinthController
+from src.gui.controllers.optifine_controller import OptiFineController
 from src.gui.controllers.settings_controller import InstanceSettingsController
 from src.gui.controllers.version_controller import VersionController
 from src.gui.controllers.update_controller import UpdateController
@@ -66,6 +67,7 @@ from src.gui.dialogs.modpack_import_settings_dialog import ModpackImportSettings
 from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
+from src.gui.dialogs.optifine_dialog import OptiFineDialog
 from src.gui.dialogs.repair_center_dialog import RepairCenterDialog
 from src.gui.dialogs.update_dialog import UpdateDialog
 from src.gui.dialogs.unsaved_changes_dialog import UnsavedChangesDecision, prompt_unsaved_changes
@@ -120,6 +122,7 @@ class MainWindow(QMainWindow):
         self.content_library_controller = ContentLibraryController(self.task_runner)
         self.ftb_controller = FTBController(self.task_runner)
         self.atlauncher_controller = ATLauncherController(self.task_runner)
+        self.optifine_controller = OptiFineController(self.task_runner)
         self.instance_settings_controller = InstanceSettingsController()
         self.gui_settings_controller = GuiSettingsController()
         self._startup_settings = self.gui_settings_controller.load()
@@ -269,6 +272,7 @@ class MainWindow(QMainWindow):
         self.shader_pack_browser_dialog = ContentPackBrowserDialog(ContentPackManager.SHADER_PACK, self)
         self.ftb_modpack_dialog = FTBBrowserDialog(self)
         self.atlauncher_modpack_dialog = ATLauncherBrowserDialog(self)
+        self.optifine_dialog = OptiFineDialog(self)
         self.curseforge_manual_dialog = CurseForgeManualDownloadDialog(self)
         self.portable_manual_dialog = CurseForgeManualDownloadDialog(self)
         self.repair_center_dialog = RepairCenterDialog(self)
@@ -324,6 +328,8 @@ class MainWindow(QMainWindow):
         self.instances_page.manage_accounts_requested.connect(lambda: self.show_page("accounts"))
         self.instances_page.selected_instance_changed.connect(self.instance_controller.select)
         self.instances_page.create_requested.connect(self.instance_controller.create)
+        self.instances_page.create_with_optifine_requested.connect(self.instance_controller.create_with_optifine)
+        self.instances_page.optifine_versions_requested.connect(self.optifine_controller.load_versions)
         self.instances_page.fabric_versions_requested.connect(self.mod_loader_controller.load_fabric_versions)
         self.instances_page.quilt_versions_requested.connect(self.mod_loader_controller.load_quilt_versions)
         self.instances_page.forge_versions_requested.connect(self.mod_loader_controller.load_forge_versions)
@@ -339,6 +345,7 @@ class MainWindow(QMainWindow):
         self.instances_page.manage_mods_requested.connect(self._open_mod_manager)
         self.instances_page.manage_content_packs_requested.connect(self._open_content_pack_manager)
         self.instances_page.manage_content_library_requested.connect(self._open_content_library)
+        self.instances_page.manage_optifine_requested.connect(self._open_optifine)
         self.instances_page.browse_modpacks_requested.connect(self._open_modrinth_modpacks)
         self.instances_page.browse_curseforge_modpacks_requested.connect(self._open_curseforge_modpacks)
         self.instances_page.browse_ftb_modpacks_requested.connect(self._open_ftb_modpacks)
@@ -620,6 +627,19 @@ class MainWindow(QMainWindow):
         self.instance_controller.repair_execution_finished.connect(self.repair_center_dialog.set_repair_result)
         self.instance_controller.repair_center_failed.connect(self.repair_center_dialog.set_error)
 
+        self.optifine_dialog.versions_requested.connect(self.optifine_controller.load_versions)
+        self.optifine_dialog.state_requested.connect(self.optifine_controller.load_state)
+        self.optifine_dialog.install_requested.connect(self.optifine_controller.install)
+        self.optifine_dialog.repair_requested.connect(self.optifine_controller.repair)
+        self.optifine_dialog.uninstall_requested.connect(self.optifine_controller.uninstall)
+        self.optifine_controller.versions_ready.connect(self.instances_page.set_optifine_versions)
+        self.optifine_controller.versions_ready.connect(self.optifine_dialog.set_versions)
+        self.optifine_controller.state_ready.connect(self.optifine_dialog.set_state)
+        self.optifine_controller.progress.connect(self._on_progress)
+        self.optifine_controller.install_finished.connect(lambda result: self.instance_controller.refresh(result.instance_name))
+        self.optifine_controller.repair_finished.connect(lambda result: self.instance_controller.refresh(result.instance_name))
+        self.optifine_controller.uninstall_finished.connect(self.instance_controller.refresh)
+
         self.update_controller.update_available.connect(self._on_update_available)
         self.update_controller.no_update_available.connect(self._on_no_update_available)
         self.update_controller.update_prepared.connect(self._on_update_prepared)
@@ -649,6 +669,7 @@ class MainWindow(QMainWindow):
             self.curseforge_controller,
             self.ftb_controller,
             self.atlauncher_controller,
+            self.optifine_controller,
             self.content_pack_controller,
             self.content_library_controller,
             self.instance_settings_controller,
@@ -1751,6 +1772,17 @@ class MainWindow(QMainWindow):
             self._show_error(tr("Java installations"), tr("The selected Java directory no longer exists."))
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory.resolve())))
+
+    def _open_optifine(self, name: str) -> None:
+        normalized = str(name or "").strip()
+        if not normalized:
+            return
+        try:
+            instance = InstanceManager.load(normalized)
+        except Exception as error:
+            self._show_error(tr("optifine.title"), str(error))
+            return
+        self.optifine_dialog.open_for_instance(instance)
 
     def _open_instance_folder(self, instance_name: str) -> None:
         name = str(instance_name).strip()

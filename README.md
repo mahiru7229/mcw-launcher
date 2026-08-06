@@ -48,6 +48,26 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.0 hỗ trợ nâng cấp
 
 ---
 
+## Có gì mới trong v1.1.1-beta.3
+
+**v1.1.1-beta.3** tích hợp OptiFine như một component tùy chọn: Vanilla có thể dùng profile standalone, Forge có thể cài OptiFine như mod, và cả hai đều có version selector, kiểm tra tương thích, journal rollback, registry, Repair/Uninstall cùng chính sách không phân phối lại JAR.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.3.md`](docs/RELEASE-v1.1.1-beta.3.md).
+
+## Có gì mới trong v1.1.1-beta.2
+
+**v1.1.1-beta.2** là hotfix cho một số modpack Forge 1.12.2 dùng LibLoader và còn phụ thuộc vào thư viện từng được lưu trên JCenter:
+
+- Xác định lỗi không liên quan tới tên thư mục instance hoặc hậu tố `(2)`; Forge đã nhận đúng game directory trước khi coremod tải dependency thất bại.
+- Quét manifest `LibLoader-*` trong các mod JAR trước khi Java khởi chạy.
+- Khôi phục dependency còn tồn tại trên Maven Central và dùng fallback giới hạn cho sáu thư viện JCenter-only đã biết.
+- Mọi file tải hoặc trích xuất đều phải khớp SHA-512 do chính manifest của mod khai báo.
+- Giữ đúng cấu trúc thư mục `libraries/` mà LibLoader sử dụng, bao gồm thư mục có suffix hash cho snapshot build.
+- Không tự tải từ host tùy ý; dependency custom chưa được nhận diện vẫn được để cho mod xử lý như trước.
+- Bao gồm toàn bộ ATLauncher provider của Beta 1; chưa phát hành MCW Core wheel mới.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.2.md`](docs/RELEASE-v1.1.1-beta.2.md).
+
 ## Có gì mới trong v1.1.1-beta.1
 
 **v1.1.1-beta.1** mở đầu tích hợp ATLauncher:

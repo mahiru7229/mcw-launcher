@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QLabel,
     QLineEdit,
@@ -25,6 +28,8 @@ from src.gui.window_sizing import resize_dialog_to_screen
 
 class CreateInstanceDialog(QDialog):
     create_requested = Signal(str, str, str, str)
+    create_with_optifine_requested = Signal(str, str, str, str, object, object)
+    optifine_versions_requested = Signal(str, bool, bool)
     fabric_versions_requested = Signal(str)
     quilt_versions_requested = Signal(str)
     forge_versions_requested = Signal(str)
@@ -43,6 +48,8 @@ class CreateInstanceDialog(QDialog):
         self._versions: list[object] = []
         self._loader_versions: dict[tuple[str, str], list[object]] = {}
         self._pending_loader_requests: set[tuple[str, str]] = set()
+        self._optifine_versions: dict[tuple[str, bool], list[object]] = {}
+        self._optifine_source_path: Path | None = None
         self._build_ui()
         self.retranslate_dynamic()
 
@@ -114,6 +121,28 @@ class CreateInstanceDialog(QDialog):
         self.loader_status.setObjectName("MutedLabel")
         self.loader_status.setWordWrap(True)
         layout.addWidget(self.loader_status)
+
+        self.optifine_checkbox = QCheckBox()
+        self.optifine_checkbox.toggled.connect(self._optifine_toggled)
+        layout.addWidget(self.optifine_checkbox)
+        optifine_form = QFormLayout()
+        optifine_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        self.optifine_version_label = QLabel()
+        self.optifine_version_combo = QComboBox()
+        self.optifine_version_combo.currentIndexChanged.connect(self._optifine_selection_changed)
+        self.optifine_preview_checkbox = QCheckBox()
+        self.optifine_preview_checkbox.toggled.connect(lambda _checked: self._request_optifine_versions(force=False))
+        self.optifine_file_label = QLabel()
+        self.optifine_file_button = QPushButton()
+        self.optifine_file_button.clicked.connect(self._choose_optifine_file)
+        optifine_form.addRow(self.optifine_version_label, self.optifine_version_combo)
+        optifine_form.addRow("", self.optifine_preview_checkbox)
+        optifine_form.addRow(self.optifine_file_label, self.optifine_file_button)
+        layout.addLayout(optifine_form)
+        self.optifine_status = QLabel()
+        self.optifine_status.setObjectName("MutedLabel")
+        self.optifine_status.setWordWrap(True)
+        layout.addWidget(self.optifine_status)
         layout.addStretch(1)
         return tab
 
@@ -173,6 +202,15 @@ class CreateInstanceDialog(QDialog):
     def set_neoforge_versions(self, game_version: str, versions: list[object]) -> None:
         self._set_loader_versions("neoforge", game_version, versions)
 
+    def set_optifine_versions(self, game_version: str, versions: list[object], include_preview: bool = False) -> None:
+        key = (str(game_version).strip(), bool(include_preview))
+        self._optifine_versions[key] = list(versions)
+        if self.optifine_checkbox.isChecked() and key == (self.version_combo.currentText().strip(), self.optifine_preview_checkbox.isChecked()):
+            self._render_optifine_versions(list(versions))
+
+    def selected_optifine_version(self) -> object | None:
+        return self.optifine_version_combo.currentData() if self.optifine_checkbox.isChecked() else None
+
     def _set_loader_versions(self, loader: str, game_version: str, versions: list[object]) -> None:
         key = (loader, str(game_version).strip())
         self._loader_versions[key] = list(versions)
@@ -199,6 +237,7 @@ class CreateInstanceDialog(QDialog):
     def _selection_changed(self, *_args) -> None:
         loader = self.selected_loader()
         game_version = self.version_combo.currentText().strip()
+        self._sync_optifine_support(loader, game_version)
         self.loader_version_combo.blockSignals(True)
         self.loader_version_combo.clear()
         self.loader_version_combo.blockSignals(False)
@@ -264,7 +303,10 @@ class CreateInstanceDialog(QDialog):
         game_version = self.version_combo.currentText().strip()
         loader = self.selected_loader()
         loader_ready = loader == "vanilla" or bool(self.selected_loader_version())
-        self.create_button.setEnabled(bool(game_version) and loader_ready)
+        selected_optifine = self.selected_optifine_version()
+        forge_unavailable = loader == "forge" and bool(getattr(selected_optifine, "forge_unavailable", False))
+        optifine_ready = (not self.optifine_checkbox.isChecked()) or (selected_optifine is not None and self._optifine_source_path is not None and loader in {"vanilla", "forge"} and not forge_unavailable)
+        self.create_button.setEnabled(bool(game_version) and loader_ready and optifine_ready)
 
     def _request_create(self) -> None:
         name = self.name_input.text().strip()
@@ -280,8 +322,85 @@ class CreateInstanceDialog(QDialog):
         if loader in self.MODDED_LOADERS and not loader_version:
             QMessageBox.information(self, tr("workspace.create.title"), tr("workspace.create.loader_version.required", loader=loader_title(loader), version=version_id))
             return
-        self.create_requested.emit(name, version_id, loader, loader_version)
+        if self.optifine_checkbox.isChecked():
+            selected_optifine = self.selected_optifine_version()
+            if selected_optifine is None or self._optifine_source_path is None:
+                QMessageBox.information(self, tr("workspace.create.title"), tr("optifine.file.required"))
+                return
+            self.create_with_optifine_requested.emit(name, version_id, loader, loader_version, selected_optifine, self._optifine_source_path)
+        else:
+            self.create_requested.emit(name, version_id, loader, loader_version)
         self.accept()
+
+    def _sync_optifine_support(self, loader: str, game_version: str) -> None:
+        supported = loader in {"vanilla", "forge"} and bool(game_version)
+        self.optifine_checkbox.setEnabled(supported)
+        if not supported and self.optifine_checkbox.isChecked():
+            self.optifine_checkbox.setChecked(False)
+        if not supported:
+            self.optifine_status.setText(tr("optifine.mode.unsupported_detail"))
+        elif self.optifine_checkbox.isChecked():
+            mode_key = "optifine.mode.standalone" if loader == "vanilla" else "optifine.mode.forge_mod"
+            self.optifine_status.setText(tr("optifine.create.mode", mode=tr(mode_key)))
+
+    def _optifine_toggled(self, checked: bool) -> None:
+        for widget in (self.optifine_version_combo, self.optifine_preview_checkbox, self.optifine_file_button):
+            widget.setEnabled(bool(checked))
+        if checked:
+            self._request_optifine_versions(force=False)
+        self._update_create_state()
+
+    def _request_optifine_versions(self, force: bool = False) -> None:
+        game = self.version_combo.currentText().strip()
+        previews = self.optifine_preview_checkbox.isChecked()
+        if not self.optifine_checkbox.isChecked() or not game:
+            return
+        cached = self._optifine_versions.get((game, previews))
+        if cached is not None and not force:
+            self._render_optifine_versions(cached)
+            return
+        self.optifine_version_combo.clear()
+        self.optifine_status.setText(tr("optifine.metadata.loading"))
+        self.optifine_versions_requested.emit(game, previews, bool(force))
+        self._update_create_state()
+
+    def _render_optifine_versions(self, versions: list[object]) -> None:
+        self.optifine_version_combo.blockSignals(True)
+        self.optifine_version_combo.clear()
+        for item in versions:
+            label = str(getattr(item, "display_name", getattr(item, "version_id", "OptiFine")))
+            forge = str(getattr(item, "forge_version", ""))
+            if forge:
+                label += f" · Forge {forge}"
+            self.optifine_version_combo.addItem(label, item)
+        self.optifine_version_combo.blockSignals(False)
+        if versions:
+            mode_key = "optifine.mode.standalone" if self.selected_loader() == "vanilla" else "optifine.mode.forge_mod"
+            selected = self.selected_optifine_version()
+            if self.selected_loader() == "forge" and bool(getattr(selected, "forge_unavailable", False)):
+                self.optifine_status.setText(tr("optifine.compatibility.forge_unavailable"))
+            else:
+                self.optifine_status.setText(tr("optifine.create.mode", mode=tr(mode_key)))
+        else:
+            self.optifine_status.setText(tr("optifine.metadata.none"))
+        self._update_create_state()
+
+    def _optifine_selection_changed(self, *_args) -> None:
+        if self.optifine_checkbox.isChecked() and self.selected_loader() == "forge" and bool(getattr(self.selected_optifine_version(), "forge_unavailable", False)):
+            self.optifine_status.setText(tr("optifine.compatibility.forge_unavailable"))
+        elif self.optifine_checkbox.isChecked() and self.selected_optifine_version() is not None:
+            mode_key = "optifine.mode.standalone" if self.selected_loader() == "vanilla" else "optifine.mode.forge_mod"
+            self.optifine_status.setText(tr("optifine.create.mode", mode=tr(mode_key)))
+        self._update_create_state()
+
+    def _choose_optifine_file(self) -> None:
+        selected = self.selected_optifine_version()
+        expected = str(getattr(selected, "filename", "OptiFine_*.jar"))
+        path, _filter = QFileDialog.getOpenFileName(self, tr("optifine.file.choose_title"), "", f"{expected} (*.jar);;Java Archive (*.jar)")
+        if path:
+            self._optifine_source_path = Path(path)
+            self.optifine_file_button.setText(self._optifine_source_path.name)
+        self._update_create_state()
 
     def _browse_modrinth(self) -> None:
         self.browse_modrinth_requested.emit()
@@ -315,6 +434,11 @@ class CreateInstanceDialog(QDialog):
         self.loader_version_label.setText(tr("workspace.create.loader_version"))
         self.snapshots_checkbox.setText(tr("workspace.create.show_snapshots"))
         self.loader_hint.setText(tr("workspace.create.loader_hint"))
+        self.optifine_checkbox.setText(tr("optifine.create.checkbox"))
+        self.optifine_version_label.setText(tr("optifine.version"))
+        self.optifine_preview_checkbox.setText(tr("optifine.show_previews"))
+        self.optifine_file_label.setText(tr("optifine.file"))
+        self.optifine_file_button.setText(self._optifine_source_path.name if self._optifine_source_path else tr("optifine.choose_file"))
         self.modpack_hint.setText(tr("workspace.create.modpack_hint"))
         self.modrinth_button.setText(tr("workspace.create.browse_modrinth"))
         self.curseforge_button.setText(tr("workspace.create.browse_curseforge"))
@@ -325,4 +449,5 @@ class CreateInstanceDialog(QDialog):
         self.create_button.setText(tr("workspace.create.create_button"))
         if self.cancel_button is not None:
             self.cancel_button.setText(tr("common.cancel"))
+        self._optifine_toggled(self.optifine_checkbox.isChecked())
         self._selection_changed()
