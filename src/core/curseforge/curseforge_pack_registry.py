@@ -95,6 +95,8 @@ class CurseForgePackRegistry:
                 "gameVersions": [str(item).strip() for item in raw.get("gameVersions", []) if str(item).strip()] if isinstance(raw.get("gameVersions"), (list, tuple, set)) else [],
                 "dependencies": CurseForgePackRegistry._normalize_dependencies(raw.get("dependencies", [])),
                 "dependencyMetadataResolved": bool(raw.get("dependencyMetadataResolved", False)),
+                "providesModId": str(raw.get("providesModId") or "").strip().casefold(),
+                "requestedVersionRanges": list(dict.fromkeys(str(item).strip() for item in raw.get("requestedVersionRanges", []) if str(item).strip())) if isinstance(raw.get("requestedVersionRanges"), (list, tuple, set)) else [],
             })
         output = dict(data)
         output["schemaVersion"] = CurseForgePackRegistry.SCHEMA_VERSION

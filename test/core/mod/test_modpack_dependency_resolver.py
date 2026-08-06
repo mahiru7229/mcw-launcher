@@ -151,3 +151,107 @@ def test_required_dependency_errors_cannot_be_bypassed_for_managed_pack(tmp_path
 
     with pytest.raises(RequiredModDependenciesMissing, match="konkrete"):
         ModpackDependencyResolver.raise_for_required_dependencies(managed_instance)
+
+
+def test_jar_audit_searches_curseforge_for_kotlinforforge(tmp_path, monkeypatch):
+    from pathlib import Path
+    import zipfile
+
+    from src.models.curseforge.project import CurseForgeProject
+
+    managed_instance = instance(tmp_path, loader="forge")
+    managed_instance.version_id = "1.19.2"
+    managed_instance.mod_loader = ("forge", "43.4.0")
+    mods = Path(managed_instance.instance_dir) / "mods"
+    mods.mkdir(parents=True)
+    metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[43,)"\n'
+        'license="MIT"\n\n'
+        '[[mods]]\n'
+        'modId="sliceanddice"\n'
+        'version="2.3.0"\n'
+        'displayName="Create Slice & Dice"\n\n'
+        '[[dependencies.sliceanddice]]\n'
+        'modId="kotlinforforge"\n'
+        'mandatory=true\n'
+        'versionRange="[3.9.1,)"\n'
+        'ordering="NONE"\n'
+        'side="BOTH"\n'
+    )
+    with zipfile.ZipFile(mods / "sliceanddice.jar", "w") as archive:
+        archive.writestr("META-INF/mods.toml", metadata)
+
+    root = cf_file(10, 100, "sliceanddice.jar")
+    root = CurseForgeFile(
+        file_id=root.file_id,
+        project_id=root.project_id,
+        display_name=root.display_name,
+        file_name=root.file_name,
+        release_type=root.release_type,
+        file_date=root.file_date,
+        file_length=(mods / "sliceanddice.jar").stat().st_size,
+        download_url=root.download_url,
+        sha1="a" * 40,
+        game_versions=("1.19.2",),
+        dependencies=(),
+        loaders=("forge",),
+    )
+    CurseForgePackRegistry.save(Path(managed_instance.instance_dir), {
+        "managedFiles": [{
+            "projectId": 10,
+            "fileId": 100,
+            "fileName": "sliceanddice.jar",
+            "path": "mods/sliceanddice.jar",
+            "provider": "curseforge",
+            "required": True,
+            "dependencyMetadataResolved": True,
+            "dependencies": [],
+            "declaredLoaders": ["forge"],
+            "gameVersions": ["1.19.2"],
+        }],
+    })
+
+    project = CurseForgeProject(
+        project_id=351264,
+        name="Kotlin for Forge",
+        slug="kotlin-for-forge",
+        summary="Kotlin language provider",
+        download_count=1,
+        authors=("thedarkcolour",),
+        logo_url="",
+        class_id=6,
+        date_modified="2026-01-01T00:00:00Z",
+        project_url="https://www.curseforge.com/minecraft/mc-mods/kotlin-for-forge",
+        game_versions=("1.19.2",),
+        loaders=("forge",),
+    )
+    kff = CurseForgeFile(
+        file_id=5000,
+        project_id=351264,
+        display_name="Kotlin for Forge 3.12.0",
+        file_name="kotlinforforge-3.12.0-all.jar",
+        release_type="release",
+        file_date="2026-01-01T00:00:00Z",
+        file_length=100,
+        download_url="https://edge.forgecdn.net/files/5000/kotlinforforge-3.12.0-all.jar",
+        sha1="b" * 40,
+        game_versions=("1.19.2",),
+        dependencies=(),
+        loaders=("forge",),
+    )
+
+    monkeypatch.setattr(ModProvenanceRegistry, "synchronize", lambda _instance: {})
+    monkeypatch.setattr(CurseForgeClient, "search_projects", lambda *_args, **_kwargs: SimpleNamespace(projects=(project,)))
+    monkeypatch.setattr(CurseForgeClient, "latest_compatible_file", lambda *_args, **_kwargs: kff)
+    monkeypatch.setattr(ModrinthClient, "search_projects", lambda *_args, **_kwargs: SimpleNamespace(projects=()))
+
+    result = ModpackDependencyResolver.resolve(managed_instance)
+    saved = CurseForgePackRegistry.load(Path(managed_instance.instance_dir))
+    added = next(entry for entry in saved["managedFiles"] if entry["projectId"] == 351264)
+
+    assert result.added_files == ("Kotlin for Forge",)
+    assert added["selectionReason"] == "jar_audit_dependency"
+    assert added["providesModId"] == "kotlinforforge"
+    assert added["requestedVersionRanges"] == ["[3.9.1,)"]
+    assert added["requiredBy"] == ["Create Slice & Dice"]

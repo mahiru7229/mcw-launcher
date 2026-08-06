@@ -4,6 +4,7 @@ from collections import defaultdict
 import re
 
 from src.core.mod.mod_manager import ModManager
+from src.core.mod.mod_capability_index import ModCapabilityIndex
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.models.instance.instance import Instance
 from src.models.mod.mod_info import ModInfo
@@ -28,6 +29,12 @@ class ModCompatibilityManager:
 
         loader_name, loader_version = ModLoaderManager.normalize(instance.mod_loader)
         installed_versions = {mod_id: entries[0].version for mod_id, entries in enabled_by_id.items() if entries}
+        # Runtime loaders can expose mods from nested JARs (Forge/NeoForge
+        # Jar-in-Jar, Fabric nested JARs, legacy ContainedDeps). Those
+        # capabilities satisfy dependencies even though no separate file is
+        # present in the instance mods directory.
+        for mod_id, version in ModCapabilityIndex.installed_versions(instance, enabled).items():
+            installed_versions.setdefault(mod_id, version)
         installed_versions["minecraft"] = instance.version_id
         if loader_name == ModLoaderManager.FABRIC:
             installed_versions["fabricloader"] = loader_version
@@ -236,34 +243,71 @@ class ModCompatibilityManager:
             upper = ModCompatibilityManager._caret_upper(expected_key)
             return current_key >= expected_key and current_key < upper
         if operator == "~":
-            upper = (expected_key[0], expected_key[1] + 1, 0, 1, "")
+            upper = ((expected_key[0][0], expected_key[0][1] + 1, 0, 0), 1, ())
             return current_key >= expected_key and current_key < upper
         return None
 
     @staticmethod
-    def _version_key(value: str) -> tuple[int, int, int, int, str] | None:
+    def _version_key(value: str) -> tuple[tuple[int, int, int, int], int, tuple[tuple[int, int, str], ...]] | None:
+        """Build a bounded Maven/Forge-friendly comparison key.
+
+        Forge metadata frequently uses versions such as ``0.6.8.a`` that are
+        not strict SemVer. Numeric components are compared numerically while
+        a trailing qualifier sorts below the matching final release.
+        """
+
         normalized = str(value).strip().lstrip("vV")
-        without_build = normalized.split("+", 1)[0]
-        numeric, separator, prerelease = without_build.partition("-")
-        parts = numeric.split(".")
-        if not 1 <= len(parts) <= 4 or any(not part.isdigit() for part in parts):
+        if not normalized:
             return None
-        numbers = [int(part) for part in parts[:3]]
-        while len(numbers) < 3:
+        normalized = normalized.split("+", 1)[0].strip()
+        match = re.match(r"^(?P<numeric>\d+(?:[._-]\d+){0,3})(?P<suffix>.*)$", normalized)
+        if match is None:
+            return None
+
+        numbers = [int(part) for part in re.split(r"[._-]", match.group("numeric")) if part != ""]
+        while len(numbers) < 4:
             numbers.append(0)
-        release_rank = 0 if separator else 1
-        extra = ".".join(parts[3:])
-        suffix = prerelease.casefold() if separator else extra
-        return numbers[0], numbers[1], numbers[2], release_rank, suffix
+        numeric_key = tuple(numbers[:4])
+
+        suffix = match.group("suffix").strip("._- ").casefold()
+        if not suffix:
+            return numeric_key, 1, ()
+
+        qualifier_rank = {
+            "snapshot": -6,
+            "dev": -5,
+            "alpha": -4,
+            "a": -4,
+            "beta": -3,
+            "b": -3,
+            "milestone": -2,
+            "m": -2,
+            "rc": -1,
+            "cr": -1,
+            "pre": -1,
+            "preview": -1,
+            "final": 0,
+            "ga": 0,
+            "release": 0,
+            "sp": 2,
+        }
+        tokens: list[tuple[int, int, str]] = []
+        for token in re.findall(r"\d+|[A-Za-z]+", suffix):
+            if token.isdigit():
+                tokens.append((1, int(token), ""))
+            else:
+                lowered = token.casefold()
+                tokens.append((0, qualifier_rank.get(lowered, 0), lowered))
+        return numeric_key, 0, tuple(tokens)
 
     @staticmethod
-    def _caret_upper(key: tuple[int, int, int, int, str]) -> tuple[int, int, int, int, str]:
-        major, minor, patch, _, _ = key
+    def _caret_upper(key: tuple[tuple[int, int, int, int], int, tuple[tuple[int, int, str], ...]]) -> tuple[tuple[int, int, int, int], int, tuple[tuple[int, int, str], ...]]:
+        major, minor, patch, _ = key[0]
         if major > 0:
-            return major + 1, 0, 0, 1, ""
+            return (major + 1, 0, 0, 0), 1, ()
         if minor > 0:
-            return 0, minor + 1, 0, 1, ""
-        return 0, 0, patch + 1, 1, ""
+            return (0, minor + 1, 0, 0), 1, ()
+        return (0, 0, patch + 1, 0), 1, ()
 
     @staticmethod
     def _format_requirement(requirement: object) -> str:

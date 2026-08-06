@@ -1,26 +1,29 @@
-# MCW Launcher v1.1.1-beta.5 dependency-resolution patch
+# MCW Launcher v1.1.1-beta.5 — embedded/search dependency hotfix
 
-Apply this patch to a complete **v1.1.1-beta.4** source tree.
+This small archive applies only to the **earlier v1.1.1-beta.5 dependency-resolution patch**.
+It upgrades that build to Beta 5 revision 2 without requiring a return to Beta 4.
 
-## Apply
+## Apply on the earlier Beta 5 build
 
-1. Close MCW Launcher and Minecraft.
-2. Back up local changes.
-3. Extract this ZIP into the repository root and allow changed files to be replaced.
-4. Run `python -m pytest -q`.
+1. Close MCW Launcher, Minecraft, and running test processes.
+2. Confirm the earlier v1.1.1-beta.5 patch is already applied.
+3. Back up or commit the tree.
+4. Extract this ZIP into the repository root and replace existing files.
+5. Run `python -m pytest -q`.
+6. Smoke-test the affected Create modpack on Windows.
 
-## Scope
+Do not apply this small hotfix directly to Beta 4. Use the full Beta 5 revision 2 patch for that baseline.
 
-- Recursive required-dependency completion for Modrinth and CurseForge managed modpacks.
-- Pack-pinned files remain authoritative and are never silently replaced.
-- Missing, disabled, or version-invalid required dependencies cannot be bypassed by the compatibility override.
-- Dependency provenance records `selectionReason` and `requiredBy`.
-- Modpack Repair reruns dependency resolution and downloads newly added files.
-- Runtime/package version updated to v1.1.1-beta.5 / 1.1.1b5.
+## Hotfix scope
+
+- Indexes bounded nested-JAR capabilities, including Forge/NeoForge Jar-in-Jar and legacy `ContainedDeps`.
+- Recognizes embedded Flywheel from the Create JAR when its actual version satisfies declared ranges.
+- Searches provider projects for missing JAR-declared mod IDs such as `kotlinforforge`.
+- Preserves search provenance and requested version ranges in Modrinth/CurseForge registries.
+- Audits the downloaded JAR before allowing launch.
+- Adds Forge/Maven-style version comparison for values such as `0.6.8.a`.
 
 ## Validation
 
-- 1375 passed, 88 skipped, 2 expected ZIP-fixture warnings.
-- `compileall` passed for `src`, `mcw_core`, and `test`.
-
-This beta patch does not contain a separately published Core source archive or wheel. Those remain scheduled for v1.1.1 stable.
+- Full suite: 1379 passed, 88 skipped, 2 expected warnings.
+- `python -m compileall -q src mcw_core test`: passed.

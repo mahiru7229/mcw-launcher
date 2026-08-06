@@ -50,14 +50,15 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.0 hỗ trợ nâng cấp
 
 ## Có gì mới trong v1.1.1-beta.5
 
-**v1.1.1-beta.5** sửa pipeline dependency bắt buộc của modpack:
+**v1.1.1-beta.5 revision 2** gia cố toàn bộ pipeline dependency bắt buộc của modpack:
 
-- Tự hoàn thiện dependency graph `required` cho modpack Modrinth và CurseForge trước khi Minecraft được tạo process.
-- Giữ nguyên file do tác giả pack ghim; dependency bổ sung được ghi `requiredBy` và `selectionReason`.
-- Không tự tải optional/embedded dependency và không tự thay file pack chỉ vì metadata system version quá chặt.
-- Tùy chọn chạy dù có lỗi tương thích không còn được phép bỏ qua dependency bắt buộc bị thiếu, disable hoặc sai version.
-- Repair modpack chạy lại resolver và tải các dependency mới tìm được.
-- Registry Modrinth, CurseForge và provenance được nâng schema với normalize tương thích dữ liệu cũ.
+- Hoàn thiện dependency graph `required` từ Modrinth và CurseForge trước khi tạo process Minecraft.
+- Đọc Forge/NeoForge Jar-in-Jar, Fabric/Quilt nested JAR và legacy `ContainedDeps`, nên dependency được nhúng như Flywheel trong Create không còn bị báo thiếu giả.
+- Khi provider relation không có project ID, tìm project theo mod ID trên provider của pack rồi fallback sang provider còn lại; candidate được audit lại từ JAR thật.
+- Hỗ trợ range version Forge/Maven như `0.6.8.a` và `[0.6.10,0.6.11)`.
+- Giữ nguyên file do tác giả pack ghim; dependency bổ sung lưu `requiredBy`, `providesModId`, `requestedVersionRanges` và `selectionReason`.
+- Tùy chọn chạy dù có lỗi tương thích không thể bỏ qua dependency bắt buộc bị thiếu, disable hoặc sai version.
+- Repair modpack chạy lại provider resolver và capability audit.
 
 Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.5.md`](docs/RELEASE-v1.1.1-beta.5.md).
 

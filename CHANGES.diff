@@ -1,1367 +1,1358 @@
 --- a/README.md
 +++ b/README.md
-@@ -48,6 +48,19 @@
+@@ -50,14 +50,15 @@
  
+ ## Có gì mới trong v1.1.1-beta.5
+ 
+-**v1.1.1-beta.5** sửa pipeline dependency bắt buộc của modpack:
++**v1.1.1-beta.5 revision 2** gia cố toàn bộ pipeline dependency bắt buộc của modpack:
+ 
+-- Tự hoàn thiện dependency graph `required` cho modpack Modrinth và CurseForge trước khi Minecraft được tạo process.
+-- Giữ nguyên file do tác giả pack ghim; dependency bổ sung được ghi `requiredBy` và `selectionReason`.
+-- Không tự tải optional/embedded dependency và không tự thay file pack chỉ vì metadata system version quá chặt.
+-- Tùy chọn chạy dù có lỗi tương thích không còn được phép bỏ qua dependency bắt buộc bị thiếu, disable hoặc sai version.
+-- Repair modpack chạy lại resolver và tải các dependency mới tìm được.
+-- Registry Modrinth, CurseForge và provenance được nâng schema với normalize tương thích dữ liệu cũ.
++- Hoàn thiện dependency graph `required` từ Modrinth và CurseForge trước khi tạo process Minecraft.
++- Đọc Forge/NeoForge Jar-in-Jar, Fabric/Quilt nested JAR và legacy `ContainedDeps`, nên dependency được nhúng như Flywheel trong Create không còn bị báo thiếu giả.
++- Khi provider relation không có project ID, tìm project theo mod ID trên provider của pack rồi fallback sang provider còn lại; candidate được audit lại từ JAR thật.
++- Hỗ trợ range version Forge/Maven như `0.6.8.a` và `[0.6.10,0.6.11)`.
++- Giữ nguyên file do tác giả pack ghim; dependency bổ sung lưu `requiredBy`, `providesModId`, `requestedVersionRanges` và `selectionReason`.
++- Tùy chọn chạy dù có lỗi tương thích không thể bỏ qua dependency bắt buộc bị thiếu, disable hoặc sai version.
++- Repair modpack chạy lại provider resolver và capability audit.
+ 
+ Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.5.md`](docs/RELEASE-v1.1.1-beta.5.md).
+ 
+--- a/docs/RELEASE-v1.1.1-beta.5.md
++++ b/docs/RELEASE-v1.1.1-beta.5.md
+@@ -2,120 +2,250 @@
+ 
+ ## Tiếng Việt
+ 
+-MCW Launcher **v1.1.1-beta.5** sửa một lỗi nghiêm trọng trong pipeline modpack: file của pack có thể được tải đầy đủ theo manifest nhưng các dependency bắt buộc do từng mod khai báo với Modrinth hoặc CurseForge lại không được bổ sung, khiến Minecraft được tạo process cùng nhiều cảnh báo và thường crash ngay sau đó.
++MCW Launcher **v1.1.1-beta.5** sửa một lỗi nghiêm trọng trong pipeline modpack: manifest có thể tải đủ các file được tác giả pack liệt kê nhưng dependency bắt buộc do chính mod khai báo vẫn bị thiếu. Trước đây tùy chọn bỏ qua lỗi tương thích có thể cho Minecraft khởi chạy trong trạng thái này; Beta 5 không còn cho phép điều đó.
+ 
+-### Dependency resolver cho modpack
++Bản cập nhật revision 2 của Beta 5 bổ sung lớp kiểm tra capability trong JAR và fallback tìm project trên provider. Nó xử lý cả dependency được nhúng như Flywheel trong Create và dependency chỉ xuất hiện dưới dạng mod ID như `kotlinforforge`.
+ 
+-- Thêm `ModpackDependencyResolver` dùng chung cho modpack Modrinth và CurseForge.
+-- Resolver duyệt đệ quy dependency loại **required** với giới hạn 20 tầng và tối đa 256 file bổ sung.
+-- Dependency đã nằm trong manifest hoặc đã được chọn trước đó không bị tải lại.
+-- Phát hiện vòng lặp bằng provider version/file identity.
+-- Metadata provider được retry tối đa ba lần đối với lỗi mạng có khả năng phục hồi.
+-- Modrinth có thể nhận diện file từ `versionId`, URL CDN hoặc SHA-512/SHA-1 lookup.
+-- CurseForge lưu dependency metadata của file vào registry để các lần launch/repair sau không phải truy vấn lại không cần thiết.
++### Resolver dependency theo nhiều tầng
++
++MCW giải dependency theo thứ tự:
++
++1. File được manifest modpack ghim.
++2. Quan hệ dependency `required` có project/version ID từ Modrinth hoặc CurseForge.
++3. Capability được cung cấp bởi JAR ngoài cùng hoặc JAR lồng bên trong.
++4. Tìm project bằng mod ID trên provider ưu tiên của pack, rồi thử provider còn lại.
++5. Tải candidate, audit metadata JAR thật và chỉ cho launch khi mod ID cùng version requirement đã được thỏa mãn.
++
++Resolver duyệt đệ quy dependency provider với giới hạn 20 tầng và tối đa 256 file bổ sung. Metadata provider được retry tối đa ba lần đối với lỗi mạng có khả năng phục hồi. Dependency đã nằm trong manifest, graph hoặc instance không bị tải lặp.
++
++### Dependency embedded và Jar-in-Jar
++
++Thêm `ModCapabilityIndex` để đọc capability runtime từ:
++
++- Forge/NeoForge `META-INF/jarjar/metadata.json`.
++- JAR nằm dưới `META-INF/jarjar/` khi metadata cũ hoặc thiếu.
++- Fabric nested JAR khai báo trong `fabric.mod.json`.
++- Quilt metadata.
++- Legacy Forge `ContainedDeps`.
++- `META-INF/mods.toml`, `META-INF/neoforge.mods.toml`, `fabric.mod.json`, `quilt.mod.json` và `mcmod.info` của JAR lồng.
++
++Scanner chỉ đọc, có giới hạn độ sâu, số lượng JAR, dung lượng giải nén và compression ratio để tránh quét không giới hạn.
++
++Nhờ đó Flywheel `0.6.10` được nhúng trong Create có thể thỏa đồng thời:
++
++```text
++Create: [0.6.10,0.6.11)
++Create Crafts & Additions: [0.6.8.a,0.7)
++```
++
++MCW không dùng ngoại lệ hard-code kiểu “bỏ qua Flywheel”; dependency chỉ được coi là đã có khi scanner thực sự tìm thấy capability đúng version trong JAR.
++
++### Tìm dependency còn thiếu theo mod ID
++
++Khi JAR audit phát hiện dependency bắt buộc nhưng provider relation không chứa project ID, MCW sẽ:
++
++- Ưu tiên provider đang quản lý phần lớn mod của pack.
++- Tìm project bằng mod ID, slug và tên đã chuẩn hóa.
++- Lọc candidate theo Minecraft version và loader.
++- Thử provider còn lại nếu provider đầu tiên không có candidate phù hợp.
++- Ghi candidate với `selectionReason: jar_audit_dependency`, `providesModId`, `requestedVersionRanges` và `requiredBy`.
++- Tải qua content pipeline hiện có, sau đó audit lại JAR thật trước khi launch.
++
++Ví dụ `Create Slice & Dice` yêu cầu `kotlinforforge [3.9.1,)`: MCW có thể tìm Kotlin for Forge trên CurseForge dù relation ban đầu của pack không cung cấp project ID. Nếu file tải về không thực sự cung cấp `kotlinforforge` hoặc version không thỏa range, dependency vẫn bị coi là chưa giải quyết và launch bị chặn.
++
++### So sánh version Forge/Maven
++
++Bộ so sánh version đã được mở rộng cho các dạng thường gặp trong metadata Forge, bao gồm:
++
++```text
++0.6.8.a
++0.6.10
++3.9.1
++1.0.0-beta
++[0.6.10,0.6.11)
++```
++
++Điều này tránh so sánh chuỗi sai đối với range có thành phần chữ như `[0.6.8.a,0.7)`.
+ 
+ ### Manifest của modpack vẫn là nguồn sự thật
+ 
+ - MCW không tự thay file mà tác giả modpack đã ghim.
+-- Nếu một dependency yêu cầu version khác nhưng pack đã chọn sẵn một version của cùng project, MCW giữ file của pack và ghi warning giải thích.
+-- Lỗi system requirement của file được pack ghim, ví dụ JEI khai báo Minecraft `[1.21, 1.21.1)` trong pack Minecraft `1.21.1`, được giữ ở mức warning thay vì tự động đổi JEI sang build khác.
+-- Optional, embedded và incompatible relations không bị coi nhầm là dependency bắt buộc cần tự tải.
++- Nếu dependency yêu cầu version khác nhưng pack đã chọn sẵn một version của cùng project, file của pack được giữ lại và warning giải thích mismatch.
++- Lỗi system requirement trên file pack-pinned, ví dụ JEI khai báo Minecraft `[1.21, 1.21.1)` trong pack Minecraft `1.21.1`, vẫn là warning thay vì tự đổi JEI.
++- Optional và incompatible relation không bị tự cài như dependency bắt buộc.
++- Embedded relation chỉ được coi là thỏa mãn sau khi capability thực tế được nhận diện.
+ 
+ ### Không còn bỏ qua dependency bắt buộc
+ 
+-- Tùy chọn **Launch anyway / bỏ qua lỗi tương thích** không còn bỏ qua dependency bắt buộc bị thiếu, bị disable hoặc sai version.
+-- MCW thử hoàn thiện dependency graph trước khi tải, tải các file mới được thêm, rồi audit lại sau download.
+-- Nếu dependency bắt buộc vẫn chưa thể xác định hoặc tải, launcher chặn trước khi tạo process Minecraft và hiển thị lỗi rõ ràng.
+-- Các warning còn lại được gộp dưới nhãn chung `Launch warning`, không còn gắn nhầm mọi cảnh báo với Modrinth.
++Tùy chọn **Launch anyway / bỏ qua lỗi tương thích** không thể bỏ qua:
++
++- Dependency bắt buộc bị thiếu.
++- Dependency bắt buộc bị disable.
++- Dependency có version không thỏa yêu cầu.
++- Dependency không thể xác định hoặc tải sau các bước recovery.
++
++MCW resolve trước download, tải file mới, audit sau download rồi mới tạo process Minecraft. Warning đã được sửa thành công không còn bị lặp lại trong báo cáo cuối.
+ 
+ ### Registry, Repair và provenance
+ 
+-Dependency tự động thêm được ghi lại với:
++Dependency được provider relation tự thêm dùng:
+ 
+ ```json
+ {
+   "selectionReason": "required_dependency",
+-  "requiredBy": ["FancyMenu"],
+-  "provider": "modrinth"
++  "requiredBy": ["FancyMenu"]
+ }
+ ```
+ 
+-- File gốc của pack dùng `selectionReason: pack_manifest`.
+-- Provenance registry giữ nguyên `requiredBy` và lý do lựa chọn.
+-- Repair modpack chạy lại resolver, tải dependency mới tìm được và chặn nếu vẫn còn dependency bắt buộc chưa giải quyết.
+-- Modrinth registry nâng lên schema 6; CurseForge registry nâng lên schema 3; provenance registry nâng lên schema 2, có normalize tương thích dữ liệu cũ.
++Dependency tìm từ JAR audit dùng:
+ 
+-### Ví dụ lỗi được xử lý
++```json
++{
++  "selectionReason": "jar_audit_dependency",
++  "requiredBy": ["Create Slice & Dice"],
++  "providesModId": "kotlinforforge",
++  "requestedVersionRanges": ["[3.9.1,)"]
++}
++```
+ 
+-Một pack có FancyMenu nhưng thiếu `drippyloadingscreen`, `fancy_entity_renderer`, `findme` và `konkrete` sẽ được MCW thử khôi phục tự động từ metadata provider trước khi launch. Nếu provider không cung cấp identity đáng tin cậy hoặc không có build tương thích với Minecraft/loader hiện tại, MCW dừng launch thay vì âm thầm chạy một pack chắc chắn thiếu dependency.
++Repair modpack chạy lại resolver và capability audit. Modrinth registry dùng schema 6, CurseForge registry schema 3 và provenance registry schema 2, có normalize dữ liệu cũ.
+ 
+ ### Phiên bản và xác thực
+ 
+ - Launcher runtime: `v1.1.1-beta.5`
+ - Python distribution metadata: `1.1.1b5`
+ - MCW Core source/wheel riêng: chưa phát hành lại; sẽ đồng bộ khi `v1.1.1` stable.
+-- Toàn bộ test: **1375 passed, 88 skipped, 2 warnings**.
++- Toàn bộ test: **1379 passed, 88 skipped, 2 warnings**.
++- Nhóm test mod/dependency/Modrinth/CurseForge/launch/repair liên quan: **257 passed**.
++- Test tập trung capability, resolver và compatibility: **19 passed**.
+ - `compileall` đạt cho `src`, `mcw_core` và `test`.
+ 
+ Hai warning đến từ fixture ZIP cố tình chứa entry trùng trong kiểm thử bảo mật, không phải lỗi dependency resolver.
+ 
++Môi trường build chưa chạy Minecraft thật hoặc live provider API với pack Create được báo cáo. Smoke test Windows với chính modpack đó vẫn là bước xác nhận cuối.
++
  ---
  
-+## Có gì mới trong v1.1.1-beta.5
-+
-+**v1.1.1-beta.5** sửa pipeline dependency bắt buộc của modpack:
-+
-+- Tự hoàn thiện dependency graph `required` cho modpack Modrinth và CurseForge trước khi Minecraft được tạo process.
-+- Giữ nguyên file do tác giả pack ghim; dependency bổ sung được ghi `requiredBy` và `selectionReason`.
-+- Không tự tải optional/embedded dependency và không tự thay file pack chỉ vì metadata system version quá chặt.
-+- Tùy chọn chạy dù có lỗi tương thích không còn được phép bỏ qua dependency bắt buộc bị thiếu, disable hoặc sai version.
-+- Repair modpack chạy lại resolver và tải các dependency mới tìm được.
-+- Registry Modrinth, CurseForge và provenance được nâng schema với normalize tương thích dữ liệu cũ.
-+
-+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.5.md`](docs/RELEASE-v1.1.1-beta.5.md).
-+
- ## Có gì mới trong v1.1.1-beta.4
+ ## English
  
- **v1.1.1-beta.4** đơn giản hóa OptiFine thành luồng nhập file trực tiếp:
---- /dev/null
-+++ b/docs/RELEASE-v1.1.1-beta.5.md
-@@ -0,0 +1,121 @@
-+# MCW Launcher v1.1.1-beta.5
+-MCW Launcher **v1.1.1-beta.5** fixes a serious modpack pipeline issue: a pack manifest could download successfully while required dependencies declared by individual Modrinth or CurseForge mods were never added. Minecraft was then allowed to start with several warnings and would commonly fail immediately afterward.
++MCW Launcher **v1.1.1-beta.5** fixes a serious modpack pipeline issue: the pack manifest could download every author-pinned file while required dependencies declared by the mods themselves remained missing. The compatibility override could previously allow Minecraft to start in that state; Beta 5 no longer permits that.
+ 
+-### Modpack dependency resolver
++Beta 5 revision 2 adds JAR capability indexing and provider project-search fallback. It handles both embedded dependencies such as Flywheel inside Create and dependencies known only by a mod ID such as `kotlinforforge`.
+ 
+-- Adds a shared `ModpackDependencyResolver` for Modrinth and CurseForge managed packs.
+-- Recursively follows **required** dependencies with a 20-level depth limit and a maximum of 256 added files.
+-- Dependencies already present in the manifest or selected graph are not downloaded twice.
+-- Cycles are stopped using provider version/file identities.
+-- Recoverable provider metadata requests are retried up to three times.
+-- Modrinth files can be identified through `versionId`, CDN URL identity, or SHA-512/SHA-1 lookup.
+-- CurseForge dependency metadata is persisted in the pack registry so later launches and repairs avoid unnecessary repeated requests.
++### Multi-stage dependency resolution
 +
-+## Tiếng Việt
++MCW resolves dependencies in this order:
 +
-+MCW Launcher **v1.1.1-beta.5** sửa một lỗi nghiêm trọng trong pipeline modpack: file của pack có thể được tải đầy đủ theo manifest nhưng các dependency bắt buộc do từng mod khai báo với Modrinth hoặc CurseForge lại không được bổ sung, khiến Minecraft được tạo process cùng nhiều cảnh báo và thường crash ngay sau đó.
++1. Files pinned by the modpack manifest.
++2. `required` provider relations with Modrinth or CurseForge project/version identities.
++3. Capabilities supplied by top-level or nested JARs.
++4. Project search by mod ID on the pack's preferred provider, followed by the other provider.
++5. Download the candidate, audit the real JAR metadata, and launch only after the mod ID and version requirement are satisfied.
 +
-+### Dependency resolver cho modpack
++Provider dependency traversal is bounded to 20 levels and 256 added files. Recoverable provider requests are retried up to three times. Files already present in the manifest, dependency graph, or instance are not downloaded twice.
 +
-+- Thêm `ModpackDependencyResolver` dùng chung cho modpack Modrinth và CurseForge.
-+- Resolver duyệt đệ quy dependency loại **required** với giới hạn 20 tầng và tối đa 256 file bổ sung.
-+- Dependency đã nằm trong manifest hoặc đã được chọn trước đó không bị tải lại.
-+- Phát hiện vòng lặp bằng provider version/file identity.
-+- Metadata provider được retry tối đa ba lần đối với lỗi mạng có khả năng phục hồi.
-+- Modrinth có thể nhận diện file từ `versionId`, URL CDN hoặc SHA-512/SHA-1 lookup.
-+- CurseForge lưu dependency metadata của file vào registry để các lần launch/repair sau không phải truy vấn lại không cần thiết.
++### Embedded and Jar-in-Jar capabilities
 +
-+### Manifest của modpack vẫn là nguồn sự thật
++A new `ModCapabilityIndex` reads runtime capabilities from:
 +
-+- MCW không tự thay file mà tác giả modpack đã ghim.
-+- Nếu một dependency yêu cầu version khác nhưng pack đã chọn sẵn một version của cùng project, MCW giữ file của pack và ghi warning giải thích.
-+- Lỗi system requirement của file được pack ghim, ví dụ JEI khai báo Minecraft `[1.21, 1.21.1)` trong pack Minecraft `1.21.1`, được giữ ở mức warning thay vì tự động đổi JEI sang build khác.
-+- Optional, embedded và incompatible relations không bị coi nhầm là dependency bắt buộc cần tự tải.
++- Forge/NeoForge `META-INF/jarjar/metadata.json`.
++- JARs below `META-INF/jarjar/` when older or incomplete metadata is used.
++- Fabric nested JAR declarations in `fabric.mod.json`.
++- Quilt metadata.
++- Legacy Forge `ContainedDeps`.
++- Nested `META-INF/mods.toml`, `META-INF/neoforge.mods.toml`, `fabric.mod.json`, `quilt.mod.json`, and `mcmod.info` metadata.
 +
-+### Không còn bỏ qua dependency bắt buộc
++The scanner is read-only and bounded by depth, nested-JAR count, extracted size, and compression ratio.
 +
-+- Tùy chọn **Launch anyway / bỏ qua lỗi tương thích** không còn bỏ qua dependency bắt buộc bị thiếu, bị disable hoặc sai version.
-+- MCW thử hoàn thiện dependency graph trước khi tải, tải các file mới được thêm, rồi audit lại sau download.
-+- Nếu dependency bắt buộc vẫn chưa thể xác định hoặc tải, launcher chặn trước khi tạo process Minecraft và hiển thị lỗi rõ ràng.
-+- Các warning còn lại được gộp dưới nhãn chung `Launch warning`, không còn gắn nhầm mọi cảnh báo với Modrinth.
++An embedded Flywheel `0.6.10` can therefore satisfy both:
 +
-+### Registry, Repair và provenance
-+
-+Dependency tự động thêm được ghi lại với:
-+
-+```json
-+{
-+  "selectionReason": "required_dependency",
-+  "requiredBy": ["FancyMenu"],
-+  "provider": "modrinth"
-+}
++```text
++Create: [0.6.10,0.6.11)
++Create Crafts & Additions: [0.6.8.a,0.7)
 +```
 +
-+- File gốc của pack dùng `selectionReason: pack_manifest`.
-+- Provenance registry giữ nguyên `requiredBy` và lý do lựa chọn.
-+- Repair modpack chạy lại resolver, tải dependency mới tìm được và chặn nếu vẫn còn dependency bắt buộc chưa giải quyết.
-+- Modrinth registry nâng lên schema 6; CurseForge registry nâng lên schema 3; provenance registry nâng lên schema 2, có normalize tương thích dữ liệu cũ.
++There is no hard-coded “ignore Flywheel” rule. The dependency is considered present only when the required capability and version are actually found inside a JAR.
 +
-+### Ví dụ lỗi được xử lý
++### Searching for dependencies known only by mod ID
 +
-+Một pack có FancyMenu nhưng thiếu `drippyloadingscreen`, `fancy_entity_renderer`, `findme` và `konkrete` sẽ được MCW thử khôi phục tự động từ metadata provider trước khi launch. Nếu provider không cung cấp identity đáng tin cậy hoặc không có build tương thích với Minecraft/loader hiện tại, MCW dừng launch thay vì âm thầm chạy một pack chắc chắn thiếu dependency.
++When JAR audit finds a required dependency but provider relations contain no project ID, MCW now:
 +
-+### Phiên bản và xác thực
++- Prefers the provider managing most of the pack's mods.
++- Searches by normalized mod ID, slug, and project name.
++- Filters candidates by Minecraft version and loader.
++- Falls back to the other provider when needed.
++- Records the candidate with `selectionReason: jar_audit_dependency`, `providesModId`, `requestedVersionRanges`, and `requiredBy`.
++- Downloads through the existing content pipeline and audits the real JAR again before launch.
 +
-+- Launcher runtime: `v1.1.1-beta.5`
-+- Python distribution metadata: `1.1.1b5`
-+- MCW Core source/wheel riêng: chưa phát hành lại; sẽ đồng bộ khi `v1.1.1` stable.
-+- Toàn bộ test: **1375 passed, 88 skipped, 2 warnings**.
-+- `compileall` đạt cho `src`, `mcw_core` và `test`.
++For example, when Create Slice & Dice requires `kotlinforforge [3.9.1,)`, MCW can locate Kotlin for Forge on CurseForge even when the original pack relation supplied no project ID. If the downloaded file does not actually provide `kotlinforforge`, or its version does not satisfy the range, the dependency remains unresolved and launch is blocked.
 +
-+Hai warning đến từ fixture ZIP cố tình chứa entry trùng trong kiểm thử bảo mật, không phải lỗi dependency resolver.
++### Forge/Maven-style version comparison
 +
-+---
++The version comparator now handles common Forge metadata forms including:
 +
-+## English
-+
-+MCW Launcher **v1.1.1-beta.5** fixes a serious modpack pipeline issue: a pack manifest could download successfully while required dependencies declared by individual Modrinth or CurseForge mods were never added. Minecraft was then allowed to start with several warnings and would commonly fail immediately afterward.
-+
-+### Modpack dependency resolver
-+
-+- Adds a shared `ModpackDependencyResolver` for Modrinth and CurseForge managed packs.
-+- Recursively follows **required** dependencies with a 20-level depth limit and a maximum of 256 added files.
-+- Dependencies already present in the manifest or selected graph are not downloaded twice.
-+- Cycles are stopped using provider version/file identities.
-+- Recoverable provider metadata requests are retried up to three times.
-+- Modrinth files can be identified through `versionId`, CDN URL identity, or SHA-512/SHA-1 lookup.
-+- CurseForge dependency metadata is persisted in the pack registry so later launches and repairs avoid unnecessary repeated requests.
-+
-+### The pack manifest remains authoritative
-+
-+- MCW never silently replaces a file pinned by the modpack author.
-+- When a dependency requests another version of a project already pinned by the pack, the pinned file is kept and a warning explains the mismatch.
-+- A system requirement mismatch on a pack-pinned file, such as JEI declaring Minecraft `[1.21, 1.21.1)` inside a Minecraft `1.21.1` pack, remains a warning instead of causing an automatic JEI replacement.
-+- Optional, embedded, and incompatible relations are not mistaken for required dependencies that should be auto-installed.
-+
-+### Required dependencies can no longer be bypassed
-+
-+- **Launch anyway / compatibility override** no longer bypasses missing, disabled, or version-invalid required mod dependencies.
-+- MCW completes the dependency graph before downloads, downloads newly added files, and audits the result again afterward.
-+- If a required dependency still cannot be identified or installed, launch is blocked before a Minecraft process is created and a clear error is shown.
-+- Remaining warnings use the generic `Launch warning` label instead of incorrectly labeling every warning as Modrinth-specific.
-+
-+### Registry, repair, and provenance
-+
-+Automatically added dependencies are recorded with:
-+
-+```json
-+{
-+  "selectionReason": "required_dependency",
-+  "requiredBy": ["FancyMenu"],
-+  "provider": "modrinth"
-+}
++```text
++0.6.8.a
++0.6.10
++3.9.1
++1.0.0-beta
++[0.6.10,0.6.11)
 +```
 +
-+- Original pack files use `selectionReason: pack_manifest`.
-+- The provenance registry preserves `requiredBy` and selection reason.
-+- Modpack Repair reruns dependency resolution, downloads newly discovered dependencies, and blocks completion if required dependencies remain unresolved.
-+- Modrinth registry schema is upgraded to 6, CurseForge registry to 3, and provenance registry to 2, with backward-compatible normalization.
-+
-+### Example fixed scenario
-+
-+A pack containing FancyMenu but missing `drippyloadingscreen`, `fancy_entity_renderer`, `findme`, and `konkrete` is now repaired from trusted provider metadata before launch. If no trustworthy provider identity or compatible build can be found, MCW blocks launch rather than silently starting a predictably incomplete pack.
-+
-+### Versions and validation
-+
-+- Launcher runtime: `v1.1.1-beta.5`
-+- Python distribution metadata: `1.1.1b5`
-+- Separate MCW Core source/wheel: not republished until `v1.1.1` stable.
-+- Full test suite: **1375 passed, 88 skipped, 2 warnings**.
-+- `compileall` passes for `src`, `mcw_core`, and `test`.
-+
-+The two warnings come from security-test ZIP fixtures that intentionally contain duplicate entries; they are unrelated to dependency resolution.
---- a/lang/en-US.json
-+++ b/lang/en-US.json
-@@ -1989,7 +1989,13 @@
-     "optifine.file.ready": "The file name matches this instance. MCW will verify the JAR contents before installing it.",
-     "optifine.file.select_hint": "Select the official OptiFine JAR. Its Minecraft version will be detected from the original file name and verified again during installation.",
-     "optifine.create.import_mode": "Installation mode: {mode}. Select the original OptiFine JAR; no online version list is used.",
--    "optifine.create.file_ready": "Ready to install {version} for Minecraft {minecraft} as {mode}."
-+    "optifine.create.file_ready": "Ready to install {version} for Minecraft {minecraft} as {mode}.",
-+    "Launch warning: {warning}": "Launch warning: {warning}",
-+    "Required mod dependencies are missing": "Required mod dependencies are missing",
-+    "MCW Launcher could not restore every required mod dependency. Retry while online or repair the modpack. The compatibility override cannot bypass missing required dependencies because the game is likely to crash or corrupt the pack state.": "MCW Launcher could not restore every required mod dependency. Retry while online or repair the modpack. The compatibility override cannot bypass missing required dependencies because the game is likely to crash or corrupt the pack state.",
-+    "Required dependencies missing": "Required dependencies missing",
-+    "Resolving Modrinth modpack dependencies...": "Resolving Modrinth modpack dependencies...",
-+    "Resolving CurseForge modpack dependencies...": "Resolving CurseForge modpack dependencies..."
-   },
-   "aliases": {
-     "MCW Launcher": "app.name",
---- a/lang/vi-VN.json
-+++ b/lang/vi-VN.json
-@@ -1989,7 +1989,13 @@
-     "optifine.file.ready": "Tên file khớp với instance. MCW sẽ kiểm tra cấu trúc JAR thêm một lần trước khi cài.",
-     "optifine.file.select_hint": "Hãy chọn file JAR OptiFine chính thức. Phiên bản Minecraft sẽ được nhận diện từ tên file gốc và xác minh lại khi cài.",
-     "optifine.create.import_mode": "Chế độ cài: {mode}. Chỉ cần chọn file JAR OptiFine gốc; launcher không tải danh sách phiên bản trực tuyến.",
--    "optifine.create.file_ready": "Sẵn sàng cài {version} cho Minecraft {minecraft} dưới dạng {mode}."
-+    "optifine.create.file_ready": "Sẵn sàng cài {version} cho Minecraft {minecraft} dưới dạng {mode}.",
-+    "Launch warning: {warning}": "Cảnh báo khi khởi chạy: {warning}",
-+    "Required mod dependencies are missing": "Thiếu dependency bắt buộc của mod",
-+    "MCW Launcher could not restore every required mod dependency. Retry while online or repair the modpack. The compatibility override cannot bypass missing required dependencies because the game is likely to crash or corrupt the pack state.": "MCW Launcher không thể khôi phục đầy đủ dependency bắt buộc của mod. Hãy thử lại khi có mạng hoặc Repair modpack. Tùy chọn bỏ qua tương thích không thể bỏ qua dependency bắt buộc vì game rất dễ crash hoặc làm trạng thái modpack sai lệch.",
-+    "Required dependencies missing": "Thiếu dependency bắt buộc",
-+    "Resolving Modrinth modpack dependencies...": "Đang xử lý dependency của modpack Modrinth...",
-+    "Resolving CurseForge modpack dependencies...": "Đang xử lý dependency của modpack CurseForge..."
-   },
-   "aliases": {
-     "Show static text over themed controls": "launcher_settings.theme.show_static_text",
---- a/pyproject.toml
-+++ b/pyproject.toml
-@@ -4,7 +4,7 @@
++This prevents lexical comparison errors for ranges containing letter components such as `[0.6.8.a,0.7)`.
  
- [project]
- name = "mcw-core"
--version = "1.1.1b4"
-+version = "1.1.1b5"
- description = "Headless Minecraft runtime, instance, loader, modpack, repair, and launch core used by MCW Launcher"
- readme = "docs/MCW_CORE_LIBRARY.md"
- requires-python = ">=3.12"
---- a/src/config.py
-+++ b/src/config.py
-@@ -1,7 +1,7 @@
- from __future__ import annotations
+ ### The pack manifest remains authoritative
  
--VERSION = "v1.1.1-beta.4"
--VERSION_ID = "1.1.1-beta.4"
-+VERSION = "v1.1.1-beta.5"
-+VERSION_ID = "1.1.1-beta.5"
- VERSION_TAG = f"v{VERSION_ID}"
- UPDATE_CHANNEL = "beta"
- GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
---- a/src/core/curseforge/curseforge_pack_installer.py
-+++ b/src/core/curseforge/curseforge_pack_installer.py
-@@ -401,6 +401,8 @@
-                 "downloadUrl": file.download_url,
-                 "declaredLoaders": list(file.loaders),
-                 "gameVersions": list(file.game_versions),
-+                "dependencies": [{"projectId": dependency.project_id, "relationType": dependency.relation_type} for dependency in file.dependencies],
-+                "dependencyMetadataResolved": True,
-                 "required": required,
-                 "provider": "curseforge",
-             })
+-- MCW never silently replaces a file pinned by the modpack author.
+-- When a dependency requests another version of a project already pinned by the pack, the pinned file is kept and a warning explains the mismatch.
+-- A system requirement mismatch on a pack-pinned file, such as JEI declaring Minecraft `[1.21, 1.21.1)` inside a Minecraft `1.21.1` pack, remains a warning instead of causing an automatic JEI replacement.
+-- Optional, embedded, and incompatible relations are not mistaken for required dependencies that should be auto-installed.
+-
+-### Required dependencies can no longer be bypassed
+-
+-- **Launch anyway / compatibility override** no longer bypasses missing, disabled, or version-invalid required mod dependencies.
+-- MCW completes the dependency graph before downloads, downloads newly added files, and audits the result again afterward.
+-- If a required dependency still cannot be identified or installed, launch is blocked before a Minecraft process is created and a clear error is shown.
+-- Remaining warnings use the generic `Launch warning` label instead of incorrectly labeling every warning as Modrinth-specific.
++- MCW does not silently replace files pinned by the modpack author.
++- When a dependency requests another version of a project already pinned by the pack, the pinned file remains and a warning explains the mismatch.
++- A system requirement mismatch on a pack-pinned file, such as JEI declaring Minecraft `[1.21, 1.21.1)` in a Minecraft `1.21.1` pack, remains a warning instead of triggering an automatic JEI replacement.
++- Optional and incompatible relations are not installed as required dependencies.
++- An embedded relation is considered satisfied only after its actual capability is identified.
++
++### Required dependencies cannot be bypassed
++
++**Launch anyway / compatibility override** cannot bypass:
++
++- A missing required dependency.
++- A disabled required dependency.
++- An invalid required dependency version.
++- A dependency that remains unidentified or unavailable after recovery.
++
++MCW resolves before download, downloads new files, audits after download, and only then creates the Minecraft process. Warnings fixed during recovery are not repeated in the final report.
+ 
+ ### Registry, repair, and provenance
+ 
+-Automatically added dependencies are recorded with:
++Provider-relation dependencies use:
+ 
+ ```json
+ {
+   "selectionReason": "required_dependency",
+-  "requiredBy": ["FancyMenu"],
+-  "provider": "modrinth"
++  "requiredBy": ["FancyMenu"]
+ }
+ ```
+ 
+-- Original pack files use `selectionReason: pack_manifest`.
+-- The provenance registry preserves `requiredBy` and selection reason.
+-- Modpack Repair reruns dependency resolution, downloads newly discovered dependencies, and blocks completion if required dependencies remain unresolved.
+-- Modrinth registry schema is upgraded to 6, CurseForge registry to 3, and provenance registry to 2, with backward-compatible normalization.
++JAR-audit search dependencies use:
+ 
+-### Example fixed scenario
++```json
++{
++  "selectionReason": "jar_audit_dependency",
++  "requiredBy": ["Create Slice & Dice"],
++  "providesModId": "kotlinforforge",
++  "requestedVersionRanges": ["[3.9.1,)"]
++}
++```
+ 
+-A pack containing FancyMenu but missing `drippyloadingscreen`, `fancy_entity_renderer`, `findme`, and `konkrete` is now repaired from trusted provider metadata before launch. If no trustworthy provider identity or compatible build can be found, MCW blocks launch rather than silently starting a predictably incomplete pack.
++Modpack Repair reruns both dependency resolution and capability audit. The Modrinth registry uses schema 6, CurseForge schema 3, and provenance schema 2 with backward-compatible normalization.
+ 
+ ### Versions and validation
+ 
+ - Launcher runtime: `v1.1.1-beta.5`
+ - Python distribution metadata: `1.1.1b5`
+ - Separate MCW Core source/wheel: not republished until `v1.1.1` stable.
+-- Full test suite: **1375 passed, 88 skipped, 2 warnings**.
++- Full test suite: **1379 passed, 88 skipped, 2 warnings**.
++- Relevant mod/dependency/Modrinth/CurseForge/launch/repair tests: **257 passed**.
++- Focused capability, resolver, and compatibility tests: **19 passed**.
+ - `compileall` passes for `src`, `mcw_core`, and `test`.
+ 
+ The two warnings come from security-test ZIP fixtures that intentionally contain duplicate entries; they are unrelated to dependency resolution.
++
++The build environment did not launch Minecraft or call live provider APIs with the reported Create pack. A Windows smoke test with that exact pack remains the final confirmation step.
 --- a/src/core/curseforge/curseforge_pack_registry.py
 +++ b/src/core/curseforge/curseforge_pack_registry.py
-@@ -9,7 +9,7 @@
- 
- 
- class CurseForgePackRegistry:
--    SCHEMA_VERSION = 2
-+    SCHEMA_VERSION = 3
- 
-     @staticmethod
-     def load(instance: Instance | Path) -> dict:
-@@ -86,9 +86,36 @@
-                 "manualImport": bool(raw.get("manualImport", False)),
-                 "resolvePathFromProvider": bool(raw.get("resolvePathFromProvider", False)),
-                 "provider": "curseforge",
-+                "selectionReason": str(raw.get("selectionReason") or "pack_manifest").strip().casefold(),
-+                "requiredBy": list(dict.fromkeys(str(item).strip() for item in raw.get("requiredBy", []) if str(item).strip())) if isinstance(raw.get("requiredBy"), (list, tuple, set)) else [],
-+                "projectUrl": str(raw.get("projectUrl") or "").strip(),
-+                "releaseType": str(raw.get("releaseType") or "release").strip().casefold(),
-+                "datePublished": str(raw.get("datePublished") or "").strip(),
-+                "declaredLoaders": [str(item).strip().casefold() for item in raw.get("declaredLoaders", []) if str(item).strip()] if isinstance(raw.get("declaredLoaders"), (list, tuple, set)) else [],
-+                "gameVersions": [str(item).strip() for item in raw.get("gameVersions", []) if str(item).strip()] if isinstance(raw.get("gameVersions"), (list, tuple, set)) else [],
-+                "dependencies": CurseForgePackRegistry._normalize_dependencies(raw.get("dependencies", [])),
-+                "dependencyMetadataResolved": bool(raw.get("dependencyMetadataResolved", False)),
+@@ -95,6 +95,8 @@
+                 "gameVersions": [str(item).strip() for item in raw.get("gameVersions", []) if str(item).strip()] if isinstance(raw.get("gameVersions"), (list, tuple, set)) else [],
+                 "dependencies": CurseForgePackRegistry._normalize_dependencies(raw.get("dependencies", [])),
+                 "dependencyMetadataResolved": bool(raw.get("dependencyMetadataResolved", False)),
++                "providesModId": str(raw.get("providesModId") or "").strip().casefold(),
++                "requestedVersionRanges": list(dict.fromkeys(str(item).strip() for item in raw.get("requestedVersionRanges", []) if str(item).strip())) if isinstance(raw.get("requestedVersionRanges"), (list, tuple, set)) else [],
              })
          output = dict(data)
          output["schemaVersion"] = CurseForgePackRegistry.SCHEMA_VERSION
-         output["managedFiles"] = managed
-         output["source"] = "curseforge"
-         return output
-+
-+    @staticmethod
-+    def _normalize_dependencies(value: object) -> list[dict]:
-+        if not isinstance(value, (list, tuple)):
-+            return []
-+        normalized: dict[tuple[int, int], dict] = {}
-+        for raw in value:
-+            if not isinstance(raw, dict):
-+                continue
-+            try:
-+                project_id = int(raw.get("projectId") or raw.get("modId") or 0)
-+                relation_type = int(raw.get("relationType") or 0)
-+            except (TypeError, ValueError):
-+                continue
-+            if project_id <= 0 or relation_type <= 0:
-+                continue
-+            normalized[(project_id, relation_type)] = {"projectId": project_id, "relationType": relation_type}
-+        return list(normalized.values())
---- a/src/core/minecraft/minecraft_executor.py
-+++ b/src/core/minecraft/minecraft_executor.py
-@@ -21,6 +21,7 @@
- from src.core.minecraft.launcher_manager import LauncherManager
- from src.core.minecraft.library_manager import DownloadLibraryManager
- from src.core.modloader.mod_loader_manager import ModLoaderManager
-+from src.core.mod.modpack_dependency_resolver import ModpackDependencyResolver
- from src.core.optifine.optifine_manager import OptiFineManager
- from src.core.modloader.forge.forge_launch_command_manager import ForgeLaunchCommandManager
- from src.core.modloader.forge.legacy_libloader_manager import LegacyLibLoaderManager
-@@ -153,11 +154,25 @@
-             launch_lock_token = getattr(run_lock, "token", None)
-             PortableContentManager.ensure(instance)
-             PortableContentManager.prefetch_referenced(instance, reporter)
-+            dependency_resolution = ModpackDependencyResolver.resolve(instance, reporter)
-             modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
-             curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
-             ftb_warnings = FTBContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
-             atlauncher_warnings = ATLauncherContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
-             legacy_libloader_warnings = LegacyLibLoaderManager.ensure(instance, reporter)
-+
-+            # A second pass can identify provider versions after pack files have
-+            # been hydrated/downloaded. Any newly discovered required files are
-+            # downloaded before the compatibility preflight runs.
-+            dependency_resolution_after_download = ModpackDependencyResolver.resolve(instance, reporter)
-+            if dependency_resolution_after_download.changed:
-+                modrinth_warnings = tuple(modrinth_warnings) + tuple(
-+                    ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
-+                )
-+                curseforge_warnings = tuple(curseforge_warnings) + tuple(
-+                    CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
-+                )
-+            ModpackDependencyResolver.raise_for_required_dependencies(instance, dependency_resolution_after_download.unresolved)
-             PortableContentManager.finalize_disabled(instance)
- 
-             download_pause_controller.raise_if_requested()
-@@ -260,7 +275,14 @@
-                 and (forge_preflight_policy == ManagedContentPolicy.ALLOW or allow_compatibility_issues_once)
-             )
-             forge_warnings = tuple(issue.message for issue in forge_preflight.warnings) + bypassed_compatibility
--            warnings = tuple(modrinth_warnings) + tuple(curseforge_warnings) + tuple(ftb_warnings) + tuple(atlauncher_warnings) + tuple(legacy_libloader_warnings) + forge_warnings + tuple(java_recovery_warnings)
-+            # Only surface the final dependency state. The first pass may
-+            # temporarily fail before pack files are hydrated, while the second
-+            # pass can resolve the same dependency successfully after download.
-+            dependency_warnings = (
-+                tuple(dependency_resolution_after_download.warnings)
-+                + tuple(dependency_resolution_after_download.unresolved)
-+            )
-+            warnings = dependency_warnings + tuple(modrinth_warnings) + tuple(curseforge_warnings) + tuple(ftb_warnings) + tuple(atlauncher_warnings) + tuple(legacy_libloader_warnings) + forge_warnings + tuple(java_recovery_warnings)
-             if warnings:
-                 result["warnings"] = warnings
-             return result
---- a/src/core/mod/mod_compatibility_manager.py
-+++ b/src/core/mod/mod_compatibility_manager.py
-@@ -11,6 +11,8 @@
- 
- 
- class ModCompatibilityManager:
-+    SYSTEM_DEPENDENCY_IDS = {"minecraft", "forge", "neoforge", "javafml", "fml", "fabricloader", "quilt_loader", "quiltloader"}
-+
-     @staticmethod
-     def scan(instance: Instance, mods: list[ModInfo] | None = None) -> ModHealthReport:
-         mods = list(mods) if mods is not None else ModManager.list_mods(instance)
-@@ -55,7 +57,7 @@
-         ModCompatibilityManager._append_duplicate_issues(enabled_by_id, issues)
- 
-         for mod in enabled:
--            ModCompatibilityManager._append_dependency_issues(mod, enabled_by_id, disabled_by_id, installed_versions, issues)
-+            ModCompatibilityManager._append_dependency_issues(mod, enabled_by_id, disabled_by_id, installed_versions, issues, managed_by_modpack=mod.managed_by_modpack)
-             ModCompatibilityManager._append_conflict_issues(mod, enabled_by_id, installed_versions, issues)
- 
-         issues.sort(key=lambda item: ({"error": 0, "warning": 1, "info": 2}.get(item.severity, 3), item.message.casefold()))
-@@ -92,7 +94,7 @@
-             issues.append(ModIssue(severity="error", code="duplicate-mod-id", message=f"Duplicate enabled mod ID '{mod_id}': {files}", mod_ids=(mod_id,)))
- 
-     @staticmethod
--    def _append_dependency_issues(mod: ModInfo, enabled_by_id: dict[str, list[ModInfo]], disabled_by_id: dict[str, list[ModInfo]], installed_versions: dict[str, str], issues: list[ModIssue]) -> None:
-+    def _append_dependency_issues(mod: ModInfo, enabled_by_id: dict[str, list[ModInfo]], disabled_by_id: dict[str, list[ModInfo]], installed_versions: dict[str, str], issues: list[ModIssue], managed_by_modpack: bool = False) -> None:
-         for dependency_id, requirement in mod.dependencies.items():
-             normalized_id = str(dependency_id).strip().casefold()
-             if not normalized_id:
-@@ -108,7 +110,18 @@
-                 continue
-             matches = ModCompatibilityManager._matches_requirement(installed_versions[normalized_id], requirement)
-             if matches is False:
--                issues.append(ModIssue(severity="error", code="dependency-version", message=f"{mod.name} requires '{dependency_id}' {ModCompatibilityManager._format_requirement(requirement)}, but {installed_versions[normalized_id]} is installed.", mod_ids=(mod.mod_id, normalized_id)))
-+                if managed_by_modpack and normalized_id in ModCompatibilityManager.SYSTEM_DEPENDENCY_IDS:
-+                    issues.append(ModIssue(
-+                        severity="warning",
-+                        code="pack-pinned-system-requirement",
-+                        message=(
-+                            f"{mod.name} requires '{dependency_id}' {ModCompatibilityManager._format_requirement(requirement)}, "
-+                            f"but {installed_versions[normalized_id]} is installed. The modpack-pinned file was kept."
-+                        ),
-+                        mod_ids=(mod.mod_id, normalized_id),
-+                    ))
-+                else:
-+                    issues.append(ModIssue(severity="error", code="dependency-version", message=f"{mod.name} requires '{dependency_id}' {ModCompatibilityManager._format_requirement(requirement)}, but {installed_versions[normalized_id]} is installed.", mod_ids=(mod.mod_id, normalized_id)))
- 
-         for dependency_id, requirement in mod.recommends.items():
-             normalized_id = str(dependency_id).strip().casefold()
---- a/src/core/mod/mod_provenance_registry.py
-+++ b/src/core/mod/mod_provenance_registry.py
-@@ -18,7 +18,7 @@
-     so the UI and future MCWPack exporter can recover provenance consistently.
-     """
- 
--    SCHEMA_VERSION = 1
-+    SCHEMA_VERSION = 2
-     _MODRINTH_CDN_PATTERN = re.compile(r"^/data/([^/]+)/versions/([^/]+)/([^/]+)$", re.IGNORECASE)
-     _PROVIDERS = {"modrinth", "curseforge", "ftb", "atlauncher", "optifine", "local", "manual", "unknown"}
- 
-@@ -192,6 +192,8 @@
-                 "size": raw.get("size"),
-                 "downloadUrls": downloads,
-                 "managedByModpack": True,
-+                "selectionReason": raw.get("selectionReason"),
-+                "requiredBy": raw.get("requiredBy", []),
-                 "packProvider": "modrinth",
-                 "packProjectId": pack_project_id,
-                 "packVersionId": pack_version_id,
-@@ -218,6 +220,8 @@
-                 "size": raw.get("size"),
-                 "downloadUrls": [raw.get("downloadUrl")] if raw.get("downloadUrl") else [],
-                 "managedByModpack": True,
-+                "selectionReason": raw.get("selectionReason"),
-+                "requiredBy": raw.get("requiredBy", []),
-                 "packProvider": "curseforge",
-                 "packProjectId": pack_project_id,
-                 "packVersionId": pack_version_id,
-@@ -318,6 +322,8 @@
-             "licenseUrl": str(raw.get("licenseUrl") or "").strip(),
-             "redistributionAllowed": bool(raw.get("redistributionAllowed", False)),
-             "managedByModpack": bool(raw.get("managedByModpack", False)),
-+            "selectionReason": str(raw.get("selectionReason") or ("pack_manifest" if raw.get("managedByModpack", False) else "direct_install")).strip().casefold(),
-+            "requiredBy": list(dict.fromkeys(str(item).strip() for item in raw.get("requiredBy", []) if str(item).strip())) if isinstance(raw.get("requiredBy"), (list, tuple, set)) else [],
-             "packProvider": str(raw.get("packProvider") or "").strip().casefold(),
-             "packProjectId": str(raw.get("packProjectId") or "").strip(),
-             "packVersionId": str(raw.get("packVersionId") or "").strip(),
 --- /dev/null
-+++ b/src/core/mod/modpack_dependency_resolver.py
-@@ -0,0 +1,531 @@
-+from __future__ import annotations
-+
-+from collections import deque
-+from datetime import datetime, timezone
-+from pathlib import Path, PurePosixPath
-+from time import sleep
-+from typing import Callable, TypeVar
-+
-+from src.core.curseforge.curseforge_client import CurseForgeClient
-+from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
-+from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
-+from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
-+from src.core.modloader.mod_loader_manager import ModLoaderManager
-+from src.core.modrinth.modrinth_client import ModrinthClient
-+from src.core.modrinth.modrinth_mod_installer import ModrinthModInstaller
-+from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
-+from src.core.network.download_pause import download_pause_controller
-+from src.core.network.retry_policy import DownloadRetryPolicy
-+from src.core.progress.progress_reporter import ProgressReporter
-+from src.models.curseforge.file import CurseForgeDependency, CurseForgeFile
-+from src.models.instance.instance import Instance
-+from src.models.mod.dependency_resolution import DependencyResolutionResult, RequiredModDependenciesMissing
-+from src.models.mod.mod_issue import ModIssue
-+from src.models.modrinth.version import ModrinthVersion
-+from src.models.progress.progress_stage import ProgressStage
-+
-+
-+T = TypeVar("T")
-+
-+
-+class ModpackDependencyResolver:
-+    """Completes required provider dependency graphs for managed modpacks.
-+
-+    A provider manifest remains authoritative for files it explicitly pins.
-+    This resolver only appends missing *required* dependencies and never
-+    replaces a pack-pinned version.
-+    """
-+
-+    MAX_DEPTH = 20
-+    MAX_DEPENDENCIES = 256
-+    MAX_ATTEMPTS = 3
-+    BLOCKING_CODES = {"dependency-missing", "dependency-disabled", "dependency-version"}
-+
-+    @staticmethod
-+    def resolve(instance: Instance, reporter: ProgressReporter | None = None) -> DependencyResolutionResult:
-+        if getattr(instance, "instance_dir", None) is None:
-+            return DependencyResolutionResult()
-+        added: list[str] = []
-+        warnings: list[str] = []
-+        unresolved: list[str] = []
-+
-+        modrinth = ModrinthPackRegistry.load(instance)
-+        if ModpackDependencyResolver._has_managed_mods(modrinth.get("managedFiles", [])):
-+            result = ModpackDependencyResolver._resolve_modrinth(instance, modrinth, reporter)
-+            added.extend(result.added_files)
-+            warnings.extend(result.warnings)
-+            unresolved.extend(result.unresolved)
-+
-+        curseforge = CurseForgePackRegistry.load(Path(instance.instance_dir))
-+        if ModpackDependencyResolver._has_managed_mods(curseforge.get("managedFiles", [])):
-+            result = ModpackDependencyResolver._resolve_curseforge(instance, curseforge, reporter)
-+            added.extend(result.added_files)
-+            warnings.extend(result.warnings)
-+            unresolved.extend(result.unresolved)
-+
-+        if added:
-+            ModProvenanceRegistry.synchronize(instance)
-+        return DependencyResolutionResult(
-+            added_files=tuple(dict.fromkeys(added)),
-+            warnings=tuple(dict.fromkeys(warnings)),
-+            unresolved=tuple(dict.fromkeys(unresolved)),
-+        )
-+
-+    @staticmethod
-+    def blocking_issues(instance: Instance) -> tuple:
-+        report = ModCompatibilityManager.scan(instance)
-+        return tuple(
-+            issue
-+            for issue in report.issues
-+            if issue.severity == "error" and issue.code in ModpackDependencyResolver.BLOCKING_CODES
-+        )
-+
-+    @staticmethod
-+    def raise_for_required_dependencies(instance: Instance, unresolved: tuple[str, ...] | list[str] = ()) -> None:
-+        if not ModpackDependencyResolver._is_managed_modpack(instance):
-+            return
-+        issues = list(ModpackDependencyResolver.blocking_issues(instance))
-+        issues.extend(
-+            ModIssue(severity="error", code="dependency-unresolved", message=str(message), mod_ids=())
-+            for message in unresolved
-+            if str(message).strip()
-+        )
-+        if issues:
-+            raise RequiredModDependenciesMissing(instance.name, tuple(issues))
-+
-+    @staticmethod
-+    def _resolve_modrinth(instance: Instance, registry: dict, reporter: ProgressReporter | None) -> DependencyResolutionResult:
-+        entries = [entry for entry in registry.get("managedFiles", []) if isinstance(entry, dict)]
-+        mod_entries = [entry for entry in entries if ModpackDependencyResolver._is_mod_entry(entry)]
-+        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-+        loader_name = str(loader_name).strip().casefold()
-+        selected: dict[str, dict] = {}
-+        versions: dict[str, ModrinthVersion] = {}
-+        warnings: list[str] = []
-+        unresolved: list[str] = []
-+        added: list[str] = []
-+        changed = False
-+
-+        ModpackDependencyResolver._report(reporter, "Resolving Modrinth modpack dependencies...", 0, max(1, len(mod_entries)))
-+        for completed, entry in enumerate(mod_entries, start=1):
-+            download_pause_controller.raise_if_requested()
-+            entry.setdefault("selectionReason", "pack_manifest")
-+            entry.setdefault("requiredBy", [])
-+            try:
-+                version = ModpackDependencyResolver._modrinth_version_for_entry(entry)
-+            except Exception as error:
-+                warnings.append(f"Could not identify Modrinth dependency metadata for {entry.get('fileName') or entry.get('path')}: {error}")
-+                ModpackDependencyResolver._report(reporter, "Resolving Modrinth modpack dependencies...", completed, max(1, len(mod_entries)))
-+                continue
-+            if version is None:
-+                warnings.append(f"Modrinth file identity is unavailable: {entry.get('fileName') or entry.get('path')}")
-+                ModpackDependencyResolver._report(reporter, "Resolving Modrinth modpack dependencies...", completed, max(1, len(mod_entries)))
-+                continue
-+            changed |= ModpackDependencyResolver._hydrate_modrinth_entry(entry, version)
-+            selected.setdefault(version.project_id, entry)
-+            versions[version.version_id] = version
-+            ModpackDependencyResolver._report(reporter, "Resolving Modrinth modpack dependencies...", completed, max(1, len(mod_entries)))
-+
-+        queue: deque[tuple[ModrinthVersion, int, str]] = deque(
-+            (version, 0, ModpackDependencyResolver._entry_label(selected.get(version.project_id, {}), version.project_id))
-+            for version in versions.values()
-+        )
-+        visited_versions: set[str] = set()
-+        discovered = 0
-+
-+        while queue:
-+            version, depth, parent_label = queue.popleft()
-+            if version.version_id in visited_versions:
-+                continue
-+            if depth > ModpackDependencyResolver.MAX_DEPTH:
-+                unresolved.append(f"Modrinth dependency depth exceeded {ModpackDependencyResolver.MAX_DEPTH} at {parent_label}.")
-+                continue
-+            visited_versions.add(version.version_id)
-+            for dependency in version.dependencies:
-+                if dependency.dependency_type != "required":
-+                    continue
-+                download_pause_controller.raise_if_requested()
-+                if dependency.project_id and dependency.project_id in selected:
-+                    target = selected[dependency.project_id]
-+                    changed |= ModpackDependencyResolver._append_required_by(target, parent_label)
-+                    if dependency.version_id and str(target.get("versionId") or "") not in {"", dependency.version_id}:
-+                        warnings.append(
-+                            f"{parent_label} requests Modrinth version {dependency.version_id}, but the modpack pins "
-+                            f"{target.get('versionId')}; the pack-pinned file was kept."
-+                        )
-+                    continue
-+                try:
-+                    dependency_version = ModpackDependencyResolver._retry(
-+                        lambda dependency=dependency: ModrinthModInstaller._resolve_dependency(
-+                            dependency.version_id,
-+                            dependency.project_id,
-+                            instance.version_id,
-+                            loader_name,
-+                            ("release", "beta", "alpha"),
-+                        )
-+                    )
-+                except Exception as error:
-+                    label = dependency.file_name or dependency.project_id or dependency.version_id or "unknown dependency"
-+                    unresolved.append(f"{parent_label} requires Modrinth dependency {label}: {error}")
-+                    continue
-+                if dependency_version is None:
-+                    label = dependency.file_name or dependency.project_id or dependency.version_id or "unknown dependency"
-+                    unresolved.append(f"{parent_label} requires external dependency {label}, which has no provider project/version ID.")
-+                    continue
-+                if dependency_version.project_id in selected:
-+                    target = selected[dependency_version.project_id]
-+                    changed |= ModpackDependencyResolver._append_required_by(target, parent_label)
-+                    continue
-+                try:
-+                    ModrinthModInstaller._validate_version(dependency_version, instance.version_id, loader_name)
-+                    project = ModpackDependencyResolver._retry(lambda: ModrinthClient.get_project(dependency_version.project_id))
-+                    file = dependency_version.primary_file(".jar")
-+                except Exception as error:
-+                    unresolved.append(f"{parent_label} dependency {dependency_version.project_id} is not installable: {error}")
-+                    continue
-+                if discovered >= ModpackDependencyResolver.MAX_DEPENDENCIES:
-+                    unresolved.append(f"The Modrinth dependency graph exceeds {ModpackDependencyResolver.MAX_DEPENDENCIES} added files.")
-+                    queue.clear()
-+                    break
-+                path = ModpackDependencyResolver._unique_mod_path(entries, file.filename, dependency_version.project_id, file.sha1)
-+                target = {
-+                    "path": path,
-+                    "fileName": PurePosixPath(path).name,
-+                    "sha1": file.sha1,
-+                    "sha512": file.sha512,
-+                    "size": file.size,
-+                    "source": "download",
-+                    "provider": "modrinth",
-+                    "projectId": dependency_version.project_id,
-+                    "versionId": dependency_version.version_id,
-+                    "versionNumber": dependency_version.version_number,
-+                    "downloads": [file.url] if file.url else [],
-+                    "required": True,
-+                    "selectionReason": "required_dependency",
-+                    "requiredBy": [parent_label],
-+                    "displayName": project.title,
-+                }
-+                entries.append(target)
-+                selected[dependency_version.project_id] = target
-+                added.append(project.title or target["fileName"])
-+                discovered += 1
-+                changed = True
-+                queue.append((dependency_version, depth + 1, project.title or target["fileName"]))
-+
-+        if changed or unresolved:
-+            registry["managedFiles"] = entries
-+            registry["dependencyResolution"] = ModpackDependencyResolver._resolution_payload(added, unresolved)
-+            registry["verificationCache"] = ModrinthPackRegistry._normalize_verification_cache(
-+                registry.get("verificationCache", {}), entries
-+            )
-+            ModrinthPackRegistry.save(instance.instance_dir, registry)
-+        return DependencyResolutionResult(tuple(added), tuple(warnings), tuple(unresolved))
-+
-+    @staticmethod
-+    def _resolve_curseforge(instance: Instance, registry: dict, reporter: ProgressReporter | None) -> DependencyResolutionResult:
-+        entries = [entry for entry in registry.get("managedFiles", []) if isinstance(entry, dict)]
-+        mod_entries = [entry for entry in entries if ModpackDependencyResolver._is_mod_entry(entry)]
-+        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-+        loader_name = str(loader_name).strip().casefold()
-+        selected: dict[int, dict] = {}
-+        files: dict[int, CurseForgeFile] = {}
-+        warnings: list[str] = []
-+        unresolved: list[str] = []
-+        added: list[str] = []
-+        changed = False
-+
-+        unresolved_file_ids: list[int] = []
-+        for entry in mod_entries:
-+            try:
-+                file_id = int(entry.get("fileId") or 0)
-+            except (TypeError, ValueError):
-+                file_id = 0
-+            if file_id > 0 and not bool(entry.get("dependencyMetadataResolved", False)):
-+                unresolved_file_ids.append(file_id)
-+        batch_files: dict[int, CurseForgeFile] = {}
-+        if unresolved_file_ids:
-+            try:
-+                batch_files = ModpackDependencyResolver._retry(lambda: CurseForgeClient.get_files_batch(unresolved_file_ids))
-+            except Exception as error:
-+                warnings.append(f"Could not batch-load CurseForge dependency metadata: {error}")
-+
-+        ModpackDependencyResolver._report(reporter, "Resolving CurseForge modpack dependencies...", 0, max(1, len(mod_entries)))
-+        for completed, entry in enumerate(mod_entries, start=1):
-+            download_pause_controller.raise_if_requested()
-+            try:
-+                project_id = int(entry.get("projectId") or 0)
-+                file_id = int(entry.get("fileId") or 0)
-+            except (TypeError, ValueError):
-+                project_id = file_id = 0
-+            entry.setdefault("selectionReason", "pack_manifest")
-+            entry.setdefault("requiredBy", [])
-+            if project_id <= 0 or file_id <= 0:
-+                warnings.append(f"CurseForge file identity is unavailable: {entry.get('fileName') or entry.get('path')}")
-+                ModpackDependencyResolver._report(reporter, "Resolving CurseForge modpack dependencies...", completed, max(1, len(mod_entries)))
-+                continue
-+            try:
-+                if bool(entry.get("dependencyMetadataResolved", False)):
-+                    file = ModpackDependencyResolver._curseforge_file_from_entry(entry)
-+                else:
-+                    file = batch_files.get(file_id)
-+                    if file is None or file.project_id != project_id:
-+                        file = ModpackDependencyResolver._retry(lambda project_id=project_id, file_id=file_id: CurseForgeClient.get_file(project_id, file_id))
-+            except Exception as error:
-+                warnings.append(f"Could not load CurseForge dependency metadata for {entry.get('fileName')}: {error}")
-+                ModpackDependencyResolver._report(reporter, "Resolving CurseForge modpack dependencies...", completed, max(1, len(mod_entries)))
-+                continue
-+            changed |= ModpackDependencyResolver._hydrate_curseforge_entry(entry, file)
-+            selected.setdefault(project_id, entry)
-+            files[file_id] = file
-+            ModpackDependencyResolver._report(reporter, "Resolving CurseForge modpack dependencies...", completed, max(1, len(mod_entries)))
-+
-+        queue: deque[tuple[CurseForgeFile, int, str]] = deque(
-+            (file, 0, ModpackDependencyResolver._entry_label(selected.get(file.project_id, {}), str(file.project_id)))
-+            for file in files.values()
-+        )
-+        visited_files: set[int] = set()
-+        discovered = 0
-+
-+        while queue:
-+            file, depth, parent_label = queue.popleft()
-+            if file.file_id in visited_files:
-+                continue
-+            if depth > ModpackDependencyResolver.MAX_DEPTH:
-+                unresolved.append(f"CurseForge dependency depth exceeded {ModpackDependencyResolver.MAX_DEPTH} at {parent_label}.")
-+                continue
-+            visited_files.add(file.file_id)
-+            for dependency in file.dependencies:
-+                if not dependency.required:
-+                    continue
-+                download_pause_controller.raise_if_requested()
-+                if dependency.project_id in selected:
-+                    changed |= ModpackDependencyResolver._append_required_by(selected[dependency.project_id], parent_label)
-+                    continue
-+                try:
-+                    dependency_file = ModpackDependencyResolver._retry(
-+                        lambda dependency=dependency: CurseForgeClient.latest_compatible_file(
-+                            dependency.project_id,
-+                            instance.version_id,
-+                            loader=loader_name,
-+                            release_types=("release", "beta", "alpha"),
-+                        )
-+                    )
-+                except Exception as error:
-+                    unresolved.append(f"{parent_label} requires CurseForge project {dependency.project_id}: {error}")
-+                    continue
-+                if dependency_file.project_id in selected:
-+                    changed |= ModpackDependencyResolver._append_required_by(selected[dependency_file.project_id], parent_label)
-+                    continue
-+                if discovered >= ModpackDependencyResolver.MAX_DEPENDENCIES:
-+                    unresolved.append(f"The CurseForge dependency graph exceeds {ModpackDependencyResolver.MAX_DEPENDENCIES} added files.")
-+                    queue.clear()
-+                    break
-+                try:
-+                    project = ModpackDependencyResolver._retry(lambda: CurseForgeClient.get_project(dependency_file.project_id))
-+                    project_name = str(getattr(project, "name", "") or dependency_file.display_name).strip()
-+                    project_url = str(getattr(project, "project_url", "") or "").strip()
-+                except Exception:
-+                    project_name = dependency_file.display_name
-+                    project_url = ""
-+                path = ModpackDependencyResolver._unique_mod_path(entries, dependency_file.file_name, str(dependency_file.project_id), dependency_file.sha1)
-+                target = {
-+                    "projectId": dependency_file.project_id,
-+                    "fileId": dependency_file.file_id,
-+                    "fileName": PurePosixPath(path).name,
-+                    "path": path,
-+                    "displayName": project_name or dependency_file.file_name,
-+                    "sha1": dependency_file.sha1,
-+                    "size": dependency_file.file_length,
-+                    "downloadUrl": dependency_file.download_url,
-+                    "declaredLoaders": list(dependency_file.loaders),
-+                    "gameVersions": list(dependency_file.game_versions),
-+                    "releaseType": dependency_file.release_type,
-+                    "datePublished": dependency_file.file_date,
-+                    "required": True,
-+                    "provider": "curseforge",
-+                    "pendingDownload": True,
-+                    "resolvePathFromProvider": False,
-+                    "selectionReason": "required_dependency",
-+                    "requiredBy": [parent_label],
-+                    "projectUrl": project_url,
-+                    "dependencies": [{"projectId": dependency.project_id, "relationType": dependency.relation_type} for dependency in dependency_file.dependencies],
-+                    "dependencyMetadataResolved": True,
-+                }
-+                entries.append(target)
-+                selected[dependency_file.project_id] = target
-+                added.append(project_name or target["fileName"])
-+                discovered += 1
-+                changed = True
-+                queue.append((dependency_file, depth + 1, project_name or target["fileName"]))
-+
-+        if changed or unresolved:
-+            registry["managedFiles"] = entries
-+            registry["dependencyResolution"] = ModpackDependencyResolver._resolution_payload(added, unresolved)
-+            CurseForgePackRegistry.save(Path(instance.instance_dir), registry)
-+        return DependencyResolutionResult(tuple(added), tuple(warnings), tuple(unresolved))
-+
-+    @staticmethod
-+    def _modrinth_version_for_entry(entry: dict) -> ModrinthVersion | None:
-+        version_id = str(entry.get("versionId") or "").strip()
-+        if not version_id:
-+            downloads = entry.get("downloads") if isinstance(entry.get("downloads"), list) else []
-+            for url in downloads:
-+                identity = ModProvenanceRegistry._modrinth_identity_from_url(str(url))
-+                if identity is None:
-+                    continue
-+                project_id, version_id, remote_name = identity
-+                entry["projectId"] = str(entry.get("projectId") or project_id)
-+                entry["versionId"] = version_id
-+                entry["fileName"] = str(entry.get("fileName") or remote_name)
-+                break
-+        if version_id:
-+            return ModpackDependencyResolver._retry(lambda: ModrinthClient.get_version(version_id))
-+        for algorithm in ("sha512", "sha1"):
-+            value = str(entry.get(algorithm) or "").strip().casefold()
-+            if not value:
-+                continue
-+            version = ModpackDependencyResolver._retry(lambda value=value, algorithm=algorithm: ModrinthClient.get_version_from_hash(value, algorithm))
-+            if version is not None:
-+                return version
-+        return None
-+
-+    @staticmethod
-+    def _hydrate_modrinth_entry(entry: dict, version: ModrinthVersion) -> bool:
-+        file = version.primary_file(".jar")
-+        updates = {
-+            "projectId": version.project_id,
-+            "versionId": version.version_id,
-+            "versionNumber": version.version_number,
-+            "sha1": str(entry.get("sha1") or file.sha1).casefold(),
-+            "sha512": str(entry.get("sha512") or file.sha512).casefold(),
-+            "size": max(0, int(entry.get("size", 0) or file.size)),
-+            "downloads": list(entry.get("downloads") or ([file.url] if file.url else [])),
-+        }
-+        changed = False
-+        for key, value in updates.items():
-+            if entry.get(key) != value:
-+                entry[key] = value
-+                changed = True
-+        return changed
-+
-+    @staticmethod
-+    def _hydrate_curseforge_entry(entry: dict, file: CurseForgeFile) -> bool:
-+        updates = {
-+            "fileName": Path(str(entry.get("fileName") or file.file_name)).name,
-+            "displayName": str(entry.get("displayName") or file.display_name),
-+            "sha1": str(entry.get("sha1") or file.sha1).casefold(),
-+            "size": max(0, int(entry.get("size", 0) or file.file_length)),
-+            "downloadUrl": str(entry.get("downloadUrl") or file.download_url),
-+            "declaredLoaders": list(entry.get("declaredLoaders") or file.loaders),
-+            "gameVersions": list(entry.get("gameVersions") or file.game_versions),
-+            "releaseType": str(entry.get("releaseType") or file.release_type),
-+            "datePublished": str(entry.get("datePublished") or file.file_date),
-+            "dependencies": [{"projectId": dependency.project_id, "relationType": dependency.relation_type} for dependency in file.dependencies],
-+            "dependencyMetadataResolved": True,
-+        }
-+        changed = False
-+        for key, value in updates.items():
-+            if entry.get(key) != value:
-+                entry[key] = value
-+                changed = True
-+        return changed
-+
-+    @staticmethod
-+    def _curseforge_file_from_entry(entry: dict) -> CurseForgeFile:
-+        dependencies = tuple(
-+            CurseForgeDependency(
-+                project_id=int(raw.get("projectId") or 0),
-+                relation_type=int(raw.get("relationType") or 0),
-+            )
-+            for raw in entry.get("dependencies", [])
-+            if isinstance(raw, dict) and int(raw.get("projectId") or 0) > 0 and int(raw.get("relationType") or 0) > 0
-+        )
-+        return CurseForgeFile(
-+            file_id=int(entry.get("fileId") or 0),
-+            project_id=int(entry.get("projectId") or 0),
-+            display_name=str(entry.get("displayName") or entry.get("fileName") or "Unknown file").strip(),
-+            file_name=Path(str(entry.get("fileName") or "download.jar")).name,
-+            release_type=str(entry.get("releaseType") or "release").strip().casefold(),
-+            file_date=str(entry.get("datePublished") or "").strip(),
-+            file_length=max(0, int(entry.get("size", 0) or 0)),
-+            download_url=str(entry.get("downloadUrl") or "").strip(),
-+            sha1=str(entry.get("sha1") or "").strip().casefold(),
-+            game_versions=tuple(str(value) for value in entry.get("gameVersions", []) if str(value).strip()),
-+            dependencies=dependencies,
-+            is_available=True,
-+            loaders=tuple(str(value).strip().casefold() for value in entry.get("declaredLoaders", []) if str(value).strip()),
-+        )
-+
-+    @staticmethod
-+    def _append_required_by(entry: dict, parent: str) -> bool:
-+        existing = entry.get("requiredBy") if isinstance(entry.get("requiredBy"), list) else []
-+        normalized = list(dict.fromkeys(str(value).strip() for value in existing if str(value).strip()))
-+        if parent and parent not in normalized:
-+            normalized.append(parent)
-+        changed = entry.get("requiredBy") != normalized
-+        entry["requiredBy"] = normalized
-+        return changed
-+
-+    @staticmethod
-+    def _unique_mod_path(entries: list[dict], filename: str, project_id: str, sha1: str) -> str:
-+        safe_name = Path(str(filename or "dependency.jar")).name or "dependency.jar"
-+        candidate = f"mods/{safe_name}"
-+        existing = {str(entry.get("path") or "").replace("\\", "/").casefold(): entry for entry in entries if isinstance(entry, dict)}
-+        current = existing.get(candidate.casefold())
-+        if current is None or (sha1 and str(current.get("sha1") or "").casefold() == sha1.casefold()):
-+            return candidate
-+        prefix = "".join(character if character.isalnum() or character in {"-", "_"} else "-" for character in str(project_id)).strip("-") or "dependency"
-+        return f"mods/{prefix}-{safe_name}"
-+
-+    @staticmethod
-+    def _entry_label(entry: dict, fallback: str) -> str:
-+        return str(entry.get("displayName") or entry.get("title") or entry.get("fileName") or fallback).strip()
-+
-+    @staticmethod
-+    def _resolution_payload(added: list[str], unresolved: list[str]) -> dict:
-+        return {
-+            "status": "unresolved" if unresolved else "complete",
-+            "added": list(dict.fromkeys(added)),
-+            "unresolved": list(dict.fromkeys(unresolved)),
-+            "resolvedAt": datetime.now(timezone.utc).isoformat(),
-+        }
-+
-+    @staticmethod
-+    def _retry(call: Callable[[], T]) -> T:
-+        last_error: Exception | None = None
-+        for attempt in range(1, ModpackDependencyResolver.MAX_ATTEMPTS + 1):
-+            download_pause_controller.raise_if_requested()
-+            try:
-+                return call()
-+            except Exception as error:
-+                last_error = error
-+                lowered = str(error).casefold()
-+                if any(marker in lowered for marker in ("http 400", "http 401", "http 403", "http 404", "not available", "no allowed", "invalid", "unsupported")):
-+                    break
-+                decision = DownloadRetryPolicy.decide(error, attempt, ModpackDependencyResolver.MAX_ATTEMPTS)
-+                if not decision.retry:
-+                    break
-+                sleep(min(max(decision.delay_seconds, 0.0), 1.0))
-+        assert last_error is not None
-+        raise last_error
-+
-+    @staticmethod
-+    def _is_mod_entry(entry: dict) -> bool:
-+        path = str(entry.get("path") or "").replace("\\", "/").strip().lstrip("/")
-+        pure = PurePosixPath(path)
-+        return len(pure.parts) >= 2 and pure.parts[0].casefold() == "mods" and pure.name.casefold().endswith(".jar")
-+
-+    @staticmethod
-+    def _has_managed_mods(value: object) -> bool:
-+        return isinstance(value, list) and any(isinstance(entry, dict) and ModpackDependencyResolver._is_mod_entry(entry) for entry in value)
-+
-+    @staticmethod
-+    def _is_managed_modpack(instance: Instance) -> bool:
-+        if getattr(instance, "instance_dir", None) is None:
-+            return False
-+        return bool(ModrinthPackRegistry.load(instance).get("managedFiles") or CurseForgePackRegistry.load(Path(instance.instance_dir)).get("managedFiles"))
-+
-+    @staticmethod
-+    def _report(reporter: ProgressReporter | None, message: str, current: int, total: int) -> None:
-+        if reporter is not None:
-+            reporter.files(stage=ProgressStage.CHECKING_MODPACK, message=message, current=current, total=total)
---- a/src/core/modrinth/modrinth_client.py
-+++ b/src/core/modrinth/modrinth_client.py
-@@ -177,6 +177,27 @@
-         payload = ModrinthClient._get_json(f"/version/{quote(identifier, safe='')}", ttl=ModrinthClient.VERSIONS_TTL_SECONDS, force_refresh=force_refresh)
-         if not isinstance(payload, dict):
-             raise RuntimeError(f"Modrinth version '{identifier}' is unavailable.")
-+        return ModrinthClient._parse_version(payload)
-+
-+    @staticmethod
-+    def get_version_from_hash(file_hash: str, algorithm: str = "sha512", force_refresh: bool = False) -> ModrinthVersion | None:
-+        digest = ModrinthClient._required(file_hash, "File hash").casefold()
-+        normalized_algorithm = str(algorithm or "sha512").strip().casefold()
-+        if normalized_algorithm not in {"sha1", "sha512"}:
-+            raise ValueError("Modrinth hash lookup supports SHA-1 or SHA-512.")
-+        try:
-+            payload = ModrinthClient._get_json(
-+                f"/version_file/{quote(digest, safe='')}",
-+                params={"algorithm": normalized_algorithm},
-+                ttl=ModrinthClient.VERSIONS_TTL_SECONDS,
-+                force_refresh=force_refresh,
-+            )
-+        except RuntimeError as error:
-+            if "HTTP 404" in str(error):
-+                return None
-+            raise
-+        if not isinstance(payload, dict):
-+            return None
-         return ModrinthClient._parse_version(payload)
- 
-     @staticmethod
---- a/src/core/modrinth/modrinth_pack_registry.py
-+++ b/src/core/modrinth/modrinth_pack_registry.py
-@@ -11,7 +11,7 @@
- 
- 
- class ModrinthPackRegistry:
--    SCHEMA_VERSION = 5
-+    SCHEMA_VERSION = 6
-     FILE_NAME = "modrinth-pack.json"
- 
-     @staticmethod
-@@ -197,6 +197,10 @@
-                 "fileName": Path(str(item.get("fileName") or relative.name)).name,
-                 "downloads": ModrinthPackRegistry._normalize_downloads(item.get("downloads", [])),
-                 "required": bool(item.get("required", True)),
-+                "selectionReason": str(item.get("selectionReason") or "pack_manifest").strip().casefold(),
-+                "requiredBy": ModrinthPackRegistry._normalize_required_by(item.get("requiredBy", [])),
-+                "displayName": str(item.get("displayName") or item.get("title") or relative.name).strip(),
-+                "versionNumber": str(item.get("versionNumber") or "").strip(),
-             }
-         return sorted(normalized.values(), key=lambda item: item["path"].casefold())
- 
-@@ -205,6 +209,12 @@
-         if not isinstance(value, (list, tuple)):
-             return []
-         return list(dict.fromkeys(str(url).strip() for url in value if str(url).strip()))
-+
-+    @staticmethod
-+    def _normalize_required_by(value: object) -> list[str]:
-+        if not isinstance(value, (list, tuple, set)):
-+            return []
-+        return list(dict.fromkeys(str(item).strip() for item in value if str(item).strip()))
- 
-     @staticmethod
-     def _normalize_preserved_files(value: object) -> list[dict]:
---- a/src/core/repair/repair_service.py
-+++ b/src/core/repair/repair_service.py
-@@ -23,6 +23,8 @@
- from src.core.minecraft.library_manager import DownloadLibraryManager
- from src.core.minecraft.version_manager import VersionManager
- from src.core.modloader.mod_loader_manager import ModLoaderManager
-+from src.core.mod.modpack_dependency_resolver import ModpackDependencyResolver
-+from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
- from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
- from src.core.modrinth.modrinth_pack_repair_manager import ModrinthPackRepairManager
- from src.core.progress.progress_reporter import ProgressReporter
-@@ -445,6 +447,16 @@
-                 ModrinthPackRepairManager.repair(instance, reporter=reporter)
-             if CurseForgePackRegistry.load(instance):
-                 CurseForgeContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
-+            resolution = ModpackDependencyResolver.resolve(instance, reporter)
-+            if resolution.changed:
-+                ModrinthContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
-+                CurseForgeContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
-+            final_resolution = ModpackDependencyResolver.resolve(instance, reporter)
-+            if final_resolution.changed:
-+                ModrinthContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
-+                CurseForgeContentManager.ensure(instance, reporter=reporter, block_launch_on_failure=True)
-+                final_resolution = ModpackDependencyResolver.resolve(instance, reporter)
-+            ModpackDependencyResolver.raise_for_required_dependencies(instance, final_resolution.unresolved)
-             return
- 
-         # Core Minecraft repairs share one resolved runtime profile. The loader
---- a/src/gui/controllers/launch_controller.py
-+++ b/src/gui/controllers/launch_controller.py
-@@ -158,7 +158,7 @@
-             self.status_changed.emit(tr("Minecraft {version} launched with warnings", version=version))
-             self.log_created.emit(tr("Minecraft process created with {count} warning(s): {version}", count=len(warnings), version=version))
-             for warning in warnings:
--                self.log_created.emit(f"Modrinth warning: {warning}")
-+                self.log_created.emit(tr("Launch warning: {warning}", warning=warning))
-             return
- 
-         self.status_changed.emit(tr("Minecraft {version} launched", version=version))
---- a/src/gui/presenters/launch_error_presenter.py
-+++ b/src/gui/presenters/launch_error_presenter.py
-@@ -4,6 +4,7 @@
- 
- from mcw_core.api.language.language_manager import tr
- from mcw_core.api.instance.errors import InstanceAlreadyRunningError
-+from src.models.mod.dependency_resolution import RequiredModDependenciesMissing
- 
- 
- @dataclass(frozen=True, slots=True)
-@@ -25,6 +26,14 @@
-                 title="Instance already running",
-                 summary="This instance is already being used by Minecraft. Close that game before launching the same instance again.",
-                 status="Instance already running",
-+                technical_message=technical_message,
-+            )
-+
-+        if isinstance(error, RequiredModDependenciesMissing):
-+            return cls._build(
-+                title="Required mod dependencies are missing",
-+                summary="MCW Launcher could not restore every required mod dependency. Retry while online or repair the modpack. The compatibility override cannot bypass missing required dependencies because the game is likely to crash or corrupt the pack state.",
-+                status="Required dependencies missing",
-                 technical_message=technical_message,
-             )
- 
---- /dev/null
-+++ b/src/models/mod/dependency_resolution.py
-@@ -0,0 +1,30 @@
++++ b/src/core/mod/mod_capability_index.py
+@@ -0,0 +1,308 @@
 +from __future__ import annotations
 +
 +from dataclasses import dataclass
++from io import BytesIO
++from pathlib import Path, PurePosixPath
++from typing import Iterable
++import json
++import re
++import tomllib
++import zipfile
 +
-+from src.models.mod.mod_issue import ModIssue
++from src.core.mod.mod_manager import ModManager
++from src.models.instance.instance import Instance
++from src.models.mod.mod_info import ModInfo
 +
 +
 +@dataclass(frozen=True, slots=True)
-+class DependencyResolutionResult:
-+    added_files: tuple[str, ...] = ()
-+    warnings: tuple[str, ...] = ()
-+    unresolved: tuple[str, ...] = ()
-+
-+    @property
-+    def changed(self) -> bool:
-+        return bool(self.added_files)
++class ModCapability:
++    mod_id: str
++    version: str
++    source: str
++    owner_file: str
++    nested_path: str = ""
 +
 +
-+class RequiredModDependenciesMissing(RuntimeError):
-+    """Raised when required mod dependencies remain unresolved before launch."""
++class ModCapabilityIndex:
++    """Indexes mod IDs supplied by top-level and safely nested JARs.
 +
-+    def __init__(self, instance_name: str, issues: tuple[ModIssue, ...]) -> None:
-+        self.instance_name = str(instance_name)
-+        self.issues = tuple(issues)
-+        details = "\n".join(f"- {issue.message}" for issue in self.issues)
-+        super().__init__(
-+            f"Required mod dependencies are unresolved for '{self.instance_name}'.\n"
-+            f"{len(self.issues)} blocking dependency issue(s) remain.\n"
-+            f"{details}"
++    Forge/NeoForge Jar-in-Jar dependencies are runtime capabilities, not
++    necessarily separate files in ``mods``. Treating only top-level JARs as
++    installed causes false missing-dependency errors (for example Flywheel
++    embedded in Create). This scanner is intentionally read-only and bounded.
++    """
++
++    MAX_NESTED_DEPTH = 3
++    MAX_NESTED_JARS_PER_OWNER = 128
++    MAX_NESTED_JAR_BYTES = 64 * 1024 * 1024
++    MAX_TOTAL_NESTED_BYTES = 192 * 1024 * 1024
++    MAX_COMPRESSION_RATIO = 250
++
++    @staticmethod
++    def build(instance: Instance, mods: Iterable[ModInfo] | None = None) -> dict[str, tuple[ModCapability, ...]]:
++        listed = list(mods) if mods is not None else ModManager.list_mods(instance)
++        output: dict[str, list[ModCapability]] = {}
++
++        for mod in listed:
++            if not mod.enabled:
++                continue
++            ModCapabilityIndex._append(
++                output,
++                ModCapability(
++                    mod_id=mod.mod_id,
++                    version=mod.version,
++                    source="top_level",
++                    owner_file=mod.file_name,
++                ),
++            )
++            path = Path(mod.path)
++            if not path.is_file():
++                continue
++            for capability in ModCapabilityIndex._scan_owner(path):
++                ModCapabilityIndex._append(output, capability)
++
++        return {key: tuple(values) for key, values in output.items()}
++
++    @staticmethod
++    def installed_versions(instance: Instance, mods: Iterable[ModInfo] | None = None) -> dict[str, str]:
++        capabilities = ModCapabilityIndex.build(instance, mods)
++        selected: dict[str, str] = {}
++        for mod_id, entries in capabilities.items():
++            versions = [str(entry.version or "").strip() for entry in entries if str(entry.version or "").strip()]
++            if versions:
++                selected[mod_id] = ModCapabilityIndex._best_version(versions)
++        return selected
++
++    @staticmethod
++    def provides(path: Path, mod_id: str, preferred_loader: str = "") -> tuple[ModCapability, ...]:
++        """Returns capabilities with ``mod_id`` supplied by a candidate JAR."""
++
++        candidate = Path(path)
++        if not candidate.is_file():
++            return ()
++        wanted = ModCapabilityIndex._normalize_id(mod_id)
++        if not wanted:
++            return ()
++
++        capabilities: list[ModCapability] = []
++        top_level = ModManager.read_mod(candidate, preferred_loader=preferred_loader)
++        if ModCapabilityIndex._normalize_id(top_level.mod_id) == wanted:
++            capabilities.append(ModCapability(top_level.mod_id, top_level.version, "top_level", candidate.name))
++        capabilities.extend(
++            capability
++            for capability in ModCapabilityIndex._scan_owner(candidate)
++            if ModCapabilityIndex._normalize_id(capability.mod_id) == wanted
 +        )
---- a/test/core/config/test_version_metadata.py
-+++ b/test/core/config/test_version_metadata.py
-@@ -6,9 +6,9 @@
++        return tuple(capabilities)
++
++    @staticmethod
++    def _scan_owner(path: Path) -> tuple[ModCapability, ...]:
++        output: list[ModCapability] = []
++        budget = {"count": 0, "bytes": 0}
++        try:
++            with zipfile.ZipFile(path, "r") as archive:
++                ModCapabilityIndex._scan_nested_archive(
++                    archive,
++                    owner_file=path.name,
++                    parent_path="",
++                    depth=0,
++                    output=output,
++                    budget=budget,
++                )
++        except (OSError, zipfile.BadZipFile, RuntimeError, ValueError):
++            return ()
++        return tuple(output)
++
++    @staticmethod
++    def _scan_nested_archive(archive: zipfile.ZipFile, owner_file: str, parent_path: str, depth: int, output: list[ModCapability], budget: dict[str, int]) -> None:
++        if depth >= ModCapabilityIndex.MAX_NESTED_DEPTH:
++            return
++        names = set(archive.namelist())
++        manifest = ModCapabilityIndex._manifest(archive, names)
++        for nested_path in ModCapabilityIndex._nested_paths(archive, names, manifest):
++            if budget["count"] >= ModCapabilityIndex.MAX_NESTED_JARS_PER_OWNER:
++                return
++            info = ModCapabilityIndex._safe_info(archive, nested_path)
++            if info is None:
++                continue
++            if info.file_size > ModCapabilityIndex.MAX_NESTED_JAR_BYTES:
++                continue
++            if budget["bytes"] + info.file_size > ModCapabilityIndex.MAX_TOTAL_NESTED_BYTES:
++                return
++            if info.compress_size > 0 and info.file_size / info.compress_size > ModCapabilityIndex.MAX_COMPRESSION_RATIO:
++                continue
++            try:
++                raw = archive.read(info)
++            except (KeyError, OSError, RuntimeError, zipfile.BadZipFile):
++                continue
++            budget["count"] += 1
++            budget["bytes"] += len(raw)
++            full_path = f"{parent_path}!/{nested_path}" if parent_path else nested_path
++            try:
++                with zipfile.ZipFile(BytesIO(raw), "r") as nested:
++                    nested_names = set(nested.namelist())
++                    nested_manifest = ModCapabilityIndex._manifest(nested, nested_names)
++                    output.extend(ModCapabilityIndex._archive_capabilities(nested, nested_names, nested_manifest, owner_file, full_path))
++                    ModCapabilityIndex._scan_nested_archive(
++                        nested,
++                        owner_file=owner_file,
++                        parent_path=full_path,
++                        depth=depth + 1,
++                        output=output,
++                        budget=budget,
++                    )
++            except (OSError, zipfile.BadZipFile, RuntimeError, ValueError):
++                continue
++
++    @staticmethod
++    def _archive_capabilities(archive: zipfile.ZipFile, names: set[str], manifest: dict[str, str], owner_file: str, nested_path: str) -> tuple[ModCapability, ...]:
++        output: list[ModCapability] = []
++
++        for metadata_path in ("META-INF/neoforge.mods.toml", "META-INF/mods.toml"):
++            if metadata_path not in names:
++                continue
++            try:
++                data = tomllib.loads(archive.read(metadata_path).decode("utf-8-sig"))
++            except (KeyError, UnicodeError, tomllib.TOMLDecodeError):
++                continue
++            mods = data.get("mods") if isinstance(data.get("mods"), list) else []
++            for raw in mods:
++                if not isinstance(raw, dict):
++                    continue
++                mod_id = str(raw.get("modId") or "").strip()
++                if not mod_id:
++                    continue
++                version = ModManager._resolve_mod_version(raw.get("version"), manifest, {**data, **raw}, "", PurePosixPath(nested_path).name)
++                output.append(ModCapability(mod_id, version, "embedded", owner_file, nested_path))
++
++        if "fabric.mod.json" in names:
++            try:
++                data = json.loads(archive.read("fabric.mod.json").decode("utf-8-sig"))
++            except (KeyError, UnicodeError, json.JSONDecodeError):
++                data = None
++            if isinstance(data, dict):
++                mod_id = str(data.get("id") or "").strip()
++                if mod_id:
++                    version = ModManager._resolve_mod_version(data.get("version"), manifest, data, "", PurePosixPath(nested_path).name)
++                    output.append(ModCapability(mod_id, version, "embedded", owner_file, nested_path))
++
++        if "quilt.mod.json" in names:
++            try:
++                data = json.loads(archive.read("quilt.mod.json").decode("utf-8-sig"))
++            except (KeyError, UnicodeError, json.JSONDecodeError):
++                data = None
++            if isinstance(data, dict):
++                loader = data.get("quilt_loader") if isinstance(data.get("quilt_loader"), dict) else {}
++                mod_id = str(loader.get("id") or data.get("id") or "").strip()
++                if mod_id:
++                    version = ModManager._resolve_mod_version(loader.get("version") or data.get("version"), manifest, {**data, **loader}, "", PurePosixPath(nested_path).name)
++                    output.append(ModCapability(mod_id, version, "embedded", owner_file, nested_path))
++
++        if "mcmod.info" in names:
++            try:
++                data = json.loads(archive.read("mcmod.info").decode("utf-8-sig"))
++            except (KeyError, UnicodeError, json.JSONDecodeError):
++                data = None
++            if isinstance(data, dict):
++                entries = data.get("modList") if isinstance(data.get("modList"), list) else [data]
++            elif isinstance(data, list):
++                entries = data
++            else:
++                entries = []
++            for raw in entries:
++                if not isinstance(raw, dict):
++                    continue
++                mod_id = str(raw.get("modid") or raw.get("modId") or "").strip()
++                if mod_id:
++                    output.append(ModCapability(mod_id, str(raw.get("version") or "Unknown").strip(), "embedded", owner_file, nested_path))
++
++        return tuple(output)
++
++    @staticmethod
++    def _nested_paths(archive: zipfile.ZipFile, names: set[str], manifest: dict[str, str]) -> tuple[str, ...]:
++        candidates: list[str] = []
++
++        if "META-INF/jarjar/metadata.json" in names:
++            try:
++                payload = json.loads(archive.read("META-INF/jarjar/metadata.json").decode("utf-8-sig"))
++            except (KeyError, UnicodeError, json.JSONDecodeError):
++                payload = None
++            jars = payload.get("jars") if isinstance(payload, dict) and isinstance(payload.get("jars"), list) else []
++            for raw in jars:
++                if isinstance(raw, dict):
++                    candidates.append(str(raw.get("path") or "").strip())
++
++        if "fabric.mod.json" in names:
++            try:
++                payload = json.loads(archive.read("fabric.mod.json").decode("utf-8-sig"))
++            except (KeyError, UnicodeError, json.JSONDecodeError):
++                payload = None
++            jars = payload.get("jars") if isinstance(payload, dict) and isinstance(payload.get("jars"), list) else []
++            for raw in jars:
++                if isinstance(raw, dict):
++                    candidates.append(str(raw.get("file") or "").strip())
++
++        contained = str(manifest.get("containeddeps") or "").strip()
++        if contained:
++            candidates.extend(part.strip() for part in re.split(r"[,;\s]+", contained) if part.strip())
++
++        # Forge JarJar always stores artifacts below this directory. Keeping a
++        # bounded fallback makes the scanner resilient to missing/older
++        # metadata while still avoiding a whole-archive recursive scan.
++        candidates.extend(name for name in names if name.casefold().startswith("meta-inf/jarjar/") and name.casefold().endswith(".jar"))
++
++        safe: list[str] = []
++        for value in candidates:
++            normalized = str(value).replace("\\", "/").strip().lstrip("/")
++            pure = PurePosixPath(normalized)
++            if not normalized or pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):
++                continue
++            if normalized not in names or not normalized.casefold().endswith(".jar"):
++                continue
++            if normalized not in safe:
++                safe.append(normalized)
++        return tuple(safe)
++
++    @staticmethod
++    def _safe_info(archive: zipfile.ZipFile, name: str) -> zipfile.ZipInfo | None:
++        try:
++            info = archive.getinfo(name)
++        except KeyError:
++            return None
++        if info.is_dir() or info.file_size < 0 or info.compress_size < 0:
++            return None
++        return info
++
++    @staticmethod
++    def _manifest(archive: zipfile.ZipFile, names: set[str]) -> dict[str, str]:
++        if "META-INF/MANIFEST.MF" not in names:
++            return {}
++        try:
++            return ModManager._manifest_attributes(archive.read("META-INF/MANIFEST.MF"))
++        except (KeyError, OSError, RuntimeError):
++            return {}
++
++    @staticmethod
++    def _append(output: dict[str, list[ModCapability]], capability: ModCapability) -> None:
++        mod_id = ModCapabilityIndex._normalize_id(capability.mod_id)
++        if not mod_id or mod_id == "unknown":
++            return
++        bucket = output.setdefault(mod_id, [])
++        signature = (capability.version.casefold(), capability.source, capability.owner_file.casefold(), capability.nested_path.casefold())
++        if any((item.version.casefold(), item.source, item.owner_file.casefold(), item.nested_path.casefold()) == signature for item in bucket):
++            return
++        bucket.append(capability)
++
++    @staticmethod
++    def _normalize_id(value: str) -> str:
++        return str(value or "").strip().casefold()
++
++    @staticmethod
++    def _best_version(versions: list[str]) -> str:
++        from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
++
++        def key(value: str):
++            parsed = ModCompatibilityManager._version_key(value)
++            return (parsed is not None, parsed or ((0, 0, 0, 0), 0, ()), value.casefold())
++
++        return max(versions, key=key)
+--- a/src/core/mod/mod_compatibility_manager.py
++++ b/src/core/mod/mod_compatibility_manager.py
+@@ -4,6 +4,7 @@
+ import re
  
+ from src.core.mod.mod_manager import ModManager
++from src.core.mod.mod_capability_index import ModCapabilityIndex
+ from src.core.modloader.mod_loader_manager import ModLoaderManager
+ from src.models.instance.instance import Instance
+ from src.models.mod.mod_info import ModInfo
+@@ -28,6 +29,12 @@
  
- def test_launcher_version_metadata_has_one_source_of_truth() -> None:
--    assert VERSION == "v1.1.1-beta.4"
--    assert VERSION_ID == "1.1.1-beta.4"
--    assert VERSION_TAG == "v1.1.1-beta.4"
-+    assert VERSION == "v1.1.1-beta.5"
-+    assert VERSION_ID == "1.1.1-beta.5"
-+    assert VERSION_TAG == "v1.1.1-beta.5"
-     assert UPDATE_CHANNEL == "beta"
-     assert GUI_VERSION == VERSION
-     assert GUI_VERSION_ID == VERSION_ID
+         loader_name, loader_version = ModLoaderManager.normalize(instance.mod_loader)
+         installed_versions = {mod_id: entries[0].version for mod_id, entries in enabled_by_id.items() if entries}
++        # Runtime loaders can expose mods from nested JARs (Forge/NeoForge
++        # Jar-in-Jar, Fabric nested JARs, legacy ContainedDeps). Those
++        # capabilities satisfy dependencies even though no separate file is
++        # present in the instance mods directory.
++        for mod_id, version in ModCapabilityIndex.installed_versions(instance, enabled).items():
++            installed_versions.setdefault(mod_id, version)
+         installed_versions["minecraft"] = instance.version_id
+         if loader_name == ModLoaderManager.FABRIC:
+             installed_versions["fabricloader"] = loader_version
+@@ -236,34 +243,71 @@
+             upper = ModCompatibilityManager._caret_upper(expected_key)
+             return current_key >= expected_key and current_key < upper
+         if operator == "~":
+-            upper = (expected_key[0], expected_key[1] + 1, 0, 1, "")
++            upper = ((expected_key[0][0], expected_key[0][1] + 1, 0, 0), 1, ())
+             return current_key >= expected_key and current_key < upper
+         return None
+ 
+     @staticmethod
+-    def _version_key(value: str) -> tuple[int, int, int, int, str] | None:
++    def _version_key(value: str) -> tuple[tuple[int, int, int, int], int, tuple[tuple[int, int, str], ...]] | None:
++        """Build a bounded Maven/Forge-friendly comparison key.
++
++        Forge metadata frequently uses versions such as ``0.6.8.a`` that are
++        not strict SemVer. Numeric components are compared numerically while
++        a trailing qualifier sorts below the matching final release.
++        """
++
+         normalized = str(value).strip().lstrip("vV")
+-        without_build = normalized.split("+", 1)[0]
+-        numeric, separator, prerelease = without_build.partition("-")
+-        parts = numeric.split(".")
+-        if not 1 <= len(parts) <= 4 or any(not part.isdigit() for part in parts):
++        if not normalized:
++            return None
++        normalized = normalized.split("+", 1)[0].strip()
++        match = re.match(r"^(?P<numeric>\d+(?:[._-]\d+){0,3})(?P<suffix>.*)$", normalized)
++        if match is None:
+             return None
+-        numbers = [int(part) for part in parts[:3]]
+-        while len(numbers) < 3:
++
++        numbers = [int(part) for part in re.split(r"[._-]", match.group("numeric")) if part != ""]
++        while len(numbers) < 4:
+             numbers.append(0)
+-        release_rank = 0 if separator else 1
+-        extra = ".".join(parts[3:])
+-        suffix = prerelease.casefold() if separator else extra
+-        return numbers[0], numbers[1], numbers[2], release_rank, suffix
++        numeric_key = tuple(numbers[:4])
++
++        suffix = match.group("suffix").strip("._- ").casefold()
++        if not suffix:
++            return numeric_key, 1, ()
++
++        qualifier_rank = {
++            "snapshot": -6,
++            "dev": -5,
++            "alpha": -4,
++            "a": -4,
++            "beta": -3,
++            "b": -3,
++            "milestone": -2,
++            "m": -2,
++            "rc": -1,
++            "cr": -1,
++            "pre": -1,
++            "preview": -1,
++            "final": 0,
++            "ga": 0,
++            "release": 0,
++            "sp": 2,
++        }
++        tokens: list[tuple[int, int, str]] = []
++        for token in re.findall(r"\d+|[A-Za-z]+", suffix):
++            if token.isdigit():
++                tokens.append((1, int(token), ""))
++            else:
++                lowered = token.casefold()
++                tokens.append((0, qualifier_rank.get(lowered, 0), lowered))
++        return numeric_key, 0, tuple(tokens)
+ 
+     @staticmethod
+-    def _caret_upper(key: tuple[int, int, int, int, str]) -> tuple[int, int, int, int, str]:
+-        major, minor, patch, _, _ = key
++    def _caret_upper(key: tuple[tuple[int, int, int, int], int, tuple[tuple[int, int, str], ...]]) -> tuple[tuple[int, int, int, int], int, tuple[tuple[int, int, str], ...]]:
++        major, minor, patch, _ = key[0]
+         if major > 0:
+-            return major + 1, 0, 0, 1, ""
++            return (major + 1, 0, 0, 0), 1, ()
+         if minor > 0:
+-            return 0, minor + 1, 0, 1, ""
+-        return 0, 0, patch + 1, 1, ""
++            return (0, minor + 1, 0, 0), 1, ()
++        return (0, 0, patch + 1, 0), 1, ()
+ 
+     @staticmethod
+     def _format_requirement(requirement: object) -> str:
+--- a/src/core/mod/modpack_dependency_resolver.py
++++ b/src/core/mod/modpack_dependency_resolver.py
+@@ -9,6 +9,8 @@
+ from src.core.curseforge.curseforge_client import CurseForgeClient
+ from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
+ from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
++from src.core.mod.mod_capability_index import ModCapabilityIndex
++from src.core.mod.mod_manager import ModManager
+ from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
+ from src.core.modloader.mod_loader_manager import ModLoaderManager
+ from src.core.modrinth.modrinth_client import ModrinthClient
+@@ -20,6 +22,7 @@
+ from src.models.curseforge.file import CurseForgeDependency, CurseForgeFile
+ from src.models.instance.instance import Instance
+ from src.models.mod.dependency_resolution import DependencyResolutionResult, RequiredModDependenciesMissing
++from src.models.mod.mod_info import ModInfo
+ from src.models.mod.mod_issue import ModIssue
+ from src.models.modrinth.version import ModrinthVersion
+ from src.models.progress.progress_stage import ProgressStage
+@@ -63,6 +66,18 @@
+             warnings.extend(result.warnings)
+             unresolved.extend(result.unresolved)
+ 
++        # Provider-declared relations are resolved first, matching Prism's
++        # dependency flow. Once those files are present, use the downloaded
++        # JAR metadata as a second source of truth and search providers for
++        # still-missing required mod IDs. Avoid doing both in the same pass so
++        # a dependency already scheduled by project ID is not duplicated by a
++        # JAR-level search before it has been downloaded.
++        if not added and ModpackDependencyResolver._is_managed_modpack(instance):
++            recovery = ModpackDependencyResolver._recover_jar_declared_dependencies(instance, reporter)
++            added.extend(recovery.added_files)
++            warnings.extend(recovery.warnings)
++            unresolved.extend(recovery.unresolved)
++
+         if added:
+             ModProvenanceRegistry.synchronize(instance)
+         return DependencyResolutionResult(
+@@ -365,6 +380,303 @@
+         return DependencyResolutionResult(tuple(added), tuple(warnings), tuple(unresolved))
+ 
+     @staticmethod
++    def _recover_jar_declared_dependencies(instance: Instance, reporter: ProgressReporter | None) -> DependencyResolutionResult:
++        mods = ModManager.list_mods(instance)
++        if not mods:
++            return DependencyResolutionResult()
++
++        report = ModCompatibilityManager.scan(instance, mods=mods)
++        missing = [issue for issue in report.issues if issue.severity == "error" and issue.code == "dependency-missing" and len(issue.mod_ids) >= 2]
++        if not missing:
++            return DependencyResolutionResult()
++
++        by_id = {mod.mod_id.casefold(): mod for mod in mods if mod.enabled and mod.mod_id.casefold() != "unknown"}
++        requests: dict[str, dict[str, object]] = {}
++        for issue in missing:
++            parent_id = str(issue.mod_ids[0]).strip().casefold()
++            dependency_id = str(issue.mod_ids[1]).strip().casefold()
++            if not dependency_id or dependency_id in ModCompatibilityManager.SYSTEM_DEPENDENCY_IDS:
++                continue
++            parent = by_id.get(parent_id)
++            requirement = parent.dependencies.get(dependency_id, "*") if parent is not None else "*"
++            entry = requests.setdefault(dependency_id, {"requiredBy": [], "requirements": []})
++            parent_label = parent.name if parent is not None else parent_id or "Unknown mod"
++            if parent_label not in entry["requiredBy"]:
++                entry["requiredBy"].append(parent_label)
++            requirement_text = ModCompatibilityManager._format_requirement(requirement)
++            if requirement_text not in entry["requirements"]:
++                entry["requirements"].append(requirement_text)
++
++        if not requests:
++            return DependencyResolutionResult()
++
++        added: list[str] = []
++        warnings: list[str] = []
++        unresolved: list[str] = []
++        total = len(requests)
++        ModpackDependencyResolver._report(reporter, "Searching for missing mod dependencies...", 0, total)
++
++        for completed, (dependency_id, request) in enumerate(sorted(requests.items()), start=1):
++            download_pause_controller.raise_if_requested()
++            pending = ModpackDependencyResolver._pending_candidate(instance, dependency_id)
++            if pending:
++                ModpackDependencyResolver._report(reporter, "Searching for missing mod dependencies...", completed, total)
++                continue
++
++            excluded = ModpackDependencyResolver._rejected_or_installed_candidates(instance, dependency_id)
++            candidate, search_errors = ModpackDependencyResolver._find_dependency_candidate(instance, dependency_id, excluded)
++            if candidate is None:
++                requirement_text = " and ".join(str(value) for value in request["requirements"] if str(value).strip()) or "*"
++                detail = "; ".join(search_errors)
++                message = f"Could not resolve required dependency '{dependency_id}' ({requirement_text}) from Modrinth or CurseForge."
++                if detail:
++                    message += f" {detail}"
++                unresolved.append(message)
++                ModpackDependencyResolver._report(reporter, "Searching for missing mod dependencies...", completed, total)
++                continue
++
++            required_by = [str(value) for value in request["requiredBy"] if str(value).strip()]
++            requirements = [str(value) for value in request["requirements"] if str(value).strip()]
++            if candidate["provider"] == "modrinth":
++                ModpackDependencyResolver._append_modrinth_search_candidate(instance, candidate, dependency_id, required_by, requirements)
++            else:
++                ModpackDependencyResolver._append_curseforge_search_candidate(instance, candidate, dependency_id, required_by, requirements)
++            title = str(candidate.get("title") or dependency_id)
++            added.append(title)
++            warnings.append(f"Scheduled {title} from {candidate['provider'].title()} to satisfy missing dependency '{dependency_id}'.")
++            ModpackDependencyResolver._report(reporter, "Searching for missing mod dependencies...", completed, total)
++
++        return DependencyResolutionResult(tuple(added), tuple(warnings), tuple(unresolved))
++
++    @staticmethod
++    def _find_dependency_candidate(instance: Instance, dependency_id: str, excluded: dict[str, set[str]]) -> tuple[dict | None, list[str]]:
++        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
++        loader_name = str(loader_name).strip().casefold()
++        errors: list[str] = []
++        for provider in ModpackDependencyResolver._provider_priority(instance):
++            try:
++                if provider == "modrinth":
++                    candidate = ModpackDependencyResolver._search_modrinth_by_mod_id(instance, dependency_id, loader_name, excluded.get("modrinth", set()))
++                else:
++                    candidate = ModpackDependencyResolver._search_curseforge_by_mod_id(instance, dependency_id, loader_name, excluded.get("curseforge", set()))
++            except Exception as error:
++                errors.append(f"{provider.title()} search failed: {error}")
++                continue
++            if candidate is not None:
++                return candidate, errors
++        return None, errors
++
++    @staticmethod
++    def _search_modrinth_by_mod_id(instance: Instance, dependency_id: str, loader_name: str, excluded: set[str]) -> dict | None:
++        result = ModpackDependencyResolver._retry(
++            lambda: ModrinthClient.search_projects(
++                "mod",
++                query=dependency_id,
++                game_version=instance.version_id,
++                loader=loader_name,
++                index="relevance",
++                offset=0,
++                limit=10,
++                force_refresh=False,
++            )
++        )
++        projects = sorted(result.projects, key=lambda project: ModpackDependencyResolver._project_match_score(dependency_id, project.slug, project.title))
++        for project in projects:
++            score = ModpackDependencyResolver._project_match_score(dependency_id, project.slug, project.title)
++            if score > 1 or project.project_id in excluded:
++                continue
++            try:
++                version = ModpackDependencyResolver._retry(
++                    lambda project_id=project.project_id: ModrinthClient.select_version(
++                        project_id,
++                        game_version=instance.version_id,
++                        loader=loader_name,
++                        version_types=("release", "beta", "alpha"),
++                    )
++                )
++                ModrinthModInstaller._validate_version(version, instance.version_id, loader_name)
++                file = version.primary_file(".jar")
++            except Exception:
++                continue
++            return {
++                "provider": "modrinth",
++                "project": project,
++                "version": version,
++                "file": file,
++                "title": project.title,
++            }
++        return None
++
++    @staticmethod
++    def _search_curseforge_by_mod_id(instance: Instance, dependency_id: str, loader_name: str, excluded: set[str]) -> dict | None:
++        result = ModpackDependencyResolver._retry(
++            lambda: CurseForgeClient.search_projects(
++                "mod",
++                query=dependency_id,
++                game_version=instance.version_id,
++                loader=loader_name,
++                index=0,
++                page_size=10,
++                sort="popularity",
++                force_refresh=False,
++            )
++        )
++        projects = sorted(result.projects, key=lambda project: ModpackDependencyResolver._project_match_score(dependency_id, project.slug, project.name))
++        for project in projects:
++            score = ModpackDependencyResolver._project_match_score(dependency_id, project.slug, project.name)
++            if score > 1 or str(project.project_id) in excluded:
++                continue
++            try:
++                file = ModpackDependencyResolver._retry(
++                    lambda project_id=project.project_id: CurseForgeClient.latest_compatible_file(
++                        project_id,
++                        instance.version_id,
++                        loader=loader_name,
++                        release_types=("release", "beta", "alpha"),
++                    )
++                )
++                if not file.file_name.casefold().endswith(".jar"):
++                    continue
++            except Exception:
++                continue
++            return {
++                "provider": "curseforge",
++                "project": project,
++                "file": file,
++                "title": project.name,
++            }
++        return None
++
++    @staticmethod
++    def _append_modrinth_search_candidate(instance: Instance, candidate: dict, dependency_id: str, required_by: list[str], requirements: list[str]) -> None:
++        registry = ModrinthPackRegistry.load(instance)
++        entries = [entry for entry in registry.get("managedFiles", []) if isinstance(entry, dict)]
++        all_entries = entries + [entry for entry in CurseForgePackRegistry.load(Path(instance.instance_dir)).get("managedFiles", []) if isinstance(entry, dict)]
++        project = candidate["project"]
++        version = candidate["version"]
++        file = candidate["file"]
++        path = ModpackDependencyResolver._unique_mod_path(all_entries, file.filename, version.project_id, file.sha1)
++        entries.append({
++            "path": path,
++            "fileName": PurePosixPath(path).name,
++            "sha1": file.sha1,
++            "sha512": file.sha512,
++            "size": file.size,
++            "source": "download",
++            "provider": "modrinth",
++            "projectId": version.project_id,
++            "versionId": version.version_id,
++            "versionNumber": version.version_number,
++            "downloads": [file.url] if file.url else [],
++            "required": True,
++            "selectionReason": "jar_audit_dependency",
++            "requiredBy": required_by,
++            "displayName": project.title,
++            "providesModId": dependency_id,
++            "requestedVersionRanges": requirements,
++        })
++        registry["managedFiles"] = entries
++        registry["dependencyResolution"] = ModpackDependencyResolver._resolution_payload([project.title], [])
++        registry["verificationCache"] = ModrinthPackRegistry._normalize_verification_cache(registry.get("verificationCache", {}), entries)
++        ModrinthPackRegistry.save(instance.instance_dir, registry)
++
++    @staticmethod
++    def _append_curseforge_search_candidate(instance: Instance, candidate: dict, dependency_id: str, required_by: list[str], requirements: list[str]) -> None:
++        registry = CurseForgePackRegistry.load(Path(instance.instance_dir))
++        entries = [entry for entry in registry.get("managedFiles", []) if isinstance(entry, dict)]
++        all_entries = entries + [entry for entry in ModrinthPackRegistry.load(instance).get("managedFiles", []) if isinstance(entry, dict)]
++        project = candidate["project"]
++        file = candidate["file"]
++        path = ModpackDependencyResolver._unique_mod_path(all_entries, file.file_name, str(file.project_id), file.sha1)
++        entries.append({
++            "projectId": file.project_id,
++            "fileId": file.file_id,
++            "fileName": PurePosixPath(path).name,
++            "path": path,
++            "displayName": project.name or file.display_name,
++            "sha1": file.sha1,
++            "size": file.file_length,
++            "downloadUrl": file.download_url,
++            "declaredLoaders": list(file.loaders),
++            "gameVersions": list(file.game_versions),
++            "releaseType": file.release_type,
++            "datePublished": file.file_date,
++            "required": True,
++            "provider": "curseforge",
++            "pendingDownload": True,
++            "resolvePathFromProvider": False,
++            "selectionReason": "jar_audit_dependency",
++            "requiredBy": required_by,
++            "projectUrl": project.project_url,
++            "dependencies": [{"projectId": dependency.project_id, "relationType": dependency.relation_type} for dependency in file.dependencies],
++            "dependencyMetadataResolved": True,
++            "providesModId": dependency_id,
++            "requestedVersionRanges": requirements,
++        })
++        registry["managedFiles"] = entries
++        registry["dependencyResolution"] = ModpackDependencyResolver._resolution_payload([project.name], [])
++        CurseForgePackRegistry.save(Path(instance.instance_dir), registry)
++
++    @staticmethod
++    def _pending_candidate(instance: Instance, dependency_id: str) -> bool:
++        wanted = dependency_id.casefold()
++        for registry in (ModrinthPackRegistry.load(instance), CurseForgePackRegistry.load(Path(instance.instance_dir))):
++            for entry in registry.get("managedFiles", []):
++                if not isinstance(entry, dict) or str(entry.get("providesModId") or "").casefold() != wanted:
++                    continue
++                relative = str(entry.get("path") or "").replace("\\", "/").strip().lstrip("/")
++                target = Path(instance.instance_dir).joinpath(*PurePosixPath(relative).parts) if relative else None
++                if target is None or not target.is_file():
++                    return True
++        return False
++
++    @staticmethod
++    def _rejected_or_installed_candidates(instance: Instance, dependency_id: str) -> dict[str, set[str]]:
++        wanted = dependency_id.casefold()
++        excluded = {"modrinth": set(), "curseforge": set()}
++        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
++        for provider, registry in (
++            ("modrinth", ModrinthPackRegistry.load(instance)),
++            ("curseforge", CurseForgePackRegistry.load(Path(instance.instance_dir))),
++        ):
++            for entry in registry.get("managedFiles", []):
++                if not isinstance(entry, dict):
++                    continue
++                project_id = str(entry.get("projectId") or "").strip()
++                if project_id:
++                    excluded[provider].add(project_id)
++                if str(entry.get("providesModId") or "").casefold() != wanted:
++                    continue
++                relative = str(entry.get("path") or "").replace("\\", "/").strip().lstrip("/")
++                target = Path(instance.instance_dir).joinpath(*PurePosixPath(relative).parts) if relative else None
++                if target is not None and target.is_file() and ModCapabilityIndex.provides(target, dependency_id, str(loader_name)):
++                    # A valid candidate should already remove the compatibility
++                    # issue. Keep it excluded from repeated provider searches.
++                    continue
++        return excluded
++
++    @staticmethod
++    def _provider_priority(instance: Instance) -> tuple[str, str]:
++        modrinth_count = sum(1 for entry in ModrinthPackRegistry.load(instance).get("managedFiles", []) if isinstance(entry, dict) and ModpackDependencyResolver._is_mod_entry(entry))
++        curseforge_count = sum(1 for entry in CurseForgePackRegistry.load(Path(instance.instance_dir)).get("managedFiles", []) if isinstance(entry, dict) and ModpackDependencyResolver._is_mod_entry(entry))
++        return ("modrinth", "curseforge") if modrinth_count >= curseforge_count else ("curseforge", "modrinth")
++
++    @staticmethod
++    def _project_match_score(dependency_id: str, slug: str, title: str) -> int:
++        wanted = ModpackDependencyResolver._search_key(dependency_id)
++        slug_key = ModpackDependencyResolver._search_key(slug)
++        title_key = ModpackDependencyResolver._search_key(title)
++        if wanted and wanted in {slug_key, title_key}:
++            return 0
++        if wanted and any(wanted in value or value in wanted for value in (slug_key, title_key) if value):
++            return 1
++        return 99
++
++    @staticmethod
++    def _search_key(value: str) -> str:
++        return "".join(character for character in str(value or "").casefold() if character.isalnum())
++
++    @staticmethod
+     def _modrinth_version_for_entry(entry: dict) -> ModrinthVersion | None:
+         version_id = str(entry.get("versionId") or "").strip()
+         if not version_id:
+--- a/src/core/modrinth/modrinth_pack_registry.py
++++ b/src/core/modrinth/modrinth_pack_registry.py
+@@ -201,6 +201,8 @@
+                 "requiredBy": ModrinthPackRegistry._normalize_required_by(item.get("requiredBy", [])),
+                 "displayName": str(item.get("displayName") or item.get("title") or relative.name).strip(),
+                 "versionNumber": str(item.get("versionNumber") or "").strip(),
++                "providesModId": str(item.get("providesModId") or "").strip().casefold(),
++                "requestedVersionRanges": ModrinthPackRegistry._normalize_required_by(item.get("requestedVersionRanges", [])),
+             }
+         return sorted(normalized.values(), key=lambda item: item["path"].casefold())
+ 
 --- /dev/null
-+++ b/test/core/mod/test_modpack_dependency_resolver.py
-@@ -0,0 +1,153 @@
++++ b/test/core/mod/test_mod_capability_index.py
+@@ -0,0 +1,124 @@
 +from __future__ import annotations
 +
-+from types import SimpleNamespace
++from io import BytesIO
++from pathlib import Path
++import json
++import zipfile
 +
-+import pytest
-+
-+from src.core.curseforge.curseforge_client import CurseForgeClient
-+from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
++from src.core.mod.mod_capability_index import ModCapabilityIndex
 +from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
-+from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
-+from src.core.mod.modpack_dependency_resolver import ModpackDependencyResolver
-+from src.core.modrinth.modrinth_client import ModrinthClient
-+from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
-+from src.models.curseforge.file import CurseForgeDependency, CurseForgeFile
-+from src.models.mod.dependency_resolution import RequiredModDependenciesMissing
-+from src.models.mod.mod_info import ModInfo
-+from src.models.mod.mod_issue import ModHealthReport, ModIssue
-+from src.models.modrinth.project import ModrinthProject
-+from src.models.modrinth.version import ModrinthDependency, ModrinthFile, ModrinthVersion
++from src.models.instance.instance import Instance
 +
 +
-+def instance(tmp_path, loader="neoforge"):
-+    return SimpleNamespace(name="Pack", version_id="1.21.1", mod_loader=(loader, "21.1.200"), instance_dir=tmp_path / "Pack")
++def forge_instance(tmp_path: Path, version: str = "1.19.2") -> Instance:
++    instance_dir = tmp_path / "Forge Pack"
++    (instance_dir / "mods").mkdir(parents=True)
++    return Instance(instance_id="forge-pack", name="Forge Pack", version_id=version, instance_dir=instance_dir, mod_loader=("forge", "43.4.0"))
 +
 +
-+def mr_version(version_id: str, project_id: str, filename: str, dependencies=()):
-+    return ModrinthVersion(
-+        version_id=version_id,
-+        project_id=project_id,
-+        name=version_id,
-+        version_number=version_id,
-+        version_type="release",
-+        game_versions=("1.21.1",),
-+        loaders=("neoforge",),
-+        files=(ModrinthFile(url=f"https://cdn.modrinth.com/data/{project_id}/versions/{version_id}/{filename}", filename=filename, sha1=(project_id[0] * 40), sha512=(project_id[0] * 128), size=10, primary=True),),
-+        dependencies=tuple(dependencies),
++def forge_jar_bytes(mod_id: str, version: str, dependencies: dict[str, str] | None = None) -> bytes:
++    lines = [
++        'modLoader="javafml"',
++        'loaderVersion="[40,)"',
++        'license="MIT"',
++        '',
++        '[[mods]]',
++        f'modId="{mod_id}"',
++        f'version="{version}"',
++        f'displayName="{mod_id}"',
++    ]
++    for dependency_id, requirement in (dependencies or {}).items():
++        lines.extend([
++            '',
++            f'[[dependencies.{mod_id}]]',
++            f'modId="{dependency_id}"',
++            'mandatory=true',
++            f'versionRange="{requirement}"',
++            'ordering="NONE"',
++            'side="BOTH"',
++        ])
++    output = BytesIO()
++    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
++        archive.writestr("META-INF/mods.toml", "\n".join(lines) + "\n")
++    return output.getvalue()
++
++
++def write_forge_jar(path: Path, mod_id: str, version: str, dependencies: dict[str, str] | None = None) -> Path:
++    path.write_bytes(forge_jar_bytes(mod_id, version, dependencies))
++    return path
++
++
++def write_jarjar_owner(path: Path, owner_id: str, owner_version: str, nested_name: str, nested_bytes: bytes, dependencies: dict[str, str] | None = None, library_outer: bool = False) -> Path:
++    owner_bytes = forge_jar_bytes(owner_id, owner_version, dependencies)
++    with zipfile.ZipFile(BytesIO(owner_bytes), "r") as source:
++        owner_entries = {name: source.read(name) for name in source.namelist()}
++
++    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
++        for name, raw in owner_entries.items():
++            archive.writestr(name, raw)
++        nested_path = f"META-INF/jarjar/{nested_name}"
++        archive.writestr(nested_path, nested_bytes)
++        archive.writestr(
++            "META-INF/jarjar/metadata.json",
++            json.dumps({"jars": [{"identifier": {"group": "test", "artifact": nested_name.removesuffix('.jar')}, "version": {"range": "[0,)", "artifactVersion": "1"}, "path": nested_path}]}),
++        )
++        if library_outer:
++            archive.writestr("META-INF/MANIFEST.MF", "Manifest-Version: 1.0\nFMLModType: LIBRARY\nImplementation-Version: 3.12.0\n")
++    return path
++
++
++def test_embedded_flywheel_satisfies_create_dependency_ranges(tmp_path):
++    instance = forge_instance(tmp_path)
++    mods = Path(instance.instance_dir) / "mods"
++    flywheel = forge_jar_bytes("flywheel", "0.6.10")
++    write_jarjar_owner(
++        mods / "create.jar",
++        "create",
++        "0.5.1",
++        "flywheel.jar",
++        flywheel,
++        dependencies={"flywheel": "[0.6.10,0.6.11)"},
++    )
++    write_forge_jar(
++        mods / "createaddition.jar",
++        "createaddition",
++        "1.2.3",
++        dependencies={"flywheel": "[0.6.8.a,0.7)"},
 +    )
 +
++    report = ModCompatibilityManager.scan(instance)
++    capabilities = ModCapabilityIndex.build(instance)
 +
-+def cf_file(project_id: int, file_id: int, filename: str, dependencies=()):
-+    return CurseForgeFile(
-+        file_id=file_id,
-+        project_id=project_id,
-+        display_name=filename,
-+        file_name=filename,
++    assert capabilities["flywheel"][0].source == "embedded"
++    assert capabilities["flywheel"][0].version == "0.6.10"
++    assert not any(issue.code.startswith("dependency-") and "flywheel" in issue.mod_ids for issue in report.issues)
++
++
++def test_nested_kotlinforforge_language_bundle_satisfies_mod_dependency(tmp_path):
++    instance = forge_instance(tmp_path)
++    mods = Path(instance.instance_dir) / "mods"
++    write_forge_jar(
++        mods / "sliceanddice.jar",
++        "sliceanddice",
++        "2.3.0",
++        dependencies={"kotlinforforge": "[3.9.1,)"},
++    )
++    kff_mod = forge_jar_bytes("kotlinforforge", "3.12.0")
++    write_jarjar_owner(
++        mods / "kotlinforforge-all.jar",
++        "kotlinforforge_bundle",
++        "3.12.0",
++        "kffmod-forge.jar",
++        kff_mod,
++        library_outer=True,
++    )
++
++    report = ModCompatibilityManager.scan(instance)
++
++    assert not any(issue.code.startswith("dependency-") and "kotlinforforge" in issue.mod_ids for issue in report.issues)
++
++
++def test_forge_style_version_with_letter_component_matches_maven_range():
++    assert ModCompatibilityManager._matches_requirement("0.6.10", "[0.6.8.a,0.7)") is True
++    assert ModCompatibilityManager._matches_requirement("0.6.8.a", "[0.6.8.a,0.7)") is True
++    assert ModCompatibilityManager._matches_requirement("0.7.0", "[0.6.8.a,0.7)") is False
+--- a/test/core/mod/test_modpack_dependency_resolver.py
++++ b/test/core/mod/test_modpack_dependency_resolver.py
+@@ -151,3 +151,107 @@
+ 
+     with pytest.raises(RequiredModDependenciesMissing, match="konkrete"):
+         ModpackDependencyResolver.raise_for_required_dependencies(managed_instance)
++
++
++def test_jar_audit_searches_curseforge_for_kotlinforforge(tmp_path, monkeypatch):
++    from pathlib import Path
++    import zipfile
++
++    from src.models.curseforge.project import CurseForgeProject
++
++    managed_instance = instance(tmp_path, loader="forge")
++    managed_instance.version_id = "1.19.2"
++    managed_instance.mod_loader = ("forge", "43.4.0")
++    mods = Path(managed_instance.instance_dir) / "mods"
++    mods.mkdir(parents=True)
++    metadata = (
++        'modLoader="javafml"\n'
++        'loaderVersion="[43,)"\n'
++        'license="MIT"\n\n'
++        '[[mods]]\n'
++        'modId="sliceanddice"\n'
++        'version="2.3.0"\n'
++        'displayName="Create Slice & Dice"\n\n'
++        '[[dependencies.sliceanddice]]\n'
++        'modId="kotlinforforge"\n'
++        'mandatory=true\n'
++        'versionRange="[3.9.1,)"\n'
++        'ordering="NONE"\n'
++        'side="BOTH"\n'
++    )
++    with zipfile.ZipFile(mods / "sliceanddice.jar", "w") as archive:
++        archive.writestr("META-INF/mods.toml", metadata)
++
++    root = cf_file(10, 100, "sliceanddice.jar")
++    root = CurseForgeFile(
++        file_id=root.file_id,
++        project_id=root.project_id,
++        display_name=root.display_name,
++        file_name=root.file_name,
++        release_type=root.release_type,
++        file_date=root.file_date,
++        file_length=(mods / "sliceanddice.jar").stat().st_size,
++        download_url=root.download_url,
++        sha1="a" * 40,
++        game_versions=("1.19.2",),
++        dependencies=(),
++        loaders=("forge",),
++    )
++    CurseForgePackRegistry.save(Path(managed_instance.instance_dir), {
++        "managedFiles": [{
++            "projectId": 10,
++            "fileId": 100,
++            "fileName": "sliceanddice.jar",
++            "path": "mods/sliceanddice.jar",
++            "provider": "curseforge",
++            "required": True,
++            "dependencyMetadataResolved": True,
++            "dependencies": [],
++            "declaredLoaders": ["forge"],
++            "gameVersions": ["1.19.2"],
++        }],
++    })
++
++    project = CurseForgeProject(
++        project_id=351264,
++        name="Kotlin for Forge",
++        slug="kotlin-for-forge",
++        summary="Kotlin language provider",
++        download_count=1,
++        authors=("thedarkcolour",),
++        logo_url="",
++        class_id=6,
++        date_modified="2026-01-01T00:00:00Z",
++        project_url="https://www.curseforge.com/minecraft/mc-mods/kotlin-for-forge",
++        game_versions=("1.19.2",),
++        loaders=("forge",),
++    )
++    kff = CurseForgeFile(
++        file_id=5000,
++        project_id=351264,
++        display_name="Kotlin for Forge 3.12.0",
++        file_name="kotlinforforge-3.12.0-all.jar",
 +        release_type="release",
 +        file_date="2026-01-01T00:00:00Z",
-+        file_length=10,
-+        download_url=f"https://edge.forgecdn.net/files/{file_id}/{filename}",
-+        sha1=(str(project_id)[0] * 40),
-+        game_versions=("1.21.1",),
-+        dependencies=tuple(dependencies),
-+        loaders=("neoforge",),
++        file_length=100,
++        download_url="https://edge.forgecdn.net/files/5000/kotlinforforge-3.12.0-all.jar",
++        sha1="b" * 40,
++        game_versions=("1.19.2",),
++        dependencies=(),
++        loaders=("forge",),
 +    )
 +
-+
-+def test_modrinth_resolver_adds_recursive_required_dependencies(tmp_path, monkeypatch):
-+    root = mr_version("root-v", "root", "root.jar", (ModrinthDependency("required", project_id="dep-a"),))
-+    dep_a = mr_version("a-v", "dep-a", "a.jar", (ModrinthDependency("required", project_id="dep-b"),))
-+    dep_b = mr_version("b-v", "dep-b", "b.jar")
-+    versions = {item.version_id: item for item in (root, dep_a, dep_b)}
-+    projects = {project_id: ModrinthProject(project_id=project_id, slug=project_id, title=project_id.title(), description="", project_type="mod") for project_id in ("root", "dep-a", "dep-b")}
-+    registry = {"projectId": "pack", "versionId": "pack-v", "managedFiles": [{"path": "mods/root.jar", "fileName": "root.jar", "source": "download", "provider": "modrinth", "projectId": "root", "versionId": "root-v", "sha1": "r" * 40, "sha512": "r" * 128, "size": 10, "downloads": ["https://cdn.modrinth.com/root.jar"]}]}
-+    saved = {}
-+
-+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: registry)
-+    monkeypatch.setattr(ModrinthPackRegistry, "save", lambda _dir, payload: saved.update(payload))
-+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: {})
 +    monkeypatch.setattr(ModProvenanceRegistry, "synchronize", lambda _instance: {})
-+    monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: versions[version_id])
-+    monkeypatch.setattr(ModrinthClient, "select_version", lambda project_id, **_kwargs: {"dep-a": dep_a, "dep-b": dep_b}[project_id])
-+    monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: projects[project_id])
++    monkeypatch.setattr(CurseForgeClient, "search_projects", lambda *_args, **_kwargs: SimpleNamespace(projects=(project,)))
++    monkeypatch.setattr(CurseForgeClient, "latest_compatible_file", lambda *_args, **_kwargs: kff)
++    monkeypatch.setattr(ModrinthClient, "search_projects", lambda *_args, **_kwargs: SimpleNamespace(projects=()))
 +
-+    result = ModpackDependencyResolver.resolve(instance(tmp_path))
++    result = ModpackDependencyResolver.resolve(managed_instance)
++    saved = CurseForgePackRegistry.load(Path(managed_instance.instance_dir))
++    added = next(entry for entry in saved["managedFiles"] if entry["projectId"] == 351264)
 +
-+    assert result.added_files == ("Dep-A", "Dep-B")
-+    by_project = {entry.get("projectId"): entry for entry in saved["managedFiles"]}
-+    assert by_project["dep-a"]["selectionReason"] == "required_dependency"
-+    assert by_project["dep-a"]["requiredBy"] == ["root.jar"]
-+    assert by_project["dep-b"]["requiredBy"] == ["Dep-A"]
-+
-+
-+def test_modrinth_resolver_keeps_pack_pinned_dependency_version(tmp_path, monkeypatch):
-+    root = mr_version("root-v", "root", "root.jar", (ModrinthDependency("required", project_id="dep", version_id="new-v"),))
-+    old = mr_version("old-v", "dep", "dep-old.jar")
-+    registry = {"managedFiles": [
-+        {"path": "mods/root.jar", "fileName": "root.jar", "source": "download", "provider": "modrinth", "projectId": "root", "versionId": "root-v", "sha1": "r" * 40, "sha512": "r" * 128, "size": 10, "downloads": []},
-+        {"path": "mods/dep-old.jar", "fileName": "dep-old.jar", "source": "download", "provider": "modrinth", "projectId": "dep", "versionId": "old-v", "sha1": "d" * 40, "sha512": "d" * 128, "size": 10, "downloads": []},
-+    ]}
-+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: registry)
-+    monkeypatch.setattr(ModrinthPackRegistry, "save", lambda *_args: None)
-+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: {})
-+    monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: {"root-v": root, "old-v": old}[version_id])
-+
-+    result = ModpackDependencyResolver.resolve(instance(tmp_path))
-+
-+    assert not result.added_files
-+    assert any("pack-pinned file was kept" in warning for warning in result.warnings)
-+    assert registry["managedFiles"][1]["requiredBy"] == ["root.jar"]
-+
-+
-+def test_curseforge_resolver_adds_only_required_dependencies(tmp_path, monkeypatch):
-+    root = cf_file(10, 100, "root.jar", (CurseForgeDependency(20, 3), CurseForgeDependency(30, 2)))
-+    required = cf_file(20, 200, "required.jar")
-+    registry = {"managedFiles": [{"projectId": 10, "fileId": 100, "fileName": "root.jar", "path": "mods/root.jar", "provider": "curseforge", "required": True}]}
-+    saved = {}
-+
-+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
-+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: registry)
-+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda _instance, payload: saved.update(payload))
-+    monkeypatch.setattr(ModProvenanceRegistry, "synchronize", lambda _instance: {})
-+    monkeypatch.setattr(CurseForgeClient, "get_files_batch", lambda _file_ids: {100: root})
-+    monkeypatch.setattr(CurseForgeClient, "get_file", lambda project_id, file_id: root if project_id == 10 else required)
-+    monkeypatch.setattr(CurseForgeClient, "latest_compatible_file", lambda project_id, *_args, **_kwargs: required if project_id == 20 else pytest.fail("optional dependency must not be resolved"))
-+    monkeypatch.setattr(CurseForgeClient, "get_project", lambda project_id: SimpleNamespace(name="Required", project_url="https://www.curseforge.com/minecraft/mc-mods/required"))
-+
-+    result = ModpackDependencyResolver.resolve(instance(tmp_path))
-+
-+    assert result.added_files == ("Required",)
-+    added = next(entry for entry in saved["managedFiles"] if entry["projectId"] == 20)
-+    assert added["selectionReason"] == "required_dependency"
-+    assert added["requiredBy"] == ["root.jar"]
-+
-+
-+def test_pack_pinned_system_requirement_mismatch_is_warning(tmp_path):
-+    mod = ModInfo(
-+        path=tmp_path / "jei.jar",
-+        file_name="jei.jar",
-+        enabled=True,
-+        mod_id="jei",
-+        name="Just Enough Items",
-+        version="19.0.0",
-+        loader="neoforge",
-+        dependencies={"minecraft": "[1.21, 1.21.1)"},
-+        managed_by_modpack=True,
-+    )
-+
-+    report = ModCompatibilityManager.scan(instance(tmp_path), mods=[mod])
-+
-+    assert report.error_count == 0
-+    assert report.warning_count == 1
-+    assert report.issues[0].code == "pack-pinned-system-requirement"
-+
-+
-+def test_required_dependency_errors_cannot_be_bypassed_for_managed_pack(tmp_path, monkeypatch):
-+    managed_instance = instance(tmp_path)
-+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {"managedFiles": [{"path": "mods/root.jar"}]})
-+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: {})
-+    issue = ModIssue("error", "dependency-missing", "FancyMenu requires missing dependency 'konkrete'.", ("fancymenu", "konkrete"))
-+    monkeypatch.setattr(ModCompatibilityManager, "scan", lambda _instance: ModHealthReport((issue,), 1, 0))
-+
-+    with pytest.raises(RequiredModDependenciesMissing, match="konkrete"):
-+        ModpackDependencyResolver.raise_for_required_dependencies(managed_instance)
---- /dev/null
-+++ b/test/core/modrinth/test_modrinth_hash_lookup.py
-@@ -0,0 +1,22 @@
-+from src.core.modrinth.modrinth_client import ModrinthClient
-+
-+
-+def test_get_version_from_hash_uses_version_file_endpoint(monkeypatch):
-+    seen = {}
-+
-+    def fake_get(path, params=None, **_kwargs):
-+        seen["path"] = path
-+        seen["params"] = params
-+        return {"id": "version", "project_id": "project", "version_number": "1.0", "files": []}
-+
-+    monkeypatch.setattr(ModrinthClient, "_get_json", fake_get)
-+    version = ModrinthClient.get_version_from_hash("A" * 128, "sha512")
-+
-+    assert version is not None
-+    assert version.version_id == "version"
-+    assert seen == {"path": "/version_file/" + "a" * 128, "params": {"algorithm": "sha512"}}
-+
-+
-+def test_get_version_from_hash_returns_none_for_404(monkeypatch):
-+    monkeypatch.setattr(ModrinthClient, "_get_json", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("Modrinth API request failed with HTTP 404.")))
-+    assert ModrinthClient.get_version_from_hash("b" * 40, "sha1") is None
---- a/test/core/modrinth/test_modrinth_pack_installer.py
-+++ b/test/core/modrinth/test_modrinth_pack_installer.py
-@@ -81,7 +81,7 @@
-     metadata_path = instance_dir / ".mcw" / "modrinth-pack.json"
-     assert metadata_path.is_file()
-     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
--    assert metadata["schemaVersion"] == 5
-+    assert metadata["schemaVersion"] == 6
-     assert {item["path"] for item in metadata["managedFiles"]} == {"mods/example.jar", "config/example.json", "options.txt"}
-     queued = next(item for item in metadata["managedFiles"] if item["path"] == "mods/example.jar")
-     assert queued["downloads"] == ["https://cdn.modrinth.com/data/project/example.jar"]
---- a/test/core/modrinth/test_modrinth_pack_repair_manager.py
-+++ b/test/core/modrinth/test_modrinth_pack_repair_manager.py
-@@ -100,6 +100,6 @@
-     assert result.repaired_files == 2
-     assert result.backup_path is not None and result.backup_path.is_file()
-     registry = ModrinthPackRegistry.load_from_dir(instance_dir)
--    assert registry["schemaVersion"] == 5
-+    assert registry["schemaVersion"] == 6
-     assert registry["preservedFiles"] == []
-     assert len(registry["verificationCache"]) == 2
---- a/test/core/modrinth/test_modrinth_pack_update_manager.py
-+++ b/test/core/modrinth/test_modrinth_pack_update_manager.py
-@@ -33,7 +33,7 @@
- def test_pack_registry_schema_four_preserves_conflict_metadata(tmp_path: Path) -> None:
-     ModrinthPackRegistry.save(tmp_path, {"projectId": "pack", "managedFiles": [], "preservedFiles": [{"path": "config/demo.json", "reason": "modified-by-user", "previousSha1": "AA", "targetSha1": "BB"}]})
-     data = ModrinthPackRegistry.load_from_dir(tmp_path)
--    assert data["schemaVersion"] == 5
-+    assert data["schemaVersion"] == 6
-     assert data["preservedFiles"] == [{"path": "config/demo.json", "reason": "modified-by-user", "previousSha1": "aa", "targetSha1": "bb"}]
- 
- 
---- a/test/gui/presenters/test_launch_error_presenter.py
-+++ b/test/gui/presenters/test_launch_error_presenter.py
-@@ -1,5 +1,7 @@
- from src.core.instance.errors import InstanceAlreadyRunningError
- from src.gui.presenters.launch_error_presenter import LaunchErrorPresenter
-+from src.models.mod.dependency_resolution import RequiredModDependenciesMissing
-+from src.models.mod.mod_issue import ModIssue
- 
- 
- def test_presents_checksum_error():
-@@ -34,6 +36,20 @@
-     assert "Close that game" in view.message
-     assert "Survival" in view.message
- 
-+
-+def test_presents_required_mod_dependency_error_as_non_bypassable():
-+    error = RequiredModDependenciesMissing(
-+        "Dependency Test",
-+        (ModIssue(severity="error", code="dependency-missing", message="FancyMenu requires Konkrete.", mod_ids=("fancymenu", "konkrete")),),
-+    )
-+
-+    view = LaunchErrorPresenter.present(error)
-+
-+    assert view.title == "Required mod dependencies are missing"
-+    assert view.status == "Required dependencies missing"
-+    assert "cannot bypass missing required dependencies" in view.message
-+    assert "FancyMenu requires Konkrete" in view.message
-+
- def test_presents_modrinth_missing_files_with_instance_setting_hint():
-     error = RuntimeError(
-         "Could not download 2 required Modrinth file(s) after 3 rounds. "
---- a/test/test_public_api.py
-+++ b/test/test_public_api.py
-@@ -8,7 +8,7 @@
- 
- 
- def test_bundled_core_runtime_version_follows_launcher_beta() -> None:
--    assert mcw_core.__version__ == "1.1.1-beta.4"
-+    assert mcw_core.__version__ == "1.1.1-beta.5"
- 
- 
- def test_distribution_version_when_installed() -> None:
++    assert result.added_files == ("Kotlin for Forge",)
++    assert added["selectionReason"] == "jar_audit_dependency"
++    assert added["providesModId"] == "kotlinforforge"
++    assert added["requestedVersionRanges"] == ["[3.9.1,)"]
++    assert added["requiredBy"] == ["Create Slice & Dice"]
