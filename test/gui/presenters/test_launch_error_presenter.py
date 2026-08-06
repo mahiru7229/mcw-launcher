@@ -1,5 +1,7 @@
 from src.core.instance.errors import InstanceAlreadyRunningError
 from src.gui.presenters.launch_error_presenter import LaunchErrorPresenter
+from src.models.mod.dependency_resolution import RequiredModDependenciesMissing
+from src.models.mod.mod_issue import ModIssue
 
 
 def test_presents_checksum_error():
@@ -33,6 +35,20 @@ def test_presents_instance_already_running_error():
     assert view.status == "Instance already running"
     assert "Close that game" in view.message
     assert "Survival" in view.message
+
+
+def test_presents_required_mod_dependency_error_as_non_bypassable():
+    error = RequiredModDependenciesMissing(
+        "Dependency Test",
+        (ModIssue(severity="error", code="dependency-missing", message="FancyMenu requires Konkrete.", mod_ids=("fancymenu", "konkrete")),),
+    )
+
+    view = LaunchErrorPresenter.present(error)
+
+    assert view.title == "Required mod dependencies are missing"
+    assert view.status == "Required dependencies missing"
+    assert "cannot bypass missing required dependencies" in view.message
+    assert "FancyMenu requires Konkrete" in view.message
 
 def test_presents_modrinth_missing_files_with_instance_setting_hint():
     error = RuntimeError(

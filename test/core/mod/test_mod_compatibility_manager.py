@@ -2,9 +2,12 @@ from pathlib import Path
 import json
 import zipfile
 
+import pytest
+
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
 from src.models.instance.instance import Instance
+from src.models.mod.mod_info import ModInfo
 
 
 def make_instance(tmp_path: Path) -> Instance:
@@ -115,6 +118,83 @@ def test_maven_range_rejects_outside_version() -> None:
     assert ModCompatibilityManager._matches_requirement("47.3.0", "[47,)") is True
     assert ModCompatibilityManager._matches_requirement("1.21.0", "[1.20.1,1.21)") is False
 
+
+@pytest.mark.parametrize(
+    ("installed", "required"),
+    (
+        ("1.19.2-3.0.0.6", "[1.19-3.0.0.3,)"),
+        ("1.19.2-5.1.4.3", "[1.19-5.1.0.0,)"),
+        ("1.8.2-55", "[1.8-54,)"),
+        ("1.19.2-4.2.8", "[1.19-4.0.7,)"),
+        ("1.19.2-4.2.18", "[1.19-4.0.12,)"),
+    ),
+)
+def test_forge_mod_versions_used_by_existing_modpacks_match(installed: str, required: str) -> None:
+    assert ModCompatibilityManager._matches_requirement(installed, required) is True
+
+
+def test_pack_managed_dependency_version_mismatch_is_non_blocking(tmp_path) -> None:
+    instance_dir = tmp_path / "pack-instance"
+    (instance_dir / "mods").mkdir(parents=True)
+    instance = Instance(instance_id="pack", name="Pack", version_id="1.19.2", instance_dir=instance_dir, mod_loader=("forge", "43.4.0"))
+    dependency = ModInfo(
+        path=tmp_path / "curios.jar",
+        file_name="curios.jar",
+        enabled=True,
+        mod_id="curios",
+        name="Curios API",
+        version="2.0.0",
+        loader="forge",
+        managed_by_modpack=True,
+    )
+    consumer = ModInfo(
+        path=tmp_path / "elytra-slot.jar",
+        file_name="elytra-slot.jar",
+        enabled=True,
+        mod_id="elytraslot",
+        name="Elytra Slot",
+        version="6.1.0",
+        loader="forge",
+        dependencies={"curios": "[3.0.0,)"},
+        managed_by_modpack=True,
+    )
+
+    report = ModCompatibilityManager.scan(instance, mods=[dependency, consumer])
+
+    assert not any(issue.code == "dependency-version" for issue in report.issues)
+    assert any(issue.code == "pack-pinned-dependency-requirement" and issue.severity == "warning" for issue in report.issues)
+
+
+def test_manual_dependency_version_mismatch_remains_blocking(tmp_path) -> None:
+    instance_dir = tmp_path / "manual-instance"
+    (instance_dir / "mods").mkdir(parents=True)
+    instance = Instance(instance_id="manual", name="Manual", version_id="1.19.2", instance_dir=instance_dir, mod_loader=("forge", "43.4.0"))
+    dependency = ModInfo(
+        path=tmp_path / "curios.jar",
+        file_name="curios.jar",
+        enabled=True,
+        mod_id="curios",
+        name="Curios API",
+        version="2.0.0",
+        loader="forge",
+        managed_by_modpack=False,
+    )
+    consumer = ModInfo(
+        path=tmp_path / "elytra-slot.jar",
+        file_name="elytra-slot.jar",
+        enabled=True,
+        mod_id="elytraslot",
+        name="Elytra Slot",
+        version="6.1.0",
+        loader="forge",
+        dependencies={"curios": "[3.0.0,)"},
+        managed_by_modpack=True,
+    )
+
+    report = ModCompatibilityManager.scan(instance, mods=[dependency, consumer])
+
+    assert any(issue.code == "dependency-version" and issue.severity == "error" for issue in report.issues)
+
 def test_neoforge_loader_dependency_matches_installed_version(tmp_path):
     instance_dir = tmp_path / "neoforge-instance"
     mods = instance_dir / "mods"
@@ -216,3 +296,36 @@ def test_quilt_instance_rejects_forge_only_mod(tmp_path):
     report = ModCompatibilityManager.scan(instance)
 
     assert any(issue.code == "loader-mismatch" for issue in report.issues)
+
+
+def test_jarjar_provided_mod_satisfies_required_dependency(tmp_path) -> None:
+    instance_dir = tmp_path / "jarjar-instance"
+    (instance_dir / "mods").mkdir(parents=True)
+    instance = Instance(instance_id="jarjar", name="JarJar", version_id="1.19.2", instance_dir=instance_dir, mod_loader=("forge", "43.4.0"))
+    provider = ModInfo(
+        path=instance_dir / "mods" / "kotlinforforge-3.9.1-all.jar",
+        file_name="kotlinforforge-3.9.1-all.jar",
+        enabled=True,
+        mod_id="unknown",
+        name="kotlinforforge-3.9.1-all",
+        version="3.9.1",
+        loader="forge",
+        metadata_format="MANIFEST.MF:FMLModType=LIBRARY",
+        provided_mods=(("kotlinforforge", "3.9.1"),),
+        managed_by_modpack=True,
+    )
+    consumer = ModInfo(
+        path=instance_dir / "mods" / "sliceanddice.jar",
+        file_name="sliceanddice.jar",
+        enabled=True,
+        mod_id="sliceanddice",
+        name="Create Slice & Dice",
+        version="2.4.0",
+        loader="forge",
+        dependencies={"kotlinforforge": "[3.9.1,)"},
+        managed_by_modpack=True,
+    )
+
+    report = ModCompatibilityManager.scan(instance, mods=[provider, consumer])
+
+    assert not any(issue.code in {"dependency-missing", "dependency-version"} and "kotlinforforge" in issue.mod_ids for issue in report.issues)

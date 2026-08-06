@@ -40,13 +40,79 @@ Mỗi instance có riêng:
 - Mods, resource packs, shader packs và saves.
 - Java runtime, RAM, JVM arguments và cấu hình cửa sổ.
 - Trạng thái runtime, lịch sử launch, backup và dữ liệu repair.
-- Metadata nguồn cho mod/modpack từ Modrinth, CurseForge hoặc FTB.
+- Metadata nguồn cho mod/modpack từ Modrinth, CurseForge, FTB hoặc ATLauncher.
 
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 ---
 Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.1.1-beta.6
+
+**v1.1.1-beta.6** sửa bước kiểm tra dependency của các modpack Forge cũ như RLCraft:
+
+- Quét cả thư mục mod chính và thư mục legacy chính xác `mods/<minecraft-version>/`, thay vì bỏ sót mod Forge 1.12.2 được loader chấp nhận.
+- Khi dependency đã được tác giả modpack ghim nhưng file local bị thiếu hoặc không cung cấp đúng mod ID, launcher đưa đúng file ghim trở lại hàng đợi tải/repair thay vì tìm một version thay thế.
+- Lưu `projectName`, `projectSlug` và `expectedModIds` trong CurseForge pack registry để các lần audit sau đối chiếu bằng identity ổn định.
+- Xác minh JAR sau download thực sự cung cấp mod ID mong đợi trước khi cho dependency audit vượt qua.
+- Giữ nguyên version/file ID của manifest và chỉ dùng provider bridge khi pack thật sự không có dependency đó.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.6.md`](docs/RELEASE-v1.1.1-beta.6.md).
+
+## Có gì mới trong v1.1.1-beta.5
+
+**v1.1.1-beta.5** sửa pipeline dependency bắt buộc của modpack:
+
+- Tự hoàn thiện dependency graph `required` cho modpack Modrinth và CurseForge trước khi Minecraft được tạo process.
+- Giữ nguyên file do tác giả pack ghim; dependency bổ sung được ghi `requiredBy` và `selectionReason`.
+- Không tự tải optional/embedded dependency và không tự thay file pack chỉ vì metadata system version quá chặt.
+- Tùy chọn chạy dù có lỗi tương thích không còn được phép bỏ qua dependency bắt buộc bị thiếu, disable hoặc sai version.
+- Repair modpack chạy lại resolver và tải các dependency mới tìm được.
+- Registry Modrinth, CurseForge và provenance được nâng schema với normalize tương thích dữ liệu cũ.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.5.md`](docs/RELEASE-v1.1.1-beta.5.md).
+
+## Có gì mới trong v1.1.1-beta.4
+
+**v1.1.1-beta.4** đơn giản hóa OptiFine thành luồng nhập file trực tiếp:
+
+- Không còn tải hoặc hiển thị danh sách phiên bản OptiFine trực tuyến.
+- Chọn JAR OptiFine gốc; MCW nhận diện Minecraft version và build từ tên file.
+- Chặn file sai Minecraft version trước khi tạo hoặc cài instance.
+- Vanilla dùng standalone component/profile; Forge instance hoặc modpack dùng mod được quản lý trong `mods/`.
+- Core vẫn xác minh cấu trúc JAR, manifest, class OptiFine và hash trước khi commit.
+- Giữ nguyên Repair, Uninstall, rollback giao dịch và chính sách không nhúng OptiFine vào export.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.4.md`](docs/RELEASE-v1.1.1-beta.4.md).
+
+## Có gì mới trong v1.1.1-beta.2
+
+**v1.1.1-beta.2** là hotfix cho một số modpack Forge 1.12.2 dùng LibLoader và còn phụ thuộc vào thư viện từng được lưu trên JCenter:
+
+- Xác định lỗi không liên quan tới tên thư mục instance hoặc hậu tố `(2)`; Forge đã nhận đúng game directory trước khi coremod tải dependency thất bại.
+- Quét manifest `LibLoader-*` trong các mod JAR trước khi Java khởi chạy.
+- Khôi phục dependency còn tồn tại trên Maven Central và dùng fallback giới hạn cho sáu thư viện JCenter-only đã biết.
+- Mọi file tải hoặc trích xuất đều phải khớp SHA-512 do chính manifest của mod khai báo.
+- Giữ đúng cấu trúc thư mục `libraries/` mà LibLoader sử dụng, bao gồm thư mục có suffix hash cho snapshot build.
+- Không tự tải từ host tùy ý; dependency custom chưa được nhận diện vẫn được để cho mod xử lý như trước.
+- Bao gồm toàn bộ ATLauncher provider của Beta 1; chưa phát hành MCW Core wheel mới.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.2.md`](docs/RELEASE-v1.1.1-beta.2.md).
+
+## Có gì mới trong v1.1.1-beta.1
+
+**v1.1.1-beta.1** mở đầu tích hợp ATLauncher:
+
+- Thêm browser ATLauncher trong Add Instance và workspace của instance.
+- Tìm kiếm pack công khai qua V2 GraphQL, với V1/CDN fallback cho metadata và manifest cài đặt.
+- Chọn version, kênh release/beta/alpha và các file tùy chọn được khuyến nghị trước khi tạo instance.
+- Tải file pack ở lần Launch đầu tiên, có retry giới hạn và xác minh SHA-1/MD5.
+- Hỗ trợ Configs.zip với staging và kiểm tra an toàn đường dẫn.
+- Pack dùng custom libraries, jar mods, extract/decomp hoặc browser-only files sẽ bị chặn rõ ràng trong beta này thay vì cài dở dang.
+- Chưa phát hành Core wheel mới; ATLauncher được bundle trong launcher để smoke test trước khi đồng bộ Core stable.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.1.md`](docs/RELEASE-v1.1.1-beta.1.md).
 
 ## Có gì mới trong v1.1.0
 

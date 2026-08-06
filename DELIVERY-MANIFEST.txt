@@ -1,0 +1,41 @@
+MCW Launcher v1.1.1-beta.6 — RLCraft legacy dependency fix
+================================================================
+
+Package type: cumulative changed-files overlay
+Apply target: MCW Launcher v1.1.1-beta.5 source root
+Also safe to apply over: Beta 5 dependency/Forge cache hotfix v1-v5
+Resulting runtime version: v1.1.1-beta.6
+Python distribution version: 1.1.1b6
+
+Runtime/source files:
+- src/config.py
+- src/core/curseforge/curseforge_content_manager.py
+- src/core/curseforge/curseforge_pack_registry.py
+- src/core/mod/mod_compatibility_manager.py
+- src/core/mod/mod_manager.py
+- src/core/mod/mod_provenance_registry.py
+- src/core/mod/modpack_dependency_resolver.py
+- src/core/modloader/forge/forge_version_manager.py
+- src/core/modrinth/modrinth_content_manager.py
+- src/models/mod/mod_info.py
+
+Regression tests:
+- test/core/config/test_version_metadata.py
+- test/core/mod/test_mod_compatibility_manager.py
+- test/core/mod/test_mod_manager.py
+- test/core/mod/test_mod_provenance_registry.py
+- test/core/mod/test_modpack_dependency_resolver.py
+- test/core/modloader/forge/test_forge_version_manager.py
+- test/core/modrinth/test_modrinth_content_manager.py
+- test/test_public_api.py
+
+Version/documentation files:
+- README.md
+- docs/RELEASE-v1.1.1-beta.6.md
+- pyproject.toml
+
+Package documentation:
+- PATCH-README.md
+- DELIVERY-MANIFEST.txt
+- TEST-RESULTS.txt
+- CHANGES.diff
