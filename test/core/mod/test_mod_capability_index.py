@@ -7,6 +7,7 @@ import zipfile
 
 from src.core.mod.mod_capability_index import ModCapabilityIndex
 from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
+from src.core.mod.mod_manager import ModManager
 from src.models.instance.instance import Instance
 
 
@@ -122,3 +123,51 @@ def test_forge_style_version_with_letter_component_matches_maven_range():
     assert ModCompatibilityManager._matches_requirement("0.6.10", "[0.6.8.a,0.7)") is True
     assert ModCompatibilityManager._matches_requirement("0.6.8.a", "[0.6.8.a,0.7)") is True
     assert ModCompatibilityManager._matches_requirement("0.7.0", "[0.6.8.a,0.7)") is False
+
+
+def test_atm9_artifacts_embedded_expandability_satisfies_dependency_without_standalone_jar(tmp_path):
+    instance = forge_instance(tmp_path, version="1.20.1")
+    instance.mod_loader = ("forge", "47.4.0")
+    mods = Path(instance.instance_dir) / "mods"
+    nested = forge_jar_bytes("expandability", "9.0.4")
+    owner_bytes = forge_jar_bytes("artifacts", "9.5.13", {"expandability": "[9.0.0,)"})
+    owner = mods / "artifacts-forge-9.5.13.jar"
+
+    with zipfile.ZipFile(BytesIO(owner_bytes), "r") as source:
+        entries = {name: source.read(name) for name in source.namelist()}
+    with zipfile.ZipFile(owner, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, raw in entries.items():
+            archive.writestr(name, raw)
+        # Some Forge JarJar artifacts are recoverable from the standard jarjar
+        # directory even when metadata.json does not enumerate the nested JAR.
+        archive.writestr("META-INF/jarjar/expandability-9.0.4.jar", nested)
+
+    listed = ModManager.list_mods(instance)
+    capabilities = ModCapabilityIndex.build(instance, listed)
+    report = ModCompatibilityManager.scan(instance, mods=listed)
+
+    assert not (mods / "expandability-9.0.4.jar").exists()
+    assert listed[0].provided_mods == ()
+    assert capabilities["expandability"][0].source == "embedded"
+    assert capabilities["expandability"][0].version == "9.0.4"
+    assert not any(issue.code.startswith("dependency-") and "expandability" in issue.mod_ids for issue in report.issues)
+
+
+def test_embedded_dependency_version_is_still_validated(tmp_path):
+    instance = forge_instance(tmp_path, version="1.20.1")
+    instance.mod_loader = ("forge", "47.4.0")
+    mods = Path(instance.instance_dir) / "mods"
+    nested = forge_jar_bytes("expandability", "8.9.0")
+    owner_bytes = forge_jar_bytes("artifacts", "9.5.13", {"expandability": "[9.0.0,)"})
+    owner = mods / "artifacts-forge-9.5.13.jar"
+
+    with zipfile.ZipFile(BytesIO(owner_bytes), "r") as source:
+        entries = {name: source.read(name) for name in source.namelist()}
+    with zipfile.ZipFile(owner, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, raw in entries.items():
+            archive.writestr(name, raw)
+        archive.writestr("META-INF/jarjar/expandability-8.9.0.jar", nested)
+
+    report = ModCompatibilityManager.scan(instance)
+
+    assert any(issue.code == "dependency-version" and "expandability" in issue.mod_ids for issue in report.issues)

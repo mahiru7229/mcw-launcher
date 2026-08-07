@@ -9,6 +9,7 @@ from typing import Callable, TypeVar
 
 from src.core.curseforge.curseforge_client import CurseForgeClient
 from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
+from src.core.mod.mod_capability_index import ModCapabilityIndex
 from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
 from src.core.mod.mod_manager import ModManager
 from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
@@ -791,13 +792,20 @@ class ModpackDependencyResolver:
             mods = ModManager.list_mods(instance)
         except (AttributeError, FileNotFoundError, OSError):
             return set()
-        return {
+        identities = {
             identity
             for mod in mods
             if mod.enabled
             for raw in ([mod.mod_id] if mod.mod_id != "unknown" else []) + [mod_id for mod_id, _version in mod.provided_mods]
             if (identity := ModpackDependencyResolver._canonical_identity(raw))
         }
+        capabilities = ModCapabilityIndex.build(instance, mods)
+        identities.update(
+            identity
+            for mod_id in capabilities
+            if (identity := ModpackDependencyResolver._canonical_identity(mod_id))
+        )
+        return identities
 
     @staticmethod
     def _prune_redundant_embedded_dependencies(instance: Instance) -> tuple[str, ...]:

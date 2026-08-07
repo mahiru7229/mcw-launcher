@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from io import BytesIO
 from types import SimpleNamespace
+import zipfile
 
 import pytest
 
@@ -344,6 +346,71 @@ def test_curseforge_resolver_does_not_add_standalone_dependency_already_provided
     assert result.added_files == ()
     assert len(registry["managedFiles"]) == 1
     assert len(saved["managedFiles"]) == 1
+
+
+def test_curseforge_resolver_does_not_add_dependency_from_fallback_embedded_capability(tmp_path, monkeypatch):
+    managed_instance = instance(tmp_path, loader="forge")
+    managed_instance.version_id = "1.20.1"
+    managed_instance.mod_loader = ("forge", "47.4.0")
+    mods_dir = managed_instance.instance_dir / "mods"
+    mods_dir.mkdir(parents=True)
+
+    nested = BytesIO()
+    with zipfile.ZipFile(nested, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "META-INF/mods.toml",
+            'modLoader="javafml"\nloaderVersion="[47,)"\nlicense="MIT"\n\n[[mods]]\nmodId="expandability"\nversion="9.0.4"\ndisplayName="ExpandAbility"\n',
+        )
+    artifacts = mods_dir / "artifacts-forge-9.5.13.jar"
+    with zipfile.ZipFile(artifacts, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "META-INF/mods.toml",
+            'modLoader="javafml"\nloaderVersion="[47,)"\nlicense="MIT"\n\n[[mods]]\nmodId="artifacts"\nversion="9.5.13"\ndisplayName="Artifacts"\n',
+        )
+        archive.writestr("META-INF/jarjar/expandability-9.0.4.jar", nested.getvalue())
+
+    root = CurseForgeFile(
+        file_id=100,
+        project_id=10,
+        display_name="Artifacts",
+        file_name=artifacts.name,
+        release_type="release",
+        file_date="2026-01-01T00:00:00Z",
+        file_length=artifacts.stat().st_size,
+        download_url="https://example/artifacts.jar",
+        sha1="1" * 40,
+        game_versions=("1.20.1",),
+        dependencies=(CurseForgeDependency(20, 3),),
+        loaders=("forge",),
+    )
+    dependency = CurseForgeFile(
+        file_id=200,
+        project_id=20,
+        display_name="ExpandAbility",
+        file_name="expandability-9.0.4.jar",
+        release_type="release",
+        file_date="2026-01-01T00:00:00Z",
+        file_length=10,
+        download_url="https://example/expandability.jar",
+        sha1="2" * 40,
+        game_versions=("1.20.1",),
+        dependencies=(),
+        loaders=("forge",),
+    )
+    registry = {"managedFiles": [{"projectId": 10, "fileId": 100, "fileName": artifacts.name, "path": f"mods/{artifacts.name}", "provider": "curseforge", "required": True}]}
+
+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: registry)
+    monkeypatch.setattr(ModProvenanceRegistry, "entries_by_file", lambda _instance: {})
+    monkeypatch.setattr(CurseForgeClient, "get_files_batch", lambda _file_ids: {100: root})
+    monkeypatch.setattr(CurseForgeClient, "latest_compatible_file", lambda project_id, *_args, **_kwargs: dependency if project_id == 20 else pytest.fail("unexpected project"))
+    monkeypatch.setattr(CurseForgeClient, "get_project", lambda _project_id: SimpleNamespace(name="ExpandAbility", slug="expandability", project_url="https://example/expandability"))
+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda *_args: None)
+
+    result = ModpackDependencyResolver._resolve_curseforge(managed_instance, registry, None)
+
+    assert result.added_files == ()
+    assert len(registry["managedFiles"]) == 1
+    assert not (mods_dir / dependency.file_name).exists()
 
 
 def test_repairs_pack_pinned_curseforge_dependency_missing_from_disk(tmp_path, monkeypatch):

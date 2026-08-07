@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 import re
 
+from src.core.mod.mod_capability_index import ModCapabilityIndex
 from src.core.mod.mod_manager import ModManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.models.instance.instance import Instance
@@ -66,6 +67,20 @@ class ModCompatibilityManager:
             installed_versions["forge"] = loader_version
             installed_versions["javafml"] = loader_version
             installed_versions["fml"] = loader_version
+
+        missing_dependency_ids = {
+            str(dependency_id).strip().casefold()
+            for mod in enabled
+            if ModCompatibilityManager._dependency_metadata_in_scope(mod, loader_name)
+            for dependency_id in mod.dependencies
+            if str(dependency_id).strip() and str(dependency_id).strip().casefold() not in installed_versions
+        }
+        if missing_dependency_ids:
+            embedded_versions = ModCapabilityIndex.installed_versions(instance, enabled)
+            for mod_id in missing_dependency_ids:
+                version = embedded_versions.get(mod_id)
+                if version:
+                    installed_versions[mod_id] = version
 
         issues: list[ModIssue] = []
         ModCompatibilityManager._append_file_issues(mods, issues)
