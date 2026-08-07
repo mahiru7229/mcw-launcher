@@ -446,15 +446,20 @@ class ModpackDependencyResolver:
                 )
             ModpackDependencyResolver._report(reporter, "Resolving CurseForge modpack dependencies...", completed, max(1, len(mod_entries)))
 
-        queue: deque[tuple[CurseForgeFile, int, str]] = deque(
-            (file, 0, ModpackDependencyResolver._entry_label(selected.get(file.project_id, {}), str(file.project_id)))
+        queue: deque[tuple[CurseForgeFile, int, str, bool]] = deque(
+            (
+                file,
+                0,
+                ModpackDependencyResolver._entry_label(selected.get(file.project_id, {}), str(file.project_id)),
+                str(selected.get(file.project_id, {}).get("selectionReason") or "pack_manifest") == "pack_manifest",
+            )
             for file in files.values()
         )
         visited_files: set[int] = set()
         discovered = 0
 
         while queue:
-            file, depth, parent_label = queue.popleft()
+            file, depth, parent_label, parent_pack_pinned = queue.popleft()
             if file.file_id in visited_files:
                 continue
             if depth > ModpackDependencyResolver.MAX_DEPTH:
@@ -478,14 +483,22 @@ class ModpackDependencyResolver:
                         )
                     )
                 except Exception as error:
-                    unresolved.append(f"{parent_label} requires CurseForge project {dependency.project_id}: {error}")
+                    message = f"{parent_label} requires CurseForge project {dependency.project_id}: {error}"
+                    if parent_pack_pinned:
+                        warnings.append(f"Ignored provider dependency from pack-pinned file: {message} The modpack manifest remains authoritative.")
+                    else:
+                        unresolved.append(message)
                     continue
                 if not ModpackDependencyResolver._curseforge_dependency_metadata_in_scope(dependency_file, loader_name):
                     declared = ", ".join(dependency_file.loaders) or "unknown"
-                    unresolved.append(
+                    message = (
                         f"{parent_label} requires CurseForge project {dependency.project_id}, but file {dependency_file.file_id} "
                         f"declares loader(s) {declared} outside the active {loader_name} context."
                     )
+                    if parent_pack_pinned:
+                        warnings.append(f"Ignored provider dependency from pack-pinned file: {message} The modpack manifest remains authoritative.")
+                    else:
+                        unresolved.append(message)
                     continue
                 if dependency_file.project_id in selected:
                     changed |= ModpackDependencyResolver._append_required_by(selected[dependency_file.project_id], parent_label)
@@ -505,7 +518,7 @@ class ModpackDependencyResolver:
                 project_identities = ModpackDependencyResolver._project_identities(project) if project is not None else {ModpackDependencyResolver._canonical_identity(project_name)}
                 project_identities.discard("")
                 if project_identities & installed_identities:
-                    queue.append((dependency_file, depth + 1, project_name or dependency_file.file_name))
+                    queue.append((dependency_file, depth + 1, project_name or dependency_file.file_name, False))
                     continue
                 path = ModpackDependencyResolver._unique_mod_path(entries, dependency_file.file_name, str(dependency_file.project_id), dependency_file.sha1)
                 target = {
@@ -537,7 +550,7 @@ class ModpackDependencyResolver:
                 added.append(project_name or target["fileName"])
                 discovered += 1
                 changed = True
-                queue.append((dependency_file, depth + 1, project_name or target["fileName"]))
+                queue.append((dependency_file, depth + 1, project_name or target["fileName"], False))
 
         if changed or unresolved:
             registry["managedFiles"] = entries

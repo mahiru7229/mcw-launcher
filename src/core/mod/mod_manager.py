@@ -272,7 +272,12 @@ class ModManager:
                 has_fabric = "fabric.mod.json" in names
                 has_quilt = "quilt.mod.json" in names
                 has_forge = "META-INF/mods.toml" in names
+                has_neoforge = "META-INF/neoforge.mods.toml" in names
 
+                if normalized_preference == ModLoaderManager.NEOFORGE and has_neoforge:
+                    return finalize(ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/neoforge.mods.toml"), loader="neoforge", metadata_format="neoforge.mods.toml", manifest=manifest, provider_version=provider_version))
+                if normalized_preference == ModLoaderManager.FORGE and has_forge:
+                    return finalize(ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/mods.toml"), loader="forge", metadata_format="mods.toml", manifest=manifest, provider_version=provider_version))
                 if has_quilt and (normalized_preference == ModLoaderManager.QUILT or not has_fabric):
                     return finalize(ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version))
                 if has_fabric and has_forge:
@@ -293,7 +298,7 @@ class ModManager:
                     return finalize(fabric)
                 if has_quilt:
                     return finalize(ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version))
-                if "META-INF/neoforge.mods.toml" in names:
+                if has_neoforge:
                     return finalize(ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/neoforge.mods.toml"), loader="neoforge", metadata_format="neoforge.mods.toml", manifest=manifest, provider_version=provider_version))
                 if has_forge:
                     loader = ModLoaderManager.NEOFORGE if normalized_preference == ModLoaderManager.NEOFORGE else ModLoaderManager.FORGE

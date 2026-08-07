@@ -871,3 +871,51 @@ def test_broken_jar_provider_identity_is_not_used_when_sha1_does_not_match(tmp_p
 
     assert installed[0].mod_id == "unknown"
     assert installed[0].status == "Broken JAR"
+
+
+def test_mixed_forge_neoforge_metadata_uses_active_loader_metadata(tmp_path):
+    source = tmp_path / "mixed-forge-neoforge.jar"
+    forge_metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[47,)"\n'
+        'license="MIT"\n\n'
+        '[[mods]]\n'
+        'modId="forge_view"\n'
+        'version="1.0.0"\n'
+        'displayName="Forge View"\n\n'
+        '[[dependencies.forge_view]]\n'
+        'modId="forge"\n'
+        'mandatory=true\n'
+        'versionRange="[47,)"\n'
+        'ordering="NONE"\n'
+        'side="BOTH"\n'
+    )
+    neoforge_metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[21,)"\n'
+        'license="MIT"\n\n'
+        '[[mods]]\n'
+        'modId="neoforge_view"\n'
+        'version="2.0.0"\n'
+        'displayName="NeoForge View"\n\n'
+        '[[dependencies.neoforge_view]]\n'
+        'modId="neoforge"\n'
+        'type="required"\n'
+        'versionRange="[21,)"\n'
+        'ordering="NONE"\n'
+        'side="BOTH"\n'
+    )
+    with zipfile.ZipFile(source, "w") as archive:
+        archive.writestr("META-INF/mods.toml", forge_metadata)
+        archive.writestr("META-INF/neoforge.mods.toml", neoforge_metadata)
+
+    forge = ModManager.read_mod(source, preferred_loader="forge")
+    neoforge = ModManager.read_mod(source, preferred_loader="neoforge")
+
+    assert forge.loader == "forge"
+    assert forge.mod_id == "forge_view"
+    assert "forge" in forge.dependencies
+    assert "neoforge" not in forge.dependencies
+    assert neoforge.loader == "neoforge"
+    assert neoforge.mod_id == "neoforge_view"
+    assert "neoforge" in neoforge.dependencies

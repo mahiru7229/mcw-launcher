@@ -549,5 +549,81 @@ def test_curseforge_resolver_rejects_foreign_loader_dependency_candidate(tmp_pat
     result = ModpackDependencyResolver.resolve(instance(tmp_path, loader="neoforge"))
 
     assert result.added_files == ()
-    assert any("outside the active neoforge context" in issue for issue in result.unresolved)
+    assert result.unresolved == ()
+    assert any("Ignored provider dependency from pack-pinned file" in warning for warning in result.warnings)
     assert all(entry.get("projectId") != 20 for entry in saved.get("managedFiles", registry["managedFiles"]))
+
+
+def test_skyfactory5_pack_pinned_foreign_loader_metadata_does_not_create_dependency_blockers(tmp_path):
+    managed_instance = instance(tmp_path, loader="forge")
+    managed_instance.version_id = "1.20.1"
+    managed_instance.mod_loader = ("forge", "47.4.0")
+    mods = [
+        ModInfo(path=tmp_path / "ForgeConfigAPIPort.jar", file_name="ForgeConfigAPIPort.jar", enabled=True, mod_id="forgeconfigapiport", name="Forge Config API Port", version="8.0.0", loader="fabric", dependencies={"fabric-api": ">=0.83.0", "fabricloader": ">=0.14.21"}, managed_by_modpack=True, source="curseforge", source_pack_provider="curseforge"),
+        ModInfo(path=tmp_path / "minecraft_style_paintings.jar", file_name="minecraft_style_paintings.jar", enabled=True, mod_id="minecraft_style_paintings", name="minecraft style paintings", version="1.0.0", loader="neoforge", dependencies={"neoforge": "[21.1.65,)"}, managed_by_modpack=True, source="curseforge", source_pack_provider="curseforge"),
+    ]
+
+    report = ModCompatibilityManager.scan(managed_instance, mods=mods)
+
+    assert not any(issue.severity == "error" for issue in report.issues)
+    assert {issue.code for issue in report.issues} == {"pack-pinned-loader-metadata"}
+
+
+def test_standalone_foreign_loader_mod_remains_strict_on_forge(tmp_path):
+    managed_instance = instance(tmp_path, loader="forge")
+    managed_instance.version_id = "1.20.1"
+    managed_instance.mod_loader = ("forge", "47.4.0")
+    mod = ModInfo(path=tmp_path / "fabric-only.jar", file_name="fabric-only.jar", enabled=True, mod_id="fabric_only", name="Fabric Only", version="1.0.0", loader="fabric", dependencies={"fabricloader": ">=0.14.21"}, managed_by_modpack=False)
+
+    report = ModCompatibilityManager.scan(managed_instance, mods=[mod])
+
+    assert any(issue.code == "loader-mismatch" and issue.severity == "error" for issue in report.issues)
+    assert any(issue.code == "dependency-missing" and issue.severity == "error" for issue in report.issues)
+
+
+def test_skyfactory5_pack_pinned_yacl_does_not_resolve_fabric_api_on_forge(tmp_path, monkeypatch):
+    managed_instance = instance(tmp_path, loader="forge")
+    managed_instance.version_id = "1.20.1"
+    managed_instance.mod_loader = ("forge", "47.4.0")
+    yacl = CurseForgeFile(
+        file_id=9001,
+        project_id=9000,
+        display_name="YetAnotherConfigLib 3.4.2 for MC 1.20.1",
+        file_name="yacl-forge.jar",
+        release_type="release",
+        file_date="2026-01-01T00:00:00Z",
+        file_length=10,
+        download_url="https://example.invalid/yacl-forge.jar",
+        sha1="9" * 40,
+        game_versions=("1.20.1",),
+        dependencies=(CurseForgeDependency(306612, 3),),
+        loaders=("forge",),
+    )
+    fabric_api = CurseForgeFile(
+        file_id=8443275,
+        project_id=306612,
+        display_name="Fabric API",
+        file_name="fabric-api.jar",
+        release_type="release",
+        file_date="2026-01-01T00:00:00Z",
+        file_length=10,
+        download_url="https://example.invalid/fabric-api.jar",
+        sha1="3" * 40,
+        game_versions=("1.20.1",),
+        dependencies=(),
+        loaders=("fabric",),
+    )
+    registry = {"managedFiles": [{"projectId": 9000, "fileId": 9001, "fileName": "yacl-forge.jar", "path": "mods/yacl-forge.jar", "provider": "curseforge", "required": True, "selectionReason": "pack_manifest"}]}
+
+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: registry)
+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda *_args: None)
+    monkeypatch.setattr(ModProvenanceRegistry, "synchronize", lambda _instance: {})
+    monkeypatch.setattr(CurseForgeClient, "get_files_batch", lambda _file_ids: {9001: yacl})
+    monkeypatch.setattr(CurseForgeClient, "list_files", lambda project_id, **_kwargs: [fabric_api] if int(project_id) == 306612 else [])
+
+    result = ModpackDependencyResolver.resolve(managed_instance)
+
+    assert result.added_files == ()
+    assert result.unresolved == ()
+    assert any("CurseForge project 306612" in warning and "modpack manifest remains authoritative" in warning for warning in result.warnings)

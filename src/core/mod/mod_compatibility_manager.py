@@ -73,8 +73,9 @@ class ModCompatibilityManager:
         ModCompatibilityManager._append_duplicate_issues(enabled_by_id, issues)
 
         for mod in enabled:
-            ModCompatibilityManager._append_dependency_issues(mod, enabled_by_id, disabled_by_id, installed_versions, issues, managed_by_modpack=mod.managed_by_modpack)
-            ModCompatibilityManager._append_conflict_issues(mod, enabled_by_id, installed_versions, issues)
+            if ModCompatibilityManager._dependency_metadata_in_scope(mod, loader_name):
+                ModCompatibilityManager._append_dependency_issues(mod, enabled_by_id, disabled_by_id, installed_versions, issues, managed_by_modpack=mod.managed_by_modpack)
+                ModCompatibilityManager._append_conflict_issues(mod, enabled_by_id, installed_versions, issues)
 
         issues.sort(key=lambda item: ({"error": 0, "warning": 1, "info": 2}.get(item.severity, 3), item.message.casefold()))
         return ModHealthReport(issues=tuple(issues), enabled_mods=len(enabled), disabled_mods=len(disabled))
@@ -92,6 +93,19 @@ class ModCompatibilityManager:
         for mod in mods:
             if mod.loader in {"unknown", "universal", loader_name}:
                 continue
+            if mod.managed_by_modpack:
+                issues.append(
+                    ModIssue(
+                        severity="warning",
+                        code="pack-pinned-loader-metadata",
+                        message=(
+                            f"{mod.name} is pinned by the modpack, but its JAR metadata declares {mod.loader.title()} "
+                            f"while this instance uses {loader_name.title()}. Foreign-loader dependency metadata was ignored."
+                        ),
+                        mod_ids=(mod.mod_id,),
+                    )
+                )
+                continue
             issues.append(
                 ModIssue(
                     severity="error",
@@ -100,6 +114,12 @@ class ModCompatibilityManager:
                     mod_ids=(mod.mod_id,),
                 )
             )
+
+    @staticmethod
+    def _dependency_metadata_in_scope(mod: ModInfo, loader_name: str) -> bool:
+        if mod.loader in {"unknown", "universal", loader_name}:
+            return True
+        return not mod.managed_by_modpack
 
     @staticmethod
     def _append_duplicate_issues(enabled_by_id: dict[str, list[ModInfo]], issues: list[ModIssue]) -> None:

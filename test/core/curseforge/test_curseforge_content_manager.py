@@ -391,3 +391,51 @@ def test_parser_broken_jar_identity_is_not_trusted_without_verified_provider_fil
 
     assert CurseForgeContentManager._can_trust_provider_identity(metadata, entry, provider_file_verified=False) is False
     assert CurseForgeContentManager._can_trust_provider_identity(metadata, entry, provider_file_verified=True) is True
+
+
+def test_download_round_downloads_multiple_artifacts_concurrently(tmp_path, monkeypatch):
+    from threading import Barrier, BrokenBarrierError, Lock
+
+    instance_dir = tmp_path / "instance-concurrent"
+    instance_dir.mkdir()
+    instance = Instance(instance_id="id", name="Pack", version_id="1.20.1", instance_dir=instance_dir, mod_loader=("forge", "47.4.0"))
+    barrier = Barrier(2)
+    lock = Lock()
+    active = 0
+    peak = 0
+
+    def cache_path(project_id, file_id, file_name):
+        return tmp_path / "cache-concurrent" / f"{project_id}-{file_id}-{file_name}"
+
+    def fake_download(_file, destination, **_kwargs):
+        nonlocal active, peak
+        with lock:
+            active += 1
+            peak = max(peak, active)
+        try:
+            barrier.wait(timeout=1)
+        except BrokenBarrierError:
+            pass
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(b"jar")
+        with lock:
+            active -= 1
+        return destination
+
+    monkeypatch.setattr(Paths, "curseforge_file_cache", staticmethod(cache_path))
+    monkeypatch.setattr(CurseForgeDownloader, "download_file", staticmethod(fake_download))
+    monkeypatch.setattr(ModManager, "read_mod", staticmethod(lambda *_args, **_kwargs: SimpleNamespace()))
+    monkeypatch.setattr(ModManager, "compatibility_warning", staticmethod(lambda *_args, **_kwargs: ""))
+    monkeypatch.setattr(ModManager, "add_mods", staticmethod(lambda _instance, paths, **_kwargs: [SimpleNamespace(file_name=Path(paths[0]).name)]))
+
+    missing = []
+    for project_id in (1, 2):
+        entry = {"projectId": project_id, "fileId": project_id + 10, "fileName": f"mod-{project_id}.jar", "path": f"mods/mod-{project_id}.jar", "sha1": str(project_id) * 40, "size": 3, "downloadUrl": f"https://example.invalid/mod-{project_id}.jar", "declaredLoaders": ["forge"], "gameVersions": ["1.20.1"]}
+        missing.append({"kind": "mod", "key": f"mod:{project_id}:{project_id + 10}", "path": entry["path"], "entry": entry})
+
+    result = CurseForgeContentManager._download_round(instance, missing, None, 1, "token")
+
+    assert result["errors"] == {}
+    assert result["downloaded"] == 2
+    assert peak >= 2
+    assert peak <= CurseForgeContentManager.MAX_WORKERS

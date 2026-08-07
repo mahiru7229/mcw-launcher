@@ -1243,3 +1243,18 @@ def test_start_with_java_recovery_retries_and_resets_custom_path(monkeypatch: py
     assert launched == [preferred, recovered]
     assert updated_paths == [""]
     assert warnings and "switched this instance back to Automatic" in warnings[0]
+
+
+def test_complete_managed_dependencies_reuses_initial_resolution_when_no_download_was_pending(monkeypatch: pytest.MonkeyPatch):
+    initial = DependencyResolutionResult()
+    monkeypatch.setattr(ModpackDependencyResolver, "resolve", lambda *_args, **_kwargs: pytest.fail("unchanged initial dependency resolution must not be repeated"))
+    monkeypatch.setattr(ModrinthContentManager, "ensure", lambda *_args, **_kwargs: pytest.fail("no additional provider pass is needed"))
+    monkeypatch.setattr(CurseForgeContentManager, "ensure", lambda *_args, **_kwargs: pytest.fail("no additional provider pass is needed"))
+
+    result, modrinth_warnings, curseforge_warnings = MinecraftExecutor._complete_managed_dependencies(
+        make_instance(), object(), True, True, "launch-token", ("m",), ("c",), initial_resolution=initial, refresh_after_initial_ensure=False
+    )
+
+    assert result is initial
+    assert modrinth_warnings == ("m",)
+    assert curseforge_warnings == ("c",)
