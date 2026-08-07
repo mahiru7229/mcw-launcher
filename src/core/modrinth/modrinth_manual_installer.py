@@ -19,17 +19,18 @@ from src.models.network.artifact import ArtifactRequest
 class ModrinthManualInstaller:
     @staticmethod
     def install(instance: Instance, requirement: ModrinthManualDownload, source: Path, launch_lock_token: str | None = None) -> str:
-        if InstanceRunLock.is_active(instance) and not InstanceRunLock.owns_preparing_lock(instance, launch_lock_token):
+        owns_preparing_lock = InstanceRunLock.owns_preparing_lock(instance, launch_lock_token)
+        if InstanceRunLock.is_active(instance) and not owns_preparing_lock:
             raise RuntimeError("Close Minecraft before importing a manually downloaded file.")
         path = Path(source)
         if not path.is_file():
             raise RuntimeError("The selected Modrinth file does not exist.")
         if requirement.managed_kind == "pack":
-            return ModrinthManualInstaller._install_pack_file(instance, requirement, path)
+            return ModrinthManualInstaller._install_pack_file(instance, requirement, path, allow_while_paused=owns_preparing_lock)
         if Path(requirement.file_name).suffix.casefold() != ".jar":
             raise RuntimeError("A standalone mod must be a .jar file.")
         cache = Paths.modrinth_file_cache(requirement.project_id, requirement.version_id, requirement.file_name)
-        artifact_download_service.accept_manual_file(ModrinthManualInstaller._request(requirement, cache), path)
+        artifact_download_service.accept_manual_file(ModrinthManualInstaller._request(requirement, cache), path, allow_while_paused=owns_preparing_lock)
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         metadata = ModManager.read_mod(cache, preferred_loader=loader_name)
         compatibility_warning = ModManager.compatibility_warning(instance, metadata)
@@ -42,6 +43,7 @@ class ModrinthManualInstaller:
 
     @staticmethod
     def install_many(instance: Instance, requirements: tuple[ModrinthManualDownload, ...] | list[ModrinthManualDownload], sources: tuple[Path, ...] | list[Path], launch_lock_token: str | None = None) -> ModrinthManualImportResult:
+        allow_while_paused = InstanceRunLock.owns_preparing_lock(instance, launch_lock_token)
         pending = list(requirements)
         imported: list[ModrinthManualImportedFile] = []
         added_mods: list[str] = []
@@ -51,7 +53,7 @@ class ModrinthManualInstaller:
             if not source.is_file():
                 rejected.append(f"{source.name}: The selected file is not readable.")
                 continue
-            requirement = ModrinthManualInstaller._match_requirement(source, pending)
+            requirement = ModrinthManualInstaller._match_requirement(source, pending, allow_while_paused=allow_while_paused)
             if requirement is not None:
                 try:
                     installed_name = ModrinthManualInstaller.install(instance, requirement, source, launch_lock_token=launch_lock_token)
@@ -72,23 +74,23 @@ class ModrinthManualInstaller:
         return ModrinthManualImportResult(imported=tuple(imported), added_mods=tuple(added_mods), rejected=tuple(rejected))
 
     @staticmethod
-    def _match_requirement(source: Path, requirements: list[ModrinthManualDownload]) -> ModrinthManualDownload | None:
+    def _match_requirement(source: Path, requirements: list[ModrinthManualDownload], allow_while_paused: bool = False) -> ModrinthManualDownload | None:
         for requirement in requirements:
             request = ModrinthManualInstaller._request(requirement, Path(requirement.file_name))
             try:
-                artifact_download_service.verify_manual_file(request, source)
+                artifact_download_service.verify_manual_file(request, source, allow_while_paused=allow_while_paused)
             except Exception:
                 continue
             return requirement
         return None
 
     @staticmethod
-    def _install_pack_file(instance: Instance, requirement: ModrinthManualDownload, source: Path) -> str:
+    def _install_pack_file(instance: Instance, requirement: ModrinthManualDownload, source: Path, allow_while_paused: bool = False) -> str:
         relative = ModrinthPackRegistry._safe_relative(requirement.managed_path)
         if relative is None:
             raise RuntimeError(f"Unsafe managed Modrinth path: {requirement.managed_path!r}")
         target = Path(instance.instance_dir).joinpath(*relative.parts)
-        artifact_download_service.accept_manual_file(ModrinthManualInstaller._request(requirement, target), source)
+        artifact_download_service.accept_manual_file(ModrinthManualInstaller._request(requirement, target), source, allow_while_paused=allow_while_paused)
         pack = ModrinthPackRegistry.load(instance)
         updated = False
         for entry in pack.get("managedFiles", []):

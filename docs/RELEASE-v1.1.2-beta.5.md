@@ -1,5 +1,7 @@
 # MCW Launcher v1.1.2-beta.5
 
+- Fixed paused-launch manual imports so verified local files can be copied while network downloads remain paused; cancellation is still honored, and the manual import button is disabled while a batch is active.
+
 ## Tiếng Việt
 
 MCW Launcher **v1.1.2-beta.5** là beta cuối dự kiến trước stable, tập trung vào độ mượt của modpack workflow, metadata legacy và manual dependency recovery trong cùng phiên launch.

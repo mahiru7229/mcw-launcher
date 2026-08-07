@@ -8,6 +8,7 @@ import pytest
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.modrinth.modrinth_manual_installer import ModrinthManualInstaller
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
+from src.core.network.download_pause import download_pause_controller
 from src.models.instance.instance import Instance
 from src.models.modrinth.manual_download import ModrinthManualDownload
 
@@ -41,8 +42,12 @@ def test_manual_import_can_use_owned_preparing_launch_lock(tmp_path, monkeypatch
 
     monkeypatch.setattr(InstanceRunLock, "is_active", staticmethod(lambda _instance: True))
     monkeypatch.setattr(InstanceRunLock, "owns_preparing_lock", staticmethod(lambda _instance, token: token == "owned-token"))
-
-    assert ModrinthManualInstaller.install(instance, requirement, source, launch_lock_token="owned-token") == source.name
+    download_pause_controller.begin()
+    assert download_pause_controller.request_pause() is True
+    try:
+        assert ModrinthManualInstaller.install(instance, requirement, source, launch_lock_token="owned-token") == source.name
+    finally:
+        download_pause_controller.finish()
 
 
 def test_manual_import_rejects_unowned_active_launch_lock(tmp_path, monkeypatch):

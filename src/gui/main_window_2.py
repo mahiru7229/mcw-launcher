@@ -1205,12 +1205,13 @@ class MainWindow(QMainWindow):
         if not self._modrinth_manual_instance_name:
             QMessageBox.warning(self, tr("artifact.manual.title", provider="Modrinth"), tr("curseforge.mod.no_instance"))
             return
-        self.modrinth_controller.install_manual_files(
+        started = self.modrinth_controller.install_manual_files(
             self._modrinth_manual_instance_name,
             self.modrinth_manual_dialog.remaining_requirements,
             paths,
             launch_lock_token=self._manual_launch_lock_token or None,
         )
+        self.modrinth_manual_dialog.set_import_busy(started)
 
     def _modrinth_manual_files_installed(self, instance_name: str, result: object) -> None:
         imported = tuple(getattr(result, "imported", ()) or ())
@@ -1659,12 +1660,13 @@ class MainWindow(QMainWindow):
         if not self._curseforge_manual_instance_name:
             QMessageBox.warning(self, tr("curseforge.manual.title"), tr("curseforge.mod.no_instance"))
             return
-        self.curseforge_controller.install_manual_files(
+        started = self.curseforge_controller.install_manual_files(
             self._curseforge_manual_instance_name,
             self.curseforge_manual_dialog.remaining_requirements,
             paths,
             launch_lock_token=self._manual_launch_lock_token or None,
         )
+        self.curseforge_manual_dialog.set_import_busy(started)
 
     def _curseforge_manual_file_installed(self, instance_name: str, requirement: object, installed_name: str) -> None:
         self.curseforge_manual_dialog.mark_installed(requirement)
@@ -2363,6 +2365,10 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, lambda event=event: self._on_progress(event))
 
     def _on_task_completed(self, task_id: str, _result: object) -> None:
+        if task_id == "curseforge.install.manual.batch":
+            self.curseforge_manual_dialog.set_import_busy(False)
+        elif task_id == "modrinth.install.manual.batch":
+            self.modrinth_manual_dialog.set_import_busy(False)
         if task_id == self.launch_controller.TASK_ID:
             self._set_launch_active(False)
             if self._manual_launch_provider:

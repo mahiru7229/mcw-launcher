@@ -6,6 +6,7 @@ from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
 from src.core.curseforge.curseforge_registry import CurseForgeRegistry
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.mod.mod_manager import ModManager
+from src.core.network.download_pause import download_pause_controller
 from src.models.curseforge.manual_download import CurseForgeManualDownload
 from src.models.instance.instance import Instance
 
@@ -259,8 +260,12 @@ def test_manual_import_can_use_owned_preparing_launch_lock(tmp_path, monkeypatch
 
     monkeypatch.setattr(InstanceRunLock, "is_active", staticmethod(lambda _instance: True))
     monkeypatch.setattr(InstanceRunLock, "owns_preparing_lock", staticmethod(lambda _instance, token: token == "owned-token"))
-
-    assert CurseForgeManualInstaller.install(instance, requirement, source, launch_lock_token="owned-token") == source.name
+    download_pause_controller.begin()
+    assert download_pause_controller.request_pause() is True
+    try:
+        assert CurseForgeManualInstaller.install(instance, requirement, source, launch_lock_token="owned-token") == source.name
+    finally:
+        download_pause_controller.finish()
 
 
 def test_manual_import_rejects_unowned_active_launch_lock(tmp_path, monkeypatch):

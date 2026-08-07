@@ -18,6 +18,7 @@ class CurseForgeManualDownloadDialog(QDialog):
         self._installed: set[tuple[str, str, str, str]] = set()
         self._instance_name = ""
         self._provider_name = "CurseForge"
+        self._import_busy = False
         resize_dialog_to_screen(self, 980, 560, 700, 420)
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 18, 18, 18)
@@ -77,6 +78,10 @@ class CurseForgeManualDownloadDialog(QDialog):
         self._installed.add(self._requirement_key(requirement))
         self._render()
 
+    def set_import_busy(self, busy: bool) -> None:
+        self._import_busy = bool(busy)
+        self._update_actions()
+
     @property
     def remaining_count(self) -> int:
         return len(self.remaining_requirements)
@@ -131,7 +136,7 @@ class CurseForgeManualDownloadDialog(QDialog):
     def _update_actions(self) -> None:
         requirement = self._selected_requirement()
         self.open_page_button.setEnabled(requirement is not None and bool(self._best_url(requirement)))
-        self.add_files_button.setEnabled(self.remaining_count > 0)
+        self.add_files_button.setEnabled(self.remaining_count > 0 and not self._import_busy)
 
     def _open_page(self) -> None:
         requirement = self._selected_requirement()
@@ -154,6 +159,8 @@ class CurseForgeManualDownloadDialog(QDialog):
         )
 
     def _select_files(self) -> None:
+        if self._import_busy:
+            return
         if self.is_modpack_archive_mode:
             selected, _ = QFileDialog.getOpenFileName(
                 self,
