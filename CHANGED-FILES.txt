@@ -1,4 +1,6 @@
-src/core/modloader/forge/forge_launch_command_manager.py
-src/core/minecraft/minecraft_executor.py
-test/core/modloader/forge/test_forge_launch_command_manager.py
-test/core/minecraft/test_minecraft_executor.py
+src/config.py
+pyproject.toml
+README.md
+docs/RELEASE-v1.1.2.md
+test/core/config/test_version_metadata.py
+test/test_public_api.py

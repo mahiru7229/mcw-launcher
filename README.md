@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.1.1">
-    <img src="https://img.shields.io/badge/Stable-v1.1.1-brightgreen" alt="Stable version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.1.2">
+    <img src="https://img.shields.io/badge/Stable-v1.1.2-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -44,9 +44,25 @@ Mỗi instance có riêng:
 
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 ---
-Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.1 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
+Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.1.2
+
+**v1.1.2** đưa toàn bộ nhánh hardening dependency/modpack lên stable:
+
+- Scope dependency theo active loader, giữ manifest authority cho modpack và không còn false blocker do metadata Fabric/Forge/NeoForge bị trộn.
+- Nhận diện embedded/JarJar capabilities, bao gồm dependency lồng như `expandability`, mà không tải JAR standalone trùng.
+- Phân biệt primary mod ID với provided/embedded capability để loại false `Duplicate enabled mod ID`, đồng thời vẫn phát hiện duplicate top-level thật.
+- Cải thiện Forge/Maven version matching, safe cleanup cho stale dependency do launcher quản lý và giảm warning preflight không actionable.
+- Tối ưu download modpack lớn, dependency progress và cài Fabric/Quilt/Forge/NeoForge với bounded concurrency, cache reuse và retry mạng giới hạn.
+- Đọc tolerant `mcmod.info` legacy có thể salvage và hỗ trợ manual CurseForge/Modrinth dependency theo flow pause → import nhiều file → revalidate → resume cùng launch session.
+- Hotfix cuối loại deadlock khiến manual batch bị kẹt ở `Task ... is already running` khi launch đang pause.
+
+Các fix dependency đã được runtime kiểm tra thành công với SkyFactory 5 và All The Mods 9 trong chu kỳ beta.
+
+Xem chi tiết tại [`docs/RELEASE-v1.1.2.md`](docs/RELEASE-v1.1.2.md).
 
 ## Có gì mới trong v1.1.1
 
