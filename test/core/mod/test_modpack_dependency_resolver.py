@@ -784,3 +784,18 @@ def test_skyfactory5_pack_pinned_yacl_does_not_resolve_fabric_api_on_forge(tmp_p
     assert result.added_files == ()
     assert result.unresolved == ()
     assert not any("CurseForge project 306612" in warning for warning in result.warnings)
+
+
+def test_modpack_dependency_progress_is_batched_for_large_packs():
+    from src.core.progress.progress_reporter import ProgressReporter
+
+    events = []
+    reporter = ProgressReporter(events.append)
+    total = 178
+
+    for current in range(total + 1):
+        ModpackDependencyResolver._report(reporter, "Resolving CurseForge modpack dependencies...", current, total)
+
+    assert events[0].current == 0
+    assert events[-1].current == total
+    assert len(events) <= 26

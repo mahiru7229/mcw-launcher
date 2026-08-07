@@ -25,6 +25,9 @@ from src.models.progress.progress_stage import ProgressStage
 class CurseForgeContentManager:
     MAX_DOWNLOAD_ROUNDS = 3
     MAX_WORKERS = 8
+    LARGE_BATCH_THRESHOLD = 96
+    LARGE_BATCH_MAX_WORKERS = 6
+    DOWNLOAD_PROGRESS_INTERVAL_SECONDS = 0.15
 
     @staticmethod
     def ensure(instance: Instance, reporter: ProgressReporter | None = None, block_launch_on_failure: bool = True, launch_lock_token: str | None = None) -> tuple[str, ...]:
@@ -175,7 +178,13 @@ class CurseForgeContentManager:
         downloaded = 0
         accepted_unverified = 0
         message = "Downloading modpack mods..."
-        batch_progress = FileBatchProgress(reporter=reporter, stage=ProgressStage.DOWNLOADING_MODS, message=message, total=len(missing), min_emit_interval_seconds=0.08)
+        batch_progress = FileBatchProgress(
+            reporter=reporter,
+            stage=ProgressStage.DOWNLOADING_MODS,
+            message=message,
+            total=len(missing),
+            min_emit_interval_seconds=CurseForgeContentManager.DOWNLOAD_PROGRESS_INTERVAL_SECONDS,
+        )
         batch_progress.start()
 
         def download_item(item: dict, child_reporter: ProgressReporter | None):
@@ -198,7 +207,7 @@ class CurseForgeContentManager:
             download_pause_controller.raise_if_requested()
             return file, cache
 
-        workers = max(1, min(CurseForgeContentManager.MAX_WORKERS, len(missing)))
+        workers = CurseForgeContentManager._download_worker_count(len(missing))
         with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {}
             for item in missing:
@@ -284,6 +293,12 @@ class CurseForgeContentManager:
                 finally:
                     batch_progress.complete(token)
         return {"errors": errors, "downloaded": downloaded, "acceptedUnverified": accepted_unverified}
+
+    @staticmethod
+    def _download_worker_count(total: int) -> int:
+        normalized_total = max(1, int(total))
+        limit = CurseForgeContentManager.LARGE_BATCH_MAX_WORKERS if normalized_total >= CurseForgeContentManager.LARGE_BATCH_THRESHOLD else CurseForgeContentManager.MAX_WORKERS
+        return max(1, min(limit, normalized_total))
 
     @staticmethod
     def _expected_mod_identity_warning(instance: Instance, path: Path, entry: dict) -> str:

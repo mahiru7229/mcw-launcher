@@ -439,3 +439,9 @@ def test_download_round_downloads_multiple_artifacts_concurrently(tmp_path, monk
     assert result["downloaded"] == 2
     assert peak >= 2
     assert peak <= CurseForgeContentManager.MAX_WORKERS
+
+
+def test_large_modpack_download_uses_lower_worker_limit_to_keep_ui_responsive():
+    assert CurseForgeContentManager._download_worker_count(188) == 6
+    assert CurseForgeContentManager._download_worker_count(40) == 8
+    assert CurseForgeContentManager._download_worker_count(3) == 3

@@ -154,6 +154,8 @@ class MainWindow(QMainWindow):
         self._modrinth_pending_modpack_install: ModrinthModpackManualDownloadRequired | None = None
         self._curseforge_manual_instance_name = ""
         self._curseforge_pending_modpack_install: CurseForgeModpackManualDownloadRequired | None = None
+        self._manual_launch_provider = ""
+        self._manual_launch_lock_token = ""
         self._portable_manual_request: object | None = None
         self._page_history: list[str] = []
         self._page_history_index = -1
@@ -505,6 +507,7 @@ class MainWindow(QMainWindow):
         self.modrinth_manual_dialog.files_selected.connect(self._install_manual_modrinth_files)
         self.launch_controller.portable_manual_download_required.connect(self._portable_manual_download_required)
         self.launch_controller.compatibility_confirmation_required.connect(self._confirm_compatibility_launch)
+        self.launch_controller.manual_content_required.connect(self._on_launch_manual_content_required)
         self.portable_manual_dialog.files_selected.connect(self._install_portable_manual_files)
         self.instance_controller.portable_manual_files_installed.connect(self._portable_manual_files_installed)
 
@@ -1202,7 +1205,12 @@ class MainWindow(QMainWindow):
         if not self._modrinth_manual_instance_name:
             QMessageBox.warning(self, tr("artifact.manual.title", provider="Modrinth"), tr("curseforge.mod.no_instance"))
             return
-        self.modrinth_controller.install_manual_files(self._modrinth_manual_instance_name, self.modrinth_manual_dialog.remaining_requirements, paths)
+        self.modrinth_controller.install_manual_files(
+            self._modrinth_manual_instance_name,
+            self.modrinth_manual_dialog.remaining_requirements,
+            paths,
+            launch_lock_token=self._manual_launch_lock_token or None,
+        )
 
     def _modrinth_manual_files_installed(self, instance_name: str, result: object) -> None:
         imported = tuple(getattr(result, "imported", ()) or ())
@@ -1231,6 +1239,49 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("artifact.manual.title", provider="Modrinth"), message)
         else:
             QMessageBox.information(self, tr("artifact.manual.title", provider="Modrinth"), message)
+        self._resume_launch_after_manual_content("modrinth", instance_name, self.modrinth_manual_dialog)
+
+    def _on_launch_manual_content_required(self, error: Exception) -> None:
+        if isinstance(error, CurseForgeManagedFilesRequired):
+            self._manual_launch_provider = "curseforge"
+            self._manual_launch_lock_token = str(getattr(error, "launch_lock_token", "") or "")
+            self._curseforge_pending_modpack_install = None
+            self._curseforge_manual_instance_name = error.instance_name
+            self.curseforge_manual_dialog.set_instance_context(error.instance_name, error.instance_dir)
+            self.curseforge_manual_dialog.set_requirements(error.requirements)
+            dialog = self.curseforge_manual_dialog
+            provider = "CurseForge"
+        elif isinstance(error, ModrinthManagedFilesRequired):
+            self._manual_launch_provider = "modrinth"
+            self._manual_launch_lock_token = str(getattr(error, "launch_lock_token", "") or "")
+            self._modrinth_pending_modpack_install = None
+            self._modrinth_manual_instance_name = error.instance_name
+            self.modrinth_manual_dialog.set_instance_context(error.instance_name, error.instance_dir)
+            self.modrinth_manual_dialog.set_requirements(error.requirements)
+            dialog = self.modrinth_manual_dialog
+            provider = "Modrinth"
+        else:
+            return
+
+        status = tr("artifact.manual.launch_paused", provider=provider, count=len(error.requirements))
+        self.home_page.set_status(status)
+        self.right_panel.set_status(status)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _resume_launch_after_manual_content(self, provider: str, instance_name: str, dialog: object) -> None:
+        if self._manual_launch_provider != str(provider).strip().casefold():
+            return
+        if not self.launch_controller.waiting_for_manual_content or getattr(dialog, "remaining_count", 1) != 0:
+            return
+        expected_instance = self._curseforge_manual_instance_name if provider == "curseforge" else self._modrinth_manual_instance_name
+        if expected_instance and expected_instance != instance_name:
+            return
+        dialog.close()
+        self._manual_launch_provider = ""
+        self._manual_launch_lock_token = ""
+        self.launch_controller.resume_manual_content()
 
     def _modrinth_modpack_manual_download_required(self, request: object) -> None:
         if not isinstance(request, ModrinthModpackManualDownloadRequired):
@@ -1588,7 +1639,12 @@ class MainWindow(QMainWindow):
         if not self._curseforge_manual_instance_name:
             QMessageBox.warning(self, tr("curseforge.manual.title"), tr("curseforge.mod.no_instance"))
             return
-        self.curseforge_controller.install_manual_file(self._curseforge_manual_instance_name, requirement, Path(source))
+        self.curseforge_controller.install_manual_file(
+            self._curseforge_manual_instance_name,
+            requirement,
+            Path(source),
+            launch_lock_token=self._manual_launch_lock_token or None,
+        )
 
     def _install_manual_curseforge_files(self, sources: object) -> None:
         paths = [Path(source) for source in sources] if isinstance(sources, (list, tuple)) else []
@@ -1607,6 +1663,7 @@ class MainWindow(QMainWindow):
             self._curseforge_manual_instance_name,
             self.curseforge_manual_dialog.remaining_requirements,
             paths,
+            launch_lock_token=self._manual_launch_lock_token or None,
         )
 
     def _curseforge_manual_file_installed(self, instance_name: str, requirement: object, installed_name: str) -> None:
@@ -1617,6 +1674,7 @@ class MainWindow(QMainWindow):
         if self.curseforge_manual_dialog.remaining_count == 0:
             message += "\n\n" + tr("curseforge.manual.all_imported")
         QMessageBox.information(self, tr("curseforge.manual.title"), message)
+        self._resume_launch_after_manual_content("curseforge", instance_name, self.curseforge_manual_dialog)
 
     def _curseforge_manual_files_installed(self, instance_name: str, result: object) -> None:
         imported = tuple(getattr(result, "imported", ()) or ())
@@ -1651,6 +1709,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("curseforge.manual.title"), message)
         else:
             QMessageBox.information(self, tr("curseforge.manual.title"), message)
+        self._resume_launch_after_manual_content("curseforge", instance_name, self.curseforge_manual_dialog)
 
     def _curseforge_modpack_manual_download_required(self, request: object) -> None:
         if not isinstance(request, CurseForgeModpackManualDownloadRequired):
@@ -2306,6 +2365,11 @@ class MainWindow(QMainWindow):
     def _on_task_completed(self, task_id: str, _result: object) -> None:
         if task_id == self.launch_controller.TASK_ID:
             self._set_launch_active(False)
+            if self._manual_launch_provider:
+                dialog = self.curseforge_manual_dialog if self._manual_launch_provider == "curseforge" else self.modrinth_manual_dialog
+                dialog.close()
+                self._manual_launch_provider = ""
+                self._manual_launch_lock_token = ""
         if task_id == "mods.update.check":
             self.mod_manager_dialog.set_update_checking(False)
         if task_id.startswith("modpack."):

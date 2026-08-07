@@ -67,14 +67,15 @@ class ModrinthController(BaseController):
         normalized_loader = self._normalize_loader(loader)
         self._task_runner.run("modrinth.install.modpack", lambda: ModrinthPackInstaller.install(project_id, version_id, instance_name, install_optional_files, allowed_version_types, reporter, expected_loader=normalized_loader, settings_override=settings_override), tr("task.modrinth.install_modpack", loader=normalized_loader.title(), instance=instance_name))
 
-    def install_manual_files(self, instance_name: str, requirements: tuple[object, ...] | list[object], sources: tuple[Path, ...] | list[Path]) -> bool:
+    def install_manual_files(self, instance_name: str, requirements: tuple[object, ...] | list[object], sources: tuple[Path, ...] | list[Path], launch_lock_token: str | None = None) -> bool:
         normalized_sources = [Path(source) for source in sources]
         if not normalized_sources:
             return False
         return self._task_runner.run(
             "modrinth.install.manual.batch",
-            lambda: (instance_name, ModrinthManualInstaller.install_many(InstanceManager.load(instance_name), requirements, normalized_sources)),
+            lambda: (instance_name, ModrinthManualInstaller.install_many(InstanceManager.load(instance_name), requirements, normalized_sources, launch_lock_token=launch_lock_token)),
             tr("task.modrinth.add_downloaded_files", count=len(normalized_sources), instance=instance_name),
+            blocking=False,
         )
 
     def install_manual_modpack(self, request: ModrinthModpackManualDownloadRequired, source: Path) -> bool:

@@ -24,6 +24,7 @@ class LaunchController(BaseController):
     launch_cancelled = Signal()
     portable_manual_download_required = Signal(object)
     compatibility_confirmation_required = Signal(object)
+    manual_content_required = Signal(object)
 
     TASK_ID = "minecraft.launch"
 
@@ -37,6 +38,9 @@ class LaunchController(BaseController):
         self._debug_mode = False
         self._progress_log_lock = Lock()
         self._last_progress_log_key: tuple[object, ...] | None = None
+        self._state_lock = Lock()
+        self._manual_content_waiting = False
+        self._manual_content_error: Exception | None = None
 
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
@@ -52,6 +56,13 @@ class LaunchController(BaseController):
 
     def launch(self, allow_compatibility_issues_once: bool = False) -> None:
         if self._task_runner.is_task_active(self.TASK_ID):
+            if self.waiting_for_manual_content:
+                with self._state_lock:
+                    error = self._manual_content_error
+                if error is not None:
+                    self.manual_content_required.emit(error)
+                self.status_changed.emit(tr("artifact.manual.launch_paused_short"))
+                return
             if self._core.operations.state.paused:
                 self.resume()
             else:
@@ -80,6 +91,7 @@ class LaunchController(BaseController):
                         debug_mode=debug_mode,
                         on_progress=self._on_progress,
                         on_exit=self._on_game_exit,
+                        on_manual_content_required=self._on_manual_content_required,
                         allow_compatibility_issues_once=allow_compatibility_issues_once,
                     )
                 )
@@ -101,6 +113,9 @@ class LaunchController(BaseController):
         self.log_created.emit(tr("launch.paused_log"))
 
     def resume(self) -> None:
+        if self.waiting_for_manual_content:
+            self.status_changed.emit(tr("artifact.manual.launch_paused_short"))
+            return
         if not self._core.operations.resume():
             return
         self.launch_resumed.emit()
@@ -113,6 +128,33 @@ class LaunchController(BaseController):
         self.cancel_requested.emit()
         self.status_changed.emit(tr("launch.cancel_requested"))
         self.log_created.emit(tr("launch.cancel_requested_log"))
+
+    @property
+    def waiting_for_manual_content(self) -> bool:
+        with self._state_lock:
+            return self._manual_content_waiting
+
+    def resume_manual_content(self) -> bool:
+        with self._state_lock:
+            if not self._manual_content_waiting:
+                return False
+            self._manual_content_waiting = False
+            self._manual_content_error = None
+        if not self._core.operations.resume():
+            return False
+        self.launch_resumed.emit()
+        self.status_changed.emit(tr("artifact.manual.launch_resuming"))
+        self.log_created.emit(tr("artifact.manual.launch_resuming_log"))
+        return True
+
+    def _on_manual_content_required(self, error: Exception) -> None:
+        with self._state_lock:
+            self._manual_content_waiting = True
+            self._manual_content_error = error
+        self.launch_paused.emit()
+        self.manual_content_required.emit(error)
+        self.status_changed.emit(tr("artifact.manual.launch_paused_short"))
+        self.log_created.emit(f"{type(error).__name__}: launch paused for manual content import")
 
     def _on_progress(self, event: ProgressEvent) -> None:
         self.progress_received.emit(event)
@@ -150,6 +192,10 @@ class LaunchController(BaseController):
         if task_id != self.TASK_ID:
             return
 
+        with self._state_lock:
+            self._manual_content_waiting = False
+            self._manual_content_error = None
+
         self.launch_finished.emit(result)
 
         version = result.get("minecraftVersion", "unknown")
@@ -168,6 +214,10 @@ class LaunchController(BaseController):
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if task_id != self.TASK_ID:
             return
+
+        with self._state_lock:
+            self._manual_content_waiting = False
+            self._manual_content_error = None
 
         if is_download_cancelled(error):
             self.launch_cancelled.emit()

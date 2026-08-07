@@ -18,8 +18,8 @@ from src.models.network.artifact import ArtifactRequest
 
 class ModrinthManualInstaller:
     @staticmethod
-    def install(instance: Instance, requirement: ModrinthManualDownload, source: Path) -> str:
-        if InstanceRunLock.is_active(instance):
+    def install(instance: Instance, requirement: ModrinthManualDownload, source: Path, launch_lock_token: str | None = None) -> str:
+        if InstanceRunLock.is_active(instance) and not InstanceRunLock.owns_preparing_lock(instance, launch_lock_token):
             raise RuntimeError("Close Minecraft before importing a manually downloaded file.")
         path = Path(source)
         if not path.is_file():
@@ -33,7 +33,7 @@ class ModrinthManualInstaller:
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         metadata = ModManager.read_mod(cache, preferred_loader=loader_name)
         compatibility_warning = ModManager.compatibility_warning(instance, metadata)
-        added = ModManager.add_mods(instance, [cache], replace=True, allow_unverified=True)
+        added = ModManager.add_mods(instance, [cache], replace=True, launch_lock_token=launch_lock_token, allow_unverified=True)
         if not added:
             raise RuntimeError("The selected file could not be added to the instance.")
         installed_name = added[0].file_name
@@ -41,7 +41,7 @@ class ModrinthManualInstaller:
         return installed_name
 
     @staticmethod
-    def install_many(instance: Instance, requirements: tuple[ModrinthManualDownload, ...] | list[ModrinthManualDownload], sources: tuple[Path, ...] | list[Path]) -> ModrinthManualImportResult:
+    def install_many(instance: Instance, requirements: tuple[ModrinthManualDownload, ...] | list[ModrinthManualDownload], sources: tuple[Path, ...] | list[Path], launch_lock_token: str | None = None) -> ModrinthManualImportResult:
         pending = list(requirements)
         imported: list[ModrinthManualImportedFile] = []
         added_mods: list[str] = []
@@ -54,7 +54,7 @@ class ModrinthManualInstaller:
             requirement = ModrinthManualInstaller._match_requirement(source, pending)
             if requirement is not None:
                 try:
-                    installed_name = ModrinthManualInstaller.install(instance, requirement, source)
+                    installed_name = ModrinthManualInstaller.install(instance, requirement, source, launch_lock_token=launch_lock_token)
                 except Exception as error:
                     rejected.append(f"{source.name}: {error}")
                 else:
@@ -65,7 +65,7 @@ class ModrinthManualInstaller:
                 rejected.append(f"{source.name}: This file is not listed by the modpack. Only unmatched .jar files can be added as extra mods.")
                 continue
             try:
-                added = ModManager.add_mods(instance, [source], replace=False, allow_unverified=True)
+                added = ModManager.add_mods(instance, [source], replace=False, launch_lock_token=launch_lock_token, allow_unverified=True)
                 added_mods.extend(item.file_name for item in added)
             except Exception as error:
                 rejected.append(f"{source.name}: {error}")

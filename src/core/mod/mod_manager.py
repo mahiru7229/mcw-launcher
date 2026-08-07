@@ -536,10 +536,17 @@ class ModManager:
 
     @staticmethod
     def _read_legacy_forge_mod(path: Path, file_name: str, enabled: bool, raw_metadata: bytes) -> ModInfo:
+        metadata_format = "mcmod.info"
         try:
-            data = json.loads(raw_metadata.decode("utf-8-sig"))
-        except (UnicodeError, json.JSONDecodeError) as error:
-            return ModManager._invalid_mod(path, file_name, enabled, "Broken JAR", f"Invalid mcmod.info: {error}", loader="forge", metadata_format="mcmod.info")
+            text = raw_metadata.decode("utf-8-sig")
+            data = json.loads(text, strict=False)
+        except UnicodeError as error:
+            return ModManager._invalid_mod(path, file_name, enabled, "Broken JAR", f"Invalid mcmod.info: {error}", loader="forge", metadata_format=metadata_format)
+        except json.JSONDecodeError as error:
+            data = ModManager._salvage_legacy_mcmod_info(text)
+            if data is None:
+                return ModManager._invalid_mod(path, file_name, enabled, "Broken JAR", f"Invalid mcmod.info: {error}", loader="forge", metadata_format=metadata_format)
+            metadata_format = "mcmod.info (tolerant)"
 
         if isinstance(data, dict):
             entries = data.get("modList") if isinstance(data.get("modList"), list) else [data]
@@ -573,7 +580,7 @@ class ModManager:
             name=str(metadata.get("name") or mod_id).strip(),
             version=str(metadata.get("version") or "Unknown").strip(),
             loader="forge",
-            metadata_format="mcmod.info",
+            metadata_format=metadata_format,
             description=str(metadata.get("description") or "").strip(),
             environment="*",
             authors=ModManager._parse_authors(metadata.get("authorList") or metadata.get("authors")),
@@ -587,6 +594,41 @@ class ModManager:
             error="",
             provided_mods=tuple(sorted(provided.items())),
         )
+
+    @staticmethod
+    def _salvage_legacy_mcmod_info(text: str) -> list[dict] | None:
+        def field(*names: str) -> str:
+            alternatives = "|".join(re.escape(name) for name in names)
+            match = re.search(rf'"(?:{alternatives})"\s*:\s*"((?:\\.|[^"\\])*)"', text, flags=re.IGNORECASE | re.DOTALL)
+            if match is None:
+                return ""
+            try:
+                return json.loads(f'"{match.group(1)}"', strict=False)
+            except json.JSONDecodeError:
+                return match.group(1).replace('\\"', '"').replace('\\\\', '\\')
+
+        mod_id = field("modid", "modId").strip()
+        if not mod_id:
+            return None
+
+        metadata: dict[str, object] = {
+            "modid": mod_id,
+            "name": field("name").strip() or mod_id,
+            "version": field("version").strip() or "Unknown",
+        }
+        for key in ("description", "mcversion", "license"):
+            value = field(key).strip()
+            if value:
+                metadata[key] = value
+
+        for key in ("requiredMods", "dependencies", "dependants"):
+            match = re.search(rf'"{re.escape(key)}"\s*:\s*\[(.*?)\]', text, flags=re.IGNORECASE | re.DOTALL)
+            if match is None:
+                continue
+            values = re.findall(r'"((?:\\.|[^"\\])*)"', match.group(1))
+            if values:
+                metadata[key] = values
+        return [metadata]
 
     @staticmethod
     def _discover_mod_paths(instance: Instance, directory: Path) -> list[Path]:

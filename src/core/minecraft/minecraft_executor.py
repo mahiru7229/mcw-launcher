@@ -28,11 +28,13 @@ from src.core.modloader.forge.legacy_libloader_manager import LegacyLibLoaderMan
 from src.core.modloader.forge.forge_preflight_manager import ForgePreflightManager
 from src.core.modloader.forge.compatibility_confirmation import CompatibilityConfirmationRequired
 from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
+from src.core.curseforge.curseforge_errors import CurseForgeManagedFilesRequired
 from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
 from src.core.curseforge.curseforge_registry import CurseForgeRegistry
 from src.core.ftb.ftb_content_manager import FTBContentManager
 from src.core.atlauncher.atlauncher_content_manager import ATLauncherContentManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
+from src.core.modrinth.modrinth_errors import ModrinthManagedFilesRequired
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.core.modrinth.modrinth_registry import ModrinthRegistry
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
@@ -52,7 +54,7 @@ from src.models.runtime.game_exit_result import GameExitResult
 
 class MinecraftExecutor:
     @staticmethod
-    def _complete_managed_dependencies(instance: Instance, reporter: ProgressReporter, block_modrinth_failure: bool, block_curseforge_failure: bool, launch_lock_token: str | None, modrinth_warnings: tuple[str, ...] | list[str], curseforge_warnings: tuple[str, ...] | list[str], initial_resolution=None, refresh_after_initial_ensure: bool = False):
+    def _complete_managed_dependencies(instance: Instance, reporter: ProgressReporter, block_modrinth_failure: bool, block_curseforge_failure: bool, launch_lock_token: str | None, modrinth_warnings: tuple[str, ...] | list[str], curseforge_warnings: tuple[str, ...] | list[str], initial_resolution=None, refresh_after_initial_ensure: bool = False, on_manual_content_required: Callable[[Exception], None] | None = None):
         final_resolution = initial_resolution if initial_resolution is not None else ModpackDependencyResolver.resolve(instance, reporter)
         modrinth_result = tuple(modrinth_warnings)
         curseforge_result = tuple(curseforge_warnings)
@@ -63,16 +65,50 @@ class MinecraftExecutor:
         for _pass_number in range(ModpackDependencyResolver.MAX_COMPLETION_PASSES):
             if not final_resolution.changed:
                 break
-            modrinth_result += tuple(ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token))
-            curseforge_result += tuple(CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token))
+            modrinth_result += tuple(MinecraftExecutor._run_with_manual_content_pause(
+                lambda: ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token),
+                (ModrinthManagedFilesRequired,),
+                on_manual_content_required,
+                launch_lock_token,
+            ))
+            curseforge_result += tuple(MinecraftExecutor._run_with_manual_content_pause(
+                lambda: CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token),
+                (CurseForgeManagedFilesRequired,),
+                on_manual_content_required,
+                launch_lock_token,
+            ))
             final_resolution = ModpackDependencyResolver.resolve(instance, reporter)
 
         if final_resolution.changed:
-            modrinth_result += tuple(ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token))
-            curseforge_result += tuple(CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token))
+            modrinth_result += tuple(MinecraftExecutor._run_with_manual_content_pause(
+                lambda: ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token),
+                (ModrinthManagedFilesRequired,),
+                on_manual_content_required,
+                launch_lock_token,
+            ))
+            curseforge_result += tuple(MinecraftExecutor._run_with_manual_content_pause(
+                lambda: CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token),
+                (CurseForgeManagedFilesRequired,),
+                on_manual_content_required,
+                launch_lock_token,
+            ))
             final_resolution = ModpackDependencyResolver.resolve(instance, reporter)
 
         return final_resolution, modrinth_result, curseforge_result
+
+    @staticmethod
+    def _run_with_manual_content_pause(operation: Callable[[], object], error_types: tuple[type[Exception], ...], on_manual_content_required: Callable[[Exception], None] | None, launch_lock_token: str | None = None):
+        while True:
+            try:
+                return operation()
+            except error_types as error:
+                if on_manual_content_required is None:
+                    raise
+                if hasattr(error, "launch_lock_token"):
+                    error.launch_lock_token = str(launch_lock_token or "")
+                download_pause_controller.request_pause()
+                on_manual_content_required(error)
+                download_pause_controller.raise_if_requested()
 
 
     @staticmethod
@@ -165,7 +201,7 @@ class MinecraftExecutor:
         return " | ".join(lines[-max(1, int(line_limit)):])
 
     @staticmethod
-    def run(instance: Instance, authentication: Authentication, account: Account, debug_mode: bool = False, on_progress: ProgressCallback | None = None, on_exit: Callable[[GameExitResult], None] | None = None, allow_compatibility_issues_once: bool = False) -> dict:
+    def run(instance: Instance, authentication: Authentication, account: Account, debug_mode: bool = False, on_progress: ProgressCallback | None = None, on_exit: Callable[[GameExitResult], None] | None = None, allow_compatibility_issues_once: bool = False, on_manual_content_required: Callable[[Exception], None] | None = None) -> dict:
         run_lock = InstanceRunLock.acquire(instance)
         process_started = False
         process = None
@@ -196,8 +232,18 @@ class MinecraftExecutor:
             PortableContentManager.prefetch_referenced(instance, reporter)
             dependency_resolution = ModpackDependencyResolver.resolve(instance, reporter)
             refresh_dependencies_after_download = MinecraftExecutor._managed_dependency_download_pending(instance)
-            modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token)
-            curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token)
+            modrinth_warnings = MinecraftExecutor._run_with_manual_content_pause(
+                lambda: ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_modrinth_failure, launch_lock_token=launch_lock_token),
+                (ModrinthManagedFilesRequired,),
+                on_manual_content_required,
+                launch_lock_token,
+            )
+            curseforge_warnings = MinecraftExecutor._run_with_manual_content_pause(
+                lambda: CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_curseforge_failure, launch_lock_token=launch_lock_token),
+                (CurseForgeManagedFilesRequired,),
+                on_manual_content_required,
+                launch_lock_token,
+            )
             ftb_warnings = FTBContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
             atlauncher_warnings = ATLauncherContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
             legacy_libloader_warnings = LegacyLibLoaderManager.ensure(instance, reporter)
@@ -216,6 +262,7 @@ class MinecraftExecutor:
                 curseforge_warnings,
                 initial_resolution=dependency_resolution,
                 refresh_after_initial_ensure=refresh_dependencies_after_download,
+                on_manual_content_required=on_manual_content_required,
             )
             ModpackDependencyResolver.raise_for_required_dependencies(instance, dependency_resolution_after_download.unresolved)
             PortableContentManager.finalize_disabled(instance)

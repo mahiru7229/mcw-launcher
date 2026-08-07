@@ -129,19 +129,20 @@ class CurseForgeController(BaseController):
 
         return self._task_runner.run("curseforge.install.mod", task, tr("task.curseforge.install_mod", instance=instance_name))
 
-    def install_manual_file(self, instance_name: str, requirement: CurseForgeManualDownload, source: Path) -> bool:
+    def install_manual_file(self, instance_name: str, requirement: CurseForgeManualDownload, source: Path, launch_lock_token: str | None = None) -> bool:
         task_id = f"curseforge.install.manual.{requirement.project_id}"
         return self._task_runner.run(
             task_id,
             lambda: (
                 instance_name,
                 requirement,
-                CurseForgeManualInstaller.install(InstanceManager.load(instance_name), requirement, source),
+                CurseForgeManualInstaller.install(InstanceManager.load(instance_name), requirement, source, launch_lock_token=launch_lock_token),
             ),
             tr("task.curseforge.import_manual_file", file=requirement.file_name),
+            blocking=False,
         )
 
-    def install_manual_files(self, instance_name: str, requirements: tuple[CurseForgeManualDownload, ...] | list[CurseForgeManualDownload], sources: tuple[Path, ...] | list[Path]) -> bool:
+    def install_manual_files(self, instance_name: str, requirements: tuple[CurseForgeManualDownload, ...] | list[CurseForgeManualDownload], sources: tuple[Path, ...] | list[Path], launch_lock_token: str | None = None) -> bool:
         normalized_sources = [Path(source) for source in sources]
         if not normalized_sources:
             return False
@@ -150,9 +151,10 @@ class CurseForgeController(BaseController):
             task_id,
             lambda: (
                 instance_name,
-                CurseForgeManualInstaller.install_many(InstanceManager.load(instance_name), requirements, normalized_sources),
+                CurseForgeManualInstaller.install_many(InstanceManager.load(instance_name), requirements, normalized_sources, launch_lock_token=launch_lock_token),
             ),
             tr("task.curseforge.add_downloaded_files", count=len(normalized_sources), instance=instance_name),
+            blocking=False,
         )
 
     def install_modpack(self, project_id: int, file_id: int, instance_name: str, install_optional_files: bool, allowed_release_types: tuple[str, ...], expected_loader: str = "", settings_override: dict | None = None) -> bool:

@@ -919,3 +919,36 @@ def test_mixed_forge_neoforge_metadata_uses_active_loader_metadata(tmp_path):
     assert neoforge.loader == "neoforge"
     assert neoforge.mod_id == "neoforge_view"
     assert "neoforge" in neoforge.dependencies
+
+
+def test_legacy_mcmod_info_allows_unescaped_control_characters(tmp_path):
+    import zipfile
+
+    jar = tmp_path / "legacy-control-char.jar"
+    raw = b'[{"modid":"legacy_control","name":"Legacy Control","version":"1.0.0","description":"line one\nline two"}]'
+    with zipfile.ZipFile(jar, "w") as archive:
+        archive.writestr("mcmod.info", raw)
+
+    mod = ModManager.read_mod(jar, preferred_loader="forge")
+
+    assert mod.status == "Ready"
+    assert mod.mod_id == "legacy_control"
+    assert mod.version == "1.0.0"
+    assert "mcmod.info" in mod.metadata_format
+
+
+def test_legacy_mcmod_info_salvages_identity_when_json_is_malformed(tmp_path):
+    import zipfile
+
+    jar = tmp_path / "switchbow-1.6.8.jar"
+    raw = b'[{"modid":"switchbow","name":"Switch-Bow","version":"1.6.8","description":}]'
+    with zipfile.ZipFile(jar, "w") as archive:
+        archive.writestr("mcmod.info", raw)
+
+    mod = ModManager.read_mod(jar, preferred_loader="forge")
+
+    assert mod.status == "Ready"
+    assert mod.mod_id == "switchbow"
+    assert mod.version == "1.6.8"
+    assert mod.metadata_format == "mcmod.info (tolerant)"
+    assert mod.error == ""

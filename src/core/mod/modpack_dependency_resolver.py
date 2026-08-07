@@ -1093,5 +1093,12 @@ class ModpackDependencyResolver:
 
     @staticmethod
     def _report(reporter: ProgressReporter | None, message: str, current: int, total: int) -> None:
-        if reporter is not None:
-            reporter.files(stage=ProgressStage.CHECKING_MODPACK, message=message, current=current, total=total)
+        if reporter is None:
+            return
+        normalized_total = max(1, int(total))
+        normalized_current = max(0, min(int(current), normalized_total))
+        if normalized_total > 20 and normalized_current not in {0, normalized_total}:
+            step = max(1, normalized_total // 20)
+            if normalized_current % step != 0:
+                return
+        reporter.files(stage=ProgressStage.CHECKING_MODPACK, message=message, current=normalized_current, total=normalized_total)

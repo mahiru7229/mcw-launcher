@@ -102,3 +102,25 @@ def test_failed_launch_logs_full_error_without_opening_error_dialog() -> None:
     assert errors == []
     assert statuses == ["Launch failed"]
     assert logs == ["RuntimeError: Forge pre-launch check failed:\n- Example mod uses the wrong loader"]
+
+
+def test_manual_content_pause_cannot_be_resumed_by_launch_toggle():
+    runner = FakeTaskRunner()
+    controller = LaunchController(runner)
+    runner.active = True
+    required = RuntimeError("manual files required")
+    emitted = []
+    controller.manual_content_required.connect(emitted.append)
+    download_pause_controller.begin()
+    assert download_pause_controller.request_pause() is True
+
+    controller._on_manual_content_required(required)
+
+    assert emitted == [required]
+    assert controller.waiting_for_manual_content is True
+    controller.launch()
+    assert download_pause_controller.is_paused is True
+
+    assert controller.resume_manual_content() is True
+    assert controller.waiting_for_manual_content is False
+    assert download_pause_controller.is_paused is False
