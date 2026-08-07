@@ -542,3 +542,14 @@ def test_search_supports_resource_pack_and_shader_class_ids(monkeypatch, tmp_pat
 
     assert class_ids == ["12", "6552"]
     client.close()
+
+
+def test_fabric_forge_universal_metadata_is_not_neoforge_compatible() -> None:
+    file = CurseForgeClient._parse_file({
+        "id": 34,
+        "modId": 11,
+        "fileName": "fabric-forge.jar",
+        "gameVersions": ["1.20.1", "Fabric", "Forge"],
+    })
+
+    assert CurseForgeClient.loader_compatibility(file, "neoforge") == "unverified"

@@ -610,9 +610,10 @@ class ModManager:
         required: dict[str, object] = {}
         optional: dict[str, object] = {}
         groups = data.get("dependencies") if isinstance(data.get("dependencies"), dict) else {}
+        # Dependencies are scoped to the selected top-level mod ID. Falling
+        # back to another dependency table can promote metadata from a sibling
+        # or nested component and create false dependencies for the active mod.
         entries = groups.get(mod_id) if isinstance(groups.get(mod_id), list) else []
-        if not entries:
-            entries = next((value for value in groups.values() if isinstance(value, list)), [])
         for entry in entries:
             if not isinstance(entry, dict):
                 continue

@@ -360,7 +360,7 @@ class CurseForgeClient:
     def _loader_compatibility(loaders: tuple[str, ...] | list[str] | set[str], loader: str) -> str:
         normalized_loader = CurseForgeClient.normalize_loader(loader)
         normalized = {str(value).strip().casefold() for value in loaders if str(value).strip()}
-        if {"fabric", "forge"}.issubset(normalized):
+        if normalized_loader in {"fabric", "forge"} and {"fabric", "forge"}.issubset(normalized):
             return "universal"
         if normalized_loader and normalized_loader in normalized:
             return "compatible"

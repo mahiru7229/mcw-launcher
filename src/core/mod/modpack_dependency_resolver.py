@@ -436,7 +436,14 @@ class ModpackDependencyResolver:
                 continue
             changed |= ModpackDependencyResolver._hydrate_curseforge_entry(entry, file)
             selected.setdefault(project_id, entry)
-            files[file_id] = file
+            if ModpackDependencyResolver._curseforge_dependency_metadata_in_scope(file, loader_name):
+                files[file_id] = file
+            else:
+                declared = ", ".join(file.loaders) or "unknown"
+                warnings.append(
+                    f"Ignored CurseForge dependency metadata for {entry.get('fileName') or file.file_name}: "
+                    f"declared loader(s) {declared} are outside the active {loader_name} context."
+                )
             ModpackDependencyResolver._report(reporter, "Resolving CurseForge modpack dependencies...", completed, max(1, len(mod_entries)))
 
         queue: deque[tuple[CurseForgeFile, int, str]] = deque(
@@ -472,6 +479,13 @@ class ModpackDependencyResolver:
                     )
                 except Exception as error:
                     unresolved.append(f"{parent_label} requires CurseForge project {dependency.project_id}: {error}")
+                    continue
+                if not ModpackDependencyResolver._curseforge_dependency_metadata_in_scope(dependency_file, loader_name):
+                    declared = ", ".join(dependency_file.loaders) or "unknown"
+                    unresolved.append(
+                        f"{parent_label} requires CurseForge project {dependency.project_id}, but file {dependency_file.file_id} "
+                        f"declares loader(s) {declared} outside the active {loader_name} context."
+                    )
                     continue
                 if dependency_file.project_id in selected:
                     changed |= ModpackDependencyResolver._append_required_by(selected[dependency_file.project_id], parent_label)
@@ -530,6 +544,11 @@ class ModpackDependencyResolver:
             registry["dependencyResolution"] = ModpackDependencyResolver._resolution_payload(added, unresolved)
             CurseForgePackRegistry.save(Path(instance.instance_dir), registry)
         return DependencyResolutionResult(tuple(added), tuple(warnings), tuple(unresolved))
+
+    @staticmethod
+    def _curseforge_dependency_metadata_in_scope(file: CurseForgeFile, loader_name: str) -> bool:
+        status = CurseForgeClient.loader_compatibility(file, loader_name)
+        return status in {"compatible", "universal", "unknown"}
 
     @staticmethod
     def _resolve_cross_provider_missing(instance: Instance, reporter: ProgressReporter | None) -> DependencyResolutionResult:

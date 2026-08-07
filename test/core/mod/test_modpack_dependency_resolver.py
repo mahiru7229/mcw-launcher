@@ -487,3 +487,67 @@ def test_pack_pinned_verified_provider_file_is_not_marked_for_download_when_meta
     assert entry["pendingDownload"] is False
     assert entry["expectedModIds"] == ["reskillable"]
     assert entry["requiredBy"] == ["CompatSkills"]
+
+
+def test_curseforge_resolver_ignores_dependency_metadata_from_foreign_loader(tmp_path, monkeypatch):
+    root = CurseForgeFile(
+        file_id=100,
+        project_id=10,
+        display_name="root.jar",
+        file_name="root.jar",
+        release_type="release",
+        file_date="2026-01-01T00:00:00Z",
+        file_length=10,
+        download_url="https://edge.forgecdn.net/files/100/root.jar",
+        sha1="1" * 40,
+        game_versions=("1.21.1",),
+        dependencies=(CurseForgeDependency(20, 3),),
+        loaders=("fabric",),
+    )
+    registry = {"managedFiles": [{"projectId": 10, "fileId": 100, "fileName": "root.jar", "path": "mods/root.jar", "provider": "curseforge", "required": True}]}
+
+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: registry)
+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda *_args: None)
+    monkeypatch.setattr(ModProvenanceRegistry, "synchronize", lambda _instance: {})
+    monkeypatch.setattr(CurseForgeClient, "get_files_batch", lambda _file_ids: {100: root})
+    monkeypatch.setattr(CurseForgeClient, "latest_compatible_file", lambda *_args, **_kwargs: pytest.fail("foreign loader metadata must not expand the dependency graph"))
+
+    result = ModpackDependencyResolver.resolve(instance(tmp_path, loader="neoforge"))
+
+    assert result.added_files == ()
+    assert result.unresolved == ()
+    assert any("outside the active neoforge context" in warning for warning in result.warnings)
+
+
+def test_curseforge_resolver_rejects_foreign_loader_dependency_candidate(tmp_path, monkeypatch):
+    root = cf_file(10, 100, "root.jar", (CurseForgeDependency(20, 3),))
+    foreign = CurseForgeFile(
+        file_id=200,
+        project_id=20,
+        display_name="fabric-only.jar",
+        file_name="fabric-only.jar",
+        release_type="release",
+        file_date="2026-01-01T00:00:00Z",
+        file_length=10,
+        download_url="https://edge.forgecdn.net/files/200/fabric-only.jar",
+        sha1="2" * 40,
+        game_versions=("1.21.1",),
+        dependencies=(CurseForgeDependency(30, 3),),
+        loaders=("fabric",),
+    )
+    registry = {"managedFiles": [{"projectId": 10, "fileId": 100, "fileName": "root.jar", "path": "mods/root.jar", "provider": "curseforge", "required": True}]}
+    saved = {}
+
+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: registry)
+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda _instance, payload: saved.update(payload))
+    monkeypatch.setattr(ModProvenanceRegistry, "synchronize", lambda _instance: {})
+    monkeypatch.setattr(CurseForgeClient, "get_files_batch", lambda _file_ids: {100: root})
+    monkeypatch.setattr(CurseForgeClient, "latest_compatible_file", lambda project_id, *_args, **_kwargs: foreign if project_id == 20 else pytest.fail("foreign child metadata must not be traversed"))
+
+    result = ModpackDependencyResolver.resolve(instance(tmp_path, loader="neoforge"))
+
+    assert result.added_files == ()
+    assert any("outside the active neoforge context" in issue for issue in result.unresolved)
+    assert all(entry.get("projectId") != 20 for entry in saved.get("managedFiles", registry["managedFiles"]))

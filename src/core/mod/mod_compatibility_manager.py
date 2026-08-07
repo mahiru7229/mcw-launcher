@@ -11,7 +11,7 @@ from src.models.mod.mod_issue import ModHealthReport, ModIssue
 
 
 class ModCompatibilityManager:
-    SYSTEM_DEPENDENCY_IDS = {"minecraft", "forge", "neoforge", "javafml", "fml", "fabricloader", "quilt_loader", "quiltloader"}
+    SYSTEM_DEPENDENCY_IDS = {"minecraft", "java", "forge", "neoforge", "javafml", "fml", "fabric", "fabricloader", "quilt", "quilt_loader", "quiltloader"}
 
     @staticmethod
     def scan(instance: Instance, mods: list[ModInfo] | None = None) -> ModHealthReport:
@@ -39,9 +39,15 @@ class ModCompatibilityManager:
                 if mod_id:
                     installed_versions.setdefault(mod_id.casefold(), version or mod.version)
         installed_versions["minecraft"] = instance.version_id
+        # Java is a launcher-managed environment capability. Its concrete
+        # runtime is selected and validated later by JavaResolver, so dependency
+        # scanning must treat it as present without trying to resolve it as a mod.
+        installed_versions["java"] = "managed-runtime"
         if loader_name == ModLoaderManager.FABRIC:
+            installed_versions["fabric"] = loader_version
             installed_versions["fabricloader"] = loader_version
         elif loader_name == ModLoaderManager.QUILT:
+            installed_versions["quilt"] = loader_version
             installed_versions["quilt_loader"] = loader_version
             installed_versions["quiltloader"] = loader_version
             # Quilt Loader exposes Fabric Loader compatibility for Fabric mods.
@@ -117,6 +123,8 @@ class ModCompatibilityManager:
                     message = f"{mod.name} requires missing dependency '{dependency_id}' ({ModCompatibilityManager._format_requirement(requirement)})."
                     code = "dependency-missing"
                 issues.append(ModIssue(severity="error", code=code, message=message, mod_ids=(mod.mod_id, normalized_id)))
+                continue
+            if normalized_id == "java" and installed_versions[normalized_id] == "managed-runtime":
                 continue
             matches = ModCompatibilityManager._matches_requirement(installed_versions[normalized_id], requirement)
             if matches is False:

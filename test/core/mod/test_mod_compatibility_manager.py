@@ -329,3 +329,72 @@ def test_jarjar_provided_mod_satisfies_required_dependency(tmp_path) -> None:
     report = ModCompatibilityManager.scan(instance, mods=[provider, consumer])
 
     assert not any(issue.code in {"dependency-missing", "dependency-version"} and "kotlinforforge" in issue.mod_ids for issue in report.issues)
+
+
+def test_java_dependency_is_launcher_environment_capability(tmp_path) -> None:
+    instance_dir = tmp_path / "java-capability"
+    (instance_dir / "mods").mkdir(parents=True)
+    instance = Instance(instance_id="java-capability", name="Java Capability", version_id="1.20.1", instance_dir=instance_dir, mod_loader=("forge", "47.3.0"))
+    consumer = ModInfo(
+        path=instance_dir / "mods" / "consumer.jar",
+        file_name="consumer.jar",
+        enabled=True,
+        mod_id="consumer",
+        name="Consumer",
+        version="1.0.0",
+        loader="forge",
+        dependencies={"java": "[17,)"},
+    )
+
+    report = ModCompatibilityManager.scan(instance, mods=[consumer])
+
+    assert not any(issue.code.startswith("dependency-") and "java" in issue.mod_ids for issue in report.issues)
+
+
+def test_active_fabric_loader_alias_is_environment_capability(tmp_path) -> None:
+    instance_dir = tmp_path / "fabric-capability"
+    (instance_dir / "mods").mkdir(parents=True)
+    instance = Instance(instance_id="fabric-capability", name="Fabric Capability", version_id="1.20.1", instance_dir=instance_dir, mod_loader=("fabric", "0.16.0"))
+    consumer = ModInfo(
+        path=instance_dir / "mods" / "consumer.jar",
+        file_name="consumer.jar",
+        enabled=True,
+        mod_id="consumer",
+        name="Consumer",
+        version="1.0.0",
+        loader="fabric",
+        dependencies={"fabric": ">=0.15.0"},
+    )
+
+    report = ModCompatibilityManager.scan(instance, mods=[consumer])
+
+    assert not any(issue.code.startswith("dependency-") and "fabric" in issue.mod_ids for issue in report.issues)
+
+
+def test_forge_parser_does_not_promote_other_mod_dependency_group(tmp_path) -> None:
+    from src.core.mod.mod_manager import ModManager
+
+    path = tmp_path / "multi-component.jar"
+    metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[47,)"\n'
+        'license="MIT"\n\n'
+        '[[mods]]\n'
+        'modId="primary"\n'
+        'version="1.0.0"\n'
+        'displayName="Primary"\n\n'
+        '[[dependencies.secondary]]\n'
+        'modId="fabricloader"\n'
+        'mandatory=true\n'
+        'versionRange="[0.15,)"\n'
+        'ordering="NONE"\n'
+        'side="BOTH"\n'
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("META-INF/mods.toml", metadata)
+
+    mod = ModManager.read_mod(path, preferred_loader="forge")
+
+    assert mod.mod_id == "primary"
+    assert "fabricloader" not in mod.dependencies
+    assert mod.dependencies["forge"] == "[47,)"
