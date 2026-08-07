@@ -20,9 +20,13 @@ class ModCompatibilityManager:
         enabled = [mod for mod in mods if mod.enabled]
         disabled = [mod for mod in mods if not mod.enabled]
         enabled_by_id: dict[str, list[ModInfo]] = defaultdict(list)
+        primary_enabled_by_id: dict[str, list[ModInfo]] = defaultdict(list)
         disabled_by_id: dict[str, list[ModInfo]] = defaultdict(list)
 
         for mod in enabled:
+            primary_id = mod.mod_id.casefold()
+            if primary_id:
+                primary_enabled_by_id[primary_id].append(mod)
             identities = {mod.mod_id.casefold()} | {mod_id.casefold() for mod_id, _version in mod.provided_mods if mod_id}
             for mod_id in identities:
                 enabled_by_id[mod_id].append(mod)
@@ -85,7 +89,7 @@ class ModCompatibilityManager:
         issues: list[ModIssue] = []
         ModCompatibilityManager._append_file_issues(mods, issues)
         ModCompatibilityManager._append_loader_issues(loader_name, enabled, issues)
-        ModCompatibilityManager._append_duplicate_issues(enabled_by_id, issues)
+        ModCompatibilityManager._append_duplicate_issues(primary_enabled_by_id, issues)
 
         for mod in enabled:
             if ModCompatibilityManager._dependency_metadata_in_scope(mod, loader_name):
@@ -111,7 +115,7 @@ class ModCompatibilityManager:
             if mod.managed_by_modpack:
                 issues.append(
                     ModIssue(
-                        severity="warning",
+                        severity="info",
                         code="pack-pinned-loader-metadata",
                         message=(
                             f"{mod.name} is pinned by the modpack, but its JAR metadata declares {mod.loader.title()} "
@@ -189,7 +193,7 @@ class ModCompatibilityManager:
         for dependency_id, requirement in mod.recommends.items():
             normalized_id = str(dependency_id).strip().casefold()
             if normalized_id and normalized_id not in installed_versions and normalized_id not in disabled_by_id:
-                issues.append(ModIssue(severity="warning", code="recommended-missing", message=f"{mod.name} recommends '{dependency_id}' ({ModCompatibilityManager._format_requirement(requirement)}).", mod_ids=(mod.mod_id, normalized_id)))
+                issues.append(ModIssue(severity="info", code="recommended-missing", message=f"{mod.name} recommends '{dependency_id}' ({ModCompatibilityManager._format_requirement(requirement)}).", mod_ids=(mod.mod_id, normalized_id)))
 
     @staticmethod
     def _append_conflict_issues(mod: ModInfo, enabled_by_id: dict[str, list[ModInfo]], installed_versions: dict[str, str], issues: list[ModIssue]) -> None:
@@ -226,6 +230,10 @@ class ModCompatibilityManager:
             return ModCompatibilityManager._match_maven_range(version, expression)
         if "||" in expression:
             return ModCompatibilityManager._matches_requirement(version, [part.strip() for part in expression.split("||")])
+        if "," in expression:
+            alternatives = [part.strip() for part in expression.split(",") if part.strip()]
+            if len(alternatives) > 1 and all(re.match(r"^(?:>=|<=|>|<|=|\^|~)", part) is None for part in alternatives):
+                return ModCompatibilityManager._matches_requirement(version, alternatives)
 
         tokens = re.findall(r"(?:>=|<=|>|<|=|\^|~)?\s*[^\s,]+", expression.replace(",", " "))
         if not tokens:
@@ -303,12 +311,12 @@ class ModCompatibilityManager:
             upper = ModCompatibilityManager._caret_upper(expected_key)
             return current_key >= expected_key and current_key < upper
         if operator == "~":
-            upper = (expected_key[0], expected_key[1] + 1, 0, 1, "")
+            upper = (expected_key[0], expected_key[1] + 1, 0, 0, 1, ())
             return current_key >= expected_key and current_key < upper
         return None
 
     @staticmethod
-    def _version_key(value: str) -> tuple[int, int, int, int, str] | None:
+    def _version_key(value: str) -> tuple[int, int, int, int, int, tuple[tuple[int, int, str], ...]] | None:
         normalized = str(value).strip().lstrip("vV")
         without_build = normalized.split("+", 1)[0]
         numeric, separator, prerelease = without_build.partition("-")
@@ -324,24 +332,42 @@ class ModCompatibilityManager:
         while len(numbers) < 3:
             numbers.append(0)
 
-        # Forge/Maven metadata occasionally uses a dotted qualifier instead of
-        # a hyphenated prerelease, for example ``0.6.8.a``. Treat that fourth
-        # non-numeric component as a qualifier so ranges such as
-        # ``[0.6.8.a,0.7)`` remain comparable instead of becoming unknown.
         extra = ".".join(parts[3:])
-        dotted_qualifier = bool(extra and not extra.isdigit())
-        release_rank = 0 if separator or dotted_qualifier else 1
-        suffix = prerelease.casefold() if separator else extra.casefold()
-        return numbers[0], numbers[1], numbers[2], release_rank, suffix
+        revision = int(extra) if extra.isdigit() else 0
+        suffix = prerelease.casefold() if separator else (extra.casefold() if extra and not extra.isdigit() else "")
+        release_rank, suffix_key = ModCompatibilityManager._suffix_key(suffix)
+        return numbers[0], numbers[1], numbers[2], revision, release_rank, suffix_key
 
     @staticmethod
-    def _caret_upper(key: tuple[int, int, int, int, str]) -> tuple[int, int, int, int, str]:
-        major, minor, patch, _, _ = key
+    def _suffix_key(value: str) -> tuple[int, tuple[tuple[int, int, str], ...]]:
+        suffix = str(value or "").strip().casefold()
+        if not suffix:
+            return 1, ()
+
+        tokens = re.findall(r"\d+|[a-z]+", suffix)
+        first_text = next((token for token in tokens if not token.isdigit()), "")
+        prerelease = {"alpha": -5, "a": -5, "beta": -4, "b": -4, "milestone": -3, "m": -3, "rc": -2, "cr": -2, "snapshot": -1, "pre": -1, "preview": -1}
+        release_aliases = {"final", "ga", "release"}
+        if first_text in release_aliases and all(token in release_aliases for token in tokens if not token.isdigit()):
+            return 1, ()
+        release_rank = 0 if first_text in prerelease else 2
+        qualifier_order = {**prerelease, "final": 0, "ga": 0, "release": 0, "sp": 1}
+        key: list[tuple[int, int, str]] = []
+        for token in tokens:
+            if token.isdigit():
+                key.append((1, int(token), ""))
+            else:
+                key.append((0, qualifier_order.get(token, 2), token))
+        return release_rank, tuple(key)
+
+    @staticmethod
+    def _caret_upper(key: tuple[int, int, int, int, int, tuple[tuple[int, int, str], ...]]) -> tuple[int, int, int, int, int, tuple[tuple[int, int, str], ...]]:
+        major, minor, patch, _, _, _ = key
         if major > 0:
-            return major + 1, 0, 0, 1, ""
+            return major + 1, 0, 0, 0, 1, ()
         if minor > 0:
-            return 0, minor + 1, 0, 1, ""
-        return 0, 0, patch + 1, 1, ""
+            return 0, minor + 1, 0, 0, 1, ()
+        return 0, 0, patch + 1, 0, 1, ()
 
     @staticmethod
     def _format_requirement(requirement: object) -> str:

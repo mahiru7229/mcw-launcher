@@ -485,9 +485,7 @@ class ModpackDependencyResolver:
                     )
                 except Exception as error:
                     message = f"{parent_label} requires CurseForge project {dependency.project_id}: {error}"
-                    if parent_pack_pinned:
-                        warnings.append(f"Ignored provider dependency from pack-pinned file: {message} The modpack manifest remains authoritative.")
-                    else:
+                    if not parent_pack_pinned:
                         unresolved.append(message)
                     continue
                 if not ModpackDependencyResolver._curseforge_dependency_metadata_in_scope(dependency_file, loader_name):
@@ -496,9 +494,7 @@ class ModpackDependencyResolver:
                         f"{parent_label} requires CurseForge project {dependency.project_id}, but file {dependency_file.file_id} "
                         f"declares loader(s) {declared} outside the active {loader_name} context."
                     )
-                    if parent_pack_pinned:
-                        warnings.append(f"Ignored provider dependency from pack-pinned file: {message} The modpack manifest remains authoritative.")
-                    else:
+                    if not parent_pack_pinned:
                         unresolved.append(message)
                     continue
                 if dependency_file.project_id in selected:
@@ -821,34 +817,65 @@ class ModpackDependencyResolver:
                 normalized = str(mod_id or "").strip().casefold()
                 if normalized:
                     embedded_providers.setdefault(normalized, []).append(mod)
-        if not embedded_providers:
-            return ()
+
+        by_filename = {mod.file_name.casefold(): mod for mod in mods}
+        try:
+            capabilities = ModCapabilityIndex.build(instance, mods)
+        except (AttributeError, FileNotFoundError, OSError):
+            capabilities = {}
+        for mod_id, entries in capabilities.items():
+            for capability in entries:
+                if capability.source == "top_level":
+                    continue
+                owner = by_filename.get(capability.owner_file.casefold())
+                if owner is not None:
+                    embedded_providers.setdefault(mod_id, []).append(owner)
 
         provenance = ModProvenanceRegistry.entries_by_file(instance)
-        redundant = []
+        pack_manifest_projects: dict[tuple[str, str], list] = {}
         for mod in mods:
-            if not mod.enabled or mod.mod_id.casefold() not in embedded_providers:
+            source = provenance.get(mod.file_name.casefold(), {})
+            if not isinstance(source, dict) or str(source.get("selectionReason") or "").strip().casefold() != "pack_manifest":
+                continue
+            provider = str(source.get("provider") or mod.source or mod.source_pack_provider or "").strip().casefold()
+            project_id = str(source.get("projectId") or mod.source_project_id or "").strip()
+            if provider and project_id:
+                pack_manifest_projects.setdefault((provider, project_id), []).append(mod)
+
+        redundant: list[tuple[object, object | None, str]] = []
+        for mod in mods:
+            if not mod.enabled:
                 continue
             source = provenance.get(mod.file_name.casefold(), {})
             if not isinstance(source, dict) or str(source.get("selectionReason") or "").strip().casefold() != "required_dependency":
                 continue
-            providers = [provider for provider in embedded_providers[mod.mod_id.casefold()] if provider.path != mod.path]
+            normalized_id = mod.mod_id.casefold()
+            providers = [provider for provider in embedded_providers.get(normalized_id, ()) if provider.path != mod.path]
             if providers:
-                redundant.append((mod, providers[0]))
+                redundant.append((mod, providers[0], f"{providers[0].name} already provides mod ID '{mod.mod_id}'"))
+                continue
+            provider = str(source.get("provider") or mod.source or mod.source_pack_provider or "").strip().casefold()
+            project_id = str(source.get("projectId") or mod.source_project_id or "").strip()
+            manifest_matches = [candidate for candidate in pack_manifest_projects.get((provider, project_id), ()) if candidate.path != mod.path]
+            if manifest_matches:
+                redundant.append((mod, manifest_matches[0], f"the pack manifest already pins {manifest_matches[0].file_name}"))
         if not redundant:
             return ()
 
         mods_dir = ModManager.mods_dir(instance).resolve()
         messages: list[str] = []
-        removed: list[tuple[object, object]] = []
-        for mod, provider in redundant:
+        removed: list[tuple[object, object | None]] = []
+        for mod, provider, reason in redundant:
             try:
                 candidate = mod.path.resolve()
                 if candidate.parent != mods_dir:
                     continue
+                expected_sha1 = str(provenance.get(mod.file_name.casefold(), {}).get("sha1") or "").strip().casefold()
+                if expected_sha1 and ModpackDependencyResolver._file_sha1(candidate) != expected_sha1:
+                    continue
                 candidate.unlink(missing_ok=True)
                 removed.append((mod, provider))
-                messages.append(f"Removed redundant standalone dependency {mod.name}; {provider.name} already provides mod ID '{mod.mod_id}'.")
+                messages.append(f"Removed redundant standalone dependency {mod.name}; {reason}.")
             except OSError:
                 continue
         if not removed:

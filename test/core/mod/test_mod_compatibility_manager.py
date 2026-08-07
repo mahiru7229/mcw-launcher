@@ -43,6 +43,46 @@ def test_detects_duplicate_and_missing_fabric_api(tmp_path, monkeypatch):
     assert report.error_count == 2
 
 
+def test_provided_capabilities_do_not_count_as_duplicate_primary_mod_ids(tmp_path) -> None:
+    instance = make_instance(tmp_path)
+    first = ModInfo(
+        path=tmp_path / "create.jar",
+        file_name="create.jar",
+        enabled=True,
+        mod_id="create",
+        name="Create",
+        version="1.0.0",
+        loader="fabric",
+        provided_mods=(("flywheel", "1.0.0"),),
+    )
+    second = ModInfo(
+        path=tmp_path / "ponderjs.jar",
+        file_name="ponderjs.jar",
+        enabled=True,
+        mod_id="ponderjs",
+        name="PonderJS",
+        version="1.0.0",
+        loader="fabric",
+        provided_mods=(("flywheel", "1.0.0"),),
+    )
+
+    report = ModCompatibilityManager.scan(instance, mods=[first, second])
+
+    assert not any(issue.code == "duplicate-mod-id" and "flywheel" in issue.mod_ids for issue in report.issues)
+
+
+def test_duplicate_primary_mod_ids_remain_blocking_with_provided_capabilities(tmp_path) -> None:
+    instance = make_instance(tmp_path)
+    first = ModInfo(path=tmp_path / "first.jar", file_name="first.jar", enabled=True, mod_id="example", name="Example A", version="1.0.0", loader="fabric", provided_mods=(("shared", "1.0.0"),))
+    second = ModInfo(path=tmp_path / "second.jar", file_name="second.jar", enabled=True, mod_id="example", name="Example B", version="2.0.0", loader="fabric", provided_mods=(("shared", "2.0.0"),))
+
+    report = ModCompatibilityManager.scan(instance, mods=[first, second])
+
+    duplicates = [issue for issue in report.issues if issue.code == "duplicate-mod-id"]
+    assert len(duplicates) == 1
+    assert duplicates[0].mod_ids == ("example",)
+
+
 def test_detects_disabled_and_wrong_dependency_version(tmp_path, monkeypatch):
     monkeypatch.setattr(InstanceRunLock, "is_active", lambda instance: False)
     instance = make_instance(tmp_path)
@@ -117,6 +157,44 @@ def test_maven_range_rejects_outside_version() -> None:
     assert ModCompatibilityManager._matches_requirement("46.0.0", "[47,)") is False
     assert ModCompatibilityManager._matches_requirement("47.3.0", "[47,)") is True
     assert ModCompatibilityManager._matches_requirement("1.21.0", "[1.20.1,1.21)") is False
+
+
+@pytest.mark.parametrize(
+    ("installed", "required"),
+    (
+        ("3.0.1.10", "[3.0.1.7,)"),
+        ("2.4-Fix", "[2.4,)"),
+        ("1.20.1-1.5.2-neoforge", "[1.20.1,]"),
+        ("1.20.1", "1.19,1.20.1,"),
+    ),
+)
+def test_atm9_forge_version_requirements_match(installed: str, required: str) -> None:
+    assert ModCompatibilityManager._matches_requirement(installed, required) is True
+
+
+def test_comma_separated_comparator_constraints_remain_conjunctive() -> None:
+    assert ModCompatibilityManager._matches_requirement("1.5.0", ">=1.0,<2.0") is True
+    assert ModCompatibilityManager._matches_requirement("2.1.0", ">=1.0,<2.0") is False
+
+
+def test_optional_recommendations_are_informational_not_launch_warnings(tmp_path) -> None:
+    instance = make_instance(tmp_path)
+    consumer = ModInfo(
+        path=tmp_path / "consumer.jar",
+        file_name="consumer.jar",
+        enabled=True,
+        mod_id="consumer",
+        name="Consumer",
+        version="1.0.0",
+        loader="fabric",
+        recommends={"optional_mod": "[1.0,)"},
+    )
+
+    report = ModCompatibilityManager.scan(instance, mods=[consumer])
+
+    issue = next(issue for issue in report.issues if issue.code == "recommended-missing")
+    assert issue.severity == "info"
+    assert report.warning_count == 0
 
 
 @pytest.mark.parametrize(

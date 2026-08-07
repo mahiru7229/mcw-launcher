@@ -318,6 +318,96 @@ def test_prunes_auto_added_standalone_dependency_when_another_mod_embeds_it(tmp_
     assert any("already provides mod ID 'flywheel'" in message for message in messages)
 
 
+def test_prunes_superseded_required_dependency_when_pack_manifest_pins_same_project(tmp_path, monkeypatch):
+    managed_instance = instance(tmp_path, loader="forge")
+    managed_instance.instance_dir.mkdir(parents=True)
+    mods_dir = managed_instance.instance_dir / "mods"
+    mods_dir.mkdir()
+    current_path = mods_dir / "cc-tweaked-1.116.1.jar"
+    stale_path = mods_dir / "cc-tweaked-1.113.1.jar"
+    current_path.write_bytes(b"current")
+    stale_path.write_bytes(b"stale")
+    current = ModInfo(path=current_path, file_name=current_path.name, enabled=True, mod_id="computercraft", name="CC:Tweaked", version="1.116.1", loader="forge", managed_by_modpack=True, source="curseforge", source_project_id="236307", source_pack_provider="curseforge")
+    stale = ModInfo(path=stale_path, file_name=stale_path.name, enabled=True, mod_id="computercraft", name="CC:Tweaked", version="1.113.1", loader="forge", managed_by_modpack=True, source="curseforge", source_project_id="236307", source_pack_provider="curseforge")
+    pack = {
+        "managedFiles": [
+            {"projectId": 236307, "fileId": 2, "path": f"mods/{current.file_name}", "fileName": current.file_name, "selectionReason": "pack_manifest"},
+            {"projectId": 236307, "fileId": 1, "path": f"mods/{stale.file_name}", "fileName": stale.file_name, "selectionReason": "required_dependency"},
+        ]
+    }
+    saved = {}
+
+    monkeypatch.setattr(ModManager, "list_mods", lambda _instance: [current, stale])
+    monkeypatch.setattr(ModProvenanceRegistry, "entries_by_file", lambda _instance: {
+        current.file_name.casefold(): {"selectionReason": "pack_manifest", "provider": "curseforge", "projectId": "236307"},
+        stale.file_name.casefold(): {"selectionReason": "required_dependency", "provider": "curseforge", "projectId": "236307"},
+    })
+    monkeypatch.setattr(ModProvenanceRegistry, "remove_by_filenames", lambda *_args: ())
+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
+    monkeypatch.setattr(ModrinthPackRegistry, "save", lambda *_args: None)
+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: pack)
+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda _instance, payload: saved.update(payload))
+    monkeypatch.setattr(ModrinthRegistry, "load", lambda _instance: {"mods": {}})
+    monkeypatch.setattr(ModrinthRegistry, "save", lambda *_args: None)
+
+    messages = ModpackDependencyResolver._prune_redundant_embedded_dependencies(managed_instance)
+
+    assert current_path.exists()
+    assert not stale_path.exists()
+    assert [entry["fileName"] for entry in saved["managedFiles"]] == [current.file_name]
+    assert any("pack manifest already pins" in message for message in messages)
+
+
+def test_does_not_prune_modified_managed_dependency_when_recorded_hash_differs(tmp_path, monkeypatch):
+    managed_instance = instance(tmp_path, loader="forge")
+    managed_instance.instance_dir.mkdir(parents=True)
+    mods_dir = managed_instance.instance_dir / "mods"
+    mods_dir.mkdir()
+    current_path = mods_dir / "current.jar"
+    stale_path = mods_dir / "stale-but-modified.jar"
+    current_path.write_bytes(b"current")
+    stale_path.write_bytes(b"user-modified")
+    current = ModInfo(path=current_path, file_name=current_path.name, enabled=True, mod_id="example", name="Current", version="2.0", loader="forge", managed_by_modpack=True, source="curseforge", source_project_id="10", source_pack_provider="curseforge")
+    stale = ModInfo(path=stale_path, file_name=stale_path.name, enabled=True, mod_id="example", name="Stale", version="1.0", loader="forge", managed_by_modpack=True, source="curseforge", source_project_id="10", source_pack_provider="curseforge")
+
+    monkeypatch.setattr(ModManager, "list_mods", lambda _instance: [current, stale])
+    monkeypatch.setattr(ModProvenanceRegistry, "entries_by_file", lambda _instance: {
+        current.file_name.casefold(): {"selectionReason": "pack_manifest", "provider": "curseforge", "projectId": "10"},
+        stale.file_name.casefold(): {"selectionReason": "required_dependency", "provider": "curseforge", "projectId": "10", "sha1": "0" * 40},
+    })
+
+    messages = ModpackDependencyResolver._prune_redundant_embedded_dependencies(managed_instance)
+
+    assert messages == ()
+    assert current_path.exists()
+    assert stale_path.read_bytes() == b"user-modified"
+
+
+def test_does_not_prune_user_added_duplicate_without_required_dependency_provenance(tmp_path, monkeypatch):
+    managed_instance = instance(tmp_path, loader="forge")
+    managed_instance.instance_dir.mkdir(parents=True)
+    mods_dir = managed_instance.instance_dir / "mods"
+    mods_dir.mkdir()
+    pack_path = mods_dir / "pack-copy.jar"
+    user_path = mods_dir / "user-copy.jar"
+    pack_path.write_bytes(b"pack")
+    user_path.write_bytes(b"user")
+    pack_mod = ModInfo(path=pack_path, file_name=pack_path.name, enabled=True, mod_id="example", name="Pack Copy", version="2.0", loader="forge", managed_by_modpack=True, source="curseforge", source_project_id="10", source_pack_provider="curseforge")
+    user_mod = ModInfo(path=user_path, file_name=user_path.name, enabled=True, mod_id="example", name="User Copy", version="1.0", loader="forge", managed_by_modpack=False, source="local")
+
+    monkeypatch.setattr(ModManager, "list_mods", lambda _instance: [pack_mod, user_mod])
+    monkeypatch.setattr(ModProvenanceRegistry, "entries_by_file", lambda _instance: {
+        pack_mod.file_name.casefold(): {"selectionReason": "pack_manifest", "provider": "curseforge", "projectId": "10"},
+        user_mod.file_name.casefold(): {"selectionReason": "direct_install", "provider": "local"},
+    })
+
+    messages = ModpackDependencyResolver._prune_redundant_embedded_dependencies(managed_instance)
+
+    assert messages == ()
+    assert pack_path.exists()
+    assert user_path.exists()
+
+
 def test_curseforge_resolver_does_not_add_standalone_dependency_already_provided_by_embedded_mod(tmp_path, monkeypatch):
     managed_instance = instance(tmp_path, loader="forge")
     root = cf_file(10, 100, "addon.jar", (CurseForgeDependency(20, 3),))
@@ -617,7 +707,7 @@ def test_curseforge_resolver_rejects_foreign_loader_dependency_candidate(tmp_pat
 
     assert result.added_files == ()
     assert result.unresolved == ()
-    assert any("Ignored provider dependency from pack-pinned file" in warning for warning in result.warnings)
+    assert not any("Ignored provider dependency from pack-pinned file" in warning for warning in result.warnings)
     assert all(entry.get("projectId") != 20 for entry in saved.get("managedFiles", registry["managedFiles"]))
 
 
@@ -693,4 +783,4 @@ def test_skyfactory5_pack_pinned_yacl_does_not_resolve_fabric_api_on_forge(tmp_p
 
     assert result.added_files == ()
     assert result.unresolved == ()
-    assert any("CurseForge project 306612" in warning and "modpack manifest remains authoritative" in warning for warning in result.warnings)
+    assert not any("CurseForge project 306612" in warning for warning in result.warnings)
