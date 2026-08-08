@@ -106,6 +106,26 @@ class InstanceController(BaseController):
             return
         self.selected_instance_changed.emit(instance)
 
+    def set_favorite(self, name: str, favorite: bool) -> None:
+        self._update_library_metadata(name, favorite=bool(favorite))
+
+    def set_group(self, name: str, group: str) -> None:
+        self._update_library_metadata(name, group=str(group or "").strip())
+
+    def set_tags(self, name: str, tags: object) -> None:
+        self._update_library_metadata(name, tags=tags)
+
+    def _update_library_metadata(self, name: str, **changes: object) -> None:
+        normalized = str(name or "").strip()
+        if not normalized:
+            return
+        try:
+            instance = self._core.instances.set_library_metadata(normalized, **changes)
+        except Exception as error:
+            self._emit_error("Update instance library", error)
+            return
+        self.refresh(selected_name=instance.name)
+
     def create(self, name: str, version_id: str, loader_name: str = "vanilla", loader_version: str = LoaderService.AUTO) -> bool:
         name = self._validated_name(name)
         version_id = version_id.strip()

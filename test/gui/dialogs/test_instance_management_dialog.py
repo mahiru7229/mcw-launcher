@@ -47,3 +47,17 @@ def test_advanced_instance_manager_dialog_is_resizable_for_compact_screens(gui_a
     assert dialog.minimumHeight() == 420
     assert dialog.maximumWidth() > dialog.width()
     assert dialog.maximumHeight() > dialog.height()
+
+
+def test_instance_editor_overview_shows_library_metadata(gui_app):
+    dialog = InstanceManagementDialog()
+    instance = make_instance(("forge", "47.4.0"))
+    instance.favorite = True
+    instance.group = "Modpacks"
+    instance.tags = ("heavy", "automation")
+
+    dialog.set_instance(instance)
+
+    assert "Favorite" in dialog.overview_library_detail.text()
+    assert "Modpacks" in dialog.overview_library_detail.text()
+    assert "heavy" in dialog.overview_library_detail.text()

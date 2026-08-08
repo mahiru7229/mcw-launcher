@@ -9,6 +9,9 @@
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.1.2">
     <img src="https://img.shields.io/badge/Stable-v1.1.2-brightgreen" alt="Stable version">
   </a>
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.2.0-beta.1">
+    <img src="https://img.shields.io/badge/Beta-v1.2.0--beta.1-orange" alt="Beta version">
+  </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
   </a>
@@ -47,6 +50,19 @@ Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh b
 Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.2.0-beta.1
+
+**v1.2.0-beta.1** mở đầu nhánh feature v1.2 với nền tảng **Instance Manager 2.0**:
+
+- Thêm metadata thư viện cho từng instance: **Favorite**, **Group** và **Tags**; dữ liệu được lưu ngay trong `instance.json` và tương thích ngược với instance v1.1.2.
+- Instance library có bộ lọc theo group, chỉ hiện favorites, tìm kiếm theo group/tag và sắp xếp theo tên, lần chơi gần nhất hoặc Minecraft version.
+- Favorites luôn được ưu tiên trong danh sách và hiển thị dấu sao trực tiếp trên card instance.
+- Context menu cho phép thêm/bỏ favorite, đặt group và chỉnh tags mà không phải sửa file metadata thủ công.
+- Instance overview hiển thị group, tags và trạng thái favorite cùng Minecraft version, loader và health hiện có.
+- Không thay đổi dependency resolver, modpack lifecycle hoặc launch pipeline của v1.1.2 trong beta này.
+
+Xem chi tiết tại [`docs/RELEASE-v1.2.0-beta.1.md`](docs/RELEASE-v1.2.0-beta.1.md).
 
 ## Có gì mới trong v1.1.2
 

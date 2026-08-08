@@ -105,6 +105,10 @@ class InstanceService:
     def reset_icon(name: str) -> Instance:
         return InstanceManager.reset_icon(name)
 
+    @staticmethod
+    def set_library_metadata(name: str, *, favorite: bool | None = None, group: str | None = None, tags: object | None = None) -> Instance:
+        return InstanceManager.set_library_metadata(name, favorite=favorite, group=group, tags=tags)
+
     def create(self, request: InstanceCreateRequest) -> Instance:
         name = InstanceManager.validate_name(request.name)
         version_id = str(request.version_id).strip()

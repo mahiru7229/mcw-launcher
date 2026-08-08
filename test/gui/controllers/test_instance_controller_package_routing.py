@@ -90,3 +90,20 @@ def test_generic_import_falls_back_to_legacy_instance_package(gui_app) -> None:
     assert received == [preview]
     assert instances.modpack_calls == 1
     assert instances.instance_calls == 1
+
+
+def test_library_metadata_update_uses_public_instance_service_and_refreshes(gui_app, monkeypatch: pytest.MonkeyPatch) -> None:
+    class _LibraryInstances(_Instances):
+        def set_library_metadata(self, name: str, **changes):
+            self.updated = (name, changes)
+            return SimpleNamespace(name=name)
+
+    instances = _LibraryInstances()
+    controller = _controller(instances)
+    refreshed: list[str] = []
+    monkeypatch.setattr(controller, "refresh", lambda selected_name="": refreshed.append(selected_name))
+
+    controller.set_favorite("ATM9", True)
+
+    assert instances.updated == ("ATM9", {"favorite": True})
+    assert refreshed == ["ATM9"]

@@ -143,6 +143,9 @@ class InstanceManagementDialog(QDialog):
         self.overview_detail = QLabel()
         self.overview_detail.setObjectName("MutedLabel")
         self.overview_detail.setWordWrap(True)
+        self.overview_library_detail = QLabel()
+        self.overview_library_detail.setObjectName("ValueLabel")
+        self.overview_library_detail.setWordWrap(True)
         self.launch_button = set_theme_icon(QPushButton(), "icon.action.launch")
         self.launch_button.setObjectName("PrimaryButton")
         self.open_folder_button = set_theme_icon(QPushButton(), "icon.action.folder")
@@ -150,6 +153,7 @@ class InstanceManagementDialog(QDialog):
         self.open_folder_button.clicked.connect(lambda: self.open_folder_requested.emit(self._instance_name))
         layout.addWidget(self.overview_title)
         layout.addWidget(self.overview_detail)
+        layout.addWidget(self.overview_library_detail)
         layout.addSpacing(6)
         layout.addWidget(self.launch_button)
         layout.addWidget(self.open_folder_button)
@@ -303,6 +307,13 @@ class InstanceManagementDialog(QDialog):
             else tr("workspace.editor.no_selection")
         )
         self.overview_detail.setText(tr("workspace.editor.overview_detail", version=version_id, loader=loader_text))
+        if instance is None:
+            self.overview_library_detail.setText("")
+        else:
+            group = str(getattr(instance, "group", "") or "").strip() or tr("workspace.library.ungrouped")
+            tags = ", ".join(str(tag) for tag in tuple(getattr(instance, "tags", ()) or ())) or tr("workspace.library.no_tags")
+            favorite = tr("workspace.library.favorite_yes") if bool(getattr(instance, "favorite", False)) else tr("workspace.library.favorite_no")
+            self.overview_library_detail.setText(tr("workspace.editor.library_summary", favorite=favorite, group=group, tags=tags))
         self.version_summary.setText(tr("workspace.editor.version_summary", version=version_id, loader=loader_text))
 
     def show_overview(self) -> None:
