@@ -45,7 +45,7 @@ class FTBBrowserDialog(QDialog):
         self._suggested_instance_name = ""
         self._instance_name_customized = False
         self._pending_channel_preferences = (False, False)
-        self._cache_info = FTBClient.cache_status()
+        self._cache_info = FTBClient.api_cache_status()
         self._image_cache = RemoteImageCache(self)
         self._channel_change_timer = QTimer(self)
         self._channel_change_timer.setSingleShot(True)

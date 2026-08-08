@@ -269,3 +269,28 @@ def test_reset_preserves_completed_first_run_state(tmp_path: Path) -> None:
 
     assert data["onboarding"] == {"completed": True, "version": 1}
     assert data["launch"]["debug_mode"] is False
+
+
+def test_legacy_storage_notification_defaults_on_and_can_be_disabled(tmp_path: Path) -> None:
+    manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
+
+    assert manager.load()["storage"]["notify_legacy_cache_cleanup"] is True
+
+    manager.update_section("storage", {"notify_legacy_cache_cleanup": False})
+
+    assert manager.load()["storage"]["notify_legacy_cache_cleanup"] is False
+
+
+def test_unused_version_retention_days_defaults_and_are_clamped(tmp_path: Path) -> None:
+    manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
+
+    assert manager.load()["storage"]["unused_version_retention_days"] == 14
+
+    manager.update_section("storage", {"unused_version_retention_days": 30})
+    assert manager.load()["storage"]["unused_version_retention_days"] == 30
+
+    manager.update_section("storage", {"unused_version_retention_days": 0})
+    assert manager.load()["storage"]["unused_version_retention_days"] == 1
+
+    manager.update_section("storage", {"unused_version_retention_days": 9999})
+    assert manager.load()["storage"]["unused_version_retention_days"] == 365

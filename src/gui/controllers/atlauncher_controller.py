@@ -81,13 +81,17 @@ class ATLauncherController(BaseController):
             tr("task.atlauncher.install_modpack", instance=instance_name),
         )
 
-    def clear_cache(self) -> bool:
+    def clear_api_cache(self) -> bool:
         return self._task_runner.run(
             "atlauncher.cache.clear",
-            lambda: (ATLauncherClient.clear_cache(), ATLauncherClient.cache_status())[1],
+            lambda: (ATLauncherClient.clear_api_cache(), ATLauncherClient.api_cache_status())[1],
             tr("task.atlauncher.clear_cache"),
             blocking=False,
         )
+
+    def clear_cache(self) -> bool:
+        """Compatibility alias for clearing the provider API metadata cache."""
+        return self.clear_api_cache()
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:

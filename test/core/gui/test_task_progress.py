@@ -12,12 +12,21 @@ def test_profiles_cover_requested_long_running_tasks() -> None:
         "modpack.import": ProgressStage.IMPORTING_INSTANCE,
         "lan.hosting.prepare": ProgressStage.PREPARING,
         "update.prepare": ProgressStage.DOWNLOADING_UPDATE,
+        "storage.legacy.scan": ProgressStage.PREPARING,
         "modrinth.install.modpack": ProgressStage.DOWNLOADING_MODPACK,
         "curseforge.install.mod": ProgressStage.DOWNLOADING_MODS,
         "content.install.modrinth": ProgressStage.DOWNLOADING_CONTENT,
     }
 
     assert {task_id: task_progress_profile(task_id).stage for task_id in expected} == expected
+
+
+def test_legacy_storage_scan_has_its_own_completion_detail() -> None:
+    profile = task_progress_profile("storage.legacy.scan")
+
+    assert profile is not None
+    assert profile.success_message == "storage.legacy.scan.completed"
+    assert profile.success_detail == "storage.legacy.scan.completed_detail"
 
 
 def test_profile_lookup_ignores_unrelated_background_searches() -> None:

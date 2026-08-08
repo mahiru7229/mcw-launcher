@@ -37,6 +37,7 @@ def task_progress_profile(task_id: str) -> TaskProgressProfile | None:
         "instance.repair.execute": TaskProgressProfile(ProgressStage.APPLYING_REPAIR, "repair.center.repair_task_completed", "repair.center.repair_task_detail", "repair.center.repair_task_failed"),
         "lan.hosting.prepare": TaskProgressProfile(ProgressStage.PREPARING, "lan.prepare.completed", "lan.prepare.completed_detail", "lan.prepare.failed"),
         "update.prepare": TaskProgressProfile(ProgressStage.DOWNLOADING_UPDATE, "update.prepare.completed", "update.prepare.completed_detail", "update.prepare.failed"),
+        "storage.legacy.scan": TaskProgressProfile(ProgressStage.PREPARING, "storage.legacy.scan.completed", "storage.legacy.scan.completed_detail", "storage.legacy.scan.failed"),
     }
     if task in exact:
         return exact[task]

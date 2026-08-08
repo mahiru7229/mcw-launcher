@@ -182,14 +182,18 @@ class CurseForgeController(BaseController):
             tr("task.curseforge.install_downloaded_modpack", instance=request.instance_name),
         )
 
-    def clear_cache(self, context: str = DIALOG_CONTEXT) -> bool:
+    def clear_api_cache(self, context: str = DIALOG_CONTEXT) -> bool:
         normalized_context = self._normalize_context(context)
         return self._task_runner.run(
             f"curseforge.cache.clear.{normalized_context}",
-            lambda: (normalized_context, (CurseForgeClient.clear_cache(), CurseForgeClient.cache_status())[1]),
+            lambda: (normalized_context, (CurseForgeClient.clear_api_cache(), CurseForgeClient.api_cache_status())[1]),
             tr("task.curseforge.clear_cache"),
             blocking=False,
         )
+
+    def clear_cache(self, context: str = DIALOG_CONTEXT) -> bool:
+        """Compatibility alias for clearing the provider API metadata cache."""
+        return self.clear_api_cache(context=context)
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
@@ -200,10 +204,10 @@ class CurseForgeController(BaseController):
             context, project_type, loader, search_result = result
             if context == self.CATALOG_CONTEXT:
                 self.catalog_search_results_changed.emit(str(loader), search_result)
-                self.catalog_cache_info_changed.emit(getattr(search_result, "cache_info", CurseForgeClient.cache_status()))
+                self.catalog_cache_info_changed.emit(getattr(search_result, "cache_info", CurseForgeClient.api_cache_status()))
             else:
                 self.search_results_changed.emit(str(project_type), str(loader), search_result)
-                self.cache_info_changed.emit(str(project_type), getattr(search_result, "cache_info", CurseForgeClient.cache_status()))
+                self.cache_info_changed.emit(str(project_type), getattr(search_result, "cache_info", CurseForgeClient.api_cache_status()))
             return
         if task_id.startswith("curseforge.details."):
             if not isinstance(result, tuple) or len(result) != 4:

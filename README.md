@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.2.0">
-    <img src="https://img.shields.io/badge/Stable-v1.2.0-brightgreen" alt="Stable version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.0">
+    <img src="https://img.shields.io/badge/Stable-v1.3.0-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -44,9 +44,54 @@ Mỗi instance có riêng:
 
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 ---
-Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.2.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
+Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.3.0
+
+**v1.3.0** đưa nhánh Shared Storage & Cache Lifecycle lên stable sau ba bản beta và bổ sung các hardening cuối cho cleanup trên installation thật:
+
+- Shared `ContentStore`, hardlink/reuse cho managed immutable content và cleanup Forge/NeoForge staging giúp hạn chế physical duplicate khi cài thêm modpack.
+- Legacy Storage Cleanup có preview item/path/reason/category, tổng dung lượng thực có thể giải phóng và revalidation ngay trước khi xóa.
+- Có thể đặt **số ngày giữ Minecraft version JAR không dùng** trong Launcher Settings (mặc định 14 ngày, 1–365 ngày).
+- Cleanup phát hiện các **thư mục instance cũ bị xóa dở** chỉ còn `.mcw` / `crash-reports`, nhưng chỉ khi không còn `instance.json` hoặc registry reference.
+- Storage scan có progress lifecycle riêng, không còn giữ nhầm 100%/detail của task Update Check trước đó.
+- Provider API Cache vẫn được tách và bảo vệ độc lập với binary Content Store.
+- Instance deletion race của Beta 2 và reference-aware unused version JAR cleanup của Beta 3 được giữ nguyên.
+
+Xem chi tiết tại [`docs/RELEASE-v1.3.0.md`](docs/RELEASE-v1.3.0.md).
+
+## Có gì mới trong v1.3.0-beta.3
+
+**v1.3.0-beta.3** bổ sung cleanup an toàn cho Minecraft version JAR không còn được instance nào sử dụng. Launcher chỉ đề xuất xóa `cache/versions/<version>/<version>.jar` sau khi reference graph xác nhận version không còn được dùng trực tiếp hoặc qua loader inheritance; metadata JSON vẫn được giữ để có thể tải lại khi cần.
+
+- Không xóa cả thư mục version.
+- Giữ mọi version đang được Vanilla/Forge/NeoForge/Fabric/Quilt sử dụng.
+- Sửa reference mapping profile Fabric/Quilt theo đúng tên thư mục thực tế.
+- Item/path/reason/dung lượng từng JAR và tổng reclaimable vẫn hiện trong Storage Cleanup trước khi xác nhận.
+- Provider API Cache và phần Shared Storage đã ổn định ở Beta 1/2 không thay đổi.
+
+Xem chi tiết tại [`docs/RELEASE-v1.3.0-beta.3.md`](docs/RELEASE-v1.3.0-beta.3.md).
+
+## Có gì mới trong v1.3.0-beta.2
+
+**v1.3.0-beta.2** sửa race condition khi xóa instance vừa chạy game: runtime watcher không còn có thể tạo lại `.mcw` và `crash-reports` sau khi thư mục instance đã bị xóa. Launcher chờ runtime exit finalization hoàn tất trước khi xóa toàn bộ instance root; nếu finalization chưa thể kết thúc, thao tác được queue thay vì báo thành công giả.
+
+Xem chi tiết tại [`docs/RELEASE-v1.3.0-beta.2.md`](docs/RELEASE-v1.3.0-beta.2.md).
+
+## Có gì mới trong v1.3.0-beta.1
+
+**v1.3.0-beta.1** mở đầu nhánh v1.3 với **Shared Storage & Cache Lifecycle**:
+
+- Thêm SHA-256 `ContentStore` cho binary artifact được provider quản lý; ưu tiên NTFS hardlink vào instance và fallback copy khi cần.
+- Forge/NeoForge installer staging reuse client/libraries đã có và được cleanup trên cả success lẫn failure thay vì tích tụ lâu dài.
+- Tách rõ Provider API/metadata cache khỏi downloaded content; API cache tiếp tục được bảo vệ để giảm request mạng.
+- Thêm Legacy Storage Migration/cleanup theo reference graph cho old staging, update packages, unused versions, unreferenced provider binaries và stale temp.
+- Launcher Settings có thông báo legacy storage mặc định bật và nút **Review old storage**. Cleanup luôn hiển thị item/path/reason/category + tổng dung lượng vật lý có thể giải phóng trước khi người dùng xác nhận.
+- Core revalidate selected candidates ngay trước khi xóa và báo actual reclaimed / removed / skipped / failures sau cleanup.
+
+Xem chi tiết tại [`docs/RELEASE-v1.3.0-beta.1.md`](docs/RELEASE-v1.3.0-beta.1.md).
 
 ## Có gì mới trong v1.2.0
 
