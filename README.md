@@ -9,8 +9,8 @@
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.1.2">
     <img src="https://img.shields.io/badge/Stable-v1.1.2-brightgreen" alt="Stable version">
   </a>
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.2.0-beta.2">
-    <img src="https://img.shields.io/badge/Beta-v1.2.0--beta.2-orange" alt="Beta version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.2.0-beta.3">
+    <img src="https://img.shields.io/badge/Beta-v1.2.0--beta.3-orange" alt="Beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -50,6 +50,18 @@ Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh b
 Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.2.0-beta.3
+
+**v1.2.0-beta.3** mở rộng Instance Manager 2.0 với Component/Runtime UX:
+
+- Instance Editor hiển thị riêng Minecraft, mod loader/version và Java requirement; loader repair được đưa ra ngay trang Version & Loader.
+- Thêm trang Java Runtime với Automatic/custom selection, scan Java và cài managed Java tương thích ngay trong instance.
+- Custom Java được Core kiểm tra path + major version + compatibility và bị chặn thay đổi khi Minecraft đang chạy.
+- Thêm public `InstanceRuntimeProfile`, giữ GUI không đọc trực tiếp internal version/settings files.
+- Minecraft version vẫn read-only trong Beta 3 để tránh phá curated modpack hoặc mod set hiện tại.
+
+Xem chi tiết tại [`docs/RELEASE-v1.2.0-beta.3.md`](docs/RELEASE-v1.2.0-beta.3.md).
 
 ## Có gì mới trong v1.2.0-beta.2
 

@@ -84,6 +84,9 @@ class InstanceWorkspacePage(BasePage):
     favorite_changed = Signal(str, bool)
     group_changed = Signal(str, str)
     tags_changed = Signal(str, object)
+    runtime_scan_requested = Signal()
+    runtime_install_requested = Signal(int)
+    java_runtime_apply_requested = Signal(str, str)
 
     launch_requested = Signal()
     instance_settings_requested = Signal(str)
@@ -308,6 +311,10 @@ class InstanceWorkspacePage(BasePage):
         self.management_dialog.open_backups_requested.connect(self.open_backups_requested.emit)
         self.management_dialog.open_logs_requested.connect(self.open_forge_logs_requested.emit)
         self.management_dialog.export_diagnostics_requested.connect(self.export_forge_diagnostics_requested.emit)
+        self.management_dialog.repair_loader_requested.connect(self.repair_loader_requested.emit)
+        self.management_dialog.runtime_scan_requested.connect(self.runtime_scan_requested.emit)
+        self.management_dialog.runtime_install_requested.connect(self.runtime_install_requested.emit)
+        self.management_dialog.runtime_apply_requested.connect(self.java_runtime_apply_requested.emit)
         self.management_dialog.advanced_requested.connect(self._open_advanced_dialog)
 
     def _forward_advanced_signals(self) -> None:
@@ -369,6 +376,12 @@ class InstanceWorkspacePage(BasePage):
     def set_neoforge_versions(self, game_version: str, versions: list[object]) -> None:
         self.advanced_page.set_neoforge_versions(game_version, versions)
         self.create_dialog.set_neoforge_versions(game_version, versions)
+
+    def set_runtime_profile(self, profile: object | None) -> None:
+        self.management_dialog.set_runtime_profile(profile)
+
+    def set_java_installations(self, installations: list[object]) -> None:
+        self.management_dialog.set_java_installations(installations)
 
     def set_instances(self, instances: list[object], selected_name: str) -> None:
         self._instances = {str(instance.name): instance for instance in instances}

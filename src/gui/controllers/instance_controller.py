@@ -20,6 +20,7 @@ class InstanceController(BaseController):
     running_instances_changed = Signal(list)
     health_reports_changed = Signal(list)
     selected_instance_changed = Signal(object)
+    runtime_profile_changed = Signal(object)
     export_finished = Signal(object)
     repair_progress = Signal(object)
     loader_progress = Signal(object)
@@ -51,6 +52,8 @@ class InstanceController(BaseController):
     FORGE_DIAGNOSTICS_TASK_ID = "instance.forge.diagnostics"
     ICON_CHANGE_TASK_ID = "instance.icon.change"
     ICON_RESET_TASK_ID = "instance.icon.reset"
+    RUNTIME_PROFILE_TASK_PREFIX = "instance.runtime.profile."
+    JAVA_RUNTIME_TASK_ID = "instance.java.runtime"
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
 
     def __init__(self, task_runner: TaskRunner) -> None:
@@ -98,6 +101,7 @@ class InstanceController(BaseController):
         self._selected_name = name.strip()
         if not self._selected_name:
             self.selected_instance_changed.emit(None)
+            self.runtime_profile_changed.emit(None)
             return
         try:
             instance = self._core.instances.load(self._selected_name)
@@ -105,6 +109,13 @@ class InstanceController(BaseController):
             self._emit_error("Load instance", error)
             return
         self.selected_instance_changed.emit(instance)
+        task_id = f"{self.RUNTIME_PROFILE_TASK_PREFIX}{instance.name}"
+        self._task_runner.run(
+            task_id,
+            lambda name=instance.name: self._core.instances.runtime_profile(name),
+            tr("workspace.editor.runtime.loading", name=instance.name),
+            blocking=False,
+        )
 
     def set_favorite(self, name: str, favorite: bool) -> None:
         self._update_library_metadata(name, favorite=bool(favorite))
@@ -114,6 +125,16 @@ class InstanceController(BaseController):
 
     def set_tags(self, name: str, tags: object) -> None:
         self._update_library_metadata(name, tags=tags)
+
+    def set_java_runtime(self, name: str, java_path: str) -> None:
+        normalized = str(name or "").strip()
+        if not normalized:
+            return
+        self._task_runner.run(
+            self.JAVA_RUNTIME_TASK_ID,
+            lambda: self._core.instances.set_java_runtime(normalized, java_path),
+            tr("task.instance.java_runtime", name=normalized),
+        )
 
     def _update_library_metadata(self, name: str, **changes: object) -> None:
         normalized = str(name or "").strip()
@@ -416,8 +437,17 @@ class InstanceController(BaseController):
             self.log_created.emit(f"Provider modpack package inspected: {result.package_path}")
             return
 
+        if task_id.startswith(self.RUNTIME_PROFILE_TASK_PREFIX):
+            if str(getattr(result, "instance_name", "")) == self._selected_name:
+                self.runtime_profile_changed.emit(result)
+            return
+
         selected_name = self._selected_name
-        if task_id == self.CREATE_TASK_ID:
+        if task_id == self.JAVA_RUNTIME_TASK_ID:
+            selected_name = str(getattr(result, "instance_name", "") or selected_name)
+            self.runtime_profile_changed.emit(result)
+            self.status_changed.emit(tr("status.instance.java_runtime_applied", name=selected_name))
+        elif task_id == self.CREATE_TASK_ID:
             selected_name = result.name
             self.instance_created.emit(result)
             self.status_changed.emit(tr("status.instance.created", name=selected_name))
@@ -497,6 +527,11 @@ class InstanceController(BaseController):
 
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
+        if task_id.startswith(self.RUNTIME_PROFILE_TASK_PREFIX):
+            self.log_created.emit(f"Instance runtime profile unavailable: {type(error).__name__}: {error}")
+            if task_id == f"{self.RUNTIME_PROFILE_TASK_PREFIX}{self._selected_name}":
+                self.runtime_profile_changed.emit(None)
+            return
         if task_id == "instance.delete" and isinstance(error, InstanceDeletionError):
             if error.scheduled:
                 self.status_changed.emit(tr("status.instance.deletion_queued", name=error.instance_name))
