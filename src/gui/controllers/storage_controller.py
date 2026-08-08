@@ -23,15 +23,30 @@ class StorageController(BaseController):
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
 
-    def probe(self) -> bool:
-        return self._task_runner.run(self.PROBE_TASK, LegacyStorageMigrationService.probe, tr("storage.legacy.scan.task"), blocking=False)
+    def probe(self, unused_version_retention_days: int = 14) -> bool:
+        return self._task_runner.run(
+            self.PROBE_TASK,
+            lambda: LegacyStorageMigrationService.probe(unused_version_retention_days=unused_version_retention_days),
+            tr("storage.legacy.scan.task"),
+            blocking=False,
+        )
 
-    def scan(self) -> bool:
-        return self._task_runner.run(self.SCAN_TASK, LegacyStorageMigrationService.scan, tr("storage.legacy.scan.task"), blocking=False)
+    def scan(self, unused_version_retention_days: int = 14) -> bool:
+        return self._task_runner.run(
+            self.SCAN_TASK,
+            lambda: LegacyStorageMigrationService.scan(unused_version_retention_days=unused_version_retention_days),
+            tr("storage.legacy.scan.task"),
+            blocking=False,
+        )
 
-    def clean(self, plan: CleanupPlan, candidate_ids: tuple[str, ...]) -> bool:
+    def clean(self, plan: CleanupPlan, candidate_ids: tuple[str, ...], unused_version_retention_days: int = 14) -> bool:
         selected = tuple(str(value) for value in candidate_ids)
-        return self._task_runner.run(self.CLEAN_TASK, lambda: LegacyStorageMigrationService.apply(plan, selected), tr("storage.legacy.clean.task"), blocking=True)
+        return self._task_runner.run(
+            self.CLEAN_TASK,
+            lambda: LegacyStorageMigrationService.apply(plan, selected, unused_version_retention_days=unused_version_retention_days),
+            tr("storage.legacy.clean.task"),
+            blocking=True,
+        )
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:

@@ -16,7 +16,7 @@ from src.core.theme.theme_palette import normalize_hex_color
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 17
+    SCHEMA_VERSION = 18
     UPDATE_CHANNEL_POLICY_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
@@ -63,6 +63,7 @@ class LauncherSettingsManager:
         },
         "storage": {
             "notify_legacy_cache_cleanup": True,
+            "unused_version_retention_days": 14,
         },
         "instance_defaults": default_instance_settings(),
         "updates": {
@@ -239,6 +240,7 @@ class LauncherSettingsManager:
 
         storage = normalized.setdefault("storage", {})
         storage["notify_legacy_cache_cleanup"] = self._as_bool(storage.get("notify_legacy_cache_cleanup"), True)
+        storage["unused_version_retention_days"] = max(1, min(self._as_non_negative_int(storage.get("unused_version_retention_days"), 14), 365))
 
         normalized["instance_defaults"] = SettingsManager.normalize_dict(normalized.get("instance_defaults"))
 

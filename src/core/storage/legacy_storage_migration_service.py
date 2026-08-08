@@ -86,11 +86,14 @@ class LegacyStorageMigrationService:
     REVIEWED = "reviewed"
     STALE_TEMP_SECONDS = 7 * 24 * 60 * 60
     LOADER_STAGING_GRACE_SECONDS = 60 * 60
-    UNUSED_VERSION_RETENTION_SECONDS = 14 * 24 * 60 * 60
+    DEFAULT_UNUSED_VERSION_RETENTION_DAYS = 14
+    MIN_UNUSED_VERSION_RETENTION_DAYS = 1
+    MAX_UNUSED_VERSION_RETENTION_DAYS = 365
+    UNUSED_VERSION_RETENTION_SECONDS = DEFAULT_UNUSED_VERSION_RETENTION_DAYS * 24 * 60 * 60
     UNREFERENCED_CONTENT_RETENTION_SECONDS = 14 * 24 * 60 * 60
 
     @classmethod
-    def probe(cls, *, now: float | None = None) -> LegacyCleanupProbe:
+    def probe(cls, *, now: float | None = None, unused_version_retention_days: int | None = None) -> LegacyCleanupProbe:
         """Lightweight startup probe that only checks whether cleanup exists.
 
         The startup path intentionally avoids recursive size calculation and
@@ -112,7 +115,8 @@ class LegacyStorageMigrationService:
 
         count += len(cls._old_update_directories())
 
-        count += len(cls._unused_version_jar_paths(current_time))
+        count += len(cls._unused_version_jar_paths(current_time, unused_version_retention_days))
+        count += len(cls._orphan_instance_residue_paths())
 
         references, provider_references_reliable = cls._provider_references()
         if provider_references_reliable:
@@ -147,12 +151,13 @@ class LegacyStorageMigrationService:
         return LegacyCleanupProbe(candidate_count=count, estimated_bytes=0)
 
     @classmethod
-    def scan(cls, *, now: float | None = None) -> CleanupPlan:
+    def scan(cls, *, now: float | None = None, unused_version_retention_days: int | None = None) -> CleanupPlan:
         current_time = time.time() if now is None else float(now)
         candidates: list[CleanupCandidate] = []
         candidates.extend(cls._scan_loader_staging(current_time))
         candidates.extend(cls._old_update_candidates(lightweight=False))
-        candidates.extend(cls._scan_unused_versions(current_time))
+        candidates.extend(cls._scan_unused_versions(current_time, unused_version_retention_days))
+        candidates.extend(cls._scan_orphan_instance_residue())
         candidates.extend(cls._scan_unreferenced_provider_artifacts(current_time))
         candidates.extend(cls._scan_stale_temp(current_time))
         candidates.extend(cls._scan_unreferenced_content_store(current_time))
@@ -169,9 +174,9 @@ class LegacyStorageMigrationService:
         return CleanupPlan(tuple(sorted(filtered, key=lambda item: (-item.size_bytes, item.category, str(item.path).casefold()))))
 
     @classmethod
-    def apply(cls, plan: CleanupPlan, candidate_ids: Iterable[str] | None = None) -> CleanupResult:
+    def apply(cls, plan: CleanupPlan, candidate_ids: Iterable[str] | None = None, *, unused_version_retention_days: int | None = None) -> CleanupResult:
         selected = {str(value) for value in candidate_ids} if candidate_ids is not None else {item.candidate_id for item in plan.candidates}
-        latest = {item.candidate_id: item for item in cls.scan().candidates}
+        latest = {item.candidate_id: item for item in cls.scan(unused_version_retention_days=unused_version_retention_days).candidates}
         removed: list[CleanupCandidate] = []
         skipped: list[CleanupCandidate] = []
         failures: list[tuple[CleanupCandidate, str]] = []
@@ -184,7 +189,11 @@ class LegacyStorageMigrationService:
             if current is None or not cls._same_candidate(original, current):
                 skipped.append(original)
                 continue
-            if cls._is_protected_path(current.path):
+            if current.category == "orphan_instance_residue":
+                if not cls._is_legacy_orphan_instance_directory(current.path):
+                    skipped.append(original)
+                    continue
+            elif cls._is_protected_path(current.path):
                 skipped.append(original)
                 continue
             try:
@@ -264,22 +273,24 @@ class LegacyStorageMigrationService:
         return output
 
     @classmethod
-    def _scan_unused_versions(cls, now: float) -> list[CleanupCandidate]:
+    def _scan_unused_versions(cls, now: float, retention_days: int | None) -> list[CleanupCandidate]:
+        normalized_days = cls.normalize_unused_version_retention_days(retention_days)
         return [
             cls._candidate(
                 jar_path,
                 "unused_minecraft_version_jar",
-                "No installed instance or loader inheritance chain references this Minecraft version JAR. Version metadata is retained for future restore/download.",
+                f"No installed instance or loader inheritance chain references this Minecraft version JAR, and it has been unused for at least {normalized_days} days. Version metadata is retained for future restore/download.",
                 cls.REVIEWED,
             )
-            for jar_path in cls._unused_version_jar_paths(now)
+            for jar_path in cls._unused_version_jar_paths(now, normalized_days)
         ]
 
     @classmethod
-    def _unused_version_jar_paths(cls, now: float) -> list[Path]:
+    def _unused_version_jar_paths(cls, now: float, retention_days: int | None = None) -> list[Path]:
         root = Paths.CACHE_ROOT / "versions"
         if not root.is_dir():
             return []
+        retention_seconds = cls.normalize_unused_version_retention_days(retention_days) * 24 * 60 * 60
         required, reliable = cls._referenced_version_directories()
         if not reliable:
             return []
@@ -288,10 +299,36 @@ class LegacyStorageMigrationService:
             if not version_dir.is_dir() or version_dir.name.casefold() in required:
                 continue
             jar_path = version_dir / f"{version_dir.name}.jar"
-            if not jar_path.is_file() or not cls._older_than(jar_path, now, cls.UNUSED_VERSION_RETENTION_SECONDS):
+            if not jar_path.is_file() or not cls._older_than(jar_path, now, retention_seconds):
                 continue
             output.append(jar_path)
         return output
+
+    @classmethod
+    def _scan_orphan_instance_residue(cls) -> list[CleanupCandidate]:
+        return [
+            cls._candidate(
+                path,
+                "orphan_instance_residue",
+                "Legacy instance residue has no instance metadata or registry reference and contains only known post-deletion .mcw/crash-reports data.",
+                cls.REVIEWED,
+            )
+            for path in cls._orphan_instance_residue_paths()
+        ]
+
+    @classmethod
+    def _orphan_instance_residue_paths(cls) -> list[Path]:
+        root = Paths.INSTANCES_ROOT
+        if not root.is_dir():
+            return []
+        registry_references, registry_reliable = cls._instance_registry_references()
+        if not registry_reliable:
+            return []
+        return [
+            child
+            for child in cls._safe_children(root)
+            if cls._is_legacy_orphan_instance_directory(child, registry_references)
+        ]
 
     @classmethod
     def _scan_unreferenced_provider_artifacts(cls, now: float) -> list[CleanupCandidate]:
@@ -386,11 +423,16 @@ class LegacyStorageMigrationService:
         instances_root = Paths.INSTANCES_ROOT
         if not instances_root.is_dir():
             return required, True
+        registry_references, registry_reliable = cls._instance_registry_references()
+        if not registry_reliable:
+            return set(), False
         for instance_dir in cls._safe_children(instances_root):
             if not instance_dir.is_dir() or instance_dir.name.startswith("."):
                 continue
             metadata = cls._read_json(instance_dir / "instance.json")
             if metadata is None:
+                if cls._is_legacy_orphan_instance_directory(instance_dir, registry_references):
+                    continue
                 return set(), False
             version_id = str(metadata.get("version_id") or "").strip()
             raw_loader = metadata.get("mod_loader")
@@ -436,11 +478,16 @@ class LegacyStorageMigrationService:
         root = Paths.INSTANCES_ROOT
         if not root.is_dir():
             return references, True
+        registry_references, registry_reliable = cls._instance_registry_references()
+        if not registry_reliable:
+            return set(), False
         for instance_dir in cls._safe_children(root):
             if not instance_dir.is_dir() or instance_dir.name.startswith("."):
                 continue
             metadata_path = instance_dir / "instance.json"
             if cls._read_json(metadata_path) is None:
+                if cls._is_legacy_orphan_instance_directory(instance_dir, registry_references):
+                    continue
                 return set(), False
             mcw = instance_dir / ".mcw"
             for path, provider in ((mcw / "curseforge.json", "curseforge"), (mcw / "modrinth.json", "modrinth")):
@@ -494,6 +541,65 @@ class LegacyStorageMigrationService:
             elif content_registry is not None:
                 return set(), False
         return references, True
+
+    @classmethod
+    def _instance_registry_references(cls) -> tuple[set[str], bool]:
+        path = Paths.instance_data_path()
+        if not path.exists():
+            return set(), True
+        data = cls._read_json(path)
+        if data is None:
+            return set(), False
+        entries = data.get("instances", [])
+        if not isinstance(entries, list):
+            return set(), False
+        references: set[str] = set()
+        for entry in entries:
+            if not isinstance(entry, dict):
+                return set(), False
+            raw_path = str(entry.get("instance_dir") or "").strip()
+            name = str(entry.get("name") or "").strip()
+            candidate = Path(raw_path) if raw_path else Paths.INSTANCES_ROOT / name if name else None
+            if candidate is None:
+                continue
+            try:
+                references.add(str(candidate.resolve(strict=False)).casefold())
+            except OSError:
+                references.add(str(candidate).casefold())
+        return references, True
+
+    @classmethod
+    def _is_legacy_orphan_instance_directory(cls, path: Path, registry_references: set[str] | None = None) -> bool:
+        candidate = Path(path)
+        if not candidate.is_dir() or (candidate / "instance.json").exists():
+            return False
+        try:
+            root = Paths.INSTANCES_ROOT.resolve(strict=False)
+            resolved = candidate.resolve(strict=False)
+            relative = resolved.relative_to(root)
+        except (OSError, ValueError):
+            return False
+        if len(relative.parts) != 1 or relative.name.casefold() in {".runtime", "instances.json"}:
+            return False
+        if registry_references is None:
+            registry_references, reliable = cls._instance_registry_references()
+            if not reliable:
+                return False
+        if str(resolved).casefold() in registry_references:
+            return False
+        children = cls._safe_children(candidate)
+        if not children:
+            return False
+        allowed = {".mcw", "crash-reports"}
+        return all(child.is_dir() and child.name.casefold() in allowed for child in children)
+
+    @classmethod
+    def normalize_unused_version_retention_days(cls, value: int | None) -> int:
+        try:
+            days = int(cls.DEFAULT_UNUSED_VERSION_RETENTION_DAYS if value is None else value)
+        except (TypeError, ValueError):
+            days = cls.DEFAULT_UNUSED_VERSION_RETENTION_DAYS
+        return max(cls.MIN_UNUSED_VERSION_RETENTION_DAYS, min(days, cls.MAX_UNUSED_VERSION_RETENTION_DAYS))
 
     @staticmethod
     def _read_json(path: Path) -> dict | None:

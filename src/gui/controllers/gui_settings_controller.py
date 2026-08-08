@@ -47,6 +47,7 @@ class GuiSettingsController(BaseController):
         "download_limit_mbps": 0.0,
         "download_concurrency": 0,
         "notify_legacy_cache_cleanup": True,
+        "unused_version_retention_days": 14,
         "instance_defaults": default_instance_settings(),
     }
 
@@ -105,6 +106,7 @@ class GuiSettingsController(BaseController):
             "download_limit_mbps": float(network.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]) or 0.0),
             "download_concurrency": int(network.get("download_concurrency", self.DEFAULTS["download_concurrency"]) or 0),
             "notify_legacy_cache_cleanup": bool(storage.get("notify_legacy_cache_cleanup", self.DEFAULTS["notify_legacy_cache_cleanup"])),
+            "unused_version_retention_days": int(storage.get("unused_version_retention_days", self.DEFAULTS["unused_version_retention_days"]) or self.DEFAULTS["unused_version_retention_days"]),
             "instance_defaults": SettingsManager.normalize_dict(data.get("instance_defaults")),
         }
         download_bandwidth_limiter.configure_mbps(self._current["download_limit_mbps"])
@@ -160,6 +162,7 @@ class GuiSettingsController(BaseController):
             "download_limit_mbps": download_limit_mbps,
             "download_concurrency": download_concurrency,
             "notify_legacy_cache_cleanup": bool(data.get("notify_legacy_cache_cleanup", self.DEFAULTS["notify_legacy_cache_cleanup"])),
+            "unused_version_retention_days": max(1, min(int(data.get("unused_version_retention_days", self.DEFAULTS["unused_version_retention_days"]) or self.DEFAULTS["unused_version_retention_days"]), 365)),
             "instance_defaults": SettingsManager.normalize_dict(data.get("instance_defaults")),
         }
         self._settings.save({
@@ -191,6 +194,7 @@ class GuiSettingsController(BaseController):
             },
             "storage": {
                 "notify_legacy_cache_cleanup": self._current["notify_legacy_cache_cleanup"],
+                "unused_version_retention_days": self._current["unused_version_retention_days"],
             },
             "instance_defaults": self._current["instance_defaults"],
         })

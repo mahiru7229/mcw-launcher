@@ -145,6 +145,7 @@ class LegacyStorageCleanupDialog(QDialog):
             "loader_staging": "Forge / NeoForge staging",
             "old_launcher_update": "Old launcher updates",
             "unused_minecraft_version_jar": "Unused Minecraft version JARs",
+            "orphan_instance_residue": "Incomplete legacy instance folders",
             "unreferenced_provider_content": "Unreferenced provider content",
             "unreferenced_content_store": "Unreferenced shared content",
             "stale_temporary_data": "Stale temporary data",

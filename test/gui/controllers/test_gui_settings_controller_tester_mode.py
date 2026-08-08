@@ -76,3 +76,17 @@ def test_legacy_storage_notification_setting_round_trips(tmp_path: Path) -> None
 
     assert controller.current["notify_legacy_cache_cleanup"] is False
     assert LauncherSettingsManager(settings_path).load()["storage"]["notify_legacy_cache_cleanup"] is False
+
+
+def test_unused_version_retention_days_round_trip_through_gui_settings(tmp_path: Path) -> None:
+    settings_path = tmp_path / "launcher_settings.json"
+    controller = _controller(settings_path)
+
+    data = controller.load()
+    assert data["unused_version_retention_days"] == 14
+
+    data["unused_version_retention_days"] = 21
+    controller.save(data)
+
+    assert controller.current["unused_version_retention_days"] == 21
+    assert LauncherSettingsManager(settings_path).load()["storage"]["unused_version_retention_days"] == 21

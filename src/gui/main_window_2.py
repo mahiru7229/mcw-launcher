@@ -731,10 +731,17 @@ class MainWindow(QMainWindow):
         if settings.get("auto_check_updates", True):
             QTimer.singleShot(1500, lambda: self.update_controller.check(manual=False))
         if settings.get("notify_legacy_cache_cleanup", True):
-            QTimer.singleShot(2500, self.storage_controller.probe)
+            retention_days = int(settings.get("unused_version_retention_days", 14) or 14)
+            QTimer.singleShot(2500, lambda days=retention_days: self.storage_controller.probe(days))
 
     def _review_legacy_storage(self) -> None:
-        self.storage_controller.scan()
+        self.storage_controller.scan(self._unused_version_retention_days())
+
+    def _unused_version_retention_days(self) -> int:
+        control = getattr(self.launcher_settings_page, "unused_version_retention_days", None)
+        if control is not None:
+            return max(1, min(int(control.value()), 365))
+        return max(1, min(int(self.gui_settings_controller.current.get("unused_version_retention_days", 14) or 14), 365))
 
     def _on_legacy_storage_probe_ready(self, probe: object) -> None:
         if self._legacy_storage_notice_shown or not bool(self.gui_settings_controller.current.get("notify_legacy_cache_cleanup", True)):
@@ -774,7 +781,7 @@ class MainWindow(QMainWindow):
         selected = dialog.selected_candidate_ids()
         self._legacy_cleanup_dialog = None
         if selected:
-            self.storage_controller.clean(plan, selected)
+            self.storage_controller.clean(plan, selected, self._unused_version_retention_days())
 
     def _on_legacy_storage_cleanup_completed(self, result: object) -> None:
         reclaimed = int(getattr(result, "reclaimed_bytes", 0) or 0)

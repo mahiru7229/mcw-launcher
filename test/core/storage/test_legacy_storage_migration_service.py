@@ -196,6 +196,75 @@ def test_recent_unused_version_jar_is_not_cleanup_candidate(tmp_path: Path) -> N
         assert client not in {item.path for item in plan.candidates}
 
 
+def test_unused_version_retention_days_controls_cleanup_threshold(tmp_path: Path) -> None:
+    with Paths.configured(tmp_path):
+        version_dir = Paths.CACHE_ROOT / "versions" / "1.5.2"
+        version_dir.mkdir(parents=True)
+        client = version_dir / "1.5.2.jar"
+        client.write_bytes(b"unused-client")
+        _make_old(version_dir, age_days=10)
+
+        keep_plan = LegacyStorageMigrationService.scan(unused_version_retention_days=14)
+        clean_plan = LegacyStorageMigrationService.scan(unused_version_retention_days=7)
+
+        assert client not in {item.path for item in keep_plan.candidates}
+        candidate = next(item for item in clean_plan.candidates if item.path == client)
+        assert candidate.category == "unused_minecraft_version_jar"
+        assert "7 days" in candidate.reason
+
+
+def test_scan_marks_only_known_orphan_instance_residue_for_cleanup(tmp_path: Path) -> None:
+    with Paths.configured(tmp_path):
+        orphan = Paths.INSTANCES_ROOT / "Deleted by old launcher"
+        (orphan / ".mcw").mkdir(parents=True)
+        (orphan / ".mcw" / "runtime-history.json").write_text("{}", encoding="utf-8")
+        (orphan / "crash-reports").mkdir()
+        (orphan / "crash-reports" / "crash.txt").write_bytes(b"crash")
+
+        unknown = Paths.INSTANCES_ROOT / "Missing metadata but valuable"
+        (unknown / ".mcw").mkdir(parents=True)
+        (unknown / "mods").mkdir()
+        (unknown / "mods" / "keep.jar").write_bytes(b"keep")
+
+        plan = LegacyStorageMigrationService.scan()
+
+        orphan_candidate = next(item for item in plan.candidates if item.path == orphan)
+        assert orphan_candidate.category == "orphan_instance_residue"
+        assert orphan_candidate.size_bytes > 0
+        assert unknown not in {item.path for item in plan.candidates}
+
+
+def test_orphan_instance_residue_is_protected_when_registry_still_references_it(tmp_path: Path) -> None:
+    with Paths.configured(tmp_path):
+        orphan = Paths.INSTANCES_ROOT / "Still registered"
+        (orphan / ".mcw").mkdir(parents=True)
+        (orphan / "crash-reports").mkdir()
+        Paths.instance_data_path().write_text(json.dumps({
+            "instances": [{"name": "Still registered", "instance_dir": str(orphan)}]
+        }), encoding="utf-8")
+
+        plan = LegacyStorageMigrationService.scan()
+
+        assert orphan not in {item.path for item in plan.candidates}
+
+
+def test_apply_removes_entire_orphan_instance_residue_directory(tmp_path: Path) -> None:
+    with Paths.configured(tmp_path):
+        orphan = Paths.INSTANCES_ROOT / "Old deleted instance"
+        (orphan / ".mcw").mkdir(parents=True)
+        (orphan / ".mcw" / "runtime-history.json").write_text("{}", encoding="utf-8")
+        (orphan / "crash-reports").mkdir()
+        (orphan / "crash-reports" / "crash.txt").write_bytes(b"crash")
+
+        plan = LegacyStorageMigrationService.scan()
+        candidate = next(item for item in plan.candidates if item.path == orphan)
+        result = LegacyStorageMigrationService.apply(plan, [candidate.candidate_id])
+
+        assert not orphan.exists()
+        assert result.removed == (candidate,)
+        assert result.failures == ()
+
+
 def test_probe_counts_old_unused_version_jar_but_not_metadata_only_directory(tmp_path: Path) -> None:
     with Paths.configured(tmp_path):
         old = Paths.CACHE_ROOT / "versions" / "1.3.2"
