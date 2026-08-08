@@ -9,8 +9,8 @@
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.1.2">
     <img src="https://img.shields.io/badge/Stable-v1.1.2-brightgreen" alt="Stable version">
   </a>
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.2.0-beta.1">
-    <img src="https://img.shields.io/badge/Beta-v1.2.0--beta.1-orange" alt="Beta version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.2.0-beta.2">
+    <img src="https://img.shields.io/badge/Beta-v1.2.0--beta.2-orange" alt="Beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -50,6 +50,18 @@ Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh b
 Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.2.0-beta.2
+
+**v1.2.0-beta.2** mở rộng Unified Content Management cho từng instance:
+
+- Thêm trực tiếp hoặc kéo-thả local mods (`.jar`), resource packs và shader packs (`.zip`) từ Installed Content Library; chế độ All types có thể tự nhận diện loại nội dung.
+- Thêm filter User-added / Modpack-managed, Pinned only và bộ đếm số item đang hiển thị để quản lý modpack lớn dễ hơn.
+- Có thể mở manager/thư mục theo loại nội dung đang filter ngay cả khi danh sách hiện tại trống.
+- Local mod import dọn tracking provider cũ theo filename, provider filter có ATLauncher và CurseForge entries có fallback project URL tốt hơn.
+- Không thay đổi dependency resolver, loader pipeline hoặc modpack lifecycle đã ổn định.
+
+Xem chi tiết tại [`docs/RELEASE-v1.2.0-beta.2.md`](docs/RELEASE-v1.2.0-beta.2.md).
 
 ## Có gì mới trong v1.2.0-beta.1
 

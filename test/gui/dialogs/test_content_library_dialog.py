@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import os
 from pathlib import Path
 
@@ -82,3 +83,37 @@ def test_modpack_row_is_read_only_in_content_library(gui_app, instance: Instance
     assert dialog.disable_button.isEnabled() is False
     assert dialog.remove_button.isEnabled() is False
     assert dialog.pin_button.isEnabled() is True
+
+
+def test_content_library_filters_by_ownership_and_pin(gui_app, instance: Instance):
+    dialog = ContentLibraryDialog()
+    dialog.set_instance(instance)
+    managed = replace(item("managed", "mod", "Managed", provider="curseforge", pinned=True), managed_by_modpack=True, source_pack_provider="curseforge", removable=False)
+    local = item("local", "resourcepack", "Local")
+    dialog.set_library(InstalledContentLibrary(instance_name=instance.name, items=(managed, local)))
+
+    dialog.ownership_filter.setCurrentIndex(dialog.ownership_filter.findData("managed"))
+    assert sum(not dialog.table.isRowHidden(row) for row in range(dialog.table.rowCount())) == 1
+
+    dialog.ownership_filter.setCurrentIndex(dialog.ownership_filter.findData(""))
+    dialog.pinned_only.setChecked(True)
+    assert sum(not dialog.table.isRowHidden(row) for row in range(dialog.table.rowCount())) == 1
+    assert "1" in dialog.visible_summary_label.text()
+
+
+def test_content_library_can_import_into_selected_type_without_existing_rows(gui_app, instance: Instance, monkeypatch, tmp_path: Path):
+    dialog = ContentLibraryDialog()
+    dialog.set_instance(instance)
+    dialog.set_library(InstalledContentLibrary(instance_name=instance.name, items=()))
+    mod_path = tmp_path / "example.jar"
+    mod_path.write_bytes(b"jar")
+    emitted: list[tuple[str, list[Path]]] = []
+    dialog.import_requested.connect(lambda kind, paths: emitted.append((kind, paths)))
+
+    dialog.type_filter.setCurrentIndex(dialog.type_filter.findData("mod"))
+    monkeypatch.setattr("src.gui.dialogs.content_library_dialog.QFileDialog.getOpenFileNames", lambda *_args, **_kwargs: ([str(mod_path)], ""))
+    dialog.add_local_button.click()
+
+    assert emitted == [("mod", [mod_path])]
+    assert dialog.manage_button.isEnabled() is True
+    assert dialog.open_folder_button.isEnabled() is True

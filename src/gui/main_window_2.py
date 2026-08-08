@@ -484,6 +484,7 @@ class MainWindow(QMainWindow):
         self.content_library_dialog.remove_requested.connect(self.content_library_controller.remove)
         self.content_library_dialog.pin_requested.connect(self.content_library_controller.set_pinned)
         self.content_library_dialog.ignore_update_requested.connect(self.content_library_controller.set_ignored_update)
+        self.content_library_dialog.import_requested.connect(self.content_library_controller.import_local)
         self.content_library_dialog.open_folder_requested.connect(self._open_content_library_folder)
         self.content_library_dialog.open_manager_requested.connect(self._open_content_library_manager)
         self.content_library_controller.instance_changed.connect(self.content_library_dialog.set_instance)
