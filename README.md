@@ -6,11 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.1.2">
-    <img src="https://img.shields.io/badge/Stable-v1.1.2-brightgreen" alt="Stable version">
-  </a>
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.2.0-rc.2">
-    <img src="https://img.shields.io/badge/RC-v1.2.0--rc.2-orange" alt="Release candidate">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.2.0">
+    <img src="https://img.shields.io/badge/Stable-v1.2.0-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -47,9 +44,22 @@ Mỗi instance có riêng:
 
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 ---
-Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
+Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.2.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.2.0
+
+**v1.2.0** đưa Instance Manager 2.0 lên stable sau Beta 1–3 và RC.1–RC.2:
+
+- Favorite / Group / Tags, search/filter/sort và Instance Overview tốt hơn.
+- Unified Content Library với local import/drag-drop, ownership/pinned filters và provider metadata rõ ràng hơn.
+- Version & Loader + Java Runtime UX trong Instance Editor, dựa trên public Core API.
+- Giữ các fix RC cho overview formatting và release lock khi ổ đĩa hết dung lượng.
+- Thêm logo **M xanh** chính thức cho Windows executable và Qt window/taskbar icon; release preflight kiểm tra icon trước build.
+- Update channel chuyển về `stable`; distribution metadata là `mcw-core 1.2.0`.
+
+Xem chi tiết tại [`docs/RELEASE-v1.2.0.md`](docs/RELEASE-v1.2.0.md).
 
 ## Release Candidate v1.2.0-rc.2
 

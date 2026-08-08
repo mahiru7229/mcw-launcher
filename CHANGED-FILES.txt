@@ -1,6 +1,12 @@
-src/config.py
-pyproject.toml
 README.md
-docs/RELEASE-v1.1.2.md
+docs/RELEASE-v1.2.0.md
+pyproject.toml
+src/config.py
+mcw_launcher.spec
+src/gui/application.py
+tools/release_preflight.py
 test/core/config/test_version_metadata.py
 test/test_public_api.py
+test/tools/test_release_preflight.py
+assets/icons/mcw_launcher.ico
+assets/icons/mcw_launcher.png
