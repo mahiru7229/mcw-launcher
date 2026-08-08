@@ -48,6 +48,12 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.2.0 hỗ trợ nâng cấp
 
 ---
 
+## Có gì mới trong v1.3.0-beta.2
+
+**v1.3.0-beta.2** sửa race condition khi xóa instance vừa chạy game: runtime watcher không còn có thể tạo lại `.mcw` và `crash-reports` sau khi thư mục instance đã bị xóa. Launcher chờ runtime exit finalization hoàn tất trước khi xóa toàn bộ instance root; nếu finalization chưa thể kết thúc, thao tác được queue thay vì báo thành công giả.
+
+Xem chi tiết tại [`docs/RELEASE-v1.3.0-beta.2.md`](docs/RELEASE-v1.3.0-beta.2.md).
+
 ## Có gì mới trong v1.3.0-beta.1
 
 **v1.3.0-beta.1** mở đầu nhánh v1.3 với **Shared Storage & Cache Lifecycle**:
