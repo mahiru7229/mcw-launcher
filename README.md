@@ -48,6 +48,18 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.2.0 hỗ trợ nâng cấp
 
 ---
 
+## Có gì mới trong v1.3.0-beta.3
+
+**v1.3.0-beta.3** bổ sung cleanup an toàn cho Minecraft version JAR không còn được instance nào sử dụng. Launcher chỉ đề xuất xóa `cache/versions/<version>/<version>.jar` sau khi reference graph xác nhận version không còn được dùng trực tiếp hoặc qua loader inheritance; metadata JSON vẫn được giữ để có thể tải lại khi cần.
+
+- Không xóa cả thư mục version.
+- Giữ mọi version đang được Vanilla/Forge/NeoForge/Fabric/Quilt sử dụng.
+- Sửa reference mapping profile Fabric/Quilt theo đúng tên thư mục thực tế.
+- Item/path/reason/dung lượng từng JAR và tổng reclaimable vẫn hiện trong Storage Cleanup trước khi xác nhận.
+- Provider API Cache và phần Shared Storage đã ổn định ở Beta 1/2 không thay đổi.
+
+Xem chi tiết tại [`docs/RELEASE-v1.3.0-beta.3.md`](docs/RELEASE-v1.3.0-beta.3.md).
+
 ## Có gì mới trong v1.3.0-beta.2
 
 **v1.3.0-beta.2** sửa race condition khi xóa instance vừa chạy game: runtime watcher không còn có thể tạo lại `.mcw` và `crash-reports` sau khi thư mục instance đã bị xóa. Launcher chờ runtime exit finalization hoàn tất trước khi xóa toàn bộ instance root; nếu finalization chưa thể kết thúc, thao tác được queue thay vì báo thành công giả.

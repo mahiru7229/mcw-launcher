@@ -53,6 +53,17 @@ def test_cleanup_dialog_shows_exact_items_category_totals_and_grand_total(gui_ap
     assert all(reasons)
 
 
+def test_cleanup_dialog_labels_unused_version_jar_category_explicitly(gui_app, tmp_path: Path) -> None:
+    plan = CleanupPlan((
+        _candidate("version-jar", tmp_path / "1.6.4.jar", "unused_minecraft_version_jar", 8 * 1024 * 1024),
+    ))
+
+    dialog = LegacyStorageCleanupDialog(plan)
+
+    assert dialog.tree.topLevelItem(0).text(0) == "Unused Minecraft version JARs"
+    assert "8.00 MB" in dialog.tree.topLevelItem(0).text(1)
+
+
 def test_cleanup_dialog_updates_selected_total_when_item_is_unchecked(gui_app, tmp_path: Path) -> None:
     plan = CleanupPlan((
         _candidate("one", tmp_path / "one", "loader_staging", 1024 * 1024),

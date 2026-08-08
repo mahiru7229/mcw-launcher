@@ -112,16 +112,7 @@ class LegacyStorageMigrationService:
 
         count += len(cls._old_update_directories())
 
-        required, version_references_reliable = cls._referenced_version_directories()
-        versions_root = Paths.CACHE_ROOT / "versions"
-        if version_references_reliable and versions_root.is_dir():
-            count += sum(
-                1
-                for child in cls._safe_children(versions_root)
-                if child.is_dir()
-                and child.name.casefold() not in required
-                and cls._older_than(child, current_time, cls.UNUSED_VERSION_RETENTION_SECONDS)
-            )
+        count += len(cls._unused_version_jar_paths(current_time))
 
         references, provider_references_reliable = cls._provider_references()
         if provider_references_reliable:
@@ -274,24 +265,32 @@ class LegacyStorageMigrationService:
 
     @classmethod
     def _scan_unused_versions(cls, now: float) -> list[CleanupCandidate]:
+        return [
+            cls._candidate(
+                jar_path,
+                "unused_minecraft_version_jar",
+                "No installed instance or loader inheritance chain references this Minecraft version JAR. Version metadata is retained for future restore/download.",
+                cls.REVIEWED,
+            )
+            for jar_path in cls._unused_version_jar_paths(now)
+        ]
+
+    @classmethod
+    def _unused_version_jar_paths(cls, now: float) -> list[Path]:
         root = Paths.CACHE_ROOT / "versions"
         if not root.is_dir():
             return []
         required, reliable = cls._referenced_version_directories()
         if not reliable:
             return []
-        output: list[CleanupCandidate] = []
-        for child in cls._safe_children(root):
-            if not child.is_dir() or child.name.casefold() in required:
+        output: list[Path] = []
+        for version_dir in cls._safe_children(root):
+            if not version_dir.is_dir() or version_dir.name.casefold() in required:
                 continue
-            if not cls._older_than(child, now, cls.UNUSED_VERSION_RETENTION_SECONDS):
+            jar_path = version_dir / f"{version_dir.name}.jar"
+            if not jar_path.is_file() or not cls._older_than(jar_path, now, cls.UNUSED_VERSION_RETENTION_SECONDS):
                 continue
-            output.append(cls._candidate(
-                child,
-                "unused_minecraft_version",
-                "No installed instance or selected loader references this cached Minecraft/loader version.",
-                cls.REVIEWED,
-            ))
+            output.append(jar_path)
         return output
 
     @classmethod
@@ -401,7 +400,13 @@ class LegacyStorageMigrationService:
             loader_version = str(raw_loader[1] or "-1").strip()
             required.add(version_id.casefold())
             if loader not in {"", "vanilla"} and loader_version not in {"", "-1", "auto"}:
-                required.add(f"{loader}-{version_id}-{loader_version}".casefold())
+                if loader == "fabric":
+                    profile_id = f"fabric-loader-{loader_version}-{version_id}"
+                elif loader == "quilt":
+                    profile_id = f"quilt-loader-{loader_version}-{version_id}"
+                else:
+                    profile_id = f"{loader}-{version_id}-{loader_version}"
+                required.add(profile_id.casefold())
 
         # Follow inheritsFrom for every already-protected cached profile.
         changed = True

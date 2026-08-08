@@ -37,12 +37,16 @@ def test_scan_protects_referenced_versions_and_provider_api_cache(tmp_path: Path
         live = Paths.CACHE_ROOT / "versions" / "1.20.1"
         live.mkdir(parents=True)
         (live / "1.20.1.json").write_text('{"id":"1.20.1"}', encoding="utf-8")
+        (live / "1.20.1.jar").write_bytes(b"live-version")
         live_loader = Paths.CACHE_ROOT / "versions" / "forge-1.20.1-47.2.0"
         live_loader.mkdir(parents=True)
         (live_loader / "forge.json").write_text('{"id":"forge-1.20.1-47.2.0","inheritsFrom":"1.20.1"}', encoding="utf-8")
         stale = Paths.CACHE_ROOT / "versions" / "1.0"
         stale.mkdir(parents=True)
-        (stale / "1.0.jar").write_bytes(b"old-version")
+        stale_json = stale / "1.0.json"
+        stale_jar = stale / "1.0.jar"
+        stale_json.write_text('{"id":"1.0"}', encoding="utf-8")
+        stale_jar.write_bytes(b"old-version")
         _make_old(stale)
 
         api_cache = Paths.CACHE_ROOT / "content" / "curseforge" / "api-v2" / "entries"
@@ -53,9 +57,14 @@ def test_scan_protects_referenced_versions_and_provider_api_cache(tmp_path: Path
         plan = LegacyStorageMigrationService.scan()
         paths = {item.path.resolve() for item in plan.candidates}
 
-        assert stale.resolve() in paths
+        assert stale_jar.resolve() in paths
+        assert stale.resolve() not in paths
         assert live.resolve() not in paths
+        assert (live / "1.20.1.jar").resolve() not in paths
         assert live_loader.resolve() not in paths
+        version_candidate = next(item for item in plan.candidates if item.path.resolve() == stale_jar.resolve())
+        assert version_candidate.category == "unused_minecraft_version_jar"
+        assert "JAR" in version_candidate.reason
         assert all(api_cache.resolve() not in [candidate, *candidate.parents] for candidate in paths)
 
 
@@ -113,17 +122,97 @@ def test_apply_revalidates_before_deleting_and_skips_newly_referenced_version(tm
         _write_instance(tmp_path, "Live", "1.20.1")
         old = Paths.CACHE_ROOT / "versions" / "1.0"
         old.mkdir(parents=True)
-        (old / "1.0.jar").write_bytes(b"old")
+        old_json = old / "1.0.json"
+        old_jar = old / "1.0.jar"
+        old_json.write_text('{"id":"1.0"}', encoding="utf-8")
+        old_jar.write_bytes(b"old")
         _make_old(old)
         plan = LegacyStorageMigrationService.scan()
-        candidate = next(item for item in plan.candidates if item.path == old)
+        candidate = next(item for item in plan.candidates if item.path == old_jar)
 
         _write_instance(tmp_path, "NewlyAdded", "1.0")
         result = LegacyStorageMigrationService.apply(plan, [candidate.candidate_id])
 
-        assert old.exists()
+        assert old_jar.exists()
+        assert old_json.exists()
         assert result.reclaimed_bytes == 0
         assert result.skipped == (candidate,)
+
+
+def test_apply_unused_version_cleanup_removes_only_client_jar_and_keeps_metadata(tmp_path: Path) -> None:
+    with Paths.configured(tmp_path):
+        version_dir = Paths.CACHE_ROOT / "versions" / "1.6.4"
+        version_dir.mkdir(parents=True)
+        metadata = version_dir / "1.6.4.json"
+        client = version_dir / "1.6.4.jar"
+        unrelated = version_dir / "notes.txt"
+        metadata.write_text('{"id":"1.6.4"}', encoding="utf-8")
+        client.write_bytes(b"unused-client")
+        unrelated.write_text("keep", encoding="utf-8")
+        _make_old(version_dir)
+
+        plan = LegacyStorageMigrationService.scan()
+        candidate = next(item for item in plan.candidates if item.path == client)
+        result = LegacyStorageMigrationService.apply(plan, [candidate.candidate_id])
+
+        assert not client.exists()
+        assert metadata.exists()
+        assert unrelated.exists()
+        assert version_dir.exists()
+        assert result.reclaimed_bytes == len(b"unused-client")
+        assert result.failures == ()
+
+
+def test_referenced_version_profiles_use_loader_specific_directory_names(tmp_path: Path) -> None:
+    with Paths.configured(tmp_path):
+        _write_instance(tmp_path, "Fabric", "1.20.1", ("fabric", "0.16.9"))
+        _write_instance(tmp_path, "Quilt", "1.19.2", ("quilt", "0.27.1"))
+
+        fabric_profile = Paths.CACHE_ROOT / "versions" / "fabric-loader-0.16.9-1.20.1"
+        quilt_profile = Paths.CACHE_ROOT / "versions" / "quilt-loader-0.27.1-1.19.2"
+        fabric_profile.mkdir(parents=True)
+        quilt_profile.mkdir(parents=True)
+        (fabric_profile / f"{fabric_profile.name}.json").write_text('{"inheritsFrom":"1.20.1"}', encoding="utf-8")
+        (quilt_profile / f"{quilt_profile.name}.json").write_text('{"inheritsFrom":"1.19.2"}', encoding="utf-8")
+
+        required, reliable = LegacyStorageMigrationService._referenced_version_directories()
+
+        assert reliable is True
+        assert fabric_profile.name.casefold() in required
+        assert quilt_profile.name.casefold() in required
+        assert "1.20.1" in required
+        assert "1.19.2" in required
+
+
+def test_recent_unused_version_jar_is_not_cleanup_candidate(tmp_path: Path) -> None:
+    with Paths.configured(tmp_path):
+        version_dir = Paths.CACHE_ROOT / "versions" / "1.2.5"
+        version_dir.mkdir(parents=True)
+        client = version_dir / "1.2.5.jar"
+        client.write_bytes(b"recent")
+
+        plan = LegacyStorageMigrationService.scan()
+
+        assert client not in {item.path for item in plan.candidates}
+
+
+def test_probe_counts_old_unused_version_jar_but_not_metadata_only_directory(tmp_path: Path) -> None:
+    with Paths.configured(tmp_path):
+        old = Paths.CACHE_ROOT / "versions" / "1.3.2"
+        old.mkdir(parents=True)
+        (old / "1.3.2.json").write_text('{"id":"1.3.2"}', encoding="utf-8")
+        client = old / "1.3.2.jar"
+        client.write_bytes(b"old-client")
+        _make_old(old)
+
+        metadata_only = Paths.CACHE_ROOT / "versions" / "1.4.7"
+        metadata_only.mkdir(parents=True)
+        (metadata_only / "1.4.7.json").write_text('{"id":"1.4.7"}', encoding="utf-8")
+        _make_old(metadata_only)
+
+        probe = LegacyStorageMigrationService.probe()
+
+        assert probe.candidate_count == 1
 
 
 def test_probe_detects_legacy_staging_without_counting_api_cache(tmp_path: Path) -> None:
