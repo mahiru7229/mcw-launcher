@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Signal, Slot
 
 from mcw_core.api.language.language_manager import tr
@@ -47,6 +49,18 @@ class ContentLibraryController(BaseController):
         instance_id = instance.instance_id
         return self._task_runner.run("content.library.scan", lambda: (instance_id, InstalledContentLibraryManager.scan(instance)), tr("task.content_library.scan", instance=instance.name), blocking=False)
 
+    def import_local(self, content_type: str, paths: list[Path]) -> bool:
+        instance = self._instance
+        if instance is None or not paths:
+            return False
+        instance_id = instance.instance_id
+        normalized_paths = [Path(path) for path in paths]
+        return self._task_runner.run(
+            "content.library.import",
+            lambda: (instance_id, InstalledContentLibraryManager.import_local(instance, content_type, normalized_paths)),
+            tr("task.content_library.import_local", count=len(normalized_paths)),
+        )
+
     def set_enabled(self, item_ids: list[str], enabled: bool) -> bool:
         instance = self._instance
         if instance is None or not item_ids:
@@ -84,7 +98,7 @@ class ContentLibraryController(BaseController):
                 self.library_changed.emit(library)
             self._run_pending_refresh()
             return
-        if task_id in {"content.library.toggle", "content.library.remove", "content.library.pin", "content.library.ignore"}:
+        if task_id in {"content.library.import", "content.library.toggle", "content.library.remove", "content.library.pin", "content.library.ignore"}:
             instance_id, changed = result
             if self._matches_instance(instance_id):
                 self.status_changed.emit(tr("status.content.updated_items", count=len(changed)))

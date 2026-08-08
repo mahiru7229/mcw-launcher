@@ -304,6 +304,35 @@ def audit_lan_agent(project_root: Path) -> list[str]:
             errors.append("mcw_launcher.spec does not bundle the MCW LAN Agent")
     return errors
 
+def audit_launcher_icon(project_root: Path) -> list[str]:
+    errors: list[str] = []
+    icon_root = project_root / "assets" / "icons"
+    ico_path = icon_root / "mcw_launcher.ico"
+    png_path = icon_root / "mcw_launcher.png"
+    for path in (ico_path, png_path):
+        if not path.is_file() or path.stat().st_size <= 0:
+            errors.append(f"Missing launcher icon asset: {path.relative_to(project_root)}")
+
+    try:
+        spec_text = (project_root / "mcw_launcher.spec").read_text(encoding="utf-8")
+    except OSError as error:
+        errors.append(f"Unable to inspect mcw_launcher.spec for icon bundling: {error}")
+    else:
+        if "mcw_launcher.ico" not in spec_text or "icon=str(APP_ICON_PATH)" not in spec_text:
+            errors.append("mcw_launcher.spec does not configure the Windows executable icon")
+        if "mcw_launcher.png" not in spec_text:
+            errors.append("mcw_launcher.spec does not bundle the runtime window icon")
+
+    try:
+        application_text = (project_root / "src" / "gui" / "application.py").read_text(encoding="utf-8")
+    except OSError as error:
+        errors.append(f"Unable to inspect src/gui/application.py for window icon setup: {error}")
+    else:
+        if "setWindowIcon" not in application_text or "mcw_launcher.png" not in application_text:
+            errors.append("QApplication does not configure the launcher window icon")
+    return errors
+
+
 def audit_version_metadata(project_root: Path) -> list[str]:
     errors: list[str] = []
     if VERSION_TAG != f"v{VERSION_ID}":
@@ -334,6 +363,7 @@ def run_preflight(project_root: Path = PROJECT_ROOT) -> list[str]:
     errors.extend(audit_private_gateway_bundling(project_root))
     errors.extend(audit_theme_contract(project_root))
     errors.extend(audit_lan_agent(project_root))
+    errors.extend(audit_launcher_icon(project_root))
     errors.extend(find_merge_markers(project_root))
     errors.extend(audit_language_packs(project_root))
     errors.extend(audit_navigation_translation_keys(project_root))

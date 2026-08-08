@@ -119,3 +119,53 @@ def test_advanced_dialog_title_and_content_follow_vietnamese_language(gui_app):
         assert page.advanced_dialog.close_button.text() == "Đóng"
     finally:
         language_manager.set_language(previous, notify=False)
+
+
+def test_workspace_filters_groups_tags_and_favorites(gui_app):
+    page = InstanceWorkspacePage()
+    favorite = make_instance("ATM9", ("neoforge", "47.1.106"), "1.20.1")
+    favorite.favorite = True
+    favorite.group = "Modpacks"
+    favorite.tags = ("heavy", "tech")
+    vanilla = make_instance("Survival", version="1.21.1")
+    vanilla.favorite = False
+    vanilla.group = "Vanilla"
+    vanilla.tags = ("survival",)
+
+    page.set_instances([vanilla, favorite], favorite.name)
+
+    group_index = page.group_filter.findData("Modpacks")
+    assert group_index >= 0
+    page.group_filter.setCurrentIndex(group_index)
+    visible = [
+        page.instance_list.item(index).data(page.ITEM_NAME_ROLE)
+        for index in range(page.instance_list.count())
+        if not page.instance_list.item(index).isHidden()
+    ]
+    assert visible == ["ATM9"]
+
+    page.group_filter.setCurrentIndex(page.group_filter.findData("__all__"))
+    page.search_input.setText("tech")
+    assert page.current_instance_name() == "ATM9"
+
+    page.search_input.clear()
+    page.favorite_only_checkbox.setChecked(True)
+    visible = [
+        page.instance_list.item(index).data(page.ITEM_NAME_ROLE)
+        for index in range(page.instance_list.count())
+        if not page.instance_list.item(index).isHidden()
+    ]
+    assert visible == ["ATM9"]
+
+
+def test_workspace_favorite_action_emits_selected_state_change(gui_app):
+    page = InstanceWorkspacePage()
+    instance = make_instance("Favorite Me")
+    instance.favorite = False
+    emitted: list[tuple[str, bool]] = []
+    page.favorite_changed.connect(lambda name, favorite: emitted.append((name, favorite)))
+    page.set_instances([instance], instance.name)
+
+    page.favorite_button.click()
+
+    assert emitted == [("Favorite Me", True)]

@@ -13,6 +13,8 @@ PROJECT_ROOT = Path(SPECPATH).resolve()
 ENTRY_POINT = PROJECT_ROOT / "launcher.py"
 LANGUAGE_ROOT = PROJECT_ROOT / "lang"
 LAN_AGENT_PATH = PROJECT_ROOT / "runtime" / "mcw-lan-agent.jar"
+APP_ICON_PATH = PROJECT_ROOT / "assets" / "icons" / "mcw_launcher.ico"
+APP_ICON_PNG_PATH = PROJECT_ROOT / "assets" / "icons" / "mcw_launcher.png"
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -31,6 +33,10 @@ if not LANGUAGE_ROOT.is_dir():
     raise FileNotFoundError(f"Language directory not found: {LANGUAGE_ROOT}")
 if not LAN_AGENT_PATH.is_file():
     raise FileNotFoundError(f"MCW LAN Agent not found: {LAN_AGENT_PATH}")
+if not APP_ICON_PATH.is_file():
+    raise FileNotFoundError(f"Launcher icon not found: {APP_ICON_PATH}")
+if not APP_ICON_PNG_PATH.is_file():
+    raise FileNotFoundError(f"Launcher runtime icon not found: {APP_ICON_PNG_PATH}")
 
 
 NUMERIC_VERSION = _numeric_version(VERSION_ID)
@@ -39,7 +45,7 @@ IS_PRERELEASE = any(marker in VERSION_ID.casefold() for marker in ("alpha", "bet
 # Keep the default language packs inside the one-file executable so the GUI can
 # still start when the external release payload is incomplete. External packs
 # beside the executable remain supported and override bundled packs.
-DATAS = [(str(LANGUAGE_ROOT), "lang"), (str(LAN_AGENT_PATH), "runtime")]
+DATAS = [(str(LANGUAGE_ROOT), "lang"), (str(LAN_AGENT_PATH), "runtime"), (str(APP_ICON_PNG_PATH), "assets/icons")]
 
 # HTTPX/Requests use certifi for HTTPS certificate validation. PyInstaller has a
 # certifi hook, but collecting the data explicitly makes the release contract
@@ -205,6 +211,7 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     version=VERSION_RESOURCE,
+    icon=str(APP_ICON_PATH),
     manifest=WINDOWS_MANIFEST,
     uac_admin=False,
     uac_uiaccess=False,

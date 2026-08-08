@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.1.2">
-    <img src="https://img.shields.io/badge/Stable-v1.1.2-brightgreen" alt="Stable version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.2.0">
+    <img src="https://img.shields.io/badge/Stable-v1.2.0-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -44,9 +44,69 @@ Mỗi instance có riêng:
 
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 ---
-Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
+Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.2.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.2.0
+
+**v1.2.0** đưa Instance Manager 2.0 lên stable sau Beta 1–3 và RC.1–RC.2:
+
+- Favorite / Group / Tags, search/filter/sort và Instance Overview tốt hơn.
+- Unified Content Library với local import/drag-drop, ownership/pinned filters và provider metadata rõ ràng hơn.
+- Version & Loader + Java Runtime UX trong Instance Editor, dựa trên public Core API.
+- Giữ các fix RC cho overview formatting và release lock khi ổ đĩa hết dung lượng.
+- Thêm logo **M xanh** chính thức cho Windows executable và Qt window/taskbar icon; release preflight kiểm tra icon trước build.
+- Update channel chuyển về `stable`; distribution metadata là `mcw-core 1.2.0`.
+
+Xem chi tiết tại [`docs/RELEASE-v1.2.0.md`](docs/RELEASE-v1.2.0.md).
+
+## Release Candidate v1.2.0-rc.2
+
+**v1.2.0-rc.2** tiếp tục feature-freeze và chỉ sửa hai lỗi tìm thấy khi smoke-test RC.1: Instance Overview hiển thị literal `\n`, và lỗi hết dung lượng bị hiểu nhầm thành manual-download pause khiến instance giữ preparing lock. RC.2 chuyển lỗi storage cục bộ thành terminal failure để task kết thúc, release lock và cho phép người dùng xóa/dọn instance ngay.
+
+- Update channel vẫn là `beta` vì RC là prerelease.
+- Build release bằng `python -m tools.release_preflight` rồi `.\build_release.ps1`.
+- Checklist EXE bao gồm startup one-file, Microsoft login, instance lifecycle, các loader, ATM9/SkyFactory 5/RLCraft, Java Runtime UX, Installed Content Library và process recovery.
+
+Xem chi tiết tại [`docs/RELEASE-v1.2.0-rc.2.md`](docs/RELEASE-v1.2.0-rc.2.md).
+
+## Có gì mới trong v1.2.0-beta.3
+
+**v1.2.0-beta.3** mở rộng Instance Manager 2.0 với Component/Runtime UX:
+
+- Instance Editor hiển thị riêng Minecraft, mod loader/version và Java requirement; loader repair được đưa ra ngay trang Version & Loader.
+- Thêm trang Java Runtime với Automatic/custom selection, scan Java và cài managed Java tương thích ngay trong instance.
+- Custom Java được Core kiểm tra path + major version + compatibility và bị chặn thay đổi khi Minecraft đang chạy.
+- Thêm public `InstanceRuntimeProfile`, giữ GUI không đọc trực tiếp internal version/settings files.
+- Minecraft version vẫn read-only trong Beta 3 để tránh phá curated modpack hoặc mod set hiện tại.
+
+Xem chi tiết tại [`docs/RELEASE-v1.2.0-beta.3.md`](docs/RELEASE-v1.2.0-beta.3.md).
+
+## Có gì mới trong v1.2.0-beta.2
+
+**v1.2.0-beta.2** mở rộng Unified Content Management cho từng instance:
+
+- Thêm trực tiếp hoặc kéo-thả local mods (`.jar`), resource packs và shader packs (`.zip`) từ Installed Content Library; chế độ All types có thể tự nhận diện loại nội dung.
+- Thêm filter User-added / Modpack-managed, Pinned only và bộ đếm số item đang hiển thị để quản lý modpack lớn dễ hơn.
+- Có thể mở manager/thư mục theo loại nội dung đang filter ngay cả khi danh sách hiện tại trống.
+- Local mod import dọn tracking provider cũ theo filename, provider filter có ATLauncher và CurseForge entries có fallback project URL tốt hơn.
+- Không thay đổi dependency resolver, loader pipeline hoặc modpack lifecycle đã ổn định.
+
+Xem chi tiết tại [`docs/RELEASE-v1.2.0-beta.2.md`](docs/RELEASE-v1.2.0-beta.2.md).
+
+## Có gì mới trong v1.2.0-beta.1
+
+**v1.2.0-beta.1** mở đầu nhánh feature v1.2 với nền tảng **Instance Manager 2.0**:
+
+- Thêm metadata thư viện cho từng instance: **Favorite**, **Group** và **Tags**; dữ liệu được lưu ngay trong `instance.json` và tương thích ngược với instance v1.1.2.
+- Instance library có bộ lọc theo group, chỉ hiện favorites, tìm kiếm theo group/tag và sắp xếp theo tên, lần chơi gần nhất hoặc Minecraft version.
+- Favorites luôn được ưu tiên trong danh sách và hiển thị dấu sao trực tiếp trên card instance.
+- Context menu cho phép thêm/bỏ favorite, đặt group và chỉnh tags mà không phải sửa file metadata thủ công.
+- Instance overview hiển thị group, tags và trạng thái favorite cùng Minecraft version, loader và health hiện có.
+- Không thay đổi dependency resolver, modpack lifecycle hoặc launch pipeline của v1.1.2 trong beta này.
+
+Xem chi tiết tại [`docs/RELEASE-v1.2.0-beta.1.md`](docs/RELEASE-v1.2.0-beta.1.md).
 
 ## Có gì mới trong v1.1.2
 

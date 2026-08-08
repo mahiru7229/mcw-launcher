@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QComboBox,
     QDialog,
     QFrame,
     QHBoxLayout,
     QHeaderView,
+    QFileDialog,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -33,6 +37,7 @@ class ContentLibraryDialog(QDialog):
     remove_requested = Signal(list)
     pin_requested = Signal(list, bool)
     ignore_update_requested = Signal(list, bool)
+    import_requested = Signal(str, list)
     open_folder_requested = Signal(str)
     open_manager_requested = Signal(str)
 
@@ -42,6 +47,7 @@ class ContentLibraryDialog(QDialog):
         super().__init__(parent)
         self.setObjectName("ContentLibraryDialog")
         self.setModal(False)
+        self.setAcceptDrops(True)
         self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
         fitted_width, fitted_height = resize_dialog_to_screen(self, 1180, 640, 860, 500)
         self.setMinimumSize(min(860, fitted_width), min(500, fitted_height))
@@ -77,6 +83,8 @@ class ContentLibraryDialog(QDialog):
         self.type_filter.setEnabled(not self._busy)
         self.provider_filter.setEnabled(not self._busy)
         self.status_filter.setEnabled(not self._busy)
+        self.ownership_filter.setEnabled(not self._busy)
+        self.pinned_only.setEnabled(not self._busy)
         self._update_actions()
 
     def selected_items(self) -> list[InstalledContentItem]:
@@ -112,18 +120,30 @@ class ContentLibraryDialog(QDialog):
         self.type_filter = QComboBox()
         self.provider_filter = QComboBox()
         self.status_filter = QComboBox()
+        self.ownership_filter = QComboBox()
+        self.pinned_only = QCheckBox()
         self.type_filter.currentIndexChanged.connect(self._apply_filter)
         self.provider_filter.currentIndexChanged.connect(self._apply_filter)
         self.status_filter.currentIndexChanged.connect(self._apply_filter)
+        self.ownership_filter.currentIndexChanged.connect(self._apply_filter)
+        self.pinned_only.toggled.connect(self._apply_filter)
         filter_row.addWidget(self.search_input, 1)
         filter_row.addWidget(self.type_filter)
         filter_row.addWidget(self.provider_filter)
         filter_row.addWidget(self.status_filter)
+        filter_row.addWidget(self.ownership_filter)
+        filter_row.addWidget(self.pinned_only)
         root.addWidget(filter_frame)
 
+        summary_row = QHBoxLayout()
         self.summary_label = QLabel()
         self.summary_label.setObjectName("TinyLabel")
-        root.addWidget(self.summary_label)
+        self.visible_summary_label = QLabel()
+        self.visible_summary_label.setObjectName("TinyLabel")
+        summary_row.addWidget(self.summary_label)
+        summary_row.addStretch(1)
+        summary_row.addWidget(self.visible_summary_label)
+        root.addLayout(summary_row)
 
         self.table = QTableWidget(0, 7)
         self.table.setObjectName("ContentLibraryTable")
@@ -154,6 +174,7 @@ class ContentLibraryDialog(QDialog):
         action_row = QHBoxLayout()
         action_row.setSpacing(8)
         self.refresh_button = set_theme_icon(QPushButton(), "icon.action.refresh")
+        self.add_local_button = set_theme_icon(QPushButton(), "icon.action.import")
         self.manage_button = set_theme_icon(QPushButton(), "icon.action.edit")
         self.open_folder_button = set_theme_icon(QPushButton(), "icon.action.folder")
         self.open_web_button = set_theme_icon(QPushButton(), "icon.action.web")
@@ -165,6 +186,7 @@ class ContentLibraryDialog(QDialog):
         self.remove_button.setObjectName("DangerButton")
 
         self.refresh_button.clicked.connect(self.refresh_requested.emit)
+        self.add_local_button.clicked.connect(self._choose_local_files)
         self.manage_button.clicked.connect(self._open_manager)
         self.open_folder_button.clicked.connect(self._open_folder)
         self.open_web_button.clicked.connect(self._open_web)
@@ -175,6 +197,7 @@ class ContentLibraryDialog(QDialog):
         self.remove_button.clicked.connect(self._remove_selected)
 
         action_row.addWidget(self.refresh_button)
+        action_row.addWidget(self.add_local_button)
         action_row.addWidget(self.manage_button)
         action_row.addWidget(self.open_folder_button)
         action_row.addWidget(self.open_web_button)
@@ -249,6 +272,9 @@ class ContentLibraryDialog(QDialog):
         kind = str(self.type_filter.currentData() or "")
         provider = str(self.provider_filter.currentData() or "")
         status = str(self.status_filter.currentData() or "")
+        ownership = str(self.ownership_filter.currentData() or "")
+        pinned_only = self.pinned_only.isChecked()
+        visible_count = 0
         for row in range(self.table.rowCount()):
             cell = self.table.item(row, 0)
             content = cell.data(self.ITEM_ROLE) if cell is not None else None
@@ -259,10 +285,19 @@ class ContentLibraryDialog(QDialog):
                 visible = content.provider == provider
             if visible and status:
                 visible = content.status == status
+            if visible and ownership == "managed":
+                visible = content.managed_by_modpack
+            elif visible and ownership == "user":
+                visible = not content.managed_by_modpack and content.content_type != "modpack"
+            if visible and pinned_only:
+                visible = content.pinned
             if visible and query:
                 haystack = " ".join((content.name, content.version, content.provider, content.project_id, content.file_name, content.target_path)).casefold()
                 visible = query in haystack
             self.table.setRowHidden(row, not visible)
+            visible_count += int(visible)
+        self.visible_summary_label.setText(tr("content.library.visible_summary", visible=visible_count, total=self.table.rowCount()))
+        self._update_actions()
 
     def _selection_changed(self) -> None:
         selected = self.selected_items()
@@ -274,8 +309,10 @@ class ContentLibraryDialog(QDialog):
         available = not self._busy and bool(selected)
         toggleable = [item for item in selected if item.toggleable]
         removable = [item for item in selected if item.removable]
-        self.manage_button.setEnabled(available and len({item.content_type for item in selected}) == 1 and all(item.content_type != "modpack" for item in selected))
-        self.open_folder_button.setEnabled(available and len({item.content_type for item in selected}) == 1)
+        action_kind = self._action_kind(selected)
+        self.add_local_button.setEnabled(not self._busy and self._instance is not None and self._import_kind() != "modpack")
+        self.manage_button.setEnabled(not self._busy and self._instance is not None and action_kind in {"mod", "resourcepack", "shader"})
+        self.open_folder_button.setEnabled(not self._busy and self._instance is not None and action_kind in {"mod", "resourcepack", "shader", "modpack"})
         self.open_web_button.setEnabled(available and len(selected) == 1 and bool(safe_external_url(selected[0].project_url)))
         self.enable_button.setEnabled(available and bool(toggleable) and any(not item.enabled for item in toggleable))
         self.disable_button.setEnabled(available and bool(toggleable) and any(item.enabled for item in toggleable))
@@ -309,14 +346,69 @@ class ContentLibraryDialog(QDialog):
             self.remove_requested.emit([item.item_id for item in removable])
 
     def _open_folder(self) -> None:
-        selected = self.selected_items()
-        if selected:
-            self.open_folder_requested.emit(selected[0].content_type)
+        kind = self._action_kind(self.selected_items())
+        if kind:
+            self.open_folder_requested.emit(kind)
 
     def _open_manager(self) -> None:
-        selected = self.selected_items()
-        if selected:
-            self.open_manager_requested.emit(selected[0].content_type)
+        kind = self._action_kind(self.selected_items())
+        if kind:
+            self.open_manager_requested.emit(kind)
+
+    def _choose_local_files(self) -> None:
+        if self._instance is None:
+            return
+        kind = self._import_kind()
+        if kind == "modpack":
+            return
+        filters = {
+            "mod": tr("content.library.file_filter.mods"),
+            "resourcepack": tr("content.library.file_filter.packs"),
+            "shader": tr("content.library.file_filter.packs"),
+            "auto": tr("content.library.file_filter.all"),
+        }
+        paths, _selected = QFileDialog.getOpenFileNames(self, tr("content.library.import_title"), "", filters[kind])
+        if paths:
+            self.import_requested.emit(kind, [Path(path) for path in paths])
+
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
+        urls = event.mimeData().urls() if event.mimeData().hasUrls() else []
+        supported = any(url.isLocalFile() and self._accepts_local_path(Path(url.toLocalFile())) for url in urls)
+        if not self._busy and self._instance is not None and self._import_kind() != "modpack" and supported:
+            event.acceptProposedAction()
+            return
+        event.ignore()
+
+    def dropEvent(self, event: QDropEvent) -> None:
+        if self._busy or self._instance is None or self._import_kind() == "modpack":
+            event.ignore()
+            return
+        paths = [Path(url.toLocalFile()) for url in event.mimeData().urls() if url.isLocalFile() and self._accepts_local_path(Path(url.toLocalFile()))]
+        if not paths:
+            event.ignore()
+            return
+        event.acceptProposedAction()
+        self.import_requested.emit(self._import_kind(), paths)
+
+    def _import_kind(self) -> str:
+        kind = str(self.type_filter.currentData() or "").strip().casefold()
+        return kind if kind else "auto"
+
+    def _accepts_local_path(self, path: Path) -> bool:
+        suffix = Path(path).suffix.casefold()
+        kind = self._import_kind()
+        if kind == "mod":
+            return suffix == ".jar"
+        if kind in {"resourcepack", "shader"}:
+            return suffix == ".zip"
+        return kind == "auto" and suffix in {".jar", ".zip"}
+
+    def _action_kind(self, selected: list[InstalledContentItem]) -> str:
+        kinds = {item.content_type for item in selected}
+        if len(kinds) == 1:
+            return next(iter(kinds))
+        filtered = str(self.type_filter.currentData() or "").strip().casefold()
+        return filtered if filtered in {"mod", "resourcepack", "shader", "modpack"} else ""
 
     def _open_web(self) -> None:
         selected = self.selected_items()
@@ -382,6 +474,7 @@ class ContentLibraryDialog(QDialog):
             (tr("content.library.provider.modrinth"), "modrinth"),
             (tr("content.library.provider.curseforge"), "curseforge"),
             (tr("content.library.provider.ftb"), "ftb"),
+            (tr("content.library.provider.atlauncher"), "atlauncher"),
             (tr("content.library.provider.local"), "local"),
             (tr("content.library.provider.manual"), "manual"),
             (tr("content.library.provider.unknown"), "unknown"),
@@ -394,6 +487,12 @@ class ContentLibraryDialog(QDialog):
             (tr("content.library.status.missing"), "missing"),
             (tr("content.library.status.broken"), "broken"),
         ))
+        self._reset_combo(self.ownership_filter, (
+            (tr("content.library.filter.all_ownership"), ""),
+            (tr("content.library.filter.user_added"), "user"),
+            (tr("content.library.filter.managed"), "managed"),
+        ))
+        self.pinned_only.setText(tr("content.library.filter.pinned_only"))
         self.table.setHorizontalHeaderLabels((
             tr("content.library.column.type"),
             tr("content.library.column.name"),
@@ -404,6 +503,7 @@ class ContentLibraryDialog(QDialog):
             tr("content.library.column.file"),
         ))
         self.refresh_button.setText(tr("content.library.refresh"))
+        self.add_local_button.setText(tr("content.library.add_local"))
         self.manage_button.setText(tr("content.library.manage"))
         self.open_folder_button.setText(tr("content.library.open_folder"))
         self.open_web_button.setText(tr("content.library.open_web"))
@@ -411,7 +511,7 @@ class ContentLibraryDialog(QDialog):
         self.disable_button.setText(tr("content.library.disable"))
         self.remove_button.setText(tr("content.library.remove"))
         self._render_summary()
-        self._update_actions()
+        self._apply_filter()
 
     @staticmethod
     def _reset_combo(combo: QComboBox, entries: tuple[tuple[str, str], ...]) -> None:

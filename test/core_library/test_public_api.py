@@ -188,3 +188,22 @@ def test_launcher_public_api_modules_exist() -> None:
             if not target.with_suffix(".py").is_file() and not (target / "__init__.py").is_file():
                 missing.append(f"{path.relative_to(PROJECT_ROOT)} -> {module}")
     assert not missing, "Missing public API re-export modules:\n" + "\n".join(missing)
+
+
+def test_instance_service_exposes_library_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from mcw_core.services import InstanceService
+
+    expected = Instance("id", "Organized", "1.20.1", tmp_path / "instances" / "Organized", ("forge", "47.4.0"), favorite=True, group="Modpacks", tags=("heavy",))
+    captured: dict[str, object] = {}
+
+    def fake_update(name: str, **changes):
+        captured["name"] = name
+        captured.update(changes)
+        return expected
+
+    monkeypatch.setattr("mcw_core.services.InstanceManager.set_library_metadata", fake_update)
+
+    result = InstanceService.set_library_metadata("Organized", favorite=True, group="Modpacks", tags=["heavy"])
+
+    assert result is expected
+    assert captured == {"name": "Organized", "favorite": True, "group": "Modpacks", "tags": ["heavy"]}

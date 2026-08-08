@@ -4,8 +4,10 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -61,18 +63,24 @@ class InstanceManagementDialog(QDialog):
     manage_mods_requested = Signal(str)
     instance_settings_requested = Signal(str)
     repair_requested = Signal(str)
+    repair_loader_requested = Signal(str)
     create_backup_requested = Signal(str, str)
     restore_backup_requested = Signal(str)
     open_backups_requested = Signal(str)
     open_logs_requested = Signal(str)
     export_diagnostics_requested = Signal(str)
     advanced_requested = Signal(str)
+    runtime_scan_requested = Signal()
+    runtime_install_requested = Signal(int)
+    runtime_apply_requested = Signal(str, str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setModal(False)
         self._instance: object | None = None
         self._instance_name = ""
+        self._runtime_profile: object | None = None
+        self._java_installations: list[object] = []
         self._nav_items: list[QListWidgetItem] = []
         self._build_ui()
         self.retranslate_dynamic()
@@ -109,6 +117,7 @@ class InstanceManagementDialog(QDialog):
         self.stack = QStackedWidget()
         self.stack.addWidget(self._overview_page())
         self.stack.addWidget(self._version_page())
+        self.stack.addWidget(self._runtime_page())
         self.stack.addWidget(self._mods_page())
         self.stack.addWidget(self._settings_page())
         self.stack.addWidget(self._maintenance_page())
@@ -143,6 +152,9 @@ class InstanceManagementDialog(QDialog):
         self.overview_detail = QLabel()
         self.overview_detail.setObjectName("MutedLabel")
         self.overview_detail.setWordWrap(True)
+        self.overview_library_detail = QLabel()
+        self.overview_library_detail.setObjectName("ValueLabel")
+        self.overview_library_detail.setWordWrap(True)
         self.launch_button = set_theme_icon(QPushButton(), "icon.action.launch")
         self.launch_button.setObjectName("PrimaryButton")
         self.open_folder_button = set_theme_icon(QPushButton(), "icon.action.folder")
@@ -150,6 +162,7 @@ class InstanceManagementDialog(QDialog):
         self.open_folder_button.clicked.connect(lambda: self.open_folder_requested.emit(self._instance_name))
         layout.addWidget(self.overview_title)
         layout.addWidget(self.overview_detail)
+        layout.addWidget(self.overview_library_detail)
         layout.addSpacing(6)
         layout.addWidget(self.launch_button)
         layout.addWidget(self.open_folder_button)
@@ -163,16 +176,68 @@ class InstanceManagementDialog(QDialog):
         self.version_detail = QLabel()
         self.version_detail.setObjectName("MutedLabel")
         self.version_detail.setWordWrap(True)
+        component_frame = QFrame()
+        component_frame.setObjectName("InsetPanel")
+        component_form = QFormLayout(component_frame)
+        component_form.setContentsMargins(14, 12, 14, 12)
+        self.minecraft_component_value = QLabel()
+        self.loader_component_value = QLabel()
+        self.java_component_value = QLabel()
+        for label in (self.minecraft_component_value, self.loader_component_value, self.java_component_value):
+            label.setObjectName("ValueLabel")
+            label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.minecraft_component_label = QLabel()
+        self.loader_component_label = QLabel()
+        self.java_component_label = QLabel()
+        component_form.addRow(self.minecraft_component_label, self.minecraft_component_value)
+        component_form.addRow(self.loader_component_label, self.loader_component_value)
+        component_form.addRow(self.java_component_label, self.java_component_value)
         self.version_summary = QLabel()
-        self.version_summary.setObjectName("ValueLabel")
+        self.version_summary.setObjectName("MutedLabel")
         self.version_summary.setWordWrap(True)
         self.advanced_button = set_theme_icon(QPushButton(), "icon.action.edit")
         self.advanced_button.setObjectName("PrimaryButton")
+        self.repair_loader_button = set_theme_icon(QPushButton(), "icon.action.repair")
         self.advanced_button.clicked.connect(lambda: self._emit_and_hide(self.advanced_requested, self._instance_name))
+        self.repair_loader_button.clicked.connect(lambda: self.repair_loader_requested.emit(self._instance_name))
         layout.addWidget(self.version_title)
         layout.addWidget(self.version_detail)
+        layout.addWidget(component_frame)
         layout.addWidget(self.version_summary)
         layout.addWidget(self.advanced_button)
+        layout.addWidget(self.repair_loader_button)
+        layout.addStretch(1)
+        return page
+
+    def _runtime_page(self) -> QWidget:
+        page, layout = self._page()
+        self.runtime_title = QLabel()
+        self.runtime_title.setObjectName("SectionTitle")
+        self.runtime_detail = QLabel()
+        self.runtime_detail.setObjectName("MutedLabel")
+        self.runtime_detail.setWordWrap(True)
+        self.runtime_required_label = QLabel()
+        self.runtime_required_label.setObjectName("ValueLabel")
+        self.runtime_current_label = QLabel()
+        self.runtime_current_label.setObjectName("MutedLabel")
+        self.runtime_current_label.setWordWrap(True)
+        self.runtime_java_combo = QComboBox()
+        self.runtime_java_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.runtime_scan_button = set_theme_icon(QPushButton(), "icon.action.refresh")
+        self.runtime_install_button = set_theme_icon(QPushButton(), "icon.action.download")
+        self.runtime_apply_button = set_theme_icon(QPushButton(), "icon.action.save")
+        self.runtime_apply_button.setObjectName("PrimaryButton")
+        self.runtime_scan_button.clicked.connect(self.runtime_scan_requested.emit)
+        self.runtime_install_button.clicked.connect(self._request_runtime_install)
+        self.runtime_apply_button.clicked.connect(self._request_runtime_apply)
+        layout.addWidget(self.runtime_title)
+        layout.addWidget(self.runtime_detail)
+        layout.addWidget(self.runtime_required_label)
+        layout.addWidget(self.runtime_current_label)
+        layout.addWidget(self.runtime_java_combo)
+        layout.addWidget(self.runtime_scan_button)
+        layout.addWidget(self.runtime_install_button)
+        layout.addWidget(self.runtime_apply_button)
         layout.addStretch(1)
         return page
 
@@ -261,9 +326,23 @@ class InstanceManagementDialog(QDialog):
         if 0 <= index < self.stack.count():
             self.stack.setCurrentIndex(index)
 
+    def _request_runtime_install(self) -> None:
+        profile = self._runtime_profile
+        if profile is None:
+            return
+        self.runtime_install_requested.emit(int(getattr(profile, "managed_java_major", 17) or 17))
+
+    def _request_runtime_apply(self) -> None:
+        if not self._instance_name:
+            return
+        self.runtime_apply_requested.emit(self._instance_name, str(self.runtime_java_combo.currentData() or ""))
+
     def set_instance(self, instance: object | None) -> None:
+        previous_name = self._instance_name
         self._instance = instance
         self._instance_name = str(getattr(instance, "name", "")) if instance is not None else ""
+        if previous_name != self._instance_name:
+            self._runtime_profile = None
         enabled = bool(self._instance_name)
         for button in (
             self.launch_button,
@@ -275,6 +354,8 @@ class InstanceManagementDialog(QDialog):
             self.world_backup_button,
             self.restore_button,
             self.open_backups_button,
+            self.runtime_scan_button,
+            self.runtime_apply_button,
         ):
             button.setEnabled(enabled)
 
@@ -292,6 +373,7 @@ class InstanceManagementDialog(QDialog):
         is_modded = loader_name in {"fabric", "quilt", "forge", "neoforge"}
         has_loader_diagnostics = loader_name in {"quilt", "forge", "neoforge"}
         self.manage_mods_button.setEnabled(enabled and is_modded)
+        self.repair_loader_button.setEnabled(enabled and is_modded)
         self.open_logs_button.setEnabled(enabled and loader_name in {"forge", "neoforge"})
         self.export_diagnostics_button.setEnabled(enabled and has_loader_diagnostics)
 
@@ -303,7 +385,86 @@ class InstanceManagementDialog(QDialog):
             else tr("workspace.editor.no_selection")
         )
         self.overview_detail.setText(tr("workspace.editor.overview_detail", version=version_id, loader=loader_text))
+        if instance is None:
+            self.overview_library_detail.setText("")
+        else:
+            group = str(getattr(instance, "group", "") or "").strip() or tr("workspace.library.ungrouped")
+            tags = ", ".join(str(tag) for tag in tuple(getattr(instance, "tags", ()) or ())) or tr("workspace.library.no_tags")
+            favorite = tr("workspace.library.favorite_yes") if bool(getattr(instance, "favorite", False)) else tr("workspace.library.favorite_no")
+            self.overview_library_detail.setText(tr("workspace.editor.library_summary", favorite=favorite, group=group, tags=tags))
         self.version_summary.setText(tr("workspace.editor.version_summary", version=version_id, loader=loader_text))
+        self.minecraft_component_value.setText(version_id)
+        self.loader_component_value.setText(loader_text)
+        self._render_runtime()
+
+    def set_runtime_profile(self, profile: object | None) -> None:
+        if profile is not None and str(getattr(profile, "instance_name", "")) != self._instance_name:
+            return
+        self._runtime_profile = profile
+        self._render_runtime()
+
+    def set_java_installations(self, installations: list[object]) -> None:
+        self._java_installations = list(installations)
+        self._populate_runtime_java_combo()
+
+    def _render_runtime(self) -> None:
+        profile = self._runtime_profile
+        if profile is None:
+            self.java_component_value.setText(tr("common.unknown"))
+            self.runtime_required_label.setText(tr("workspace.editor.runtime.unavailable"))
+            self.runtime_current_label.setText("")
+            self.runtime_install_button.setEnabled(False)
+            self._populate_runtime_java_combo()
+            return
+
+        required = int(getattr(profile, "required_java_major", 8) or 8)
+        managed = int(getattr(profile, "managed_java_major", required) or required)
+        automatic = bool(getattr(profile, "java_automatic", True))
+        configured = str(getattr(profile, "configured_java_path", "") or "")
+        self.java_component_value.setText(tr("workspace.editor.component.java_value", major=required))
+        self.runtime_required_label.setText(tr("workspace.editor.runtime.required", required=required, managed=managed))
+        self.runtime_current_label.setText(
+            tr("workspace.editor.runtime.current_auto")
+            if automatic
+            else tr("workspace.editor.runtime.current_custom", path=configured)
+        )
+        self.runtime_install_button.setEnabled(bool(self._instance_name))
+        self._populate_runtime_java_combo()
+
+    def _populate_runtime_java_combo(self) -> None:
+        current = str(self.runtime_java_combo.currentData() or "")
+        profile = self._runtime_profile
+        configured = str(getattr(profile, "configured_java_path", "") or "") if profile is not None else ""
+        selected = configured if configured else current
+        required = int(getattr(profile, "required_java_major", 0) or 0) if profile is not None else 0
+        managed = int(getattr(profile, "managed_java_major", required) or required) if profile is not None else 0
+        accepted = {major for major in (required, managed) if major > 0}
+
+        self.runtime_java_combo.blockSignals(True)
+        self.runtime_java_combo.clear()
+        self.runtime_java_combo.addItem(tr("workspace.editor.runtime.automatic"), "")
+        known_paths: set[str] = set()
+        for java in self._java_installations:
+            major = int(getattr(java, "major_version", getattr(java, "version", 0)) or 0)
+            if accepted and major not in accepted:
+                continue
+            path = str(getattr(java, "executable", "") or "")
+            if not path:
+                continue
+            known_paths.add(path.casefold())
+            if configured and configured.casefold() == path.casefold():
+                selected = path
+            vendor = str(getattr(java, "vendor", "") or "").strip()
+            version = str(getattr(java, "version_string", "") or "").strip()
+            details = " ".join(part for part in (vendor, version) if part)
+            label = f"Java {major}" + (f" • {details}" if details else "")
+            self.runtime_java_combo.addItem(label, path)
+        if configured and configured.casefold() not in known_paths:
+            self.runtime_java_combo.addItem(tr("workspace.editor.runtime.configured_path", path=configured), configured)
+        index = self.runtime_java_combo.findData(selected)
+        self.runtime_java_combo.setCurrentIndex(max(0, index))
+        self.runtime_java_combo.blockSignals(False)
+        self.runtime_java_combo.setEnabled(bool(self._instance_name and profile is not None))
 
     def show_overview(self) -> None:
         self.navigation.setCurrentRow(0)
@@ -312,6 +473,7 @@ class InstanceManagementDialog(QDialog):
         labels = (
             "workspace.editor.nav.overview",
             "workspace.editor.nav.version",
+            "workspace.editor.nav.runtime",
             "workspace.editor.nav.mods",
             "workspace.editor.nav.settings",
             "workspace.editor.nav.maintenance",
@@ -321,18 +483,27 @@ class InstanceManagementDialog(QDialog):
             item.setText(tr(key))
         self.overview_title.setText(tr("workspace.editor.overview"))
         self.version_title.setText(tr("workspace.editor.version"))
+        self.runtime_title.setText(tr("workspace.editor.runtime"))
         self.mods_title.setText(tr("workspace.editor.mods"))
         self.settings_title.setText(tr("workspace.editor.settings"))
         self.maintenance_title.setText(tr("workspace.editor.maintenance"))
         self.diagnostics_title.setText(tr("workspace.editor.diagnostics"))
         self.version_detail.setText(tr("workspace.editor.version_detail"))
+        self.runtime_detail.setText(tr("workspace.editor.runtime_detail"))
         self.mods_detail.setText(tr("workspace.editor.mods_detail"))
         self.settings_detail.setText(tr("workspace.editor.settings_detail"))
         self.maintenance_detail.setText(tr("workspace.editor.maintenance_detail"))
         self.diagnostics_detail.setText(tr("workspace.editor.diagnostics_detail"))
+        self.minecraft_component_label.setText(tr("workspace.editor.component.minecraft"))
+        self.loader_component_label.setText(tr("workspace.editor.component.loader"))
+        self.java_component_label.setText(tr("workspace.editor.component.java"))
         self.launch_button.setText(tr("workspace.action.launch"))
         self.open_folder_button.setText(tr("workspace.action.open_folder"))
-        self.advanced_button.setText(tr("workspace.action.advanced"))
+        self.advanced_button.setText(tr("workspace.action.manage_components"))
+        self.repair_loader_button.setText(tr("workspace.action.repair_loader"))
+        self.runtime_scan_button.setText(tr("workspace.editor.runtime.scan"))
+        self.runtime_install_button.setText(tr("workspace.editor.runtime.install"))
+        self.runtime_apply_button.setText(tr("workspace.editor.runtime.apply"))
         self.manage_mods_button.setText(tr("workspace.action.manage_mods"))
         self.settings_button.setText(tr("workspace.action.instance_settings"))
         self.repair_button.setText(tr("workspace.action.repair"))
@@ -343,3 +514,4 @@ class InstanceManagementDialog(QDialog):
         self.open_logs_button.setText(tr("workspace.action.open_loader_logs"))
         self.export_diagnostics_button.setText(tr("workspace.action.export_diagnostics"))
         self.set_instance(self._instance)
+        self._render_runtime()

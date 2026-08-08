@@ -6,6 +6,8 @@ from PySide6.QtCore import QPoint, QSize, Qt, Signal
 from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
+    QComboBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -79,6 +81,12 @@ class InstanceWorkspacePage(BasePage):
     repair_modpack_requested = Signal(str)
     check_modpack_update_requested = Signal(str)
     apply_modpack_update_requested = Signal(str)
+    favorite_changed = Signal(str, bool)
+    group_changed = Signal(str, str)
+    tags_changed = Signal(str, object)
+    runtime_scan_requested = Signal()
+    runtime_install_requested = Signal(int)
+    java_runtime_apply_requested = Signal(str, str)
 
     launch_requested = Signal()
     instance_settings_requested = Signal(str)
@@ -160,6 +168,21 @@ class InstanceWorkspacePage(BasePage):
         self.search_input.textChanged.connect(self._apply_search)
         library_layout.addWidget(self.search_input)
 
+        filters = QHBoxLayout()
+        filters.setSpacing(6)
+        self.group_filter = QComboBox()
+        self.group_filter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.sort_combo = QComboBox()
+        self.sort_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.favorite_only_checkbox = QCheckBox()
+        self.group_filter.currentIndexChanged.connect(lambda _index: self._rebuild_library(self.current_instance_name()))
+        self.sort_combo.currentIndexChanged.connect(lambda _index: self._rebuild_library(self.current_instance_name()))
+        self.favorite_only_checkbox.toggled.connect(lambda _checked: self._rebuild_library(self.current_instance_name()))
+        filters.addWidget(self.group_filter, 1)
+        filters.addWidget(self.sort_combo, 1)
+        filters.addWidget(self.favorite_only_checkbox)
+        library_layout.addLayout(filters)
+
         self.instance_list = QListWidget()
         self.instance_list.setObjectName("InstanceLibraryList")
         self.instance_list.setViewMode(QListView.ViewMode.IconMode)
@@ -200,10 +223,15 @@ class InstanceWorkspacePage(BasePage):
         self.health_label.setObjectName("TinyLabel")
         self.health_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.health_label.setWordWrap(True)
+        self.library_meta_label = QLabel()
+        self.library_meta_label.setObjectName("TinyLabel")
+        self.library_meta_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.library_meta_label.setWordWrap(True)
 
         self.launch_button = set_theme_icon(QPushButton(), "icon.action.launch")
         self.launch_button.setObjectName("PrimaryButton")
         self.edit_button = set_theme_icon(QPushButton(), "icon.action.edit")
+        self.favorite_button = QPushButton()
         self.manage_mods_button = set_theme_icon(QPushButton(), "icon.action.mods")
         self.manage_content_packs_button = set_theme_icon(QPushButton(), "icon.action.download")
         self.manage_content_library_button = set_theme_icon(QPushButton(), "icon.action.search")
@@ -219,6 +247,7 @@ class InstanceWorkspacePage(BasePage):
 
         self.launch_button.clicked.connect(self._request_launch)
         self.edit_button.clicked.connect(self._open_management_dialog)
+        self.favorite_button.clicked.connect(self._toggle_favorite)
         self.manage_mods_button.clicked.connect(lambda: self.manage_mods_requested.emit(self.current_instance_name()))
         self.manage_content_packs_button.clicked.connect(lambda: self.manage_content_packs_requested.emit(self.current_instance_name()))
         self.manage_content_library_button.clicked.connect(lambda: self.manage_content_library_requested.emit(self.current_instance_name()))
@@ -236,8 +265,10 @@ class InstanceWorkspacePage(BasePage):
         self.action_panel.layout.addWidget(self.instance_detail_label)
         self.action_panel.layout.addWidget(self.running_label)
         self.action_panel.layout.addWidget(self.health_label)
+        self.action_panel.layout.addWidget(self.library_meta_label)
         self.action_panel.layout.addSpacing(4)
         self.action_panel.layout.addWidget(self.launch_button)
+        self.action_panel.layout.addWidget(self.favorite_button)
         self.action_panel.layout.addWidget(self.edit_button)
         self.action_panel.layout.addWidget(self.manage_content_library_button)
         self.action_panel.layout.addWidget(self.manage_mods_button)
@@ -280,6 +311,10 @@ class InstanceWorkspacePage(BasePage):
         self.management_dialog.open_backups_requested.connect(self.open_backups_requested.emit)
         self.management_dialog.open_logs_requested.connect(self.open_forge_logs_requested.emit)
         self.management_dialog.export_diagnostics_requested.connect(self.export_forge_diagnostics_requested.emit)
+        self.management_dialog.repair_loader_requested.connect(self.repair_loader_requested.emit)
+        self.management_dialog.runtime_scan_requested.connect(self.runtime_scan_requested.emit)
+        self.management_dialog.runtime_install_requested.connect(self.runtime_install_requested.emit)
+        self.management_dialog.runtime_apply_requested.connect(self.java_runtime_apply_requested.emit)
         self.management_dialog.advanced_requested.connect(self._open_advanced_dialog)
 
     def _forward_advanced_signals(self) -> None:
@@ -342,8 +377,15 @@ class InstanceWorkspacePage(BasePage):
         self.advanced_page.set_neoforge_versions(game_version, versions)
         self.create_dialog.set_neoforge_versions(game_version, versions)
 
+    def set_runtime_profile(self, profile: object | None) -> None:
+        self.management_dialog.set_runtime_profile(profile)
+
+    def set_java_installations(self, installations: list[object]) -> None:
+        self.management_dialog.set_java_installations(installations)
+
     def set_instances(self, instances: list[object], selected_name: str) -> None:
         self._instances = {str(instance.name): instance for instance in instances}
+        self._sync_group_filter()
         self.advanced_page.set_instances(instances, selected_name)
         target = selected_name if selected_name in self._instances else self._selected_name
         if target not in self._instances:
@@ -424,13 +466,13 @@ class InstanceWorkspacePage(BasePage):
         try:
             self.instance_list.clear()
             selected_item: QListWidgetItem | None = None
-            for name, instance in sorted(self._instances.items(), key=lambda item: item[0].casefold()):
+            for name, instance in self._sorted_instances():
                 item = QListWidgetItem(self._instance_item_icon(instance), self._instance_item_text(instance))
                 item.setData(self.ITEM_NAME_ROLE, name)
-                item.setToolTip(str(Path(getattr(instance, "instance_dir", ""))))
+                item.setToolTip(self._instance_tooltip(instance))
                 item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
                 self.instance_list.addItem(item)
-                item.setHidden(bool(query and query not in self._search_blob(instance)))
+                item.setHidden(not self._matches_library_filters(instance, query))
                 if name == selected_name:
                     selected_item = item
             if selected_item is not None and not selected_item.isHidden():
@@ -469,7 +511,13 @@ class InstanceWorkspacePage(BasePage):
         state = self._instance_state(instance)
         health = self._instance_health_state(instance)
         health_line = "" if health == "healthy" else f"\n{self._health_text(health)}"
-        return f"{getattr(instance, 'name', '?')}\n{getattr(instance, 'version_id', '?')} • {loader}\n{self._state_text(state)}{health_line}"
+        favorite = "★ " if bool(getattr(instance, "favorite", False)) else ""
+        return f"{favorite}{getattr(instance, 'name', '?')}\n{getattr(instance, 'version_id', '?')} • {loader}\n{self._state_text(state)}{health_line}"
+
+    def _instance_tooltip(self, instance: object) -> str:
+        group = str(getattr(instance, "group", "") or "").strip() or tr("workspace.library.ungrouped")
+        tags = ", ".join(str(tag) for tag in tuple(getattr(instance, "tags", ()) or ())) or tr("workspace.library.no_tags")
+        return f"{Path(getattr(instance, 'instance_dir', ''))}\n{tr('workspace.library.group_value', group=group)}\n{tr('workspace.library.tags_value', tags=tags)}"
 
     def _search_blob(self, instance: object) -> str:
         loader_name, loader_version = self._instance_loader(instance)
@@ -480,6 +528,8 @@ class InstanceWorkspacePage(BasePage):
                 loader_name,
                 loader_version,
                 self._instance_health_state(instance),
+                str(getattr(instance, "group", "") or ""),
+                " ".join(str(tag) for tag in tuple(getattr(instance, "tags", ()) or ())),
             )
         ).casefold()
 
@@ -610,6 +660,7 @@ class InstanceWorkspacePage(BasePage):
         for button in (
             self.launch_button,
             self.edit_button,
+            self.favorite_button,
             self.settings_button,
             self.change_icon_button,
             self.open_folder_button,
@@ -626,6 +677,8 @@ class InstanceWorkspacePage(BasePage):
             self.instance_detail_label.setText(tr("workspace.no_selection_detail"))
             self.running_label.setText("")
             self.health_label.setText("")
+            self.library_meta_label.setText("")
+            self.favorite_button.setText(tr("workspace.action.favorite_add"))
             self.manage_mods_button.setEnabled(False)
             self.manage_content_packs_button.setEnabled(False)
             self.manage_content_library_button.setEnabled(False)
@@ -659,6 +712,10 @@ class InstanceWorkspacePage(BasePage):
         self.health_label.setProperty("state", "success" if health_state == "healthy" else "error" if health_state in {"corrupted", "incomplete", "missing_java", "missing_files"} else "busy")
         self.health_label.style().unpolish(self.health_label)
         self.health_label.style().polish(self.health_label)
+        group = str(getattr(instance, "group", "") or "").strip() or tr("workspace.library.ungrouped")
+        tags = ", ".join(str(tag) for tag in tuple(getattr(instance, "tags", ()) or ())) or tr("workspace.library.no_tags")
+        self.library_meta_label.setText(f"{tr('workspace.library.group_value', group=group)} • {tr('workspace.library.tags_value', tags=tags)}")
+        self.favorite_button.setText(tr("workspace.action.favorite_remove") if bool(getattr(instance, "favorite", False)) else tr("workspace.action.favorite_add"))
         self.manage_mods_button.setEnabled(enabled and loader_name in {"fabric", "quilt", "forge", "neoforge"})
         self.manage_content_packs_button.setEnabled(enabled)
         self.manage_content_library_button.setEnabled(enabled)
@@ -674,17 +731,85 @@ class InstanceWorkspacePage(BasePage):
         else:
             self.library_status.setText(tr("workspace.library.filtered", visible=visible, total=total))
 
-    def _apply_search(self, query: str) -> None:
-        normalized = str(query or "").strip().casefold()
-        for index in range(self.instance_list.count()):
-            item = self.instance_list.item(index)
-            instance = self._instances.get(str(item.data(self.ITEM_NAME_ROLE)))
-            item.setHidden(instance is None or bool(normalized and normalized not in self._search_blob(instance)))
-        current = self.instance_list.currentItem()
-        if current is None or current.isHidden():
-            visible = next((self.instance_list.item(index) for index in range(self.instance_list.count()) if not self.instance_list.item(index).isHidden()), None)
-            self.instance_list.setCurrentItem(visible)
-        self._update_library_status()
+    def _apply_search(self, _query: str) -> None:
+        self._rebuild_library(self.current_instance_name())
+
+    def _sync_group_filter(self) -> None:
+        current = self.group_filter.currentData()
+        groups = sorted({str(getattr(instance, "group", "") or "").strip() for instance in self._instances.values() if str(getattr(instance, "group", "") or "").strip()}, key=str.casefold)
+        self.group_filter.blockSignals(True)
+        try:
+            self.group_filter.clear()
+            self.group_filter.addItem(tr("workspace.library.all_groups"), "__all__")
+            self.group_filter.addItem(tr("workspace.library.ungrouped"), "__ungrouped__")
+            for group in groups:
+                self.group_filter.addItem(group, group)
+            index = self.group_filter.findData(current)
+            self.group_filter.setCurrentIndex(index if index >= 0 else 0)
+        finally:
+            self.group_filter.blockSignals(False)
+
+    def _sync_sort_options(self) -> None:
+        current = self.sort_combo.currentData()
+        self.sort_combo.blockSignals(True)
+        try:
+            self.sort_combo.clear()
+            self.sort_combo.addItem(tr("workspace.library.sort.name"), "name")
+            self.sort_combo.addItem(tr("workspace.library.sort.last_played"), "last_played")
+            self.sort_combo.addItem(tr("workspace.library.sort.version"), "version")
+            index = self.sort_combo.findData(current)
+            self.sort_combo.setCurrentIndex(index if index >= 0 else 0)
+        finally:
+            self.sort_combo.blockSignals(False)
+
+    def _sorted_instances(self) -> list[tuple[str, object]]:
+        mode = str(self.sort_combo.currentData() or "name")
+        items = list(self._instances.items())
+        if mode == "last_played":
+            favorites = [item for item in items if bool(getattr(item[1], "favorite", False))]
+            regular = [item for item in items if not bool(getattr(item[1], "favorite", False))]
+            for group in (favorites, regular):
+                group.sort(key=lambda item: item[0].casefold())
+                group.sort(key=lambda item: str(getattr(item[1], "last_played", "") or ""), reverse=True)
+            return favorites + regular
+        if mode == "version":
+            return sorted(items, key=lambda item: (not bool(getattr(item[1], "favorite", False)), str(getattr(item[1], "version_id", "") or "").casefold(), item[0].casefold()))
+        return sorted(items, key=lambda item: (not bool(getattr(item[1], "favorite", False)), item[0].casefold()))
+
+    def _matches_library_filters(self, instance: object, query: str) -> bool:
+        if query and query not in self._search_blob(instance):
+            return False
+        if self.favorite_only_checkbox.isChecked() and not bool(getattr(instance, "favorite", False)):
+            return False
+        selected_group = self.group_filter.currentData()
+        group = str(getattr(instance, "group", "") or "").strip()
+        if selected_group == "__ungrouped__" and group:
+            return False
+        if selected_group not in {None, "__all__", "__ungrouped__"} and group.casefold() != str(selected_group).casefold():
+            return False
+        return True
+
+    def _toggle_favorite(self) -> None:
+        instance = self._instances.get(self.current_instance_name())
+        if instance is not None:
+            self.favorite_changed.emit(str(instance.name), not bool(getattr(instance, "favorite", False)))
+
+    def _edit_group(self) -> None:
+        instance = self._instances.get(self.current_instance_name())
+        if instance is None:
+            return
+        value, accepted = QInputDialog.getText(self, tr("workspace.library.group_title"), tr("workspace.library.group_prompt"), text=str(getattr(instance, "group", "") or ""))
+        if accepted:
+            self.group_changed.emit(str(instance.name), value.strip())
+
+    def _edit_tags(self) -> None:
+        instance = self._instances.get(self.current_instance_name())
+        if instance is None:
+            return
+        current = ", ".join(str(tag) for tag in tuple(getattr(instance, "tags", ()) or ()))
+        value, accepted = QInputDialog.getText(self, tr("workspace.library.tags_title"), tr("workspace.library.tags_prompt"), text=current)
+        if accepted:
+            self.tags_changed.emit(str(instance.name), [part.strip() for part in value.split(",")])
 
     def _open_create_dialog(self) -> None:
         self.create_dialog.set_versions(self._versions)
@@ -815,6 +940,11 @@ class InstanceWorkspacePage(BasePage):
         menu = QMenu(self)
         launch = menu.addAction(tr("workspace.action.launch"))
         edit = menu.addAction(tr("workspace.action.edit"))
+        instance = self._instances.get(self.current_instance_name())
+        favorite = menu.addAction(tr("workspace.action.favorite_remove") if bool(getattr(instance, "favorite", False)) else tr("workspace.action.favorite_add"))
+        set_group = menu.addAction(tr("workspace.action.set_group"))
+        edit_tags = menu.addAction(tr("workspace.action.edit_tags"))
+        menu.addSeparator()
         change_icon = menu.addAction(tr("workspace.action.change_icon"))
         reset_icon = menu.addAction(tr("workspace.action.reset_icon"))
         manage_library = menu.addAction(tr("workspace.action.manage_content_library"))
@@ -835,6 +965,12 @@ class InstanceWorkspacePage(BasePage):
             self._request_launch()
         elif chosen is edit:
             self._open_management_dialog()
+        elif chosen is favorite:
+            self._toggle_favorite()
+        elif chosen is set_group:
+            self._edit_group()
+        elif chosen is edit_tags:
+            self._edit_tags()
         elif chosen is change_icon:
             self._choose_icon()
         elif chosen is reset_icon:
@@ -868,6 +1004,9 @@ class InstanceWorkspacePage(BasePage):
         self.browse_curseforge_modpacks_button.setVisible(CurseForgeConfigManager.is_configured())
         self.refresh_button.setText(tr("workspace.toolbar.refresh"))
         self.search_input.setPlaceholderText(tr("workspace.search.placeholder"))
+        self.favorite_only_checkbox.setText(tr("workspace.library.favorites_only"))
+        self._sync_group_filter()
+        self._sync_sort_options()
         self.launch_button.setText(tr("workspace.action.launch"))
         self.edit_button.setText(tr("workspace.action.edit"))
         self.manage_content_library_button.setText(tr("workspace.action.manage_content_library"))
