@@ -9,8 +9,8 @@
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.1.2">
     <img src="https://img.shields.io/badge/Stable-v1.1.2-brightgreen" alt="Stable version">
   </a>
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.2.0-beta.3">
-    <img src="https://img.shields.io/badge/Beta-v1.2.0--beta.3-orange" alt="Beta version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.2.0-rc.1">
+    <img src="https://img.shields.io/badge/RC-v1.2.0--rc.1-orange" alt="Release candidate">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -50,6 +50,16 @@ Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh b
 Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.1.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Release Candidate v1.2.0-rc.1
+
+**v1.2.0-rc.1** feature-freeze toàn bộ thay đổi đã được xác nhận trong Beta 1–3 để kiểm thử bản Windows `.exe` trước stable. RC.1 không thêm feature mới; trọng tâm là regression, packaging và smoke test thực tế.
+
+- Update channel vẫn là `beta` vì RC là prerelease.
+- Build release bằng `python -m tools.release_preflight` rồi `.\build_release.ps1`.
+- Checklist EXE bao gồm startup one-file, Microsoft login, instance lifecycle, các loader, ATM9/SkyFactory 5/RLCraft, Java Runtime UX, Installed Content Library và process recovery.
+
+Xem chi tiết tại [`docs/RELEASE-v1.2.0-rc.1.md`](docs/RELEASE-v1.2.0-rc.1.md).
 
 ## Có gì mới trong v1.2.0-beta.3
 
