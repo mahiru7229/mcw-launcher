@@ -50,6 +50,7 @@ from src.gui.controllers.mod_loader_controller import ModLoaderController
 from src.gui.controllers.modrinth_controller import ModrinthController
 from src.gui.controllers.optifine_controller import OptiFineController
 from src.gui.controllers.settings_controller import InstanceSettingsController
+from src.gui.controllers.storage_controller import StorageController
 from src.gui.controllers.version_controller import VersionController
 from src.gui.controllers.update_controller import UpdateController
 from src.gui.dialogs.compatible_instance_dialog import CompatibleInstanceDialog
@@ -61,6 +62,7 @@ from src.gui.dialogs.curseforge_manual_download_dialog import CurseForgeManualDo
 from src.gui.dialogs.ftb_browser_dialog import FTBBrowserDialog
 from src.gui.dialogs.atlauncher_browser_dialog import ATLauncherBrowserDialog
 from src.gui.dialogs.lan_agent_log_dialog import LanAgentLogDialog
+from src.gui.dialogs.legacy_storage_cleanup_dialog import LegacyStorageCleanupDialog, format_bytes
 from src.gui.dialogs.instance_import_settings_dialog import InstanceImportSettingsDialog
 from src.gui.dialogs.modpack_export_dialog import ModpackExportDialog
 from src.gui.dialogs.modpack_import_settings_dialog import ModpackImportSettingsDialog
@@ -125,11 +127,15 @@ class MainWindow(QMainWindow):
         self.optifine_controller = OptiFineController(self.task_runner)
         self.instance_settings_controller = InstanceSettingsController()
         self.gui_settings_controller = GuiSettingsController()
+        self.storage_controller = StorageController(self.task_runner)
         self._startup_settings = self.gui_settings_controller.load()
         self._session_locale = str(self._startup_settings.get("language", "en-US"))
         self._pending_restart_locale = ""
         self._dismissed_restart_locale = ""
         self._language_restart_prompt_scheduled = False
+        self._legacy_storage_notice_shown = False
+        self._legacy_storage_notice = None
+        self._legacy_cleanup_dialog = None
         self.theme_runtime = ThemeRuntime()
         self.motion_runtime = MotionRuntime(parent=self)
         language_manager.reload()
@@ -384,7 +390,7 @@ class MainWindow(QMainWindow):
         self.mods_page.curseforge_files_requested.connect(self._load_curseforge_catalog_files)
         self.mods_page.curseforge_project_details_requested.connect(lambda project_id, loader: self.curseforge_controller.load_project_details("mod", project_id, loader))
         self.mods_page.curseforge_files_refresh_requested.connect(self._refresh_curseforge_catalog_files)
-        self.mods_page.curseforge_clear_cache_requested.connect(lambda: self.curseforge_controller.clear_cache(context=CurseForgeController.CATALOG_CONTEXT))
+        self.mods_page.curseforge_clear_cache_requested.connect(lambda: self.curseforge_controller.clear_api_cache(context=CurseForgeController.CATALOG_CONTEXT))
         self.mods_page.curseforge_install_requested.connect(self._choose_instance_for_curseforge_install)
         self.mods_page.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.mod_catalog_controller.search_results_changed.connect(lambda loader, result: self.mods_page.set_search_result(result, loader))
@@ -402,6 +408,7 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.dirty_changed.connect(lambda dirty: self.sidebar.set_page_dirty("launcher_settings", dirty))
         self.launcher_settings_page.reset_requested.connect(self.gui_settings_controller.reset)
         self.launcher_settings_page.first_run_setup_requested.connect(self._run_first_run_setup)
+        self.launcher_settings_page.review_legacy_storage_requested.connect(self._review_legacy_storage)
         self.launcher_settings_page.check_updates_requested.connect(lambda: self.update_controller.check(manual=True))
         self.launcher_settings_page.reload_theme_requested.connect(self._preview_theme)
         self.launcher_settings_page.live_theme_reload_requested.connect(self._reload_theme_silently)
@@ -466,6 +473,9 @@ class MainWindow(QMainWindow):
         self.instance_controller.modpack_export_finished.connect(self._show_modpack_export_finished)
 
         self.instance_settings_controller.settings_loaded.connect(self.instance_settings_page.set_settings)
+        self.storage_controller.legacy_probe_ready.connect(self._on_legacy_storage_probe_ready)
+        self.storage_controller.cleanup_plan_ready.connect(self._on_legacy_storage_plan_ready)
+        self.storage_controller.cleanup_completed.connect(self._on_legacy_storage_cleanup_completed)
         self.gui_settings_controller.settings_changed.connect(self._apply_gui_settings)
 
         self.mod_manager_dialog.refresh_requested.connect(self.mod_controller.refresh)
@@ -530,8 +540,8 @@ class MainWindow(QMainWindow):
         self.curseforge_modpack_dialog.project_details_requested.connect(self.curseforge_controller.load_project_details)
         self.curseforge_mod_dialog.files_refresh_requested.connect(lambda project_type, project_id, game_version, loader, channels: self.curseforge_controller.load_files(project_type, project_id, game_version, loader, tuple(channels), force_refresh=True, manual_refresh=False))
         self.curseforge_modpack_dialog.files_refresh_requested.connect(lambda project_type, project_id, game_version, loader, channels: self.curseforge_controller.load_files(project_type, project_id, game_version, loader, tuple(channels), force_refresh=True, manual_refresh=False))
-        self.curseforge_mod_dialog.clear_cache_requested.connect(self.curseforge_controller.clear_cache)
-        self.curseforge_modpack_dialog.clear_cache_requested.connect(self.curseforge_controller.clear_cache)
+        self.curseforge_mod_dialog.clear_cache_requested.connect(self.curseforge_controller.clear_api_cache)
+        self.curseforge_modpack_dialog.clear_cache_requested.connect(self.curseforge_controller.clear_api_cache)
         self.curseforge_mod_dialog.install_mod_requested.connect(self._install_curseforge_mod)
         self.curseforge_modpack_dialog.install_modpack_requested.connect(self._install_curseforge_modpack)
         self.curseforge_mod_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
@@ -556,7 +566,7 @@ class MainWindow(QMainWindow):
         self.ftb_modpack_dialog.project_details_requested.connect(self.ftb_controller.load_project_details)
         self.ftb_modpack_dialog.versions_requested.connect(self.ftb_controller.load_versions)
         self.ftb_modpack_dialog.version_details_requested.connect(self.ftb_controller.load_version_details)
-        self.ftb_modpack_dialog.clear_cache_requested.connect(self.ftb_controller.clear_cache)
+        self.ftb_modpack_dialog.clear_cache_requested.connect(self.ftb_controller.clear_api_cache)
         self.ftb_modpack_dialog.install_modpack_requested.connect(self._install_ftb_modpack)
         self.ftb_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.ftb_controller.search_results_changed.connect(self.ftb_modpack_dialog.set_search_result)
@@ -571,7 +581,7 @@ class MainWindow(QMainWindow):
         self.atlauncher_modpack_dialog.project_details_requested.connect(self.atlauncher_controller.load_project_details)
         self.atlauncher_modpack_dialog.versions_requested.connect(self.atlauncher_controller.load_versions)
         self.atlauncher_modpack_dialog.version_details_requested.connect(self.atlauncher_controller.load_version_details)
-        self.atlauncher_modpack_dialog.clear_cache_requested.connect(self.atlauncher_controller.clear_cache)
+        self.atlauncher_modpack_dialog.clear_cache_requested.connect(self.atlauncher_controller.clear_api_cache)
         self.atlauncher_modpack_dialog.install_modpack_requested.connect(self._install_atlauncher_modpack)
         self.atlauncher_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.atlauncher_controller.search_results_changed.connect(self.atlauncher_modpack_dialog.set_search_result)
@@ -685,6 +695,7 @@ class MainWindow(QMainWindow):
             self.launch_controller,
             self.lan_hosting_controller,
             self.update_controller,
+            self.storage_controller,
         )
 
         for controller in controllers:
@@ -719,6 +730,62 @@ class MainWindow(QMainWindow):
         self.logs_page.append(tr("Started {launcher_name}", launcher_name=LAUNCHER_NAME))
         if settings.get("auto_check_updates", True):
             QTimer.singleShot(1500, lambda: self.update_controller.check(manual=False))
+        if settings.get("notify_legacy_cache_cleanup", True):
+            QTimer.singleShot(2500, self.storage_controller.probe)
+
+    def _review_legacy_storage(self) -> None:
+        self.storage_controller.scan()
+
+    def _on_legacy_storage_probe_ready(self, probe: object) -> None:
+        if self._legacy_storage_notice_shown or not bool(self.gui_settings_controller.current.get("notify_legacy_cache_cleanup", True)):
+            return
+        if not bool(getattr(probe, "has_candidates", False)):
+            return
+        self._legacy_storage_notice_shown = True
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setWindowTitle(tr("storage.legacy.startup.title"))
+        box.setText(tr("storage.legacy.startup.message"))
+        review = box.addButton(tr("storage.legacy.startup.review"), QMessageBox.ButtonRole.AcceptRole)
+        later = box.addButton(tr("storage.legacy.startup.later"), QMessageBox.ButtonRole.RejectRole)
+        disable = box.addButton(tr("storage.legacy.startup.disable"), QMessageBox.ButtonRole.ActionRole)
+        box.setDefaultButton(review)
+        box.buttonClicked.connect(lambda button: self._handle_legacy_storage_notice_button(button, review, disable))
+        box.finished.connect(lambda _result: setattr(self, "_legacy_storage_notice", None))
+        self._legacy_storage_notice = box
+        box.open()
+
+    def _handle_legacy_storage_notice_button(self, button: object, review_button: object, disable_button: object) -> None:
+        if button is review_button:
+            self._review_legacy_storage()
+        elif button is disable_button:
+            self.gui_settings_controller.set_notify_legacy_cache_cleanup(False)
+
+    def _on_legacy_storage_plan_ready(self, plan: object) -> None:
+        candidates = tuple(getattr(plan, "candidates", ()) or ())
+        if not candidates:
+            QMessageBox.information(self, tr("storage.legacy.none.title"), tr("storage.legacy.none.message"))
+            return
+        dialog = LegacyStorageCleanupDialog(plan, self)
+        self._legacy_cleanup_dialog = dialog
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            self._legacy_cleanup_dialog = None
+            return
+        selected = dialog.selected_candidate_ids()
+        self._legacy_cleanup_dialog = None
+        if selected:
+            self.storage_controller.clean(plan, selected)
+
+    def _on_legacy_storage_cleanup_completed(self, result: object) -> None:
+        reclaimed = int(getattr(result, "reclaimed_bytes", 0) or 0)
+        removed = len(tuple(getattr(result, "removed", ()) or ()))
+        skipped = len(tuple(getattr(result, "skipped", ()) or ()))
+        failures = len(tuple(getattr(result, "failures", ()) or ()))
+        QMessageBox.information(
+            self,
+            tr("storage.legacy.completed.title"),
+            tr("storage.legacy.completed.message", size=format_bytes(reclaimed), removed=removed, skipped=skipped, failed=failures),
+        )
 
     def _refresh_all(self) -> None:
         self.account_controller.refresh()
@@ -2234,6 +2301,9 @@ class MainWindow(QMainWindow):
 
     def _prompt_language_restart(self) -> None:
         self._language_restart_prompt_scheduled = False
+        self._legacy_storage_notice_shown = False
+        self._legacy_storage_notice = None
+        self._legacy_cleanup_dialog = None
         locale = self._pending_restart_locale
         if not locale or locale == self._session_locale:
             return

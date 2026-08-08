@@ -44,6 +44,7 @@ class LauncherSettingsPage(BasePage):
     open_java_requested = Signal(object)
     dirty_changed = Signal(bool)
     first_run_setup_requested = Signal()
+    review_legacy_storage_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__(tr("launcher_settings.page.title"), tr("launcher_settings.page.subtitle"), "launcher_settings")
@@ -84,9 +85,10 @@ class LauncherSettingsPage(BasePage):
 
         general_section = SettingsSection("settings.section.general", "settings.section.general_detail")
         downloads_section = SettingsSection("settings.section.downloads", "settings.section.downloads_detail")
+        storage_section = SettingsSection("storage.settings.section", "storage.settings.section_detail")
         runtime_section = SettingsSection("settings.section.runtime", "settings.section.runtime_detail")
         appearance_section = SettingsSection("settings.section.appearance", "settings.section.appearance_detail")
-        for section in (general_section, downloads_section, runtime_section, appearance_section):
+        for section in (general_section, downloads_section, storage_section, runtime_section, appearance_section):
             self.root_layout.addWidget(section)
 
         behavior_card = CardWidget("Startup and behavior")
@@ -272,6 +274,18 @@ class LauncherSettingsPage(BasePage):
         self.forge_preflight_card.layout.addWidget(self.forge_preflight_policy_combo)
         self.forge_preflight_card.layout.addWidget(self.forge_preflight_warning_label)
         runtime_section.add_card(self.forge_preflight_card)
+
+        self.storage_cleanup_card = CardWidget(tr("storage.legacy.title"), tr("storage.legacy.detail"))
+        self.notify_legacy_cache_cleanup = QCheckBox(tr("storage.legacy.notify"))
+        self.review_legacy_storage_button = set_theme_icon(QPushButton(tr("storage.legacy.review")), "icon.action.settings")
+        self.review_legacy_storage_button.clicked.connect(self.review_legacy_storage_requested.emit)
+        self.storage_cleanup_hint = QLabel(tr("storage.legacy.protected_hint"))
+        self.storage_cleanup_hint.setObjectName("MutedLabel")
+        self.storage_cleanup_hint.setWordWrap(True)
+        self.storage_cleanup_card.layout.addWidget(self.notify_legacy_cache_cleanup)
+        self.storage_cleanup_card.layout.addWidget(self.storage_cleanup_hint)
+        self.storage_cleanup_card.layout.addWidget(self.review_legacy_storage_button)
+        storage_section.add_card(self.storage_cleanup_card, span=2)
 
         update_card = CardWidget("Launcher updates", "Stable updates are used by default. Join the tester program only when you want to receive experimental builds.")
         self.current_version_label = QLabel(tr("launcher_settings.update.current_version", version=VERSION))
@@ -485,6 +499,7 @@ class LauncherSettingsPage(BasePage):
         for field in self.curseforge_gateway_inputs:
             field.textChanged.connect(self._refresh_dirty_state)
         self.auto_check_updates.toggled.connect(self._refresh_dirty_state)
+        self.notify_legacy_cache_cleanup.toggled.connect(self._refresh_dirty_state)
         self.join_tester_program.toggled.connect(self._refresh_dirty_state)
         self.theme_combo.currentIndexChanged.connect(self._on_theme_selection_changed)
         self.theme_combo.currentIndexChanged.connect(self._refresh_dirty_state)
@@ -849,6 +864,7 @@ class LauncherSettingsPage(BasePage):
             "language": self.language_combo.currentData() or "en-US",
             "show_content_descriptions": self.show_content_descriptions.isChecked(),
             "auto_check_updates": self.auto_check_updates.isChecked(),
+            "notify_legacy_cache_cleanup": self.notify_legacy_cache_cleanup.isChecked(),
             "tester_mode": self.join_tester_program.isChecked(),
             "theme": self.theme_combo.currentData() or "mcw-default",
             "show_static_text": self.show_static_text.isChecked(),
@@ -922,6 +938,13 @@ class LauncherSettingsPage(BasePage):
             self.first_run_card.subtitle_label.setText(tr("launcher_settings.first_run.detail"))
         self.first_run_setup_button.setText(tr("launcher_settings.first_run.button"))
         self.current_version_label.setText(tr("launcher_settings.update.current_version", version=VERSION))
+        if self.storage_cleanup_card.title_label is not None:
+            self.storage_cleanup_card.title_label.setText(tr("storage.legacy.title"))
+        if self.storage_cleanup_card.subtitle_label is not None:
+            self.storage_cleanup_card.subtitle_label.setText(tr("storage.legacy.detail"))
+        self.notify_legacy_cache_cleanup.setText(tr("storage.legacy.notify"))
+        self.storage_cleanup_hint.setText(tr("storage.legacy.protected_hint"))
+        self.review_legacy_storage_button.setText(tr("storage.legacy.review"))
         self.update_status_label.setText(tr(self._update_status_source))
         if self.java_card.title_label is not None:
             self.java_card.title_label.setText(tr("launcher_settings.java.title"))
@@ -1008,6 +1031,7 @@ class LauncherSettingsPage(BasePage):
             self.prefer_dedicated_gpu,
             self.remember_window_size,
             self.auto_check_updates,
+            self.notify_legacy_cache_cleanup,
             self.show_content_descriptions,
             self.modrinth_include_beta,
             self.modrinth_include_alpha,
@@ -1035,6 +1059,7 @@ class LauncherSettingsPage(BasePage):
         self.prefer_dedicated_gpu.setChecked(bool(settings.get("prefer_dedicated_gpu", False)) and self._gpu_detection.has_dedicated_gpu)
         self.remember_window_size.setChecked(bool(settings.get("remember_window_size", True)))
         self.auto_check_updates.setChecked(bool(settings.get("auto_check_updates", True)))
+        self.notify_legacy_cache_cleanup.setChecked(bool(settings.get("notify_legacy_cache_cleanup", True)))
         self.show_content_descriptions.setChecked(bool(settings.get("show_content_descriptions", False)))
         self.modrinth_include_beta.setChecked(bool(settings.get("modrinth_include_beta", False)))
         self.modrinth_include_alpha.setChecked(bool(settings.get("modrinth_include_alpha", False)))

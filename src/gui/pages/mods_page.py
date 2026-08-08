@@ -51,7 +51,7 @@ class ModsPage(BasePage):
         self._busy = False
         self._refresh_files_after_search = False
         self._pending_channel_preferences = (False, False)
-        self._cache_info = CurseForgeClient.cache_status()
+        self._cache_info = CurseForgeClient.api_cache_status()
         self._image_cache = RemoteImageCache(self)
 
         self._channel_change_timer = QTimer(self)

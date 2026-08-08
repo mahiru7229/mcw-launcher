@@ -46,6 +46,7 @@ class GuiSettingsController(BaseController):
         "curseforge_gateway_urls": (),
         "download_limit_mbps": 0.0,
         "download_concurrency": 0,
+        "notify_legacy_cache_cleanup": True,
         "instance_defaults": default_instance_settings(),
     }
 
@@ -70,6 +71,7 @@ class GuiSettingsController(BaseController):
         modrinth = data.get("modrinth", {})
         managed_content = data.get("managed_content", {})
         network = data.get("network", {})
+        storage = data.get("storage", {})
         try:
             curseforge_gateway_urls = CurseForgeConfigManager.gateway_urls()
         except (RuntimeError, ValueError):
@@ -102,6 +104,7 @@ class GuiSettingsController(BaseController):
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": float(network.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]) or 0.0),
             "download_concurrency": int(network.get("download_concurrency", self.DEFAULTS["download_concurrency"]) or 0),
+            "notify_legacy_cache_cleanup": bool(storage.get("notify_legacy_cache_cleanup", self.DEFAULTS["notify_legacy_cache_cleanup"])),
             "instance_defaults": SettingsManager.normalize_dict(data.get("instance_defaults")),
         }
         download_bandwidth_limiter.configure_mbps(self._current["download_limit_mbps"])
@@ -156,6 +159,7 @@ class GuiSettingsController(BaseController):
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": download_limit_mbps,
             "download_concurrency": download_concurrency,
+            "notify_legacy_cache_cleanup": bool(data.get("notify_legacy_cache_cleanup", self.DEFAULTS["notify_legacy_cache_cleanup"])),
             "instance_defaults": SettingsManager.normalize_dict(data.get("instance_defaults")),
         }
         self._settings.save({
@@ -185,6 +189,9 @@ class GuiSettingsController(BaseController):
                 "download_limit_mbps": self._current["download_limit_mbps"],
                 "download_concurrency": self._current["download_concurrency"],
             },
+            "storage": {
+                "notify_legacy_cache_cleanup": self._current["notify_legacy_cache_cleanup"],
+            },
             "instance_defaults": self._current["instance_defaults"],
         })
         self.settings_changed.emit(copy.deepcopy(self._current))
@@ -206,6 +213,11 @@ class GuiSettingsController(BaseController):
         self._current["modrinth_include_beta"] = bool(include_beta)
         self._current["modrinth_include_alpha"] = bool(include_alpha)
         self._settings.update_section("modrinth", {"include_beta": bool(include_beta), "include_alpha": bool(include_alpha)})
+        self.settings_changed.emit(copy.deepcopy(self._current))
+
+    def set_notify_legacy_cache_cleanup(self, enabled: bool) -> None:
+        self._current["notify_legacy_cache_cleanup"] = bool(enabled)
+        self._settings.update_section("storage", {"notify_legacy_cache_cleanup": bool(enabled)})
         self.settings_changed.emit(copy.deepcopy(self._current))
 
     def reset(self) -> None:

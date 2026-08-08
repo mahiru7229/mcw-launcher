@@ -86,13 +86,17 @@ class FTBController(BaseController):
             tr("task.ftb.install_modpack", instance=instance_name),
         )
 
-    def clear_cache(self) -> bool:
+    def clear_api_cache(self) -> bool:
         return self._task_runner.run(
             "ftb.cache.clear",
-            lambda: (FTBClient.clear_cache(), FTBClient.cache_status())[1],
+            lambda: (FTBClient.clear_api_cache(), FTBClient.api_cache_status())[1],
             tr("task.ftb.clear_cache"),
             blocking=False,
         )
+
+    def clear_cache(self) -> bool:
+        """Compatibility alias for clearing the provider API metadata cache."""
+        return self.clear_api_cache()
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:

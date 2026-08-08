@@ -48,6 +48,19 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.2.0 hỗ trợ nâng cấp
 
 ---
 
+## Có gì mới trong v1.3.0-beta.1
+
+**v1.3.0-beta.1** mở đầu nhánh v1.3 với **Shared Storage & Cache Lifecycle**:
+
+- Thêm SHA-256 `ContentStore` cho binary artifact được provider quản lý; ưu tiên NTFS hardlink vào instance và fallback copy khi cần.
+- Forge/NeoForge installer staging reuse client/libraries đã có và được cleanup trên cả success lẫn failure thay vì tích tụ lâu dài.
+- Tách rõ Provider API/metadata cache khỏi downloaded content; API cache tiếp tục được bảo vệ để giảm request mạng.
+- Thêm Legacy Storage Migration/cleanup theo reference graph cho old staging, update packages, unused versions, unreferenced provider binaries và stale temp.
+- Launcher Settings có thông báo legacy storage mặc định bật và nút **Review old storage**. Cleanup luôn hiển thị item/path/reason/category + tổng dung lượng vật lý có thể giải phóng trước khi người dùng xác nhận.
+- Core revalidate selected candidates ngay trước khi xóa và báo actual reclaimed / removed / skipped / failures sau cleanup.
+
+Xem chi tiết tại [`docs/RELEASE-v1.3.0-beta.1.md`](docs/RELEASE-v1.3.0-beta.1.md).
+
 ## Có gì mới trong v1.2.0
 
 **v1.2.0** đưa Instance Manager 2.0 lên stable sau Beta 1–3 và RC.1–RC.2:

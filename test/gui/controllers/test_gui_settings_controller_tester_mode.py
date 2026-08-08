@@ -63,3 +63,16 @@ def test_content_description_visibility_round_trips_through_gui_settings(tmp_pat
 
     assert controller.current["show_content_descriptions"] is True
     assert LauncherSettingsManager(settings_path).load()["gui"]["show_content_descriptions"] is True
+
+
+def test_legacy_storage_notification_setting_round_trips(tmp_path: Path) -> None:
+    settings_path = tmp_path / "launcher_settings.json"
+    controller = _controller(settings_path)
+
+    data = controller.load()
+    assert data["notify_legacy_cache_cleanup"] is True
+
+    controller.set_notify_legacy_cache_cleanup(False)
+
+    assert controller.current["notify_legacy_cache_cleanup"] is False
+    assert LauncherSettingsManager(settings_path).load()["storage"]["notify_legacy_cache_cleanup"] is False

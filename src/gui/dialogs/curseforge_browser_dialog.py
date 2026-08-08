@@ -50,7 +50,7 @@ class CurseForgeBrowserDialog(QDialog):
         self._suggested_instance_name = ""
         self._instance_name_customized = False
         self._pending_channel_preferences = (False, False)
-        self._cache_info = CurseForgeClient.cache_status()
+        self._cache_info = CurseForgeClient.api_cache_status()
         self._refresh_files_after_search = False
         self._busy = False
         self._image_cache = RemoteImageCache(self)

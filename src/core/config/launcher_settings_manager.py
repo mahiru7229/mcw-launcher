@@ -16,7 +16,7 @@ from src.core.theme.theme_palette import normalize_hex_color
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 16
+    SCHEMA_VERSION = 17
     UPDATE_CHANNEL_POLICY_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
@@ -60,6 +60,9 @@ class LauncherSettingsManager:
         "network": {
             "download_limit_mbps": 0.0,
             "download_concurrency": 0,
+        },
+        "storage": {
+            "notify_legacy_cache_cleanup": True,
         },
         "instance_defaults": default_instance_settings(),
         "updates": {
@@ -233,6 +236,9 @@ class LauncherSettingsManager:
         network = normalized.setdefault("network", {})
         network["download_limit_mbps"] = self._as_download_limit(network.get("download_limit_mbps"))
         network["download_concurrency"] = self._as_download_concurrency(network.get("download_concurrency"))
+
+        storage = normalized.setdefault("storage", {})
+        storage["notify_legacy_cache_cleanup"] = self._as_bool(storage.get("notify_legacy_cache_cleanup"), True)
 
         normalized["instance_defaults"] = SettingsManager.normalize_dict(normalized.get("instance_defaults"))
 
