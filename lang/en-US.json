@@ -2030,7 +2030,7 @@
     "workspace.action.favorite_remove": "Remove from Favorites",
     "workspace.action.set_group": "Set Group...",
     "workspace.action.edit_tags": "Edit Tags...",
-    "workspace.editor.library_summary": "{favorite}\\nGroup: {group}\\nTags: {tags}",
+    "workspace.editor.library_summary": "{favorite}\nGroup: {group}\nTags: {tags}",
     "workspace.editor.nav.runtime": "Java Runtime",
     "workspace.editor.runtime": "Java Runtime",
     "workspace.editor.runtime_detail": "Choose the Java runtime for this instance. Automatic mode follows the Minecraft Java requirement and can use MCW-managed Java.",

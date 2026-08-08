@@ -2030,7 +2030,7 @@
     "workspace.action.favorite_remove": "Bỏ khỏi yêu thích",
     "workspace.action.set_group": "Đặt nhóm...",
     "workspace.action.edit_tags": "Chỉnh thẻ...",
-    "workspace.editor.library_summary": "{favorite}\\nNhóm: {group}\\nThẻ: {tags}",
+    "workspace.editor.library_summary": "{favorite}\nNhóm: {group}\nThẻ: {tags}",
     "workspace.editor.nav.runtime": "Java Runtime",
     "workspace.editor.runtime": "Java Runtime",
     "workspace.editor.runtime_detail": "Chọn Java runtime cho instance này. Chế độ Tự động bám theo yêu cầu Java của Minecraft và có thể dùng Java do MCW quản lý.",

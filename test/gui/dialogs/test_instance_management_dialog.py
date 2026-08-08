@@ -59,9 +59,9 @@ def test_instance_editor_overview_shows_library_metadata(gui_app):
 
     dialog.set_instance(instance)
 
-    assert "Favorite" in dialog.overview_library_detail.text()
-    assert "Modpacks" in dialog.overview_library_detail.text()
-    assert "heavy" in dialog.overview_library_detail.text()
+    summary = dialog.overview_library_detail.text()
+    assert summary.splitlines() == ["Favorite", "Group: Modpacks", "Tags: heavy, automation"]
+    assert "\\n" not in summary
 
 
 def test_instance_editor_runtime_page_selects_compatible_java(gui_app, tmp_path):
