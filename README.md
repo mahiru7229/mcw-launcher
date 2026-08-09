@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.0">
-    <img src="https://img.shields.io/badge/Stable-v1.3.0-brightgreen" alt="Stable version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.1">
+    <img src="https://img.shields.io/badge/Stable-v1.3.1-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -44,9 +44,17 @@ Mỗi instance có riêng:
 
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 ---
-Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
+Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.1 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.3.1
+
+**v1.3.1** là hotfix tương thích Windows cho các installation đặt launcher trong đường dẫn sâu. Các bước Java extraction, Forge/NeoForge installer staging và Modrinth staging dùng short workspace dưới `%LOCALAPPDATA%\MCW\t` với prefix dễ đọc (`jvm`, `frg`, `neo`, `mrd`, `cfr`), đồng thời extraction/copy boundary hỗ trợ Windows extended paths.
+
+Hotfix này nhắm trực tiếp hai failure đã quan sát trên Windows 10 khi path cũ chạm khoảng 260 ký tự: Temurin Java 8 `DirectoryScannerConfig.java` và Modrinth `zlm_arab.json`. Permanent launcher data vẫn ở vị trí người dùng chọn; short workspace chỉ tồn tại trong quá trình cài đặt và được cleanup sau task.
+
+Xem chi tiết tại [`docs/RELEASE-v1.3.1.md`](docs/RELEASE-v1.3.1.md).
 
 ## Có gì mới trong v1.3.0
 
