@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.1">
-    <img src="https://img.shields.io/badge/Stable-v1.3.1-brightgreen" alt="Stable version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.2">
+    <img src="https://img.shields.io/badge/Stable-v1.3.2-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -44,9 +44,24 @@ Mỗi instance có riêng:
 
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 ---
-Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.1 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
+Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.3.2
+
+**v1.3.2** là bản stability/security update tập trung vào filesystem race trên Windows và hardening auto-update. Bản này xử lý lỗi `WinError 32` được ghi nhận ở issue #19 khi background version refresh và launch cùng ghi `version_manifest_v2.json.tmp`, đồng thời áp cùng atomic-write boundary cho instance registry/metadata quan trọng.
+
+- Atomic text writer dùng temp file riêng theo operation, `os.replace()` có retry cho sharing violation và cleanup best-effort.
+- `cleanup_short_workspace()` canonicalize đường dẫn trước khi recursive delete, chặn `..` escape và chặn xoá chính short-workspace root.
+- Auto-update yêu cầu SHA-256 tin cậy: dùng GitHub asset digest hoặc `<archive>.sha256`; không còn fallback sang unverified ZIP.
+- Update package bắt buộc `mcw-update.json` và khai báo managed files để updater v1.3.2+ có thể loại bỏ file release cũ có kiểm soát, kèm rollback.
+- Modpack archive path validation dùng chung Windows-safe policy với MCW package importer.
+- Theme overwrite import có rollback nếu bước publish cuối thất bại.
+- Release preflight kiểm tra stale release evidence và dependency boundary `src.gui -> src.core`.
+- Test long-path short-workspace cũ đã được đổi tên để pytest thực sự collect.
+
+Xem chi tiết tại [`docs/RELEASE-v1.3.2.md`](docs/RELEASE-v1.3.2.md).
 
 ## Có gì mới trong v1.3.1
 

@@ -123,3 +123,56 @@ def test_start_launcher_passes_hidden_cleanup_request(tmp_path, monkeypatch) -> 
     assert calls[0][0] == [str(executable), "--cleanup-update", str(request.updater_directory), "9876"]
     assert calls[0][1]["stdout"] is not None
     assert calls[0][1]["stderr"] is not None
+
+
+def write_update_manifest(root: Path, files: list[str], version: str) -> None:
+    import json
+
+    (root / "mcw-update.json").write_text(
+        json.dumps({
+            "schema_version": 1,
+            "version": version,
+            "platform": "windows-x64",
+            "executable": "MCW Launcher.exe",
+            "files": files,
+        }),
+        encoding="utf-8",
+    )
+
+
+def test_update_applier_removes_files_managed_by_previous_release(tmp_path, monkeypatch) -> None:
+    request = make_request(tmp_path)
+    (request.source_directory / "MCW Launcher.exe").write_bytes(b"new-exe")
+    (request.destination_directory / "MCW Launcher.exe").write_bytes(b"old-exe")
+    stale = request.destination_directory / "docs" / "obsolete.md"
+    stale.parent.mkdir()
+    stale.write_text("obsolete", encoding="utf-8")
+    write_update_manifest(request.destination_directory, ["MCW Launcher.exe", "docs/obsolete.md", "mcw-update.json"], "1.3.1")
+    write_update_manifest(request.source_directory, ["MCW Launcher.exe", "mcw-update.json"], "1.3.2")
+
+    applier = UpdateApplier(request)
+    monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
+    monkeypatch.setattr(applier, "_start_launcher", lambda: None)
+
+    assert applier.run() == 0
+    assert not stale.exists()
+
+
+def test_update_applier_restores_removed_managed_file_on_rollback(tmp_path, monkeypatch) -> None:
+    request = make_request(tmp_path)
+    (request.source_directory / "MCW Launcher.exe").write_bytes(b"new-exe")
+    (request.destination_directory / "MCW Launcher.exe").write_bytes(b"old-exe")
+    stale = request.destination_directory / "docs" / "obsolete.md"
+    stale.parent.mkdir()
+    stale.write_text("obsolete", encoding="utf-8")
+    write_update_manifest(request.destination_directory, ["MCW Launcher.exe", "docs/obsolete.md", "mcw-update.json"], "1.3.1")
+    write_update_manifest(request.source_directory, ["MCW Launcher.exe", "mcw-update.json"], "1.3.2")
+
+    applier = UpdateApplier(request)
+    monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
+    monkeypatch.setattr(applier, "_start_launcher", lambda: None)
+    monkeypatch.setattr(applier, "_show_error", lambda _message: None)
+    monkeypatch.setattr(applier, "_verify_updated_executable", lambda: (_ for _ in ()).throw(RuntimeError("verify failed")))
+
+    assert applier.run() == 1
+    assert stale.read_text(encoding="utf-8") == "obsolete"

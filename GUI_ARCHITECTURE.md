@@ -3,7 +3,8 @@
 ```text
 MCW Launcher GUI / launcher.py
         │
-        │ imports only mcw_core / mcw_core.api
+        │ services via mcw_core / mcw_core.api
+        │ shared DTOs may still come from src.models during migration
         ▼
 ┌──────────────────────────────────────┐
 │ Public MCW Core library              │
@@ -56,7 +57,8 @@ Controllers
 ## Dependency rules
 
 - `src.core` and `src.models` must not import `src.gui`, PySide6, or PyQt.
-- `src.gui` and `launcher.py` must not import `src.core` directly.
+- `src.gui` and `launcher.py` must not import `src.core` directly; release preflight enforces this for GUI source.
+- Existing GUI code may still import shared DTO/model types from `src.models` while those exports are migrated to `mcw_core`; new service integrations should not add new implementation-layer dependencies.
 - New integrations should use top-level objects exported from `mcw_core`.
 - `mcw_core.api` preserves domain-level compatibility while GUI adapters are
   gradually simplified around the high-level facade.

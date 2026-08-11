@@ -1,2144 +1,1485 @@
---- a/README.md
-+++ b/README.md
-@@ -48,6 +48,18 @@
+# MCW Launcher v1.3.2 changes from v1.3.1 source baseline
+
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/CHANGED-FILES.txt mcw-launcher-v1.3.2/CHANGED-FILES.txt
+--- mcw-launcher-v1.3.2-base/CHANGED-FILES.txt	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/CHANGED-FILES.txt	2026-08-11 13:49:37.367914905 +0000
+@@ -1,19 +1,36 @@
++COMMIT-NAME.txt
++CHANGED-FILES.txt
++DELIVERY-MANIFEST.txt
++TEST-RESULTS.txt
++CHANGES.diff
++GUI_ARCHITECTURE.md
+ README.md
+-docs/RELEASE-v1.3.1.md
++docs/MCW_CORE_LIBRARY.md
++docs/MCW_CORE_RELEASE-v1.3.2.md
++docs/RELEASE-v1.3.2.md
+ pyproject.toml
+ src/config.py
+-src/core/curseforge/curseforge_pack_installer.py
++src/core/fs/atomic_file.py
+ src/core/fs/paths.py
+-src/core/fs/windows_path.py
+-src/core/java/java_archive_extractor.py
+-src/core/java/java_provisioner.py
+-src/core/modrinth/modrinth_pack_installer.py
+-src/core/modrinth/modrinth_pack_registry.py
+-src/core/network/download_manager.py
++src/core/instance/instance_manager.py
++src/core/minecraft/version_manifest_manager.py
++src/core/package/modpack_package_manager.py
++src/core/theme/theme_authoring.py
++src/core/update/github_release_client.py
++src/core/update/update_applier.py
++src/core/update/update_manager.py
++src/models/update/update_info.py
+ test/core/config/test_version_metadata.py
+-test/core/curseforge/test_curseforge_pack_installer.py
+-test/core/fs_test_short_workspaces.py
+-test/core/java/test_java_provisioner.py
+-test/core/modrinth/test_modrinth_pack_installer.py
+-test/core/test_windows_path.py
++test/core/fs_test_short_workspaces.py -> removed/renamed
++test/core/test_short_workspaces.py
++test/core/test_atomic_file.py
++test/core/minecraft/test_version_manifest_manager.py
++test/core/package/test_modpack_package_manager.py
++test/core/theme/test_theme_authoring.py
++test/core/update/test_github_release_client.py
++test/core/update/test_update_applier.py
++test/core/update/test_update_manager.py
+ test/test_public_api.py
++test/tools/test_release_preflight.py
++tools/build_release_zip.py
++tools/release_preflight.py
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/COMMIT-NAME.txt mcw-launcher-v1.3.2/COMMIT-NAME.txt
+--- mcw-launcher-v1.3.2-base/COMMIT-NAME.txt	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/COMMIT-NAME.txt	2026-08-11 13:49:37.357185304 +0000
+@@ -1 +1 @@
+-chore(release): mcw-launcher v1.3.1
++fix(release): mcw-launcher v1.3.2 stability and update hardening
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/DELIVERY-MANIFEST.txt mcw-launcher-v1.3.2/DELIVERY-MANIFEST.txt
+--- mcw-launcher-v1.3.2-base/DELIVERY-MANIFEST.txt	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/DELIVERY-MANIFEST.txt	2026-08-11 13:49:37.369185303 +0000
+@@ -1,37 +1,32 @@
+-MCW Launcher v1.1.1 stable release
++MCW Launcher / MCW Core v1.3.2 release candidate
+ 
+ Release metadata
+-- Launcher runtime: v1.1.1
++- Launcher runtime: v1.3.2
+ - Update channel: stable
+-- MCW Core distribution: 1.1.1
++- MCW Core distribution: 1.3.2
+ 
+-Validated source changes for stable promotion
+-- src/config.py
+-- pyproject.toml
+-- test/core/config/test_version_metadata.py
+-- test/test_public_api.py
+-- README.md
+-- docs/RELEASE-v1.1.1.md
+-- config/curseforge.example.json
+-- .gitignore
+-- TEST-RESULTS.txt
+-- DELIVERY-MANIFEST.txt
++Primary fixes
++- Windows WinError 32 fixed-temp race for Mojang manifest and instance registry/metadata
++- Canonical short-workspace recursive-delete guard
++- Verified-only launcher auto-update with GitHub digest/.sha256 fallback
++- Managed release-file inventory and rollback-aware stale file cleanup for v1.3.2+ updater
++- Unified Windows-safe modpack archive paths
++- Transactional theme overwrite publish
++- Release evidence and GUI/core boundary preflight checks
+ 
+ Generated deliverables
+-- MCW-Launcher-v1.1.1-source.zip
+-- mcw-launcher-v1.1.1-stable-promotion-changed-files.zip
+-- mcw_core-1.1.1-py3-none-any.whl
+-- mcw-core-v1.1.1-source.zip
+-- README-launcher-v1.1.1.md
+-- README-core-v1.1.1.md
+-- RELEASE-v1.1.1.md
+-- RELEASE-core-v1.1.1.md
+-- TEST-RESULTS.txt
++- MCW-Launcher-v1.3.2-source.zip
++- MCW-Launcher-v1.3.2-changed-files.zip
++- README-launcher-v1.3.2.md
++- RELEASE-v1.3.2.md
++- mcw-core-v1.3.2-source.zip
++- mcw_core-1.3.2-py3-none-any.whl
++- README-core-v1.3.2.md
++- RELEASE-core-v1.3.2.md
+ - SHA256SUMS.txt
+-- MCW-Launcher-v1.1.1-release-bundle.zip
+ 
+-Not generated in this environment
++Not generated in this Linux environment
+ - MCW Launcher.exe
+-- MCW-Launcher-v1.1.1-windows-x64.zip
++- MCW-Launcher-v1.3.2-windows-x64.zip
+ 
+-Those two Windows artifacts require PyInstaller on Windows and are built by build_release.ps1.
++The Windows executable/update ZIP still requires the existing Windows PyInstaller build workflow. The source, tests, release preflight, and pure-Python Core wheel are validated here.
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/GUI_ARCHITECTURE.md mcw-launcher-v1.3.2/GUI_ARCHITECTURE.md
+--- mcw-launcher-v1.3.2-base/GUI_ARCHITECTURE.md	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/GUI_ARCHITECTURE.md	2026-08-11 13:45:13.426125401 +0000
+@@ -3,7 +3,8 @@
+ ```text
+ MCW Launcher GUI / launcher.py
+         │
+-        │ imports only mcw_core / mcw_core.api
++        │ services via mcw_core / mcw_core.api
++        │ shared DTOs may still come from src.models during migration
+         ▼
+ ┌──────────────────────────────────────┐
+ │ Public MCW Core library              │
+@@ -56,7 +57,8 @@
+ ## Dependency rules
+ 
+ - `src.core` and `src.models` must not import `src.gui`, PySide6, or PyQt.
+-- `src.gui` and `launcher.py` must not import `src.core` directly.
++- `src.gui` and `launcher.py` must not import `src.core` directly; release preflight enforces this for GUI source.
++- Existing GUI code may still import shared DTO/model types from `src.models` while those exports are migrated to `mcw_core`; new service integrations should not add new implementation-layer dependencies.
+ - New integrations should use top-level objects exported from `mcw_core`.
+ - `mcw_core.api` preserves domain-level compatibility while GUI adapters are
+   gradually simplified around the high-level facade.
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/README.md mcw-launcher-v1.3.2/README.md
+--- mcw-launcher-v1.3.2-base/README.md	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/README.md	2026-08-11 13:46:06.403598334 +0000
+@@ -6,8 +6,8 @@
+ </p>
+ 
+ <p align="center">
+-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.1">
+-    <img src="https://img.shields.io/badge/Stable-v1.3.1-brightgreen" alt="Stable version">
++  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.2">
++    <img src="https://img.shields.io/badge/Stable-v1.3.2-brightgreen" alt="Stable version">
+   </a>
+   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
+     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
+@@ -44,10 +44,25 @@
+ 
+ Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
+ ---
+-Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.1 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
++Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
  
  ---
  
-+## Có gì mới trong v1.1.1-beta.6
++## Có gì mới trong v1.3.2
 +
-+**v1.1.1-beta.6** sửa bước kiểm tra dependency của các modpack Forge cũ như RLCraft:
++**v1.3.2** là bản stability/security update tập trung vào filesystem race trên Windows và hardening auto-update. Bản này xử lý lỗi `WinError 32` được ghi nhận ở issue #19 khi background version refresh và launch cùng ghi `version_manifest_v2.json.tmp`, đồng thời áp cùng atomic-write boundary cho instance registry/metadata quan trọng.
 +
-+- Quét cả thư mục mod chính và thư mục legacy chính xác `mods/<minecraft-version>/`, thay vì bỏ sót mod Forge 1.12.2 được loader chấp nhận.
-+- Khi dependency đã được tác giả modpack ghim nhưng file local bị thiếu hoặc không cung cấp đúng mod ID, launcher đưa đúng file ghim trở lại hàng đợi tải/repair thay vì tìm một version thay thế.
-+- Lưu `projectName`, `projectSlug` và `expectedModIds` trong CurseForge pack registry để các lần audit sau đối chiếu bằng identity ổn định.
-+- Xác minh JAR sau download thực sự cung cấp mod ID mong đợi trước khi cho dependency audit vượt qua.
-+- Giữ nguyên version/file ID của manifest và chỉ dùng provider bridge khi pack thật sự không có dependency đó.
++- Atomic text writer dùng temp file riêng theo operation, `os.replace()` có retry cho sharing violation và cleanup best-effort.
++- `cleanup_short_workspace()` canonicalize đường dẫn trước khi recursive delete, chặn `..` escape và chặn xoá chính short-workspace root.
++- Auto-update yêu cầu SHA-256 tin cậy: dùng GitHub asset digest hoặc `<archive>.sha256`; không còn fallback sang unverified ZIP.
++- Update package bắt buộc `mcw-update.json` và khai báo managed files để updater v1.3.2+ có thể loại bỏ file release cũ có kiểm soát, kèm rollback.
++- Modpack archive path validation dùng chung Windows-safe policy với MCW package importer.
++- Theme overwrite import có rollback nếu bước publish cuối thất bại.
++- Release preflight kiểm tra stale release evidence và dependency boundary `src.gui -> src.core`.
++- Test long-path short-workspace cũ đã được đổi tên để pytest thực sự collect.
 +
-+Xem chi tiết tại [`docs/RELEASE-v1.1.1-beta.6.md`](docs/RELEASE-v1.1.1-beta.6.md).
++Xem chi tiết tại [`docs/RELEASE-v1.3.2.md`](docs/RELEASE-v1.3.2.md).
 +
- ## Có gì mới trong v1.1.1-beta.5
+ ## Có gì mới trong v1.3.1
  
- **v1.1.1-beta.5** sửa pipeline dependency bắt buộc của modpack:
---- a/docs/RELEASE-v1.1.1-beta.6.md
-+++ b/docs/RELEASE-v1.1.1-beta.6.md
-@@ -0,0 +1,95 @@
-+# MCW Launcher v1.1.1-beta.6
+ **v1.3.1** là hotfix tương thích Windows cho các installation đặt launcher trong đường dẫn sâu. Các bước Java extraction, Forge/NeoForge installer staging và Modrinth staging dùng short workspace dưới `%LOCALAPPDATA%\MCW\t` với prefix dễ đọc (`jvm`, `frg`, `neo`, `mrd`, `cfr`), đồng thời extraction/copy boundary hỗ trợ Windows extended paths.
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/TEST-RESULTS.txt mcw-launcher-v1.3.2/TEST-RESULTS.txt
+--- mcw-launcher-v1.3.2-base/TEST-RESULTS.txt	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/TEST-RESULTS.txt	2026-08-11 13:49:37.373185303 +0000
+@@ -1,17 +1,19 @@
+-MCW Launcher / MCW Core v1.1.1
++MCW Launcher / MCW Core v1.3.2
+ 
+ Release validation
+ 
+-- Release preflight: PASS
+ - Update channel: stable
+-- Language parity: 1991 keys in en-US and vi-VN
+-- Unresolved merge markers: 0
+-- Python compileall: PASS for launcher.py, src, mcw_core, tools, and test
+-- Full regression: 1414 passed, 88 skipped, 2 warnings
++- Language parity: 2084 keys in en-US and vi-VN
++- Python compileall: PASS for launcher.py, src, mcw_core, and tools
++- Full regression: 1544 passed, 90 skipped, 2 warnings
++- Focused v1.3.2 regression: 105 passed
++- MCW Core wheel build: PASS using local setuptools/wheel with build isolation disabled
+ - Wheel install into isolated target: PASS
+-- Installed distribution metadata: mcw-core 1.1.1
+-- Installed runtime metadata: mcw_core.__version__ == 1.1.1
+-- Forge dotted-letter range regression: 0.6.10 matches [0.6.8.a,0.7)
++- Installed distribution metadata: mcw-core 1.3.2
++- Installed runtime metadata: mcw_core.__version__ == 1.3.2
++- Wheel GUI exclusion: PASS (no src/gui package)
++- Release preflight: PASS
++- Unresolved merge markers: 0
+ 
+ Warnings
+ 
+@@ -19,11 +21,19 @@
+ - test_extract_deduplicates_identical_archive_members
+ - test_extract_rejects_conflicting_duplicate_archive_members
+ 
+-Real-world smoke validation reported during Beta 6 testing
++v1.3.2 regression coverage added
+ 
+-- SkyFactory 3 / Forge 1.10.2: launched successfully
+-- RLCraft / Forge 1.12.2: launched successfully after legacy/manual dependency validation
++- Concurrent Minecraft manifest refresh uses independent temporary files.
++- Existing manifest cache survives an atomic publish sharing violation.
++- Atomic replace retries PermissionError and cleanup remains best-effort.
++- Short-workspace cleanup rejects canonical parent escape and root deletion.
++- Automatic update uses .sha256 sidecar when GitHub digest is absent.
++- Automatic update rejects an archive with no trusted SHA-256 source.
++- Update manifest is mandatory and managed-file lifecycle is rollback-safe.
++- Modpack package paths reject absolute/traversal/Windows-invalid names.
++- Theme overwrite restores the previous theme if final publish fails.
++- Release preflight rejects stale evidence and direct GUI -> src.core imports.
+ 
+ Platform note
+ 
+-The release source and pure-Python MCW Core wheel were built and validated in a Linux headless environment. The one-file Windows EXE and updater-compatible Windows ZIP must be produced on Windows with build_release.ps1, then smoke-tested before GitHub publication.
++Validation was executed in a Linux headless environment with Python 3.13.5. Windows-only GUI/Win32 behavior remains covered by the repository's Windows CI and should receive the normal packaged EXE smoke test before publishing the GitHub release.
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/docs/MCW_CORE_LIBRARY.md mcw-launcher-v1.3.2/docs/MCW_CORE_LIBRARY.md
+--- mcw-launcher-v1.3.2-base/docs/MCW_CORE_LIBRARY.md	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/docs/MCW_CORE_LIBRARY.md	2026-08-11 13:46:07.432251267 +0000
+@@ -1,5 +1,7 @@
+ # MCW Core Library
+ 
++Current distribution: **mcw-core 1.3.2**. This release adds Windows-safe atomic state publishing, update-integrity hardening, short-workspace cleanup guards, and rollback-safe package/theme operations without adding a GUI dependency.
++
+ MCW Core is the GUI-independent runtime used by MCW Launcher. It can be imported from a Python program without installing PySide6.
+ 
+ ```python
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/docs/MCW_CORE_RELEASE-v1.3.2.md mcw-launcher-v1.3.2/docs/MCW_CORE_RELEASE-v1.3.2.md
+--- mcw-launcher-v1.3.2-base/docs/MCW_CORE_RELEASE-v1.3.2.md	1970-01-01 00:00:00.000000000 +0000
++++ mcw-launcher-v1.3.2/docs/MCW_CORE_RELEASE-v1.3.2.md	2026-08-11 13:46:06.587537018 +0000
+@@ -0,0 +1,21 @@
++# MCW Core 1.3.2
++
++MCW Core **1.3.2** ships the headless/runtime-side fixes used by MCW Launcher v1.3.2.
++
++## Fixed
++
++- Added a reusable atomic text writer with per-operation temporary files, fsync, retryable atomic replace, and best-effort cleanup.
++- Removed the reported manifest and instance-registry fixed-temp collision paths that could surface as Windows `WinError 32`.
++- Hardened short-workspace recursive cleanup against canonical-path escapes and root deletion.
++- Hardened launcher-update verification so automatic downloads require SHA-256 metadata or a `.sha256` sidecar.
++- Added managed release-file inventory support and rollback-aware stale-file removal for future updates applied by v1.3.2+.
++- Unified modpack relative-path validation with MCW package Windows filename restrictions.
++- Made theme overwrite import rollback-safe at the final publish boundary.
++
++## Compatibility
++
++- Python: `>=3.12`
++- Distribution: `mcw-core==1.3.2`
++- No PySide6 dependency is introduced.
++- Existing public imports from `mcw_core` remain unchanged; `ReleaseAsset` only gains the optional `sha256_url` field.
++- Existing persisted instance/account/package formats are unchanged.
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/docs/RELEASE-v1.3.2.md mcw-launcher-v1.3.2/docs/RELEASE-v1.3.2.md
+--- mcw-launcher-v1.3.2-base/docs/RELEASE-v1.3.2.md	1970-01-01 00:00:00.000000000 +0000
++++ mcw-launcher-v1.3.2/docs/RELEASE-v1.3.2.md	2026-08-11 13:46:06.583205939 +0000
+@@ -0,0 +1,73 @@
++# MCW Launcher v1.3.2
 +
 +## Tiếng Việt
 +
-+MCW Launcher **v1.1.1-beta.6** sửa lỗi dependency cuối được phát hiện khi cài và launch các modpack Forge legacy như **RLCraft 2.9.3**. Một dependency có thể đã được chính manifest của pack ghim, nhưng bước audit cuối vẫn kết luận thiếu mod ID và chặn launch.
++MCW Launcher **v1.3.2** là bản ổn định/hardening sau v1.3.1, tập trung vào lỗi filesystem race trên Windows được ghi nhận trong issue #19 và các boundary an toàn đã phát hiện trong review code.
 +
-+### Legacy Forge mod discovery
++### Sửa WinError 32 / fixed `.tmp` race
 +
-+- `ModManager` tiếp tục quét `mods/*.jar` như trước.
-+- Với Forge và NeoForge, scanner còn quét đúng một thư mục legacy khớp Minecraft version: `mods/<minecraft-version>/*.jar`.
-+- Không quét đệ quy toàn bộ cây thư mục, tránh nhận nhầm cache, backup hoặc JAR không thuộc runtime.
-+- Enable, disable và remove mod được phép hoạt động an toàn trong cả thư mục `mods/` và thư mục version hợp lệ.
-+- Legacy `mcmod.info` có nhiều mod entry giữ entry đầu làm mod chính và ghi các entry còn lại vào `provided_mods`.
++- Minecraft version manifest không còn ghi vào tên cố định `version_manifest_v2.json.tmp`.
++- Instance registry và metadata quan trọng dùng atomic writer với temporary file riêng cho từng operation.
++- Atomic publish dùng `os.replace()` với retry ngắn cho `PermissionError` / Windows sharing violation.
++- Cleanup temporary file là best-effort nên lỗi cleanup không còn che mất fallback/cache hợp lệ.
++- GitHub release cache cũng dùng cùng atomic writer.
 +
-+### Reconcile dependency do modpack ghim
++### Filesystem safety
 +
-+Khi audit báo thiếu dependency, resolver thực hiện thứ tự mới:
++- `Paths.cleanup_short_workspace()` resolve canonical path trước khi `rmtree()`.
++- Chặn đường dẫn chứa `..` thoát khỏi short-workspace root.
++- Chặn xoá trực tiếp chính short-workspace root.
++- Test short-workspace của v1.3.1 được đổi sang tên pytest collect được và bổ sung regression cho hai guard trên.
 +
-+1. Kiểm tra mod ID đã được một JAR hiện có cung cấp hay chưa.
-+2. Tìm file mà manifest CurseForge của chính modpack đã ghim bằng project identity.
-+3. Giữ nguyên `projectId`, `fileId`, path và version của pack.
-+4. Nếu file local bị thiếu hoặc không cung cấp đúng mod ID, đưa file đó trở lại hàng đợi download/repair.
-+5. Chỉ dùng cross-provider bridge khi pack thật sự không chứa dependency cần thiết.
++### Auto-update integrity và lifecycle
 +
-+Launcher không tìm theo tên gần giống và không tự thay file pack bằng bản mới nhất.
++- Auto-update không còn cho phép download archive ở chế độ unverified.
++- SHA-256 được lấy từ GitHub release asset digest; nếu digest không có, launcher dùng asset `<archive>.sha256`.
++- Nếu không có SHA-256 tin cậy, launcher từ chối automatic update thay vì chỉ kiểm tra ZIP hợp lệ.
++- `mcw-update.json` là bắt buộc cho update package do v1.3.2+ xử lý.
++- Release builder thêm `files` inventory vào manifest mà vẫn giữ `schema_version: 1` để updater v1.3.1 có thể cài v1.3.2.
++- Updater v1.3.2+ backup và loại bỏ file từng do release trước quản lý nhưng không còn trong release mới; rollback khôi phục chúng nếu update thất bại.
 +
-+### Xác minh identity sau download
++### Package/theme safety
 +
-+- CurseForge pack registry nâng lên schema **4**.
-+- Registry lưu `projectName`, `projectSlug` và `expectedModIds` với normalize tương thích dữ liệu cũ.
-+- File JAR có `expectedModIds` phải thật sự khai mod ID tương ứng trong metadata chính hoặc dependency JarJar được cung cấp.
-+- File có hash đúng nhưng identity sai không còn được xem là hoàn tất.
-+- Metadata project được cache trong registry; mạng chỉ cần dùng để bổ sung identity còn thiếu.
++- Modpack package path validation dùng cùng Windows-safe contract với MCW package importer: reject absolute path, traversal, NUL/control chars, reserved device names, trailing dot/space và ký tự tên file Windows không hợp lệ.
++- Theme overwrite import không xoá theme cũ trước khi package mới được publish; theme cũ được tạm backup và restore nếu publish thất bại.
 +
-+### Trường hợp RLCraft
++### Release hygiene
 +
-+`CompatSkills` yêu cầu mod ID `reskillable`. Nếu `Reskillable-1.12.2-1.13.0.jar` nằm trong thư mục legacy hoặc file pack-pinned bị mất, Beta 6 sẽ nhận diện hoặc repair đúng file Reskillable mà RLCraft đã chọn, thay vì báo `RequiredModDependenciesMissing` ngay lập tức.
++- Release preflight kiểm tra `TEST-RESULTS.txt` và `CHANGES.diff` có tham chiếu version hiện tại.
++- Release preflight khóa dependency rule: GUI source không được import `src.core` trực tiếp.
++- `GUI_ARCHITECTURE.md` được chỉnh để phản ánh đúng trạng thái migration: service calls qua `mcw_core`/`mcw_core.api`, trong khi một số shared DTO vẫn còn ở `src.models`.
 +
-+### Phiên bản và xác thực
++### Compatibility
 +
-+- Launcher runtime: `v1.1.1-beta.6`
-+- Python distribution metadata: `1.1.1b6`
-+- CurseForge pack registry schema: `4`
-+- Toàn bộ test: **1398 passed, 88 skipped, 2 warnings**.
-+- `compileall` đạt cho `src`, `mcw_core` và `test`.
++- Update channel: `stable`.
++- Package manifest vẫn dùng schema 1 để không phá upgrade path từ v1.3.1.
++- Không thay đổi format instance, account database, theme schema hay modpack format.
++- Không di chuyển permanent launcher data.
 +
-+Hai warning đến từ fixture ZIP cố tình chứa entry trùng trong kiểm thử bảo mật, không liên quan tới dependency resolver.
++### Version metadata
 +
-+---
++- Launcher runtime: `v1.3.2`
++- Python distribution metadata: `mcw-core 1.3.2`
 +
 +## English
 +
-+MCW Launcher **v1.1.1-beta.6** fixes the final dependency issue found while installing and launching legacy Forge modpacks such as **RLCraft 2.9.3**. A dependency could already be pinned by the pack manifest while the final audit still failed to discover its mod ID and blocked launch.
++MCW Launcher **v1.3.2** is a stability and hardening release focused on Windows filesystem races reported in issue #19 and the safety boundaries found during the v1.3.1 code review.
 +
-+### Legacy Forge mod discovery
++### Highlights
 +
-+- `ModManager` continues to scan `mods/*.jar`.
-+- For Forge and NeoForge, it also scans exactly one legacy directory matching the Minecraft version: `mods/<minecraft-version>/*.jar`.
-+- The launcher does not recursively scan the entire directory tree, avoiding caches, backups, and unrelated JARs.
-+- Enable, disable, and remove operations safely support both the main mods directory and the valid version directory.
-+- Legacy `mcmod.info` files containing multiple mod entries keep the first entry as the primary mod and expose the remaining entries through `provided_mods`.
++- Replaces deterministic temporary filenames in the affected manifest/instance state paths with per-operation atomic writes and retryable `os.replace()` publishing.
++- Canonicalizes short-workspace cleanup paths before recursive deletion and refuses both parent escapes and deletion of the workspace root itself.
++- Requires a trusted SHA-256 for automatic launcher updates, using either the GitHub release asset digest or the matching `.sha256` sidecar asset.
++- Requires an update package manifest and records managed release files while retaining manifest schema 1 for v1.3.1 compatibility.
++- Adds managed-file removal with rollback for updater versions running v1.3.2 or later.
++- Aligns modpack archive path validation with the existing Windows-safe MCW package policy.
++- Makes theme overwrite publishing transactional.
++- Extends release preflight to catch stale release evidence and direct GUI-to-implementation imports.
 +
-+### Pack-pinned dependency reconciliation
++### Version metadata
 +
-+When the audit reports a missing dependency, the resolver now follows this order:
-+
-+1. Check whether an installed JAR already provides the requested mod ID.
-+2. Find the file pinned by the modpack's own CurseForge manifest using project identity.
-+3. Preserve the pack's `projectId`, `fileId`, path, and version.
-+4. If the local file is missing or does not provide the expected mod ID, return that exact pinned file to the download/repair queue.
-+5. Use the cross-provider bridge only when the pack truly does not contain the dependency.
-+
-+The launcher does not use fuzzy name matching and does not silently replace a pack file with the latest version.
-+
-+### Post-download identity validation
-+
-+- The CurseForge pack registry is upgraded to schema **4**.
-+- The registry persists `projectName`, `projectSlug`, and `expectedModIds` with backward-compatible normalization.
-+- A JAR with `expectedModIds` must actually declare the requested identity in its primary metadata or supplied JarJar dependencies.
-+- A file with a valid hash but the wrong mod identity is no longer considered complete.
-+- Project metadata is cached in the registry; network access is only needed to fill missing identities.
-+
-+### RLCraft scenario
-+
-+`CompatSkills` requires the `reskillable` mod ID. If `Reskillable-1.12.2-1.13.0.jar` is stored in the legacy version directory or the pack-pinned local file is missing, Beta 6 discovers or repairs the exact Reskillable file selected by RLCraft instead of immediately raising `RequiredModDependenciesMissing`.
-+
-+### Versions and validation
-+
-+- Launcher runtime: `v1.1.1-beta.6`
-+- Python distribution metadata: `1.1.1b6`
-+- CurseForge pack registry schema: `4`
-+- Full test suite: **1398 passed, 88 skipped, 2 warnings**.
-+- `compileall` passes for `src`, `mcw_core`, and `test`.
-+
-+The two warnings come from security-test ZIP fixtures that intentionally contain duplicate entries; they are unrelated to dependency resolution.
---- a/pyproject.toml
-+++ b/pyproject.toml
++- Launcher runtime: `v1.3.2`
++- Update channel: `stable`
++- Python distribution metadata: `mcw-core 1.3.2`
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/pyproject.toml mcw-launcher-v1.3.2/pyproject.toml
+--- mcw-launcher-v1.3.2-base/pyproject.toml	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/pyproject.toml	2026-08-11 13:45:13.426023330 +0000
 @@ -4,7 +4,7 @@
  
  [project]
  name = "mcw-core"
--version = "1.1.1b5"
-+version = "1.1.1b6"
+-version = "1.3.1"
++version = "1.3.2"
  description = "Headless Minecraft runtime, instance, loader, modpack, repair, and launch core used by MCW Launcher"
  readme = "docs/MCW_CORE_LIBRARY.md"
  requires-python = ">=3.12"
---- a/src/config.py
-+++ b/src/config.py
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/src/config.py mcw-launcher-v1.3.2/src/config.py
+--- mcw-launcher-v1.3.2-base/src/config.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/src/config.py	2026-08-11 13:45:13.425899188 +0000
 @@ -1,7 +1,7 @@
  from __future__ import annotations
  
--VERSION = "v1.1.1-beta.5"
--VERSION_ID = "1.1.1-beta.5"
-+VERSION = "v1.1.1-beta.6"
-+VERSION_ID = "1.1.1-beta.6"
+-VERSION = "v1.3.1"
+-VERSION_ID = "1.3.1"
++VERSION = "v1.3.2"
++VERSION_ID = "1.3.2"
  VERSION_TAG = f"v{VERSION_ID}"
- UPDATE_CHANNEL = "beta"
+ UPDATE_CHANNEL = "stable"
  GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
---- a/src/core/curseforge/curseforge_content_manager.py
-+++ b/src/core/curseforge/curseforge_content_manager.py
-@@ -150,6 +150,8 @@
-         for index, item in enumerate(combined, start=1):
-             path = Path(instance.instance_dir) / item["path"]
-             valid = path.is_file() and CurseForgeContentManager._verify(path, item["sha1"], item["size"])
-+            if valid and path.suffix.casefold() == ".jar" and item["entry"].get("expectedModIds"):
-+                valid = CurseForgeContentManager._provides_expected_mod_ids(instance, path, item["entry"])
-             item["entry"]["pendingDownload"] = not valid
-             if valid:
-                 item["entry"]["lastDownloadError"] = ""
-@@ -204,6 +206,7 @@
-                         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-                         metadata = ModManager.read_mod(target, preferred_loader=loader_name, provider_version=file.display_name)
-                         compatibility_warning = ModManager.compatibility_warning(instance, metadata)
-+                        CurseForgeContentManager._validate_expected_mod_ids(metadata, entry)
-                 else:
-                     loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-                     metadata = ModManager.read_mod(cache, preferred_loader=loader_name, provider_version=file.display_name)
-@@ -211,6 +214,7 @@
-                     added = ModManager.add_mods(instance, [cache], replace=True, launch_lock_token=launch_lock_token, allow_unverified=True)
-                     if not added:
-                         raise RuntimeError("Downloaded file could not be added to the instance.")
-+                    CurseForgeContentManager._validate_expected_mod_ids(added[0], entry)
-                     entry["fileName"] = added[0].file_name
-                     entry["path"] = f"mods/{added[0].file_name}"
- 
-@@ -259,6 +263,28 @@
-         return {"errors": errors, "downloaded": downloaded, "acceptedUnverified": accepted_unverified}
- 
-     @staticmethod
-+    def _provides_expected_mod_ids(instance: Instance, path: Path, entry: dict) -> bool:
-+        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-+        metadata = ModManager.read_mod(path, preferred_loader=loader_name, provider_version=str(entry.get("displayName") or ""))
-+        try:
-+            CurseForgeContentManager._validate_expected_mod_ids(metadata, entry)
-+        except RuntimeError:
-+            return False
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/src/core/fs/atomic_file.py mcw-launcher-v1.3.2/src/core/fs/atomic_file.py
+--- mcw-launcher-v1.3.2-base/src/core/fs/atomic_file.py	1970-01-01 00:00:00.000000000 +0000
++++ mcw-launcher-v1.3.2/src/core/fs/atomic_file.py	2026-08-11 13:39:07.759523305 +0000
+@@ -0,0 +1,65 @@
++from __future__ import annotations
++
++from pathlib import Path
++import os
++import tempfile
++import time
++
++
++DEFAULT_RETRY_DELAYS = (0.05, 0.15, 0.30, 0.50)
++_WINDOWS_RETRYABLE_ERRORS = {5, 32}
++
++
++def _is_retryable_replace_error(error: OSError) -> bool:
++    if isinstance(error, PermissionError):
 +        return True
++    return getattr(error, "winerror", None) in _WINDOWS_RETRYABLE_ERRORS
 +
-+    @staticmethod
-+    def _validate_expected_mod_ids(metadata, entry: dict) -> None:
-+        expected = {str(value).strip().casefold() for value in entry.get("expectedModIds", []) if str(value).strip()}
-+        if not expected:
++
++def replace_with_retry(
++    source: Path,
++    destination: Path,
++    *,
++    retry_delays: tuple[float, ...] = DEFAULT_RETRY_DELAYS,
++) -> None:
++    source_path = Path(source)
++    destination_path = Path(destination)
++    for attempt in range(len(retry_delays) + 1):
++        try:
++            os.replace(source_path, destination_path)
 +            return
-+        provided = {str(metadata.mod_id).strip().casefold()} | {str(mod_id).strip().casefold() for mod_id, _version in metadata.provided_mods if str(mod_id).strip()}
-+        missing = sorted(expected - provided)
-+        if missing:
-+            raise RuntimeError(
-+                f"Downloaded CurseForge file '{metadata.file_name}' does not provide expected mod ID(s): {', '.join(missing)}."
-+            )
++        except OSError as error:
++            if not _is_retryable_replace_error(error) or attempt >= len(retry_delays):
++                raise
++            time.sleep(max(0.0, float(retry_delays[attempt])))
 +
-+    @staticmethod
-     def _artifact_request(file: CurseForgeFile, destination: Path, item: dict):
-         from src.models.network.artifact import ArtifactRequest
-         return ArtifactRequest(
---- a/src/core/curseforge/curseforge_pack_registry.py
-+++ b/src/core/curseforge/curseforge_pack_registry.py
-@@ -9,7 +9,7 @@
- 
- 
- class CurseForgePackRegistry:
--    SCHEMA_VERSION = 3
-+    SCHEMA_VERSION = 4
- 
-     @staticmethod
-     def load(instance: Instance | Path) -> dict:
-@@ -89,6 +89,9 @@
-                 "selectionReason": str(raw.get("selectionReason") or "pack_manifest").strip().casefold(),
-                 "requiredBy": list(dict.fromkeys(str(item).strip() for item in raw.get("requiredBy", []) if str(item).strip())) if isinstance(raw.get("requiredBy"), (list, tuple, set)) else [],
-                 "projectUrl": str(raw.get("projectUrl") or "").strip(),
-+                "projectName": str(raw.get("projectName") or "").strip(),
-+                "projectSlug": str(raw.get("projectSlug") or "").strip().casefold(),
-+                "expectedModIds": CurseForgePackRegistry._normalize_mod_ids(raw.get("expectedModIds", [])),
-                 "releaseType": str(raw.get("releaseType") or "release").strip().casefold(),
-                 "datePublished": str(raw.get("datePublished") or "").strip(),
-                 "declaredLoaders": [str(item).strip().casefold() for item in raw.get("declaredLoaders", []) if str(item).strip()] if isinstance(raw.get("declaredLoaders"), (list, tuple, set)) else [],
-@@ -101,6 +104,14 @@
-         output["managedFiles"] = managed
-         output["source"] = "curseforge"
-         return output
 +
-+    @staticmethod
-+    def _normalize_mod_ids(value: object) -> list[str]:
-+        if isinstance(value, str):
-+            value = [value]
-+        if not isinstance(value, (list, tuple, set)):
-+            return []
-+        return list(dict.fromkeys(str(item).strip().casefold() for item in value if str(item).strip()))
- 
-     @staticmethod
-     def _normalize_dependencies(value: object) -> list[dict]:
---- a/src/core/mod/mod_compatibility_manager.py
-+++ b/src/core/mod/mod_compatibility_manager.py
-@@ -22,12 +22,22 @@
-         disabled_by_id: dict[str, list[ModInfo]] = defaultdict(list)
- 
-         for mod in enabled:
--            enabled_by_id[mod.mod_id.casefold()].append(mod)
-+            identities = {mod.mod_id.casefold()} | {mod_id.casefold() for mod_id, _version in mod.provided_mods if mod_id}
-+            for mod_id in identities:
-+                enabled_by_id[mod_id].append(mod)
-         for mod in disabled:
--            disabled_by_id[mod.mod_id.casefold()].append(mod)
-+            identities = {mod.mod_id.casefold()} | {mod_id.casefold() for mod_id, _version in mod.provided_mods if mod_id}
-+            for mod_id in identities:
-+                disabled_by_id[mod_id].append(mod)
- 
-         loader_name, loader_version = ModLoaderManager.normalize(instance.mod_loader)
--        installed_versions = {mod_id: entries[0].version for mod_id, entries in enabled_by_id.items() if entries}
-+        installed_versions: dict[str, str] = {}
-+        for mod in enabled:
-+            if mod.mod_id and mod.mod_id != "unknown":
-+                installed_versions.setdefault(mod.mod_id.casefold(), mod.version)
-+            for mod_id, version in mod.provided_mods:
-+                if mod_id:
-+                    installed_versions.setdefault(mod_id.casefold(), version or mod.version)
-         installed_versions["minecraft"] = instance.version_id
-         if loader_name == ModLoaderManager.FABRIC:
-             installed_versions["fabricloader"] = loader_version
-@@ -120,6 +130,16 @@
-                         ),
-                         mod_ids=(mod.mod_id, normalized_id),
-                     ))
-+                elif managed_by_modpack and ModCompatibilityManager._is_pack_managed_dependency(enabled_by_id, normalized_id):
-+                    issues.append(ModIssue(
-+                        severity="warning",
-+                        code="pack-pinned-dependency-requirement",
-+                        message=(
-+                            f"{mod.name} declares '{dependency_id}' {ModCompatibilityManager._format_requirement(requirement)}, "
-+                            f"but the modpack pins {installed_versions[normalized_id]}. The modpack selection was accepted."
-+                        ),
-+                        mod_ids=(mod.mod_id, normalized_id),
-+                    ))
-                 else:
-                     issues.append(ModIssue(severity="error", code="dependency-version", message=f"{mod.name} requires '{dependency_id}' {ModCompatibilityManager._format_requirement(requirement)}, but {installed_versions[normalized_id]} is installed.", mod_ids=(mod.mod_id, normalized_id)))
- 
-@@ -139,6 +159,10 @@
-                 if matches is not False:
-                     verb = "breaks with" if code == "breaks" else "conflicts with"
-                     issues.append(ModIssue(severity=severity, code=code, message=f"{mod.name} {verb} '{dependency_id}' ({ModCompatibilityManager._format_requirement(requirement)}).", mod_ids=(mod.mod_id, normalized_id)))
-+
-+    @staticmethod
-+    def _is_pack_managed_dependency(enabled_by_id: dict[str, list[ModInfo]], dependency_id: str) -> bool:
-+        return any(mod.managed_by_modpack for mod in enabled_by_id.get(dependency_id, ()))
- 
-     @staticmethod
-     def _matches_requirement(version: str, requirement: object) -> bool | None:
---- a/src/core/mod/mod_manager.py
-+++ b/src/core/mod/mod_manager.py
-@@ -3,6 +3,7 @@
- from dataclasses import replace as dataclass_replace
- from pathlib import Path
- from typing import Iterable
-+import io
- import json
- import re
- import shutil
-@@ -21,6 +22,9 @@
- class ModManager:
-     DISABLED_SUFFIX = ".disabled"
-     _INVALID_STATUSES = {"Broken JAR", "Not a mod", "Broken metadata", "Unverified"}
-+    MAX_EMBEDDED_MOD_JARS = 64
-+    MAX_EMBEDDED_MOD_JAR_SIZE = 32 * 1024 * 1024
-+    MAX_EMBEDDED_MOD_DEPTH = 2
- 
-     @staticmethod
-     def mods_dir(instance: Instance) -> Path:
-@@ -29,7 +33,7 @@
-     @staticmethod
-     def list_mods(instance: Instance) -> list[ModInfo]:
-         directory = ModManager.mods_dir(instance)
--        paths = [path for path in directory.iterdir() if path.is_file() and ModManager._is_mod_file(path)]
-+        paths = ModManager._discover_mod_paths(instance, directory)
-         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-         provenance = ModProvenanceRegistry.entries_by_file(instance)
-         mods: list[ModInfo] = []
-@@ -111,11 +115,12 @@
-     def remove_mods(instance: Instance, paths: Iterable[Path]) -> None:
-         ModManager._ensure_modifiable(instance)
-         directory = ModManager.mods_dir(instance).resolve()
-+        allowed_directories = ModManager._allowed_mod_directories(instance, directory)
- 
-         removed_names: list[str] = []
-         for path in paths:
-             candidate = Path(path).resolve()
--            if candidate.parent != directory:
-+            if candidate.parent not in allowed_directories:
-                 raise RuntimeError("Refusing to remove a file outside the instance mods folder.")
-             removed_names.append(candidate.name)
-             candidate.unlink(missing_ok=True)
-@@ -125,12 +130,13 @@
-     def set_enabled(instance: Instance, paths: Iterable[Path], enabled: bool) -> list[ModInfo]:
-         ModManager._ensure_modifiable(instance)
-         directory = ModManager.mods_dir(instance).resolve()
-+        allowed_directories = ModManager._allowed_mod_directories(instance, directory)
-         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-         changed: list[ModInfo] = []
- 
-         for path in paths:
-             source = Path(path).resolve()
--            if source.parent != directory or not source.exists():
-+            if source.parent not in allowed_directories or not source.exists():
-                 raise RuntimeError("Mod file no longer exists in this instance.")
- 
-             currently_enabled = not source.name.endswith(ModManager.DISABLED_SUFFIX)
-@@ -158,14 +164,23 @@
-             with zipfile.ZipFile(path, "r") as archive:
-                 names = set(archive.namelist())
-                 manifest = ModManager._manifest_attributes(archive.read("META-INF/MANIFEST.MF")) if "META-INF/MANIFEST.MF" in names else {}
-+                provided_mods = ModManager._embedded_mods(archive, provider_version=provider_version)
-+
-+                def finalize(mod: ModInfo) -> ModInfo:
-+                    if not provided_mods:
-+                        return mod
-+                    merged = {(mod_id.casefold(), version) for mod_id, version in mod.provided_mods if mod_id}
-+                    merged.update((mod_id.casefold(), version) for mod_id, version in provided_mods if mod_id and mod_id.casefold() != mod.mod_id.casefold())
-+                    return dataclass_replace(mod, provided_mods=tuple(sorted(merged)))
-+
-                 has_fabric = "fabric.mod.json" in names
-                 has_quilt = "quilt.mod.json" in names
-                 has_forge = "META-INF/mods.toml" in names
- 
-                 if has_quilt and (normalized_preference == ModLoaderManager.QUILT or not has_fabric):
--                    return ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version)
-+                    return finalize(ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version))
-                 if has_fabric and has_forge:
--                    return ModManager._read_universal_fabric_forge_mod(
-+                    return finalize(ModManager._read_universal_fabric_forge_mod(
-                         path,
-                         file_name,
-                         enabled,
-@@ -174,21 +189,21 @@
-                         normalized_preference,
-                         manifest,
-                         provider_version,
--                    )
-+                    ))
-                 if has_fabric:
-                     fabric = ModManager._read_fabric_mod(path, file_name, enabled, archive.read("fabric.mod.json"), manifest, provider_version)
-                     if normalized_preference == ModLoaderManager.QUILT:
--                        return dataclass_replace(fabric, loader="quilt", metadata_format="fabric.mod.json (Quilt compatibility)")
--                    return fabric
-+                        return finalize(dataclass_replace(fabric, loader="quilt", metadata_format="fabric.mod.json (Quilt compatibility)"))
-+                    return finalize(fabric)
-                 if has_quilt:
--                    return ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version)
-+                    return finalize(ModManager._read_quilt_mod(path, file_name, enabled, archive.read("quilt.mod.json"), manifest, provider_version))
-                 if "META-INF/neoforge.mods.toml" in names:
--                    return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/neoforge.mods.toml"), loader="neoforge", metadata_format="neoforge.mods.toml", manifest=manifest, provider_version=provider_version)
-+                    return finalize(ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/neoforge.mods.toml"), loader="neoforge", metadata_format="neoforge.mods.toml", manifest=manifest, provider_version=provider_version))
-                 if has_forge:
-                     loader = ModLoaderManager.NEOFORGE if normalized_preference == ModLoaderManager.NEOFORGE else ModLoaderManager.FORGE
--                    return ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/mods.toml"), loader=loader, metadata_format="mods.toml", manifest=manifest, provider_version=provider_version)
-+                    return finalize(ModManager._read_forge_mod(path, file_name, enabled, archive.read("META-INF/mods.toml"), loader=loader, metadata_format="mods.toml", manifest=manifest, provider_version=provider_version))
-                 if "mcmod.info" in names:
--                    return ModManager._read_legacy_forge_mod(path, file_name, enabled, archive.read("mcmod.info"))
-+                    return finalize(ModManager._read_legacy_forge_mod(path, file_name, enabled, archive.read("mcmod.info")))
-                 fml_mod_type = str(manifest.get("fmlmodtype") or "").strip().upper()
-                 if fml_mod_type in {"LANGPROVIDER", "LIBRARY", "GAMELIBRARY"}:
-                     loader = normalized_preference if normalized_preference in ModLoaderManager.FORGE_FAMILY else ModLoaderManager.FORGE
-@@ -197,7 +212,7 @@
-                         "LIBRARY": f"{loader.title()} managed library",
-                         "GAMELIBRARY": f"{loader.title()} game library",
-                     }[fml_mod_type]
--                    return ModInfo(
-+                    return finalize(ModInfo(
-                         path=path,
-                         file_name=file_name,
-                         enabled=enabled,
-@@ -208,16 +223,16 @@
-                         metadata_format=f"MANIFEST.MF:FMLModType={fml_mod_type}",
-                         status="Ready",
-                         description=label,
--                    )
-+                    ))
-                 has_java_content = any(name.endswith(".class") for name in names)
-                 status = "Unverified" if manifest or has_java_content else "Not a mod"
--                return ModManager._invalid_mod(
-+                return finalize(ModManager._invalid_mod(
-                     path,
-                     file_name,
-                     enabled,
-                     status,
-                     "No quilt.mod.json, fabric.mod.json, Forge META-INF/mods.toml, NeoForge metadata, mcmod.info, or recognized Forge library metadata was found.",
--                )
-+                ))
-         except (OSError, zipfile.BadZipFile) as error:
-             return ModManager._invalid_mod(path, file_name, enabled, "Broken JAR", str(error))
- 
-@@ -431,7 +446,8 @@
-             entries = data
-         else:
-             entries = []
--        metadata = next((item for item in entries if isinstance(item, dict)), {})
-+        normalized_entries = [item for item in entries if isinstance(item, dict)]
-+        metadata = next((item for item in normalized_entries if str(item.get("modid") or item.get("modId") or "").strip()), {})
-         mod_id = str(metadata.get("modid") or metadata.get("modId") or "").strip()
-         if not mod_id:
-             return ModManager._invalid_mod(path, file_name, enabled, "Broken metadata", "Legacy Forge mod id is missing.", loader="forge", metadata_format="mcmod.info")
-@@ -440,6 +456,13 @@
-         minecraft_version = str(metadata.get("mcversion") or "").strip()
-         if minecraft_version and minecraft_version.casefold() not in {"unknown", "*"}:
-             dependencies.setdefault("minecraft", minecraft_version)
-+
-+        provided: dict[str, str] = {}
-+        for item in normalized_entries:
-+            item_id = str(item.get("modid") or item.get("modId") or "").strip().casefold()
-+            if not item_id or item_id == mod_id.casefold():
-+                continue
-+            provided.setdefault(item_id, str(item.get("version") or "Unknown").strip())
- 
-         return ModInfo(
-             path=path,
-@@ -461,7 +484,30 @@
-             breaks={},
-             status="Ready",
-             error="",
-+            provided_mods=tuple(sorted(provided.items())),
-         )
-+
-+    @staticmethod
-+    def _discover_mod_paths(instance: Instance, directory: Path) -> list[Path]:
-+        paths: list[Path] = []
-+        for candidate_directory in ModManager._allowed_mod_directories(instance, directory.resolve()):
-+            try:
-+                paths.extend(path for path in candidate_directory.iterdir() if path.is_file() and ModManager._is_mod_file(path))
-+            except (FileNotFoundError, NotADirectoryError, PermissionError, OSError):
-+                continue
-+        unique = {path.resolve(): path for path in paths}
-+        return sorted(unique.values(), key=lambda path: (len(path.parts), path.name.casefold(), str(path).casefold()))
-+
-+    @staticmethod
-+    def _allowed_mod_directories(instance: Instance, directory: Path) -> set[Path]:
-+        allowed = {Path(directory).resolve()}
-+        loader_name, _loader_version = ModLoaderManager.normalize(getattr(instance, "mod_loader", None))
-+        if loader_name not in ModLoaderManager.FORGE_FAMILY:
-+            return allowed
-+        version_id = str(getattr(instance, "version_id", "") or "").strip()
-+        if version_id and version_id not in {".", ".."} and "/" not in version_id and "\\" not in version_id:
-+            allowed.add((Path(directory) / version_id).resolve())
-+        return allowed
- 
-     @staticmethod
-     def _forge_dependencies(data: dict, mod_id: str) -> tuple[dict[str, object], dict[str, object]]:
-@@ -517,6 +563,86 @@
-             expected = loader_name.title()
-             actual = mod.loader.title()
-             raise RuntimeError(f"'{mod.file_name}' is a {actual} mod and cannot be added to this {expected} instance.")
-+
-+    @staticmethod
-+    def _embedded_mods(archive: zipfile.ZipFile, provider_version: str = "", depth: int = 0) -> tuple[tuple[str, str], ...]:
-+        if depth >= ModManager.MAX_EMBEDDED_MOD_DEPTH:
-+            return ()
-+        names = set(archive.namelist())
-+        metadata_name = "META-INF/jarjar/metadata.json"
-+        if metadata_name not in names:
-+            return ()
++def atomic_write_text(
++    path: Path,
++    text: str,
++    *,
++    encoding: str = "utf-8",
++    newline: str | None = "\n",
++    retry_delays: tuple[float, ...] = DEFAULT_RETRY_DELAYS,
++) -> Path:
++    target = Path(path)
++    target.parent.mkdir(parents=True, exist_ok=True)
++    handle, temporary_name = tempfile.mkstemp(
++        prefix=f".{target.name}.",
++        suffix=".tmp",
++        dir=str(target.parent),
++    )
++    temporary = Path(temporary_name)
++    try:
++        with os.fdopen(handle, "w", encoding=encoding, newline=newline) as file:
++            file.write(text)
++            file.flush()
++            os.fsync(file.fileno())
++        replace_with_retry(temporary, target, retry_delays=retry_delays)
++        return target
++    except Exception:
 +        try:
-+            payload = json.loads(archive.read(metadata_name).decode("utf-8-sig"))
-+        except (KeyError, UnicodeError, json.JSONDecodeError):
-+            return ()
-+        jars = payload.get("jars") if isinstance(payload, dict) and isinstance(payload.get("jars"), list) else []
-+        paths: list[str] = []
-+        for item in jars[:ModManager.MAX_EMBEDDED_MOD_JARS]:
-+            path = str(item.get("path") or "").replace("\\", "/").lstrip("/") if isinstance(item, dict) else ""
-+            if path.startswith("META-INF/jarjar/") and path.endswith(".jar") and path in names:
-+                paths.append(path)
-+
-+        found: dict[str, str] = {}
-+        for path in paths:
-+            try:
-+                info = archive.getinfo(path)
-+                if info.file_size <= 0 or info.file_size > ModManager.MAX_EMBEDDED_MOD_JAR_SIZE:
-+                    continue
-+                raw = archive.read(info)
-+                with zipfile.ZipFile(io.BytesIO(raw), "r") as nested:
-+                    for mod_id, version in ModManager._declared_mods(nested, provider_version):
-+                        found.setdefault(mod_id.casefold(), version)
-+                    for mod_id, version in ModManager._embedded_mods(nested, provider_version, depth + 1):
-+                        found.setdefault(mod_id.casefold(), version)
-+            except (KeyError, OSError, zipfile.BadZipFile, RuntimeError):
-+                continue
-+        return tuple(sorted(found.items()))
-+
-+    @staticmethod
-+    def _declared_mods(archive: zipfile.ZipFile, provider_version: str = "") -> tuple[tuple[str, str], ...]:
-+        names = set(archive.namelist())
-+        manifest = ModManager._manifest_attributes(archive.read("META-INF/MANIFEST.MF")) if "META-INF/MANIFEST.MF" in names else {}
-+        found: dict[str, str] = {}
-+
-+        for metadata_name in ("META-INF/neoforge.mods.toml", "META-INF/mods.toml"):
-+            if metadata_name not in names:
-+                continue
-+            try:
-+                data = tomllib.loads(archive.read(metadata_name).decode("utf-8-sig"))
-+            except (UnicodeError, tomllib.TOMLDecodeError):
-+                continue
-+            mods = data.get("mods") if isinstance(data, dict) and isinstance(data.get("mods"), list) else []
-+            for metadata in mods:
-+                if not isinstance(metadata, dict):
-+                    continue
-+                mod_id = str(metadata.get("modId") or "").strip().casefold()
-+                if not mod_id:
-+                    continue
-+                version = ModManager._resolve_mod_version(metadata.get("version"), manifest, {**data, **metadata}, provider_version, Path(metadata_name).name)
-+                found.setdefault(mod_id, version)
-+
-+        if "fabric.mod.json" in names:
-+            try:
-+                data = json.loads(archive.read("fabric.mod.json").decode("utf-8-sig"))
-+            except (UnicodeError, json.JSONDecodeError):
-+                data = {}
-+            if isinstance(data, dict):
-+                mod_id = str(data.get("id") or "").strip().casefold()
-+                if mod_id:
-+                    found.setdefault(mod_id, ModManager._resolve_mod_version(data.get("version"), manifest, data, provider_version, "fabric.mod.json"))
-+
-+        if "quilt.mod.json" in names:
-+            try:
-+                data = json.loads(archive.read("quilt.mod.json").decode("utf-8-sig"))
-+            except (UnicodeError, json.JSONDecodeError):
-+                data = {}
-+            loader_data = data.get("quilt_loader") if isinstance(data, dict) and isinstance(data.get("quilt_loader"), dict) else {}
-+            mod_id = str(loader_data.get("id") or data.get("id") or "").strip().casefold() if isinstance(data, dict) else ""
-+            if mod_id:
-+                found.setdefault(mod_id, ModManager._resolve_mod_version(loader_data.get("version") or data.get("version"), manifest, {**data, **loader_data}, provider_version, "quilt.mod.json"))
-+
-+        return tuple(sorted(found.items()))
- 
-     @staticmethod
-     def compatibility_warning(instance: Instance, mod: ModInfo) -> str:
---- a/src/core/mod/mod_provenance_registry.py
-+++ b/src/core/mod/mod_provenance_registry.py
-@@ -80,6 +80,7 @@
-         for project_id, raw in ModrinthRegistry.load(instance).get("mods", {}).items():
-             if not isinstance(raw, dict):
-                 continue
-+            managed_by_modpack = bool(raw.get("managedByModpack", False))
-             merge({
-                 "fileName": raw.get("fileName"),
-                 "provider": "modrinth",
-@@ -90,7 +91,10 @@
-                 "sha512": raw.get("sha512"),
-                 "size": raw.get("size"),
-                 "downloadUrls": raw.get("downloadUrls", []),
--                "managedByModpack": False,
-+                "managedByModpack": managed_by_modpack,
-+                "selectionReason": raw.get("selectionReason"),
-+                "requiredBy": raw.get("requiredBy", []),
-+                "packProvider": raw.get("packProvider") if managed_by_modpack else "",
-             }, 30)
- 
-         for project_id, raw in CurseForgeRegistry.load(instance).get("mods", {}).items():
---- a/src/core/mod/modpack_dependency_resolver.py
-+++ b/src/core/mod/modpack_dependency_resolver.py
-@@ -1,6 +1,7 @@
- from __future__ import annotations
- 
- from collections import deque
-+import hashlib
- from datetime import datetime, timezone
- from pathlib import Path, PurePosixPath
- from time import sleep
-@@ -9,11 +10,13 @@
- from src.core.curseforge.curseforge_client import CurseForgeClient
- from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
- from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
-+from src.core.mod.mod_manager import ModManager
- from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
- from src.core.modloader.mod_loader_manager import ModLoaderManager
- from src.core.modrinth.modrinth_client import ModrinthClient
- from src.core.modrinth.modrinth_mod_installer import ModrinthModInstaller
- from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
-+from src.core.modrinth.modrinth_registry import ModrinthRegistry
- from src.core.network.download_pause import download_pause_controller
- from src.core.network.retry_policy import DownloadRetryPolicy
- from src.core.progress.progress_reporter import ProgressReporter
-@@ -49,6 +52,9 @@
-         warnings: list[str] = []
-         unresolved: list[str] = []
- 
-+        pruned = ModpackDependencyResolver._prune_redundant_embedded_dependencies(instance)
-+        warnings.extend(pruned)
-+
-         modrinth = ModrinthPackRegistry.load(instance)
-         if ModpackDependencyResolver._has_managed_mods(modrinth.get("managedFiles", [])):
-             result = ModpackDependencyResolver._resolve_modrinth(instance, modrinth, reporter)
-@@ -62,6 +68,24 @@
-             added.extend(result.added_files)
-             warnings.extend(result.warnings)
-             unresolved.extend(result.unresolved)
-+
-+        # Legacy packs can pin a dependency in their manifest while storing it
-+        # in a version-specific mods directory or leaving a stale/missing local
-+        # file behind. Reconcile the dependency audit with the authoritative
-+        # pack registry before attempting a cross-provider replacement.
-+        result = ModpackDependencyResolver._reconcile_pack_pinned_dependencies(instance, reporter)
-+        added.extend(result.added_files)
-+        warnings.extend(result.warnings)
-+        unresolved.extend(result.unresolved)
-+
-+        # CurseForge file relations are not always complete. Once the pack JARs
-+        # exist locally, use the exact file hash to find the same release on
-+        # Modrinth and recover required relations from that provider. This is
-+        # identity-based enrichment, not a name-only search or a hardcoded mod.
-+        result = ModpackDependencyResolver._resolve_cross_provider_missing(instance, reporter)
-+        added.extend(result.added_files)
-+        warnings.extend(result.warnings)
-+        unresolved.extend(result.unresolved)
- 
-         if added:
-             ModProvenanceRegistry.synchronize(instance)
-@@ -105,6 +129,7 @@
-         unresolved: list[str] = []
-         added: list[str] = []
-         changed = False
-+        installed_identities = ModpackDependencyResolver._installed_mod_identities(instance)
- 
-         ModpackDependencyResolver._report(reporter, "Resolving Modrinth modpack dependencies...", 0, max(1, len(mod_entries)))
-         for completed, entry in enumerate(mod_entries, start=1):
-@@ -182,6 +207,10 @@
-                     file = dependency_version.primary_file(".jar")
-                 except Exception as error:
-                     unresolved.append(f"{parent_label} dependency {dependency_version.project_id} is not installable: {error}")
-+                    continue
-+                project_identities = ModpackDependencyResolver._project_identities(project)
-+                if project_identities & installed_identities:
-+                    queue.append((dependency_version, depth + 1, project.title or dependency_version.project_id))
-                     continue
-                 if discovered >= ModpackDependencyResolver.MAX_DEPENDENCIES:
-                     unresolved.append(f"The Modrinth dependency graph exceeds {ModpackDependencyResolver.MAX_DEPENDENCIES} added files.")
-@@ -207,6 +236,7 @@
-                 }
-                 entries.append(target)
-                 selected[dependency_version.project_id] = target
-+                installed_identities.update(project_identities)
-                 added.append(project.title or target["fileName"])
-                 discovered += 1
-                 changed = True
-@@ -220,6 +250,133 @@
-             )
-             ModrinthPackRegistry.save(instance.instance_dir, registry)
-         return DependencyResolutionResult(tuple(added), tuple(warnings), tuple(unresolved))
-+
-+    @staticmethod
-+    def _reconcile_pack_pinned_dependencies(instance: Instance, reporter: ProgressReporter | None) -> DependencyResolutionResult:
-+        if not getattr(instance, "instance_dir", None):
-+            return DependencyResolutionResult()
-+        registry = CurseForgePackRegistry.load(Path(instance.instance_dir))
-+        entries = [entry for entry in registry.get("managedFiles", []) if isinstance(entry, dict) and ModpackDependencyResolver._is_mod_entry(entry)]
-+        if not entries:
-+            return DependencyResolutionResult()
-+        try:
-+            mods = ModManager.list_mods(instance)
-+        except (AttributeError, FileNotFoundError, OSError):
-+            return DependencyResolutionResult()
-+        report = ModCompatibilityManager.scan(instance, mods=mods)
-+        issues = [issue for issue in report.issues if issue.code == "dependency-missing" and len(issue.mod_ids) >= 2]
-+        if not issues:
-+            return DependencyResolutionResult()
-+
-+        entries_by_identity: dict[str, list[dict]] = {}
-+        changed = False
-+        for entry in entries:
-+            ModpackDependencyResolver._index_curseforge_entry_identities(entries_by_identity, entry)
-+
-+        required_identities = {
-+            ModpackDependencyResolver._canonical_identity(issue.mod_ids[1])
-+            for issue in issues
-+            if len(issue.mod_ids) >= 2 and ModpackDependencyResolver._canonical_identity(issue.mod_ids[1])
-+        }
-+        missing_identities = required_identities - set(entries_by_identity)
-+        metadata_warning = ""
-+        if missing_identities:
-+            project_ids: set[int] = set()
-+            for entry in entries:
-+                try:
-+                    project_id = int(entry.get("projectId") or 0)
-+                except (TypeError, ValueError):
-+                    continue
-+                if project_id > 0:
-+                    project_ids.add(project_id)
-+            try:
-+                projects = ModpackDependencyResolver._retry(lambda: CurseForgeClient.get_projects_batch(project_ids)) if project_ids else {}
-+            except Exception as error:
-+                projects = {}
-+                metadata_warning = f"Could not refresh CurseForge project identities while reconciling pack-pinned dependencies: {error}"
-+            if projects:
-+                entries_by_identity.clear()
-+                for entry in entries:
-+                    try:
-+                        project_id = int(entry.get("projectId") or 0)
-+                    except (TypeError, ValueError):
-+                        project_id = 0
-+                    project = projects.get(project_id)
-+                    if project is not None:
-+                        project_name = str(getattr(project, "name", "") or "").strip()
-+                        project_slug = str(getattr(project, "slug", "") or "").strip().casefold()
-+                        if entry.get("projectName") != project_name:
-+                            entry["projectName"] = project_name
-+                            changed = True
-+                        if entry.get("projectSlug") != project_slug:
-+                            entry["projectSlug"] = project_slug
-+                            changed = True
-+                    ModpackDependencyResolver._index_curseforge_entry_identities(entries_by_identity, entry)
-+
-+        parents_by_id = {mod.mod_id.casefold(): mod for mod in mods if mod.enabled and mod.mod_id and mod.mod_id != "unknown"}
-+        added: list[str] = []
-+        warnings: list[str] = [metadata_warning] if metadata_warning else []
-+        processed: set[tuple[str, str]] = set()
-+        ModpackDependencyResolver._report(reporter, "Reconciling pack-pinned mod dependencies...", 0, max(1, len(issues)))
-+        for completed, issue in enumerate(issues, start=1):
-+            parent_id = str(issue.mod_ids[0]).strip().casefold()
-+            dependency_id = str(issue.mod_ids[1]).strip().casefold()
-+            key = (parent_id, dependency_id)
-+            if not dependency_id or key in processed:
-+                ModpackDependencyResolver._report(reporter, "Reconciling pack-pinned mod dependencies...", completed, max(1, len(issues)))
-+                continue
-+            processed.add(key)
-+            candidates = entries_by_identity.get(ModpackDependencyResolver._canonical_identity(dependency_id), [])
-+            if len(candidates) != 1:
-+                ModpackDependencyResolver._report(reporter, "Reconciling pack-pinned mod dependencies...", completed, max(1, len(issues)))
-+                continue
-+            entry = candidates[0]
-+            expected = list(dict.fromkeys(str(value).strip().casefold() for value in entry.get("expectedModIds", []) if str(value).strip()))
-+            if dependency_id not in expected:
-+                expected.append(dependency_id)
-+                entry["expectedModIds"] = expected
-+                changed = True
-+            parent = parents_by_id.get(parent_id)
-+            parent_label = parent.name if parent is not None else parent_id
-+            changed |= ModpackDependencyResolver._append_required_by(entry, parent_label)
-+
-+            target, _relative = CurseForgePackRegistry.managed_path(instance, str(entry.get("path") or ""), str(entry.get("fileName") or "dependency.jar"))
-+            provides_dependency = False
-+            if target.is_file():
-+                loader_name = str(ModLoaderManager.normalize(instance.mod_loader)[0]).strip().casefold()
-+                metadata = ModManager.read_mod(target, preferred_loader=loader_name, provider_version=str(entry.get("displayName") or ""))
-+                identities = {metadata.mod_id.casefold()} | {mod_id.casefold() for mod_id, _version in metadata.provided_mods if mod_id}
-+                provides_dependency = dependency_id in identities
-+            if not provides_dependency:
-+                before = (bool(entry.get("pendingDownload", False)), bool(entry.get("retryableDownload", True)), str(entry.get("lastDownloadError") or ""))
-+                entry["pendingDownload"] = True
-+                entry["retryableDownload"] = True
-+                entry["lastDownloadError"] = f"Pack-pinned dependency '{dependency_id}' is missing or does not provide the expected mod ID."
-+                changed |= before != (True, True, entry["lastDownloadError"])
-+                label = str(entry.get("projectName") or entry.get("displayName") or entry.get("fileName") or dependency_id).strip()
-+                added.append(label)
-+            ModpackDependencyResolver._report(reporter, "Reconciling pack-pinned mod dependencies...", completed, max(1, len(issues)))
-+
-+        if changed:
-+            registry["managedFiles"] = entries
-+            CurseForgePackRegistry.save(Path(instance.instance_dir), registry)
-+        return DependencyResolutionResult(tuple(dict.fromkeys(added)), tuple(dict.fromkeys(warnings)), ())
-+
-+    @staticmethod
-+    def _index_curseforge_entry_identities(index: dict[str, list[dict]], entry: dict) -> None:
-+        expected = entry.get("expectedModIds", [])
-+        if isinstance(expected, str):
-+            expected = [expected]
-+        identities = {
-+            ModpackDependencyResolver._canonical_identity(entry.get("projectName")),
-+            ModpackDependencyResolver._canonical_identity(entry.get("projectSlug")),
-+            ModpackDependencyResolver._canonical_identity(entry.get("displayName")),
-+        }
-+        if isinstance(expected, (list, tuple, set)):
-+            identities.update(ModpackDependencyResolver._canonical_identity(value) for value in expected if str(value).strip())
-+        for identity in identities:
-+            if identity and entry not in index.setdefault(identity, []):
-+                index[identity].append(entry)
- 
-     @staticmethod
-     def _resolve_curseforge(instance: Instance, registry: dict, reporter: ProgressReporter | None) -> DependencyResolutionResult:
-@@ -233,6 +390,7 @@
-         unresolved: list[str] = []
-         added: list[str] = []
-         changed = False
-+        installed_identities = ModpackDependencyResolver._installed_mod_identities(instance)
- 
-         unresolved_file_ids: list[int] = []
-         for entry in mod_entries:
-@@ -325,8 +483,14 @@
-                     project_name = str(getattr(project, "name", "") or dependency_file.display_name).strip()
-                     project_url = str(getattr(project, "project_url", "") or "").strip()
-                 except Exception:
-+                    project = None
-                     project_name = dependency_file.display_name
-                     project_url = ""
-+                project_identities = ModpackDependencyResolver._project_identities(project) if project is not None else {ModpackDependencyResolver._canonical_identity(project_name)}
-+                project_identities.discard("")
-+                if project_identities & installed_identities:
-+                    queue.append((dependency_file, depth + 1, project_name or dependency_file.file_name))
-+                    continue
-                 path = ModpackDependencyResolver._unique_mod_path(entries, dependency_file.file_name, str(dependency_file.project_id), dependency_file.sha1)
-                 target = {
-                     "projectId": dependency_file.project_id,
-@@ -353,6 +517,7 @@
-                 }
-                 entries.append(target)
-                 selected[dependency_file.project_id] = target
-+                installed_identities.update(project_identities)
-                 added.append(project_name or target["fileName"])
-                 discovered += 1
-                 changed = True
-@@ -363,6 +528,338 @@
-             registry["dependencyResolution"] = ModpackDependencyResolver._resolution_payload(added, unresolved)
-             CurseForgePackRegistry.save(Path(instance.instance_dir), registry)
-         return DependencyResolutionResult(tuple(added), tuple(warnings), tuple(unresolved))
-+
-+    @staticmethod
-+    def _resolve_cross_provider_missing(instance: Instance, reporter: ProgressReporter | None) -> DependencyResolutionResult:
-+        if not getattr(instance, "mod_loader", None) or not ModpackDependencyResolver._is_managed_modpack(instance):
-+            return DependencyResolutionResult()
-+        try:
-+            mods = ModManager.list_mods(instance)
-+        except (FileNotFoundError, OSError):
-+            return DependencyResolutionResult()
-+        report = ModCompatibilityManager.scan(instance, mods=mods)
-+        issues = [issue for issue in report.issues if issue.code == "dependency-missing" and len(issue.mod_ids) >= 2]
-+        if not issues:
-+            return DependencyResolutionResult()
-+
-+        enabled_by_id: dict[str, list] = {}
-+        for mod in mods:
-+            if mod.enabled:
-+                enabled_by_id.setdefault(mod.mod_id.casefold(), []).append(mod)
-+        provenance = ModProvenanceRegistry.entries_by_file(instance)
-+        registry = ModrinthRegistry.load(instance)
-+        registry_mods = registry.setdefault("mods", {})
-+        selected_projects = {str(project_id).strip() for project_id in registry_mods if str(project_id).strip()}
-+        pack_registry = ModrinthPackRegistry.load(instance)
-+        selected_projects.update(
-+            str(entry.get("projectId") or "").strip()
-+            for entry in pack_registry.get("managedFiles", [])
-+            if isinstance(entry, dict) and str(entry.get("projectId") or "").strip()
-+        )
-+        installed_identities = {
-+            ModpackDependencyResolver._canonical_identity(identity)
-+            for mod in mods
-+            if mod.enabled
-+            for identity in ([mod.mod_id] if mod.mod_id != "unknown" else []) + [mod_id for mod_id, _version in mod.provided_mods]
-+            if ModpackDependencyResolver._canonical_identity(identity)
-+        }
-+        added: list[str] = []
-+        warnings: list[str] = []
-+        changed = False
-+        processed: set[tuple[str, str]] = set()
-+
-+        ModpackDependencyResolver._report(reporter, "Resolving cross-provider mod dependencies...", 0, max(1, len(issues)))
-+        for completed, issue in enumerate(issues, start=1):
-+            parent_id = str(issue.mod_ids[0]).strip().casefold()
-+            dependency_id = str(issue.mod_ids[1]).strip().casefold()
-+            key = (parent_id, dependency_id)
-+            if not parent_id or not dependency_id or key in processed:
-+                ModpackDependencyResolver._report(reporter, "Resolving cross-provider mod dependencies...", completed, max(1, len(issues)))
-+                continue
-+            processed.add(key)
-+            parents = enabled_by_id.get(parent_id, [])
-+            for parent in parents:
-+                if not parent.managed_by_modpack or (parent.source_pack_provider or parent.source) != "curseforge":
-+                    continue
-+                source = provenance.get(parent.file_name.casefold(), {})
-+                sha1 = str(source.get("sha1") or "").strip().casefold() if isinstance(source, dict) else ""
-+                if not sha1:
-+                    sha1 = ModpackDependencyResolver._file_sha1(parent.path)
-+                if not sha1:
-+                    continue
-+                try:
-+                    mirror = ModpackDependencyResolver._retry(lambda sha1=sha1: ModrinthClient.get_version_from_hash(sha1, "sha1"))
-+                except Exception as error:
-+                    warnings.append(f"Could not enrich dependency metadata for {parent.name} through its exact file hash: {error}")
-+                    continue
-+                if mirror is None:
-+                    continue
-+                parent_label = parent.name or parent.file_name
-+                matched = False
-+                for dependency in mirror.dependencies:
-+                    if dependency.dependency_type != "required":
-+                        continue
-+                    try:
-+                        dependency_version = ModpackDependencyResolver._retry(
-+                            lambda dependency=dependency: ModrinthModInstaller._resolve_dependency(
-+                                dependency.version_id,
-+                                dependency.project_id,
-+                                instance.version_id,
-+                                str(ModLoaderManager.normalize(instance.mod_loader)[0]).strip().casefold(),
-+                                ("release", "beta", "alpha"),
-+                            )
-+                        )
-+                        if dependency_version is None:
-+                            continue
-+                        project = ModpackDependencyResolver._retry(lambda dependency_version=dependency_version: ModrinthClient.get_project(dependency_version.project_id))
-+                    except Exception as error:
-+                        warnings.append(f"Could not inspect a Modrinth mirror dependency for {parent_label}: {error}")
-+                        continue
-+                    if not ModpackDependencyResolver._project_matches_mod_id(project, dependency_id):
-+                        continue
-+                    matched = True
-+                    tree_result, tree_changed = ModpackDependencyResolver._append_modrinth_registry_tree(
-+                        instance=instance,
-+                        registry_mods=registry_mods,
-+                        selected_projects=selected_projects,
-+                        installed_identities=installed_identities,
-+                        root_version=dependency_version,
-+                        root_project=project,
-+                        parent_label=parent_label,
-+                        expected_mod_id=dependency_id,
-+                        pack_provider=parent.source_pack_provider or "curseforge",
-+                    )
-+                    added.extend(tree_result.added_files)
-+                    warnings.extend(tree_result.warnings)
-+                    changed |= tree_changed
-+                    break
-+                if matched:
-+                    break
-+            ModpackDependencyResolver._report(reporter, "Resolving cross-provider mod dependencies...", completed, max(1, len(issues)))
-+
-+        if changed:
-+            ModrinthRegistry.save(instance, registry)
-+        return DependencyResolutionResult(tuple(added), tuple(warnings), ())
-+
-+    @staticmethod
-+    def _append_modrinth_registry_tree(instance: Instance, registry_mods: dict, selected_projects: set[str], installed_identities: set[str], root_version: ModrinthVersion, root_project, parent_label: str, expected_mod_id: str, pack_provider: str) -> tuple[DependencyResolutionResult, bool]:
-+        queue: deque[tuple[ModrinthVersion, object, int, str, str]] = deque([(root_version, root_project, 0, parent_label, expected_mod_id)])
-+        visited: set[str] = set()
-+        added: list[str] = []
-+        warnings: list[str] = []
-+        changed = False
-+        discovered = 0
-+        loader_name = str(ModLoaderManager.normalize(instance.mod_loader)[0]).strip().casefold()
-+
-+        while queue:
-+            version, project, depth, required_by, expected_id = queue.popleft()
-+            if version.version_id in visited:
-+                continue
-+            visited.add(version.version_id)
-+            if depth > ModpackDependencyResolver.MAX_DEPTH:
-+                warnings.append(f"Cross-provider dependency depth exceeded {ModpackDependencyResolver.MAX_DEPTH} at {required_by}.")
-+                continue
-+            project_id = version.project_id
-+            identities = ModpackDependencyResolver._project_identities(project)
-+            already_installed = bool(identities & installed_identities)
-+            entry = registry_mods.get(project_id)
-+            if isinstance(entry, dict):
-+                changed |= ModpackDependencyResolver._mark_registry_dependency(entry, required_by, pack_provider, expected_id)
-+            elif project_id not in selected_projects and not already_installed:
-+                if discovered >= ModpackDependencyResolver.MAX_DEPENDENCIES:
-+                    warnings.append(f"The cross-provider dependency graph exceeds {ModpackDependencyResolver.MAX_DEPENDENCIES} added files.")
-+                    break
-+                try:
-+                    ModrinthModInstaller._validate_version(version, instance.version_id, loader_name)
-+                    file = version.primary_file(".jar")
-+                except Exception as error:
-+                    warnings.append(f"{required_by} dependency {project_id} is not installable: {error}")
-+                    continue
-+                title = str(getattr(project, "title", "") or file.filename).strip()
-+                entry = {
-+                    "projectId": project_id,
-+                    "versionId": version.version_id,
-+                    "versionNumber": version.version_number,
-+                    "versionType": version.version_type,
-+                    "fileName": file.filename,
-+                    "sha1": file.sha1,
-+                    "sha512": file.sha512,
-+                    "size": file.size,
-+                    "downloadUrls": [file.url] if file.url else [],
-+                    "title": title,
-+                    "datePublished": version.date_published,
-+                    "pendingDownload": True,
-+                    "locked": True,
-+                    "managedByModpack": True,
-+                    "selectionReason": "required_dependency",
-+                    "requiredBy": [required_by],
-+                    "packProvider": pack_provider,
-+                }
-+                if expected_id:
-+                    entry["expectedModId"] = expected_id
-+                registry_mods[project_id] = entry
-+                selected_projects.add(project_id)
-+                installed_identities.update(identities)
-+                added.append(title)
-+                discovered += 1
-+                changed = True
-+
-+            for dependency in version.dependencies:
-+                if dependency.dependency_type != "required":
-+                    continue
-+                try:
-+                    child_version = ModpackDependencyResolver._retry(
-+                        lambda dependency=dependency: ModrinthModInstaller._resolve_dependency(
-+                            dependency.version_id,
-+                            dependency.project_id,
-+                            instance.version_id,
-+                            loader_name,
-+                            ("release", "beta", "alpha"),
-+                        )
-+                    )
-+                    if child_version is None:
-+                        continue
-+                    child_project = ModpackDependencyResolver._retry(lambda child_version=child_version: ModrinthClient.get_project(child_version.project_id))
-+                except Exception as error:
-+                    warnings.append(f"Could not inspect required dependency metadata for {getattr(project, 'title', project_id)}: {error}")
-+                    continue
-+                queue.append((child_version, child_project, depth + 1, str(getattr(project, "title", "") or project_id), ""))
-+
-+        return DependencyResolutionResult(tuple(added), tuple(warnings), ()), changed
-+
-+    @staticmethod
-+    def _mark_registry_dependency(entry: dict, required_by: str, pack_provider: str, expected_mod_id: str = "") -> bool:
-+        before = dict(entry)
-+        entry["managedByModpack"] = True
-+        entry["selectionReason"] = "required_dependency"
-+        entry["packProvider"] = str(pack_provider or entry.get("packProvider") or "").strip().casefold()
-+        entry["locked"] = True
-+        if expected_mod_id:
-+            entry["expectedModId"] = expected_mod_id
-+        ModpackDependencyResolver._append_required_by(entry, required_by)
-+        return entry != before
-+
-+    @staticmethod
-+    def _project_identities(project) -> set[str]:
-+        return {
-+            identity
-+            for identity in (
-+                ModpackDependencyResolver._canonical_identity(getattr(project, "slug", "")),
-+                ModpackDependencyResolver._canonical_identity(getattr(project, "title", "")),
-+                ModpackDependencyResolver._canonical_identity(getattr(project, "name", "")),
-+            )
-+            if identity
-+        }
-+
-+    @staticmethod
-+    def _installed_mod_identities(instance: Instance) -> set[str]:
-+        try:
-+            mods = ModManager.list_mods(instance)
-+        except (AttributeError, FileNotFoundError, OSError):
-+            return set()
-+        return {
-+            identity
-+            for mod in mods
-+            if mod.enabled
-+            for raw in ([mod.mod_id] if mod.mod_id != "unknown" else []) + [mod_id for mod_id, _version in mod.provided_mods]
-+            if (identity := ModpackDependencyResolver._canonical_identity(raw))
-+        }
-+
-+    @staticmethod
-+    def _prune_redundant_embedded_dependencies(instance: Instance) -> tuple[str, ...]:
-+        try:
-+            mods = ModManager.list_mods(instance)
-+        except (AttributeError, FileNotFoundError, OSError):
-+            return ()
-+        embedded_providers: dict[str, list] = {}
-+        for mod in mods:
-+            if not mod.enabled:
-+                continue
-+            for mod_id, _version in mod.provided_mods:
-+                normalized = str(mod_id or "").strip().casefold()
-+                if normalized:
-+                    embedded_providers.setdefault(normalized, []).append(mod)
-+        if not embedded_providers:
-+            return ()
-+
-+        provenance = ModProvenanceRegistry.entries_by_file(instance)
-+        redundant = []
-+        for mod in mods:
-+            if not mod.enabled or mod.mod_id.casefold() not in embedded_providers:
-+                continue
-+            source = provenance.get(mod.file_name.casefold(), {})
-+            if not isinstance(source, dict) or str(source.get("selectionReason") or "").strip().casefold() != "required_dependency":
-+                continue
-+            providers = [provider for provider in embedded_providers[mod.mod_id.casefold()] if provider.path != mod.path]
-+            if providers:
-+                redundant.append((mod, providers[0]))
-+        if not redundant:
-+            return ()
-+
-+        mods_dir = ModManager.mods_dir(instance).resolve()
-+        messages: list[str] = []
-+        removed: list[tuple[object, object]] = []
-+        for mod, provider in redundant:
-+            try:
-+                candidate = mod.path.resolve()
-+                if candidate.parent != mods_dir:
-+                    continue
-+                candidate.unlink(missing_ok=True)
-+                removed.append((mod, provider))
-+                messages.append(f"Removed redundant standalone dependency {mod.name}; {provider.name} already provides mod ID '{mod.mod_id}'.")
-+            except OSError:
-+                continue
-+        if not removed:
-+            return ()
-+
-+        removed_names = [mod.file_name for mod, _provider in removed]
-+        filenames = {name.casefold() for name in removed_names}
-+        paths = {f"mods/{name}".replace("\\", "/").casefold() for name in removed_names}
-+
-+        modrinth_pack = ModrinthPackRegistry.load(instance)
-+        mr_entries = [entry for entry in modrinth_pack.get("managedFiles", []) if isinstance(entry, dict)]
-+        filtered_mr = [entry for entry in mr_entries if str(entry.get("fileName") or PurePosixPath(str(entry.get("path") or "")).name).casefold() not in filenames and str(entry.get("path") or "").replace("\\", "/").casefold() not in paths]
-+        if filtered_mr != mr_entries:
-+            modrinth_pack["managedFiles"] = filtered_mr
-+            modrinth_pack["verificationCache"] = ModrinthPackRegistry._normalize_verification_cache(modrinth_pack.get("verificationCache", {}), filtered_mr)
-+            ModrinthPackRegistry.save(instance.instance_dir, modrinth_pack)
-+
-+        curseforge_pack = CurseForgePackRegistry.load(Path(instance.instance_dir))
-+        cf_entries = [entry for entry in curseforge_pack.get("managedFiles", []) if isinstance(entry, dict)]
-+        filtered_cf = [entry for entry in cf_entries if str(entry.get("fileName") or PurePosixPath(str(entry.get("path") or "")).name).casefold() not in filenames and str(entry.get("path") or "").replace("\\", "/").casefold() not in paths]
-+        if filtered_cf != cf_entries:
-+            curseforge_pack["managedFiles"] = filtered_cf
-+            CurseForgePackRegistry.save(Path(instance.instance_dir), curseforge_pack)
-+
-+        direct_registry = ModrinthRegistry.load(instance)
-+        direct_mods = direct_registry.get("mods") if isinstance(direct_registry.get("mods"), dict) else {}
-+        filtered_direct = {project_id: entry for project_id, entry in direct_mods.items() if not isinstance(entry, dict) or str(entry.get("fileName") or "").casefold() not in filenames}
-+        if filtered_direct != direct_mods:
-+            direct_registry["mods"] = filtered_direct
-+            ModrinthRegistry.save(instance, direct_registry)
-+
-+        ModProvenanceRegistry.remove_by_filenames(instance, removed_names)
-+        return tuple(messages)
-+
-+    @staticmethod
-+    def _project_matches_mod_id(project, mod_id: str) -> bool:
-+        identity = ModpackDependencyResolver._canonical_identity(mod_id)
-+        return bool(identity and identity in ModpackDependencyResolver._project_identities(project))
-+
-+    @staticmethod
-+    def _canonical_identity(value: object) -> str:
-+        return "".join(character for character in str(value or "").casefold() if character.isalnum())
-+
-+    @staticmethod
-+    def _file_sha1(path: Path) -> str:
-+        try:
-+            digest = hashlib.sha1()
-+            with Path(path).open("rb") as stream:
-+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-+                    digest.update(chunk)
-+            return digest.hexdigest()
++            temporary.unlink(missing_ok=True)
 +        except OSError:
-+            return ""
++            pass
++        raise
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/src/core/fs/paths.py mcw-launcher-v1.3.2/src/core/fs/paths.py
+--- mcw-launcher-v1.3.2-base/src/core/fs/paths.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/src/core/fs/paths.py	2026-08-11 13:39:28.428994685 +0000
+@@ -181,11 +181,10 @@
  
      @staticmethod
-     def _modrinth_version_for_entry(entry: dict) -> ModrinthVersion | None:
---- a/src/core/modloader/forge/forge_version_manager.py
-+++ b/src/core/modloader/forge/forge_version_manager.py
-@@ -30,6 +30,13 @@
- 
- class ForgeVersionManager:
-     CACHE_SCHEMA_VERSION = 1
-+    LEGACY_NATIVE_PLATFORM_COORDINATES = frozenset({
-+        "org.lwjgl.lwjgl:lwjgl-platform",
-+        "net.java.jinput:jinput-platform",
-+        "tv.twitch:twitch-platform",
-+        "tv.twitch:twitch-external-platform",
-+    })
-+    SPURIOUS_NATIVE_PLATFORM_COORDINATES = frozenset({"net.java.dev.jna:jna-platform"})
-     _locks: dict[str, Lock] = {}
-     _guard = Lock()
- 
-@@ -55,6 +62,17 @@
-                     version = VersionManager._parse_version(cached, cache_path)
-                     if version is not None:
-                         return version
-+                repairable = ForgeVersionManager._load_structurally_valid_cache(cache_path, base_version.id, loader)
-+                if repairable is not None:
-+                    if reporter is not None:
-+                        reporter.status(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Refreshing cached Minecraft Forge {loader} metadata...")
-+                    refreshed = ForgeVersionManager._normalize_libraries(repairable, reporter)
-+                    ForgeVersionManager._write_json(cache_path, refreshed)
-+                    cached = ForgeVersionManager._load_cached(cache_path, base_version.id, loader)
-+                    if cached is not None:
-+                        version = VersionManager._parse_version(cached, cache_path)
-+                        if version is not None:
-+                            return version
-             if reporter is not None:
-                 reporter.status(stage=ProgressStage.INSTALLING_MOD_LOADER, message=f"Preparing Minecraft Forge {loader}...")
-             installer = ForgeVersionManager._download_installer(base_version.id, loader, reporter)
-@@ -68,6 +86,7 @@
-             ForgeVersionManager._import_libraries(staging, reporter)
-             normalized = ForgeVersionManager._normalize_libraries(profile, reporter)
-             merged = ForgeVersionManager._merge_profiles(base_version.raw_json, normalized, base_version.id, loader)
-+            merged = ForgeVersionManager._normalize_libraries(merged, reporter)
-             ForgeVersionManager._write_json(cache_path, merged)
-             version = VersionManager._parse_version(merged, cache_path)
-             if version is None:
-@@ -268,6 +287,8 @@
+     def cleanup_short_workspace(workspace: Path) -> None:
+-        path = Path(workspace)
+-        try:
+-            path.relative_to(Paths.short_workspace_root())
+-        except ValueError as error:
+-            raise ValueError(f"Refusing to clean a path outside the MCW short workspace root: {path}") from error
++        root = Paths.short_workspace_root().resolve(strict=False)
++        path = Path(workspace).resolve(strict=False)
++        if path == root or not path.is_relative_to(root):
++            raise ValueError(f"Refusing to clean a path outside the MCW short workspace root: {path}")
+         shutil.rmtree(path, ignore_errors=True)
  
      @staticmethod
-     def _normalize_windows_native(item: dict, coordinate: str, repository: str, downloads: dict, reporter: ProgressReporter | None) -> None:
-+        if ForgeVersionManager._remove_spurious_native_platform_metadata(item, coordinate, downloads):
-+            return
-         natives = deepcopy(item.get("natives")) if isinstance(item.get("natives"), dict) else {}
-         classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
-         if not classifier and ForgeVersionManager._is_legacy_native_platform_coordinate(coordinate):
-@@ -314,9 +335,50 @@
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/src/core/instance/instance_manager.py mcw-launcher-v1.3.2/src/core/instance/instance_manager.py
+--- mcw-launcher-v1.3.2-base/src/core/instance/instance_manager.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/src/core/instance/instance_manager.py	2026-08-11 13:39:08.690575887 +0000
+@@ -4,6 +4,7 @@
+ from src.models.instance.settings import InstanceSettings
+ from src.models.package.instance_package_preview import InstancePackagePreview
+ from src.core.config.launcher_settings_manager import LauncherSettingsManager
++from src.core.fs.atomic_file import atomic_write_text
+ from src.core.fs.paths import Paths
+ from src.core.instance.settings_manager import SettingsManager
+ from src.core.instance.instance_deletion_manager import InstanceDeletionManager
+@@ -94,12 +95,7 @@
+             "metadata_version": InstanceManager.METADATA_VERSION,
+         })
+ 
+-        temporary = path.with_name(f"{path.name}.tmp")
+-        with temporary.open("w", encoding="utf-8", newline="\n") as file:
+-            file.write(json.dumps(data, indent=4, ensure_ascii=False) + "\n")
+-            file.flush()
+-            os.fsync(file.fileno())
+-        temporary.replace(path)
++        atomic_write_text(path, json.dumps(data, indent=4, ensure_ascii=False) + "\n")
  
      @staticmethod
-     def _is_legacy_native_platform_coordinate(coordinate: str) -> bool:
--        parts = str(coordinate).split(":")
--        artifact = parts[1].strip().casefold() if len(parts) >= 2 else ""
--        return artifact.endswith("-platform")
-+        return ForgeVersionManager._coordinate_key(coordinate) in ForgeVersionManager.LEGACY_NATIVE_PLATFORM_COORDINATES
-+
-+    @staticmethod
-+    def _remove_spurious_native_platform_metadata(item: dict, coordinate: str, downloads: dict) -> bool:
-+        if ForgeVersionManager._coordinate_key(coordinate) not in ForgeVersionManager.SPURIOUS_NATIVE_PLATFORM_COORDINATES:
-+            return False
-+        natives = deepcopy(item.get("natives")) if isinstance(item.get("natives"), dict) else {}
-+        classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
-+        if classifier != "natives-windows":
-+            return False
-+        classifiers = deepcopy(downloads.get("classifiers")) if isinstance(downloads.get("classifiers"), dict) else {}
-+        current = classifiers.get(classifier) if isinstance(classifiers.get(classifier), dict) else None
-+        if ForgeVersionManager._download_entry_is_complete(current):
-+            return False
-+        natives.pop("windows", None)
-+        if natives:
-+            item["natives"] = natives
-+        else:
-+            item.pop("natives", None)
-+        classifiers.pop(classifier, None)
-+        if classifiers:
-+            downloads["classifiers"] = classifiers
-+        else:
-+            downloads.pop("classifiers", None)
-+        return True
-+
-+    @staticmethod
-+    def _has_spurious_native_platform_metadata(item: dict, coordinate: str, downloads: dict) -> bool:
-+        if ForgeVersionManager._coordinate_key(coordinate) not in ForgeVersionManager.SPURIOUS_NATIVE_PLATFORM_COORDINATES:
-+            return False
-+        natives = item.get("natives") if isinstance(item.get("natives"), dict) else {}
-+        classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
-+        if classifier != "natives-windows":
-+            return False
-+        classifiers = downloads.get("classifiers") if isinstance(downloads.get("classifiers"), dict) else {}
-+        current = classifiers.get(classifier) if isinstance(classifiers.get(classifier), dict) else None
-+        return not ForgeVersionManager._download_entry_is_complete(current)
-+
-+    @staticmethod
-+    def _coordinate_key(coordinate: str) -> str:
-+        parts = str(coordinate).strip().split(":")
-+        if len(parts) < 2:
-+            return ""
-+        return f"{parts[0].strip().casefold()}:{parts[1].strip().casefold()}"
+     def _update_instance_metadata_fields(instance: Instance, updates: dict) -> None:
+@@ -112,12 +108,7 @@
+             raise RuntimeError(f"Invalid instance metadata: {path}")
+         data.update(dict(updates))
+         data["updated_at"] = datetime.now(timezone.utc).isoformat()
+-        temporary = path.with_name(f"{path.name}.tmp")
+-        with temporary.open("w", encoding="utf-8", newline="\n") as file:
+-            file.write(json.dumps(data, indent=4, ensure_ascii=False) + "\n")
+-            file.flush()
+-            os.fsync(file.fileno())
+-        temporary.replace(path)
++        atomic_write_text(path, json.dumps(data, indent=4, ensure_ascii=False) + "\n")
  
      @staticmethod
-     def _maven_path(coordinate: str, classifier: str | None = None) -> Path:
-@@ -393,6 +455,17 @@
+     def _load_instance_metadata(path: Path) -> Instance:
+@@ -936,14 +927,5 @@
+     def _save_instances(data: dict) -> Path:
+         instance_data_path = Paths.instance_data_path()
+         instance_data_path.parent.mkdir(parents=True, exist_ok=True)
+-        temporary = instance_data_path.with_name(f"{instance_data_path.name}.tmp")
+-        try:
+-            with temporary.open("w", encoding="utf-8", newline="\n") as file:
+-                file.write(json.dumps(data, indent=4, ensure_ascii=False) + "\n")
+-                file.flush()
+-                os.fsync(file.fileno())
+-            temporary.replace(instance_data_path)
+-        except Exception:
+-            temporary.unlink(missing_ok=True)
+-            raise
++        atomic_write_text(instance_data_path, json.dumps(data, indent=4, ensure_ascii=False) + "\n")
+         return instance_data_path
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/src/core/minecraft/version_manifest_manager.py mcw-launcher-v1.3.2/src/core/minecraft/version_manifest_manager.py
+--- mcw-launcher-v1.3.2-base/src/core/minecraft/version_manifest_manager.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/src/core/minecraft/version_manifest_manager.py	2026-08-11 13:39:08.689841385 +0000
+@@ -3,10 +3,9 @@
+ from datetime import datetime
+ from pathlib import Path
+ import json
+-import os
+-
+ import requests
  
-     @staticmethod
-     def _load_cached(path: Path, game_version: str, forge_version: str) -> dict | None:
-+        data = ForgeVersionManager._load_structurally_valid_cache(path, game_version, forge_version)
-+        if data is None:
-+            return None
-+        if not ForgeVersionManager._legacy_launchwrapper_cache_is_complete(data):
-+            return None
-+        if not ForgeVersionManager._windows_native_cache_is_complete(data):
-+            return None
-+        return data
-+
-+    @staticmethod
-+    def _load_structurally_valid_cache(path: Path, game_version: str, forge_version: str) -> dict | None:
++from src.core.fs.atomic_file import atomic_write_text
+ from src.core.fs.paths import Paths
+ from src.models.minecraft.version_manifest import VersionManifest
+ 
+@@ -25,8 +24,6 @@
+     def _download_manifest() -> Path | None:
+         manifest_path = Paths.version_manifest()
+         manifest_path.parent.mkdir(exist_ok=True, parents=True)
+-        temporary_path = manifest_path.with_name(f"{manifest_path.name}.tmp")
+-
          try:
-             data = json.loads(path.read_text(encoding="utf-8"))
-         except (FileNotFoundError, OSError, json.JSONDecodeError):
-@@ -402,10 +475,6 @@
-             return None
-         if not data.get("mainClass") or not data.get("libraries"):
-             return None
--        if not ForgeVersionManager._legacy_launchwrapper_cache_is_complete(data):
--            return None
--        if not ForgeVersionManager._windows_native_cache_is_complete(data):
--            return None
-         return data
+             response = requests.get(MANIFEST_URL, timeout=10)
+             raise_for_status = getattr(response, "raise_for_status", None)
+@@ -38,14 +35,9 @@
+             if not isinstance(payload, dict) or not isinstance(payload.get("versions"), list):
+                 raise ValueError("Mojang returned an invalid version manifest.")
+ 
+-            with temporary_path.open("w", encoding="utf-8", newline="\n") as file:
+-                file.write(response_text)
+-                file.flush()
+-                os.fsync(file.fileno())
+-            temporary_path.replace(manifest_path)
++            atomic_write_text(manifest_path, response_text)
+             return manifest_path
+         except (requests.RequestException, OSError, UnicodeError, json.JSONDecodeError, ValueError):
+-            temporary_path.unlink(missing_ok=True)
+             return manifest_path if manifest_path.is_file() else None
  
      @staticmethod
-@@ -427,13 +496,16 @@
-         for item in libraries:
-             if not isinstance(item, dict) or not LibraryRuleManager.is_allowed(item):
-                 continue
-+            coordinate = str(item.get("name") or "")
-+            downloads = item.get("downloads") if isinstance(item.get("downloads"), dict) else {}
-+            if ForgeVersionManager._has_spurious_native_platform_metadata(item, coordinate, downloads):
-+                return False
-             natives = item.get("natives") if isinstance(item.get("natives"), dict) else {}
-             classifier = str(natives.get("windows") or "").replace("${arch}", "64").strip()
-             if not classifier and ForgeVersionManager._is_legacy_native_platform_coordinate(str(item.get("name") or "")):
-                 classifier = "natives-windows"
-             if not classifier:
-                 continue
--            downloads = item.get("downloads") if isinstance(item.get("downloads"), dict) else {}
-             classifiers = downloads.get("classifiers") if isinstance(downloads.get("classifiers"), dict) else {}
-             entry = classifiers.get(classifier) if isinstance(classifiers.get(classifier), dict) else None
-             if not ForgeVersionManager._download_entry_is_complete(entry):
---- a/src/core/modrinth/modrinth_content_manager.py
-+++ b/src/core/modrinth/modrinth_content_manager.py
-@@ -288,6 +288,18 @@
-                     version_id=version_id,
-                 )
-                 metadata = ModManager.read_mod(downloaded_path, provider_version=str(entry.get("versionNumber") or ""))
-+                expected_mod_id = str(entry.get("expectedModId") or "").strip().casefold()
-+                provided_mod_ids = {metadata.mod_id.casefold()} | {mod_id.casefold() for mod_id, _version in getattr(metadata, "provided_mods", ()) if mod_id}
-+                if expected_mod_id and expected_mod_id not in provided_mod_ids:
-+                    provided_values = sorted(value for value in provided_mod_ids if value)
-+                    if len(provided_values) == 1:
-+                        provided_label = f"mod ID '{provided_values[0]}'"
-+                    else:
-+                        provided_label = f"mod IDs '{', '.join(provided_values) or 'unknown'}'"
-+                    raise RuntimeError(
-+                        f"Downloaded Modrinth project '{project_id}' provides {provided_label}, "
-+                        f"but dependency metadata requires '{expected_mod_id}'."
-+                    )
-                 if launch_lock_token is None:
-                     added = ModManager.add_mods(instance, [downloaded_path], replace=True)
-                 else:
---- a/src/models/mod/mod_info.py
-+++ b/src/models/mod/mod_info.py
-@@ -29,3 +29,4 @@
-     source_file_id: str = ""
-     managed_by_modpack: bool = False
-     source_pack_provider: str = ""
-+    provided_mods: tuple[tuple[str, str], ...] = ()
---- a/test/core/config/test_version_metadata.py
-+++ b/test/core/config/test_version_metadata.py
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/src/core/package/modpack_package_manager.py mcw-launcher-v1.3.2/src/core/package/modpack_package_manager.py
+--- mcw-launcher-v1.3.2-base/src/core/package/modpack_package_manager.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/src/core/package/modpack_package_manager.py	2026-08-11 13:41:33.676018599 +0000
+@@ -1062,13 +1062,10 @@
+ 
+     @staticmethod
+     def _safe_relative(value: str) -> PurePosixPath | None:
+-        normalized = str(value or "").replace("\\", "/").strip().strip("/")
+-        path = PurePosixPath(normalized)
+-        if not normalized or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
++        try:
++            return PackageManager._safe_relative_path(str(value or ""))
++        except RuntimeError:
+             return None
+-        if not path.parts or ":" in path.parts[0]:
+-            return None
+-        return path
+ 
+     @staticmethod
+     def _read_json(archive: ZipFile, name: str) -> dict:
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/src/core/theme/theme_authoring.py mcw-launcher-v1.3.2/src/core/theme/theme_authoring.py
+--- mcw-launcher-v1.3.2-base/src/core/theme/theme_authoring.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/src/core/theme/theme_authoring.py	2026-08-11 13:41:33.676244893 +0000
+@@ -4,6 +4,7 @@
+ from pathlib import Path, PurePosixPath
+ import shutil
+ import tempfile
++from uuid import uuid4
+ import zipfile
+ 
+ from src.core.theme.theme_contract import MAX_THEME_ARCHIVE_BYTES, MAX_THEME_ARCHIVE_FILES, THEME_ID_PATTERN
+@@ -110,12 +111,21 @@
+             normalized_id = self._normalize_theme_id(report.theme_id)
+             destination = (self.manager.root / normalized_id).resolve()
+             self._ensure_inside_root(destination)
++            backup: Path | None = None
+             if destination.exists():
+                 if not overwrite:
+                     raise ThemeAuthoringError(f"Theme already exists: {normalized_id}", "THEME_IMPORT_ALREADY_EXISTS")
+-                shutil.rmtree(destination)
+-            staging_root.replace(destination)
++                backup = self.manager.root / f".theme-backup-{normalized_id}-{uuid4().hex}"
++                destination.replace(backup)
++            try:
++                staging_root.replace(destination)
++            except OSError:
++                if backup is not None and backup.exists() and not destination.exists():
++                    backup.replace(destination)
++                raise
+             staging_root = None
++            if backup is not None:
++                shutil.rmtree(backup, ignore_errors=True)
+             self.manager.reload()
+             return self._require_theme(normalized_id)
+         except ThemePackageError as error:
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/src/core/update/github_release_client.py mcw-launcher-v1.3.2/src/core/update/github_release_client.py
+--- mcw-launcher-v1.3.2-base/src/core/update/github_release_client.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/src/core/update/github_release_client.py	2026-08-11 13:41:12.867143024 +0000
+@@ -2,10 +2,10 @@
+ 
+ from datetime import datetime, timezone
+ import json
+-import os
+ from pathlib import Path
+ from typing import Any
+ 
++from src.core.fs.atomic_file import atomic_write_text
+ from src.core.fs.paths import Paths
+ from src.core.network.httpx_downloader import HttpDownloader
+ from src.core.update.versioning import LauncherVersion
+@@ -140,13 +140,26 @@
+             return None
+ 
+         raw_asset = max(scored, key=lambda item: item[0])[1]
++        asset_name = str(raw_asset.get("name") or "update.zip")
+         digest = str(raw_asset.get("digest") or "").strip().lower()
+         sha256 = digest.removeprefix("sha256:") if digest.startswith("sha256:") and len(digest) == 71 else None
++        sidecar_name = f"{asset_name}.sha256".casefold()
++        sha256_url = None
++        for candidate in raw_assets:
++            if not isinstance(candidate, dict):
++                continue
++            if str(candidate.get("name") or "").strip().casefold() != sidecar_name:
++                continue
++            candidate_url = str(candidate.get("browser_download_url") or "").strip()
++            if candidate_url.startswith("https://"):
++                sha256_url = candidate_url
++                break
+         return ReleaseAsset(
+-            name=str(raw_asset.get("name") or "update.zip"),
++            name=asset_name,
+             download_url=str(raw_asset.get("browser_download_url") or ""),
+             size=max(0, int(raw_asset.get("size") or 0)),
+             sha256=sha256,
++            sha256_url=sha256_url,
+         )
+ 
+     def _read_cache(self) -> dict[str, Any] | None:
+@@ -162,19 +175,13 @@
+ 
+     def _write_cache(self, releases: list[dict[str, Any]]) -> None:
+         self.cache_path.parent.mkdir(parents=True, exist_ok=True)
+-        temporary_path = self.cache_path.with_name(f"{self.cache_path.name}.tmp")
+         payload = {
+             "schema_version": self.CACHE_SCHEMA_VERSION,
+             "repository": self.repository,
+             "fetched_at": datetime.now(timezone.utc).isoformat(),
+             "releases": releases,
+         }
+-        with temporary_path.open("w", encoding="utf-8", newline="\n") as file:
+-            json.dump(payload, file, ensure_ascii=False, indent=2)
+-            file.write("\n")
+-            file.flush()
+-            os.fsync(file.fileno())
+-        temporary_path.replace(self.cache_path)
++        atomic_write_text(self.cache_path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+ 
+     def _cache_expired(self, payload: dict[str, Any]) -> bool:
+         fetched_at = payload.get("fetched_at")
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/src/core/update/update_applier.py mcw-launcher-v1.3.2/src/core/update/update_applier.py
+--- mcw-launcher-v1.3.2-base/src/core/update/update_applier.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/src/core/update/update_applier.py	2026-08-11 13:42:16.859928332 +0000
+@@ -5,7 +5,7 @@
+ import ctypes
+ import json
+ import os
+-from pathlib import Path
++from pathlib import Path, PurePosixPath
+ import shutil
+ import subprocess
+ import sys
+@@ -67,6 +67,7 @@
+         self.backup_directory = request.updater_directory / "backup"
+         self.temporary_log_path = request.updater_directory / "update.log"
+         self.new_files: list[Path] = []
++        self.stale_files = self._stale_managed_files()
+ 
+     def run(self) -> int:
+         try:
+@@ -77,6 +78,7 @@
+ 
+             self._backup_existing_files()
+             self._copy_update_files()
++            self._remove_stale_files()
+             self._verify_updated_executable()
+             self._start_launcher()
+             self._log(f"Update to {self.request.target_version} completed")
+@@ -101,14 +103,14 @@
+ 
+     def _backup_existing_files(self) -> None:
+         self._log("Creating rollback backup")
+-        for source_path in self._iter_source_files():
+-            relative_path = source_path.relative_to(self.request.source_directory)
++        source_relative = {path.relative_to(self.request.source_directory) for path in self._iter_source_files()}
++        for relative_path in sorted(source_relative | set(self.stale_files), key=lambda path: str(path).casefold()):
+             destination_path = self.request.destination_directory / relative_path
+             if destination_path.is_file():
+                 backup_path = self.backup_directory / relative_path
+                 backup_path.parent.mkdir(parents=True, exist_ok=True)
+                 shutil.copy2(destination_path, backup_path)
+-            elif not destination_path.exists():
++            elif relative_path in source_relative and not destination_path.exists():
+                 self.new_files.append(destination_path)
+ 
+     def _copy_update_files(self) -> None:
+@@ -119,6 +121,42 @@
+             destination_path.parent.mkdir(parents=True, exist_ok=True)
+             self._copy_with_retry(source_path, destination_path)
+ 
++    def _remove_stale_files(self) -> None:
++        for relative_path in self.stale_files:
++            target = self.request.destination_directory / relative_path
++            try:
++                target.unlink(missing_ok=True)
++            except OSError as error:
++                raise RuntimeError(f"Could not remove obsolete launcher file {target}: {error}") from error
++
++    def _stale_managed_files(self) -> list[Path]:
++        previous = self._managed_files(self.request.destination_directory)
++        incoming = self._managed_files(self.request.source_directory)
++        if not previous or not incoming:
++            return []
++        return sorted((Path(*path.parts) for path in previous.difference(incoming)), key=lambda path: str(path).casefold())
++
++    @staticmethod
++    def _managed_files(root: Path) -> set[PurePosixPath]:
++        manifest_path = Path(root) / "mcw-update.json"
++        try:
++            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
++        except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError):
++            return set()
++        values = payload.get("files") if isinstance(payload, dict) else None
++        if not isinstance(values, list):
++            return set()
++        managed: set[PurePosixPath] = set()
++        for raw in values:
++            normalized = str(raw or "").replace("\\", "/").strip()
++            path = PurePosixPath(normalized)
++            if not normalized or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
++                return set()
++            if not path.parts or ":" in path.parts[0]:
++                return set()
++            managed.add(path)
++        return managed
++
+     def _restore_backup(self) -> None:
+         self._log("Restoring files after update failure")
+         for path in reversed(self.new_files):
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/src/core/update/update_manager.py mcw-launcher-v1.3.2/src/core/update/update_manager.py
+--- mcw-launcher-v1.3.2-base/src/core/update/update_manager.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/src/core/update/update_manager.py	2026-08-11 13:42:52.882187483 +0000
+@@ -60,7 +60,7 @@
+     def _validate_package_manifest(cls, content_directory: Path, info: UpdateInfo) -> None:
+         manifest_path = content_directory / cls.PACKAGE_MANIFEST_NAME
+         if not manifest_path.is_file():
+-            return
++            raise RuntimeError(f"The update package is missing {cls.PACKAGE_MANIFEST_NAME}.")
+         try:
+             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+         except (OSError, UnicodeError, json.JSONDecodeError) as error:
+@@ -84,10 +84,26 @@
+             raise RuntimeError("The update package manifest contains an invalid executable name.")
+         if not (content_directory / executable_name).is_file():
+             raise RuntimeError(f"The update package does not contain the declared executable: {executable_name}")
++        managed_files = payload.get("files")
++        if not isinstance(managed_files, list) or not managed_files:
++            raise RuntimeError("The update package manifest does not declare its managed files.")
++        normalized_files: set[str] = set()
++        for raw_path in managed_files:
++            relative = cls._safe_archive_path(str(raw_path or ""))
++            if relative is None:
++                raise RuntimeError("The update package manifest contains an invalid managed file path.")
++            normalized = relative.as_posix()
++            if normalized.casefold() in {value.casefold() for value in normalized_files}:
++                raise RuntimeError(f"The update package manifest contains a duplicate managed file path: {normalized}")
++            normalized_files.add(normalized)
++            if not (content_directory / Path(*relative.parts)).is_file():
++                raise RuntimeError(f"The update package is missing a managed file: {normalized}")
++        if cls.PACKAGE_MANIFEST_NAME not in normalized_files:
++            raise RuntimeError(f"The update package manifest must list {cls.PACKAGE_MANIFEST_NAME} as a managed file.")
+ 
+     def _download_archive(self, info: UpdateInfo, archive_path: Path, reporter: ProgressReporter | None = None, max_retry: int = 3) -> None:
+-        expected_sha256 = str(info.asset.sha256 or "").strip().lower()
+-        if archive_path.is_file() and self._archive_matches(archive_path, info.asset.size, expected_sha256 or None):
++        expected_sha256 = self._resolve_expected_sha256(info)
++        if archive_path.is_file() and self._archive_matches(archive_path, info.asset.size, expected_sha256):
+             size = info.asset.size if info.asset.size > 0 else archive_path.stat().st_size
+             if reporter is not None:
+                 reporter.bytes(stage=ProgressStage.DOWNLOADING_UPDATE, message="Using cached launcher update...", current=size, total=size)
+@@ -97,13 +113,13 @@
+             urls=(info.asset.download_url,),
+             destination=archive_path,
+             expected_size=max(0, int(info.asset.size or 0)),
+-            hashes={"sha256": expected_sha256} if expected_sha256 else {},
++            hashes={"sha256": expected_sha256},
+             source="launcher_update",
+             display_name=info.asset.name or archive_path.name,
+             max_attempts=max_retry,
+             timeout=httpx.Timeout(connect=20.0, read=120.0, write=30.0, pool=30.0),
+             headers={"User-Agent": f"mahiru7229/mcw-launcher/{info.current_version}"},
+-            allow_unverified=not bool(expected_sha256),
++            allow_unverified=False,
+             max_bytes=self.MAX_ARCHIVE_BYTES,
+             operation_id=f"launcher-update:{info.version}",
+         )
+@@ -114,10 +130,39 @@
+             progress_message=f"Downloading launcher update {info.version}...",
+             client_provider=HttpDownloader.get_client,
+         )
+-        if not self._archive_matches(archive_path, info.asset.size, expected_sha256 or None):
++        if not self._archive_matches(archive_path, info.asset.size, expected_sha256):
+             archive_path.unlink(missing_ok=True)
+             raise RuntimeError("The downloaded launcher update archive failed validation.")
+ 
++
++    @staticmethod
++    def _valid_sha256(value: str) -> bool:
++        normalized = str(value or "").strip().casefold()
++        return len(normalized) == 64 and all(character in "0123456789abcdef" for character in normalized)
++
++    def _resolve_expected_sha256(self, info: UpdateInfo) -> str:
++        direct = str(info.asset.sha256 or "").strip().casefold()
++        if self._valid_sha256(direct):
++            return direct
++
++        checksum_url = str(info.asset.sha256_url or "").strip()
++        if not checksum_url.startswith("https://"):
++            raise RuntimeError("Automatic launcher updates require a trusted SHA-256 digest or .sha256 release asset.")
++
++        response = HttpDownloader.get_client().get(
++            checksum_url,
++            headers={"User-Agent": f"mahiru7229/mcw-launcher/{info.current_version}"},
++            timeout=15.0,
++        )
++        response.raise_for_status()
++        if len(response.content) > 4096:
++            raise RuntimeError("The launcher update checksum file is unexpectedly large.")
++        first_line = response.text.lstrip("\ufeff").strip().splitlines()[0] if response.text.strip() else ""
++        candidate = first_line.split()[0].strip().casefold() if first_line else ""
++        if not self._valid_sha256(candidate):
++            raise RuntimeError("The launcher update checksum file does not contain a valid SHA-256 digest.")
++        return candidate
++
+     @staticmethod
+     def _response_size(response: httpx.Response) -> int:
+         try:
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/src/models/update/update_info.py mcw-launcher-v1.3.2/src/models/update/update_info.py
+--- mcw-launcher-v1.3.2-base/src/models/update/update_info.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/src/models/update/update_info.py	2026-08-11 13:41:12.866848843 +0000
+@@ -10,6 +10,7 @@
+     download_url: str
+     size: int
+     sha256: str | None = None
++    sha256_url: str | None = None
+ 
+ 
+ @dataclass(frozen=True, slots=True)
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/test/core/config/test_version_metadata.py mcw-launcher-v1.3.2/test/core/config/test_version_metadata.py
+--- mcw-launcher-v1.3.2-base/test/core/config/test_version_metadata.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/test/core/config/test_version_metadata.py	2026-08-11 13:46:06.402698023 +0000
 @@ -6,9 +6,9 @@
  
  
  def test_launcher_version_metadata_has_one_source_of_truth() -> None:
--    assert VERSION == "v1.1.1-beta.5"
--    assert VERSION_ID == "1.1.1-beta.5"
--    assert VERSION_TAG == "v1.1.1-beta.5"
-+    assert VERSION == "v1.1.1-beta.6"
-+    assert VERSION_ID == "1.1.1-beta.6"
-+    assert VERSION_TAG == "v1.1.1-beta.6"
-     assert UPDATE_CHANNEL == "beta"
+-    assert VERSION == "v1.3.1"
+-    assert VERSION_ID == "1.3.1"
+-    assert VERSION_TAG == "v1.3.1"
++    assert VERSION == "v1.3.2"
++    assert VERSION_ID == "1.3.2"
++    assert VERSION_TAG == "v1.3.2"
+     assert UPDATE_CHANNEL == "stable"
      assert GUI_VERSION == VERSION
      assert GUI_VERSION_ID == VERSION_ID
---- a/test/core/mod/test_mod_compatibility_manager.py
-+++ b/test/core/mod/test_mod_compatibility_manager.py
-@@ -2,9 +2,12 @@
- import json
- import zipfile
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/test/core/fs_test_short_workspaces.py mcw-launcher-v1.3.2/test/core/fs_test_short_workspaces.py
+--- mcw-launcher-v1.3.2-base/test/core/fs_test_short_workspaces.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/test/core/fs_test_short_workspaces.py	1970-01-01 00:00:00.000000000 +0000
+@@ -1,49 +0,0 @@
+-from pathlib import Path
+-
+-from src.core.fs.paths import Paths
+-
+-
+-def test_short_workspace_uses_readable_three_character_prefix(monkeypatch, tmp_path: Path) -> None:
+-    root = tmp_path / "short"
+-    monkeypatch.setattr(Paths, "SHORT_WORKSPACE_ROOT", root)
+-
+-    workspace = Paths.create_short_workspace("jvm")
+-
+-    assert workspace.parent == root / "jvm"
+-    assert len(workspace.name) == 8
+-    assert workspace.is_dir()
+-
+-    Paths.cleanup_short_workspace(workspace)
+-    assert not workspace.exists()
+-
+-
+-def test_loader_and_modrinth_staging_use_short_workspace_root(monkeypatch, tmp_path: Path) -> None:
+-    root = tmp_path / "short"
+-    monkeypatch.setattr(Paths, "SHORT_WORKSPACE_ROOT", root)
+-    monkeypatch.setattr(Paths, "CACHE_ROOT", tmp_path / ("very-long-launcher-root-" * 8) / "cache")
+-
+-    forge = Paths.forge_staging_dir("1.20.1", "47.4.21")
+-    neoforge = Paths.neoforge_staging_dir("1.21.1", "21.1.200")
+-    modrinth = Paths.modrinth_staging_root()
+-
+-    assert forge.parent == root / "frg"
+-    assert neoforge.parent == root / "neo"
+-    assert modrinth == root / "mrd"
+-    assert len(str(forge)) < len(str(Paths.CACHE_ROOT / "modloaders" / "forge" / "staging" / "1.20.1-47.4.21"))
+-
+-
+-def test_diagnostic_long_paths_fit_inside_short_workspace() -> None:
+-    long_root = Path(r"C:\Users\Administrator\Downloads\MCW-Launcher-v1.3.0-windows-x64\MCW-Launcher-v1.3.0-windows-x64")
+-    short_root = Path(r"C:\Users\Administrator\AppData\Local\MCW\t")
+-    java_relative = Path(r"jdk8u502-b07\sample\jmx\jmx-scandir\src\com\sun\jmx\examples\scandir\config\DirectoryScannerConfig.java")
+-    modrinth_relative = Path(r"config\modpack_defaults\config\crash_assistant\crash_assistant_localization_overrides\zlm_arab.json")
+-
+-    old_java = long_root / "runtimes" / (".java-8.installing-" + "3" * 32) / java_relative
+-    new_java = short_root / "jvm" / "a31f42c0" / java_relative
+-    old_modrinth = long_root / "cache" / "content" / "modrinth" / "staging" / ("b" * 32) / modrinth_relative
+-    new_modrinth = short_root / "mrd" / "b0f92b34" / modrinth_relative
+-
+-    assert len(str(old_java)) >= 260
+-    assert len(str(old_modrinth)) >= 260
+-    assert len(str(new_java)) < 260
+-    assert len(str(new_modrinth)) < 260
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/test/core/minecraft/test_version_manifest_manager.py mcw-launcher-v1.3.2/test/core/minecraft/test_version_manifest_manager.py
+--- mcw-launcher-v1.3.2-base/test/core/minecraft/test_version_manifest_manager.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/test/core/minecraft/test_version_manifest_manager.py	2026-08-11 13:43:36.165197471 +0000
+@@ -473,3 +473,45 @@
  
-+import pytest
+     assert VersionManifestManager._download_manifest() == manifest_path
+     assert manifest_path.read_text(encoding="utf-8") == cached_text
 +
- from src.core.instance.instance_run_lock import InstanceRunLock
- from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
- from src.models.instance.instance import Instance
-+from src.models.mod.mod_info import ModInfo
++
++def test_download_manifest_falls_back_to_existing_cache_when_atomic_publish_is_locked(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
++    manifest_path = tmp_path / "manifest.json"
++    cached = json.dumps(make_manifest_data())
++    manifest_path.write_text(cached, encoding="utf-8")
++    monkeypatch.setattr(Paths, "version_manifest", lambda: manifest_path)
++    monkeypatch.setattr(
++        requests,
++        "get",
++        lambda url, timeout: SimpleNamespace(text=json.dumps(make_manifest_data()), raise_for_status=lambda: None),
++    )
++    monkeypatch.setattr(
++        "src.core.minecraft.version_manifest_manager.atomic_write_text",
++        lambda *_args, **_kwargs: (_ for _ in ()).throw(PermissionError("sharing violation")),
++    )
++
++    assert VersionManifestManager._download_manifest() == manifest_path
++    assert manifest_path.read_text(encoding="utf-8") == cached
++
++
++def test_concurrent_manifest_refreshes_use_independent_temporary_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
++    from concurrent.futures import ThreadPoolExecutor
++    from threading import Barrier
++
++    manifest_path = tmp_path / "manifest.json"
++    payload = json.dumps(make_manifest_data())
++    barrier = Barrier(2)
++    monkeypatch.setattr(Paths, "version_manifest", lambda: manifest_path)
++
++    def fake_get(url: str, timeout: int):
++        barrier.wait(timeout=2)
++        return SimpleNamespace(text=payload, raise_for_status=lambda: None)
++
++    monkeypatch.setattr(requests, "get", fake_get)
++
++    with ThreadPoolExecutor(max_workers=2) as executor:
++        results = list(executor.map(lambda _value: VersionManifestManager._download_manifest(), range(2)))
++
++    assert results == [manifest_path, manifest_path]
++    assert json.loads(manifest_path.read_text(encoding="utf-8")) == make_manifest_data()
++    assert not list(tmp_path.glob(".*.tmp"))
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/test/core/package/test_modpack_package_manager.py mcw-launcher-v1.3.2/test/core/package/test_modpack_package_manager.py
+--- mcw-launcher-v1.3.2-base/test/core/package/test_modpack_package_manager.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/test/core/package/test_modpack_package_manager.py	2026-08-11 13:43:36.173197470 +0000
+@@ -331,3 +331,23 @@
  
- 
- def make_instance(tmp_path: Path) -> Instance:
-@@ -115,6 +118,83 @@
-     assert ModCompatibilityManager._matches_requirement("47.3.0", "[47,)") is True
-     assert ModCompatibilityManager._matches_requirement("1.21.0", "[1.20.1,1.21)") is False
- 
+     with pytest.raises(RuntimeError, match="checksum"):
+         ModpackPackageManager.inspect(profile)
++
 +
 +@pytest.mark.parametrize(
-+    ("installed", "required"),
-+    (
-+        ("1.19.2-3.0.0.6", "[1.19-3.0.0.3,)"),
-+        ("1.19.2-5.1.4.3", "[1.19-5.1.0.0,)"),
-+        ("1.8.2-55", "[1.8-54,)"),
-+        ("1.19.2-4.2.8", "[1.19-4.0.7,)"),
-+        ("1.19.2-4.2.18", "[1.19-4.0.12,)"),
-+    ),
++    "value",
++    [
++        "/absolute/file.txt",
++        "../escape.txt",
++        "folder/../escape.txt",
++        "CON/config.txt",
++        "folder/NUL.txt",
++        "folder/trailing./file.txt",
++        "folder/bad:name.txt",
++    ],
 +)
-+def test_forge_mod_versions_used_by_existing_modpacks_match(installed: str, required: str) -> None:
-+    assert ModCompatibilityManager._matches_requirement(installed, required) is True
++def test_safe_relative_rejects_windows_and_absolute_paths(value: str) -> None:
++    assert ModpackPackageManager._safe_relative(value) is None
 +
 +
-+def test_pack_managed_dependency_version_mismatch_is_non_blocking(tmp_path) -> None:
-+    instance_dir = tmp_path / "pack-instance"
-+    (instance_dir / "mods").mkdir(parents=True)
-+    instance = Instance(instance_id="pack", name="Pack", version_id="1.19.2", instance_dir=instance_dir, mod_loader=("forge", "43.4.0"))
-+    dependency = ModInfo(
-+        path=tmp_path / "curios.jar",
-+        file_name="curios.jar",
-+        enabled=True,
-+        mod_id="curios",
-+        name="Curios API",
-+        version="2.0.0",
-+        loader="forge",
-+        managed_by_modpack=True,
-+    )
-+    consumer = ModInfo(
-+        path=tmp_path / "elytra-slot.jar",
-+        file_name="elytra-slot.jar",
-+        enabled=True,
-+        mod_id="elytraslot",
-+        name="Elytra Slot",
-+        version="6.1.0",
-+        loader="forge",
-+        dependencies={"curios": "[3.0.0,)"},
-+        managed_by_modpack=True,
-+    )
++def test_safe_relative_accepts_normal_package_path() -> None:
++    assert ModpackPackageManager._safe_relative("overrides/config/options.txt").as_posix() == "overrides/config/options.txt"
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/test/core/test_atomic_file.py mcw-launcher-v1.3.2/test/core/test_atomic_file.py
+--- mcw-launcher-v1.3.2-base/test/core/test_atomic_file.py	1970-01-01 00:00:00.000000000 +0000
++++ mcw-launcher-v1.3.2/test/core/test_atomic_file.py	2026-08-11 13:42:52.023784260 +0000
+@@ -0,0 +1,44 @@
++from pathlib import Path
 +
-+    report = ModCompatibilityManager.scan(instance, mods=[dependency, consumer])
++import pytest
 +
-+    assert not any(issue.code == "dependency-version" for issue in report.issues)
-+    assert any(issue.code == "pack-pinned-dependency-requirement" and issue.severity == "warning" for issue in report.issues)
++from src.core.fs import atomic_file
 +
 +
-+def test_manual_dependency_version_mismatch_remains_blocking(tmp_path) -> None:
-+    instance_dir = tmp_path / "manual-instance"
-+    (instance_dir / "mods").mkdir(parents=True)
-+    instance = Instance(instance_id="manual", name="Manual", version_id="1.19.2", instance_dir=instance_dir, mod_loader=("forge", "43.4.0"))
-+    dependency = ModInfo(
-+        path=tmp_path / "curios.jar",
-+        file_name="curios.jar",
-+        enabled=True,
-+        mod_id="curios",
-+        name="Curios API",
-+        version="2.0.0",
-+        loader="forge",
-+        managed_by_modpack=False,
-+    )
-+    consumer = ModInfo(
-+        path=tmp_path / "elytra-slot.jar",
-+        file_name="elytra-slot.jar",
-+        enabled=True,
-+        mod_id="elytraslot",
-+        name="Elytra Slot",
-+        version="6.1.0",
-+        loader="forge",
-+        dependencies={"curios": "[3.0.0,)"},
-+        managed_by_modpack=True,
-+    )
-+
-+    report = ModCompatibilityManager.scan(instance, mods=[dependency, consumer])
-+
-+    assert any(issue.code == "dependency-version" and issue.severity == "error" for issue in report.issues)
-+
- def test_neoforge_loader_dependency_matches_installed_version(tmp_path):
-     instance_dir = tmp_path / "neoforge-instance"
-     mods = instance_dir / "mods"
-@@ -216,3 +296,36 @@
-     report = ModCompatibilityManager.scan(instance)
- 
-     assert any(issue.code == "loader-mismatch" for issue in report.issues)
-+
-+
-+def test_jarjar_provided_mod_satisfies_required_dependency(tmp_path) -> None:
-+    instance_dir = tmp_path / "jarjar-instance"
-+    (instance_dir / "mods").mkdir(parents=True)
-+    instance = Instance(instance_id="jarjar", name="JarJar", version_id="1.19.2", instance_dir=instance_dir, mod_loader=("forge", "43.4.0"))
-+    provider = ModInfo(
-+        path=instance_dir / "mods" / "kotlinforforge-3.9.1-all.jar",
-+        file_name="kotlinforforge-3.9.1-all.jar",
-+        enabled=True,
-+        mod_id="unknown",
-+        name="kotlinforforge-3.9.1-all",
-+        version="3.9.1",
-+        loader="forge",
-+        metadata_format="MANIFEST.MF:FMLModType=LIBRARY",
-+        provided_mods=(("kotlinforforge", "3.9.1"),),
-+        managed_by_modpack=True,
-+    )
-+    consumer = ModInfo(
-+        path=instance_dir / "mods" / "sliceanddice.jar",
-+        file_name="sliceanddice.jar",
-+        enabled=True,
-+        mod_id="sliceanddice",
-+        name="Create Slice & Dice",
-+        version="2.4.0",
-+        loader="forge",
-+        dependencies={"kotlinforforge": "[3.9.1,)"},
-+        managed_by_modpack=True,
-+    )
-+
-+    report = ModCompatibilityManager.scan(instance, mods=[provider, consumer])
-+
-+    assert not any(issue.code in {"dependency-missing", "dependency-version"} and "kotlinforforge" in issue.mod_ids for issue in report.issues)
---- a/test/core/mod/test_mod_manager.py
-+++ b/test/core/mod/test_mod_manager.py
-@@ -1,4 +1,5 @@
- from pathlib import Path
-+import io
- import json
- import zipfile
- 
-@@ -561,3 +562,67 @@
-     assert quilt_mod.name == "Quilt View"
-     assert fabric_mod.loader == "fabric"
-     assert fabric_mod.name == "Fabric View"
-+
-+
-+def test_reads_mod_id_provided_by_forge_jarjar_library(tmp_path):
-+    nested_buffer = io.BytesIO()
-+    nested_metadata = (
-+        'modLoader="javafml"\n'
-+        'loaderVersion="[43,)"\n'
-+        'license="LGPL-2.1"\n\n'
-+        '[[mods]]\n'
-+        'modId="kotlinforforge"\n'
-+        'version="3.9.1"\n'
-+        'displayName="Kotlin for Forge"\n'
-+    )
-+    with zipfile.ZipFile(nested_buffer, "w") as nested:
-+        nested.writestr("META-INF/mods.toml", nested_metadata)
-+
-+    source = tmp_path / "kotlinforforge-3.9.1-all.jar"
-+    jarjar = {"jars": [{"path": "META-INF/jarjar/kffmod-3.9.1.jar"}]}
-+    with zipfile.ZipFile(source, "w") as archive:
-+        archive.writestr(
-+            "META-INF/MANIFEST.MF",
-+            "Manifest-Version: 1.0\nFMLModType: LIBRARY\nImplementation-Version: 3.9.1\n",
-+        )
-+        archive.writestr("META-INF/jarjar/metadata.json", json.dumps(jarjar))
-+        archive.writestr("META-INF/jarjar/kffmod-3.9.1.jar", nested_buffer.getvalue())
-+
-+    mod = ModManager.read_mod(source, preferred_loader="forge", provider_version="3.9.1")
-+
-+    assert mod.mod_id == "unknown"
-+    assert mod.status == "Ready"
-+    assert mod.metadata_format == "MANIFEST.MF:FMLModType=LIBRARY"
-+    assert mod.provided_mods == (("kotlinforforge", "3.9.1"),)
-+
-+
-+def test_scans_legacy_forge_version_mod_directory(tmp_path):
-+    instance = make_instance(tmp_path, loader=("forge", "14.23.5.2860"))
-+    instance.version_id = "1.12.2"
-+    version_dir = ModManager.mods_dir(instance) / "1.12.2"
-+    version_dir.mkdir(parents=True)
-+    metadata = [{"modid": "reskillable", "name": "Reskillable", "version": "1.13.0", "mcversion": "1.12.2"}]
-+    with zipfile.ZipFile(version_dir / "Reskillable-1.12.2-1.13.0.jar", "w") as archive:
-+        archive.writestr("mcmod.info", json.dumps(metadata))
-+
-+    mods = ModManager.list_mods(instance)
-+
-+    assert len(mods) == 1
-+    assert mods[0].mod_id == "reskillable"
-+    assert mods[0].version == "1.13.0"
-+    assert mods[0].path.parent == version_dir
-+
-+
-+def test_legacy_forge_metadata_preserves_additional_declared_mod_ids(tmp_path):
-+    path = tmp_path / "legacy-library-bundle.jar"
-+    metadata = [
-+        {"modid": "primarymod", "name": "Primary Mod", "version": "1.0.0", "mcversion": "1.12.2"},
-+        {"modid": "bundledlibrary", "name": "Bundled Library", "version": "2.0.0", "mcversion": "1.12.2"},
-+    ]
-+    with zipfile.ZipFile(path, "w") as archive:
-+        archive.writestr("mcmod.info", json.dumps(metadata))
-+
-+    mod = ModManager.read_mod(path, preferred_loader="forge")
-+
-+    assert mod.mod_id == "primarymod"
-+    assert mod.provided_mods == (("bundledlibrary", "2.0.0"),)
---- a/test/core/mod/test_mod_provenance_registry.py
-+++ b/test/core/mod/test_mod_provenance_registry.py
-@@ -104,3 +104,34 @@
- 
-     assert mod.source == "local"
-     assert mod.managed_by_modpack is False
-+
-+
-+def test_cross_provider_modrinth_dependency_remains_pack_managed(tmp_path: Path) -> None:
-+    from src.core.modrinth.modrinth_registry import ModrinthRegistry
-+
-+    instance = make_instance(tmp_path, "CrossProvider")
-+    make_mod(instance.instance_dir / "mods" / "kotlinforforge.jar", "kotlinforforge")
-+    ModrinthRegistry.save(instance, {
-+        "mods": {
-+            "kff-project": {
-+                "projectId": "kff-project",
-+                "versionId": "kff-version",
-+                "versionNumber": "3.9.1",
-+                "fileName": "kotlinforforge.jar",
-+                "managedByModpack": True,
-+                "selectionReason": "required_dependency",
-+                "requiredBy": ["Create Slice & Dice"],
-+                "packProvider": "curseforge",
-+            },
-+        },
-+    })
-+
-+    mod = ModManager.list_mods(instance)[0]
-+    entry = ModProvenanceRegistry.entry_for_file(instance, "kotlinforforge.jar")
-+
-+    assert mod.source == "modrinth"
-+    assert mod.managed_by_modpack is True
-+    assert mod.source_pack_provider == "curseforge"
-+    assert entry is not None
-+    assert entry["selectionReason"] == "required_dependency"
-+    assert entry["requiredBy"] == ["Create Slice & Dice"]
---- a/test/core/mod/test_modpack_dependency_resolver.py
-+++ b/test/core/mod/test_modpack_dependency_resolver.py
-@@ -7,12 +7,14 @@
- from src.core.curseforge.curseforge_client import CurseForgeClient
- from src.core.curseforge.curseforge_pack_registry import CurseForgePackRegistry
- from src.core.mod.mod_compatibility_manager import ModCompatibilityManager
-+from src.core.mod.mod_manager import ModManager
- from src.core.mod.mod_provenance_registry import ModProvenanceRegistry
- from src.core.mod.modpack_dependency_resolver import ModpackDependencyResolver
- from src.core.modrinth.modrinth_client import ModrinthClient
- from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
-+from src.core.modrinth.modrinth_registry import ModrinthRegistry
- from src.models.curseforge.file import CurseForgeDependency, CurseForgeFile
--from src.models.mod.dependency_resolution import RequiredModDependenciesMissing
-+from src.models.mod.dependency_resolution import DependencyResolutionResult, RequiredModDependenciesMissing
- from src.models.mod.mod_info import ModInfo
- from src.models.mod.mod_issue import ModHealthReport, ModIssue
- from src.models.modrinth.project import ModrinthProject
-@@ -151,3 +153,274 @@
- 
-     with pytest.raises(RequiredModDependenciesMissing, match="konkrete"):
-         ModpackDependencyResolver.raise_for_required_dependencies(managed_instance)
-+
-+
-+def test_curseforge_mod_uses_exact_modrinth_mirror_to_recover_kotlinforforge(tmp_path, monkeypatch):
-+    managed_instance = instance(tmp_path, loader="forge")
-+    managed_instance.version_id = "1.19.2"
-+    managed_instance.instance_dir.mkdir(parents=True)
-+    parent = ModInfo(
-+        path=managed_instance.instance_dir / "mods" / "slice-and-dice.jar",
-+        file_name="slice-and-dice.jar",
-+        enabled=True,
-+        mod_id="sliceanddice",
-+        name="Create Slice & Dice",
-+        version="2.4.0",
-+        loader="forge",
-+        dependencies={"create": "*", "kotlinforforge": "[3.9.1,)"},
-+        source="curseforge",
-+        managed_by_modpack=True,
-+        source_pack_provider="curseforge",
-+    )
-+    create = ModInfo(
-+        path=managed_instance.instance_dir / "mods" / "create.jar",
-+        file_name="create.jar",
-+        enabled=True,
-+        mod_id="create",
-+        name="Create",
-+        version="0.5.1",
-+        loader="forge",
-+        managed_by_modpack=True,
-+        source="curseforge",
-+        source_pack_provider="curseforge",
-+    )
-+    mirror = ModrinthVersion(
-+        version_id="slice-mirror",
-+        project_id="slice-project",
-+        name="Create Slice & Dice 2.4.0",
-+        version_number="2.4.0",
-+        version_type="release",
-+        game_versions=("1.19.2",),
-+        loaders=("forge",),
-+        files=(ModrinthFile("https://cdn.modrinth.com/slice.jar", "slice-and-dice.jar", "a" * 40, "a" * 128, 10, True),),
-+        dependencies=(
-+            ModrinthDependency("required", project_id="create-project"),
-+            ModrinthDependency("required", project_id="kff-project"),
-+        ),
-+    )
-+    create_version = ModrinthVersion(
-+        version_id="create-version",
-+        project_id="create-project",
-+        name="Create",
-+        version_number="0.5.1",
-+        version_type="release",
-+        game_versions=("1.19.2",),
-+        loaders=("forge",),
-+        files=(ModrinthFile("https://cdn.modrinth.com/create.jar", "create.jar", "b" * 40, "b" * 128, 10, True),),
-+    )
-+    kff_version = ModrinthVersion(
-+        version_id="kff-version",
-+        project_id="kff-project",
-+        name="Kotlin for Forge 3.9.1",
-+        version_number="3.9.1",
-+        version_type="release",
-+        game_versions=("1.19.2",),
-+        loaders=("forge",),
-+        files=(ModrinthFile("https://cdn.modrinth.com/kff.jar", "kotlinforforge-3.9.1-all.jar", "c" * 40, "c" * 128, 10, True),),
-+    )
-+    projects = {
-+        "create-project": ModrinthProject("create-project", "create", "Create", "", "mod"),
-+        "kff-project": ModrinthProject("kff-project", "kotlin-for-forge", "Kotlin for Forge", "", "mod"),
-+    }
-+    direct_registry = {"mods": {}}
-+    saved = {}
-+
-+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
-+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: {"managedFiles": [{"path": "mods/slice-and-dice.jar"}]})
-+    monkeypatch.setattr(ModpackDependencyResolver, "_resolve_curseforge", staticmethod(lambda *_args, **_kwargs: DependencyResolutionResult()))
-+    monkeypatch.setattr(ModManager, "list_mods", lambda _instance: [parent, create])
-+    monkeypatch.setattr(ModProvenanceRegistry, "entries_by_file", lambda _instance: {"slice-and-dice.jar": {"sha1": "a" * 40}})
-+    monkeypatch.setattr(ModProvenanceRegistry, "synchronize", lambda _instance: {})
-+    monkeypatch.setattr(ModrinthRegistry, "load", lambda _instance: direct_registry)
-+    monkeypatch.setattr(ModrinthRegistry, "save", lambda _instance, payload: saved.update(payload))
-+    monkeypatch.setattr(ModrinthClient, "get_version_from_hash", lambda value, algorithm="sha512": mirror if value == "a" * 40 and algorithm == "sha1" else None)
-+    monkeypatch.setattr(ModrinthClient, "select_version", lambda project_id, **_kwargs: {"create-project": create_version, "kff-project": kff_version}[project_id])
-+    monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: projects[project_id])
-+
-+    result = ModpackDependencyResolver.resolve(managed_instance)
-+
-+    assert result.added_files == ("Kotlin for Forge",)
-+    assert set(saved["mods"]) == {"kff-project"}
-+    entry = saved["mods"]["kff-project"]
-+    assert entry["versionId"] == "kff-version"
-+    assert entry["expectedModId"] == "kotlinforforge"
-+    assert entry["managedByModpack"] is True
-+    assert entry["selectionReason"] == "required_dependency"
-+    assert entry["requiredBy"] == ["Create Slice & Dice"]
-+    assert entry["packProvider"] == "curseforge"
-+    assert entry["locked"] is True
-+
-+
-+def test_prunes_auto_added_standalone_dependency_when_another_mod_embeds_it(tmp_path, monkeypatch):
-+    managed_instance = instance(tmp_path, loader="forge")
-+    managed_instance.instance_dir.mkdir(parents=True)
-+    mods_dir = managed_instance.instance_dir / "mods"
-+    mods_dir.mkdir()
-+    create_path = mods_dir / "create.jar"
-+    flywheel_path = mods_dir / "flywheel-forge-1.19.2-0.6.8.a.jar"
-+    create_path.write_bytes(b"create")
-+    flywheel_path.write_bytes(b"old-flywheel")
-+    create = ModInfo(
-+        path=create_path,
-+        file_name=create_path.name,
-+        enabled=True,
-+        mod_id="create",
-+        name="Create",
-+        version="0.5.1.f",
-+        loader="forge",
-+        provided_mods=(("flywheel", "0.6.10-20"),),
-+        managed_by_modpack=True,
-+        source="curseforge",
-+        source_pack_provider="curseforge",
-+    )
-+    flywheel = ModInfo(
-+        path=flywheel_path,
-+        file_name=flywheel_path.name,
-+        enabled=True,
-+        mod_id="flywheel",
-+        name="Flywheel",
-+        version="0.6.8.a",
-+        loader="forge",
-+        managed_by_modpack=True,
-+        source="curseforge",
-+        source_pack_provider="curseforge",
-+    )
-+    curseforge_pack = {
-+        "managedFiles": [
-+            {"path": f"mods/{create.file_name}", "fileName": create.file_name, "selectionReason": "pack_manifest"},
-+            {"path": f"mods/{flywheel.file_name}", "fileName": flywheel.file_name, "selectionReason": "required_dependency"},
-+        ]
-+    }
-+    saved = {}
-+    removed = []
-+
-+    monkeypatch.setattr(ModManager, "list_mods", lambda _instance: [create, flywheel])
-+    monkeypatch.setattr(ModProvenanceRegistry, "entries_by_file", lambda _instance: {
-+        create.file_name.casefold(): {"selectionReason": "pack_manifest"},
-+        flywheel.file_name.casefold(): {"selectionReason": "required_dependency"},
-+    })
-+    monkeypatch.setattr(ModProvenanceRegistry, "remove_by_filenames", lambda _instance, names: removed.extend(names) or tuple(names))
-+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
-+    monkeypatch.setattr(ModrinthPackRegistry, "save", lambda *_args: None)
-+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: curseforge_pack)
-+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda _instance, payload: saved.update(payload))
-+    monkeypatch.setattr(ModrinthRegistry, "load", lambda _instance: {"mods": {}})
-+    monkeypatch.setattr(ModrinthRegistry, "save", lambda *_args: None)
-+
-+    messages = ModpackDependencyResolver._prune_redundant_embedded_dependencies(managed_instance)
-+
-+    assert not flywheel_path.exists()
-+    assert create_path.exists()
-+    assert removed == [flywheel.file_name]
-+    assert [entry["fileName"] for entry in saved["managedFiles"]] == [create.file_name]
-+    assert any("already provides mod ID 'flywheel'" in message for message in messages)
-+
-+
-+def test_curseforge_resolver_does_not_add_standalone_dependency_already_provided_by_embedded_mod(tmp_path, monkeypatch):
-+    managed_instance = instance(tmp_path, loader="forge")
-+    root = cf_file(10, 100, "addon.jar", (CurseForgeDependency(20, 3),))
-+    flywheel = cf_file(20, 200, "flywheel.jar")
-+    registry = {"managedFiles": [{"projectId": 10, "fileId": 100, "fileName": "addon.jar", "path": "mods/addon.jar", "provider": "curseforge", "required": True}]}
-+    create = ModInfo(
-+        path=tmp_path / "create.jar",
-+        file_name="create.jar",
-+        enabled=True,
-+        mod_id="create",
-+        name="Create",
-+        version="0.5.1.f",
-+        loader="forge",
-+        provided_mods=(("flywheel", "0.6.10-20"),),
-+    )
-+
-+    monkeypatch.setattr(ModManager, "list_mods", lambda _instance: [create])
-+    monkeypatch.setattr(CurseForgeClient, "get_files_batch", lambda _ids: {100: root})
-+    monkeypatch.setattr(CurseForgeClient, "latest_compatible_file", lambda project_id, *_args, **_kwargs: flywheel if project_id == 20 else pytest.fail("unexpected project"))
-+    monkeypatch.setattr(CurseForgeClient, "get_project", lambda project_id: SimpleNamespace(name="Flywheel", slug="flywheel", project_url="https://example/flywheel"))
-+    saved = {}
-+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda _instance, payload: saved.update(payload))
-+
-+    result = ModpackDependencyResolver._resolve_curseforge(managed_instance, registry, None)
-+
-+    assert result.added_files == ()
-+    assert len(registry["managedFiles"]) == 1
-+    assert len(saved["managedFiles"]) == 1
-+
-+
-+def test_repairs_pack_pinned_curseforge_dependency_missing_from_disk(tmp_path, monkeypatch):
-+    managed_instance = instance(tmp_path, loader="forge")
-+    managed_instance.version_id = "1.12.2"
-+    managed_instance.instance_dir.mkdir(parents=True)
-+    compat = ModInfo(
-+        path=managed_instance.instance_dir / "mods" / "CompatSkills-1.12.2-1.17.0.jar",
-+        file_name="CompatSkills-1.12.2-1.17.0.jar",
-+        enabled=True,
-+        mod_id="compatskills",
-+        name="CompatSkills",
-+        version="1.17.0",
-+        loader="forge",
-+        dependencies={"reskillable": "*"},
-+        managed_by_modpack=True,
-+        source="curseforge",
-+        source_project_id="290541",
-+        source_file_id="2815687",
-+        source_pack_provider="curseforge",
-+    )
-+    registry = {
-+        "managedFiles": [
-+            {"projectId": 290541, "fileId": 2815687, "fileName": compat.file_name, "path": f"mods/{compat.file_name}", "selectionReason": "pack_manifest"},
-+            {"projectId": 286382, "fileId": 2815686, "fileName": "Reskillable-1.12.2-1.13.0.jar", "path": "mods/Reskillable-1.12.2-1.13.0.jar", "selectionReason": "pack_manifest", "pendingDownload": False},
-+        ]
-+    }
-+    projects = {
-+        290541: SimpleNamespace(project_id=290541, name="CompatSkills", slug="compatskills"),
-+        286382: SimpleNamespace(project_id=286382, name="Reskillable", slug="reskillable"),
-+    }
-+    saved = {}
-+
-+    monkeypatch.setattr(ModManager, "list_mods", lambda _instance: [compat])
-+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
-+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: registry)
-+    monkeypatch.setattr(CurseForgePackRegistry, "save", lambda _instance, payload: saved.update(payload))
-+    monkeypatch.setattr(CurseForgeClient, "get_projects_batch", lambda project_ids: {project_id: projects[project_id] for project_id in project_ids})
-+
-+    result = ModpackDependencyResolver._reconcile_pack_pinned_dependencies(managed_instance, None)
-+
-+    assert result.added_files == ("Reskillable",)
-+    entry = next(item for item in saved["managedFiles"] if item["projectId"] == 286382)
-+    assert entry["pendingDownload"] is True
-+    assert entry["retryableDownload"] is True
-+    assert entry["expectedModIds"] == ["reskillable"]
-+    assert entry["requiredBy"] == ["CompatSkills"]
-+    assert entry["projectSlug"] == "reskillable"
-+
-+
-+def test_pack_pinned_dependency_is_not_redownloaded_when_legacy_version_folder_is_scanned(tmp_path, monkeypatch):
-+    managed_instance = instance(tmp_path, loader="forge")
-+    managed_instance.version_id = "1.12.2"
-+    mods_dir = managed_instance.instance_dir / "mods"
-+    version_dir = mods_dir / "1.12.2"
-+    version_dir.mkdir(parents=True)
-+    compat_path = mods_dir / "CompatSkills-1.12.2-1.17.0.jar"
-+    compat_metadata = [{"modid": "compatskills", "name": "CompatSkills", "version": "1.17.0", "requiredMods": ["required-after:reskillable"]}]
-+    reskillable_path = version_dir / "Reskillable-1.12.2-1.13.0.jar"
-+    reskillable_metadata = [{"modid": "reskillable", "name": "Reskillable", "version": "1.13.0", "mcversion": "1.12.2"}]
-+    import json
-+    import zipfile
-+    with zipfile.ZipFile(compat_path, "w") as archive:
-+        archive.writestr("mcmod.info", json.dumps(compat_metadata))
-+    with zipfile.ZipFile(reskillable_path, "w") as archive:
-+        archive.writestr("mcmod.info", json.dumps(reskillable_metadata))
-+    registry = {
-+        "managedFiles": [
-+            {"projectId": 290541, "fileId": 2815687, "fileName": compat_path.name, "path": f"mods/{compat_path.name}", "selectionReason": "pack_manifest"},
-+            {"projectId": 286382, "fileId": 2815686, "fileName": reskillable_path.name, "path": f"mods/1.12.2/{reskillable_path.name}", "selectionReason": "pack_manifest", "pendingDownload": False, "projectSlug": "reskillable", "expectedModIds": ["reskillable"]},
-+        ]
-+    }
-+
-+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {})
-+    monkeypatch.setattr(CurseForgePackRegistry, "load", lambda _instance: registry)
-+
-+    result = ModpackDependencyResolver._reconcile_pack_pinned_dependencies(managed_instance, None)
-+
-+    assert result.added_files == ()
-+    assert ModpackDependencyResolver.blocking_issues(managed_instance) == ()
---- a/test/core/modloader/forge/test_forge_version_manager.py
-+++ b/test/core/modloader/forge/test_forge_version_manager.py
-@@ -218,6 +218,100 @@
-     assert library["natives"] == {"windows": "natives-windows"}
-     assert "artifact" not in library["downloads"]
-     assert library["downloads"]["classifiers"]["natives-windows"]["path"] == "net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5-natives-windows.jar"
-+
-+
-+def test_normalize_jna_platform_as_regular_artifact_without_native_classifier(monkeypatch, tmp_path: Path) -> None:
-+    root = tmp_path / "libraries"
-+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: root))
++def test_atomic_write_text_retries_permission_error(monkeypatch, tmp_path: Path) -> None:
++    target = tmp_path / "state.json"
++    real_replace = atomic_file.os.replace
 +    calls = []
 +
-+    def fake_download_and_hash(**kwargs):
-+        calls.append(kwargs)
-+        target = kwargs["path"]
-+        target.parent.mkdir(parents=True, exist_ok=True)
-+        target.write_bytes(b"jna-platform")
-+        return target, "9" * 40, len(b"jna-platform")
++    def flaky_replace(source, destination):
++        calls.append((Path(source), Path(destination)))
++        if len(calls) == 1:
++            raise PermissionError("sharing violation")
++        return real_replace(source, destination)
 +
-+    monkeypatch.setattr(
-+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
-+        staticmethod(fake_download_and_hash),
-+    )
++    monkeypatch.setattr(atomic_file.os, "replace", flaky_replace)
++    monkeypatch.setattr(atomic_file.time, "sleep", lambda _delay: None)
 +
-+    normalized = ForgeVersionManager._normalize_libraries({"libraries": [{"name": "net.java.dev.jna:jna-platform:5.10.0"}]})
-+    library = normalized["libraries"][0]
++    atomic_file.atomic_write_text(target, '{"ok": true}\n')
 +
-+    assert "natives" not in library
-+    assert "classifiers" not in library["downloads"]
-+    assert library["downloads"]["artifact"]["path"] == "net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar"
-+    assert len(calls) == 1
-+    assert calls[0]["url"].endswith("/net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar")
++    assert target.read_text(encoding="utf-8") == '{"ok": true}\n'
++    assert len(calls) == 2
++    assert calls[0][0] != target
++    assert not calls[0][0].exists()
 +
 +
-+def test_normalize_removes_spurious_jna_native_metadata_from_v4_cache(monkeypatch, tmp_path: Path) -> None:
-+    monkeypatch.setattr(Paths, "libraries", staticmethod(lambda: tmp_path / "libraries"))
-+    monkeypatch.setattr(
-+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
-+        staticmethod(lambda **kwargs: (_ for _ in ()).throw(AssertionError("The valid JNA artifact must be reused"))),
-+    )
-+    artifact = {
-+        "path": "net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar",
-+        "url": "https://libraries.minecraft.net/net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar",
-+        "sha1": "8" * 40,
-+        "size": 1,
-+    }
-+    profile = {
-+        "libraries": [{
-+            "name": "net.java.dev.jna:jna-platform:5.10.0",
-+            "natives": {"windows": "natives-windows"},
-+            "downloads": {"artifact": artifact},
-+        }]
-+    }
++def test_atomic_write_text_cleanup_is_best_effort(monkeypatch, tmp_path: Path) -> None:
++    target = tmp_path / "state.json"
 +
-+    normalized = ForgeVersionManager._normalize_libraries(profile)
-+    library = normalized["libraries"][0]
++    monkeypatch.setattr(atomic_file, "replace_with_retry", lambda *_args, **_kwargs: (_ for _ in ()).throw(PermissionError("locked")))
++    original_unlink = Path.unlink
 +
-+    assert "natives" not in library
-+    assert library["downloads"] == {"artifact": artifact}
++    def locked_unlink(self, *args, **kwargs):
++        if self.suffix == ".tmp":
++            raise PermissionError("still locked")
++        return original_unlink(self, *args, **kwargs)
++
++    monkeypatch.setattr(Path, "unlink", locked_unlink)
++
++    with pytest.raises(PermissionError, match="locked"):
++        atomic_file.atomic_write_text(target, "payload")
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/test/core/test_short_workspaces.py mcw-launcher-v1.3.2/test/core/test_short_workspaces.py
+--- mcw-launcher-v1.3.2-base/test/core/test_short_workspaces.py	1970-01-01 00:00:00.000000000 +0000
++++ mcw-launcher-v1.3.2/test/core/test_short_workspaces.py	2026-08-11 13:42:52.013198958 +0000
+@@ -0,0 +1,83 @@
++from pathlib import Path
++
++from src.core.fs.paths import Paths
 +
 +
-+def test_polluted_jna_platform_cache_is_repaired_without_forge_installer(monkeypatch, tmp_path: Path) -> None:
++def test_short_workspace_uses_readable_three_character_prefix(monkeypatch, tmp_path: Path) -> None:
++    root = tmp_path / "short"
++    monkeypatch.setattr(Paths, "SHORT_WORKSPACE_ROOT", root)
++
++    workspace = Paths.create_short_workspace("jvm")
++
++    assert workspace.parent == root / "jvm"
++    assert len(workspace.name) == 8
++    assert workspace.is_dir()
++
++    Paths.cleanup_short_workspace(workspace)
++    assert not workspace.exists()
++
++
++def test_loader_and_modrinth_staging_use_short_workspace_root(monkeypatch, tmp_path: Path) -> None:
++    root = tmp_path / "short"
++    monkeypatch.setattr(Paths, "SHORT_WORKSPACE_ROOT", root)
++    monkeypatch.setattr(Paths, "CACHE_ROOT", tmp_path / ("very-long-launcher-root-" * 8) / "cache")
++
++    forge = Paths.forge_staging_dir("1.20.1", "47.4.21")
++    neoforge = Paths.neoforge_staging_dir("1.21.1", "21.1.200")
++    modrinth = Paths.modrinth_staging_root()
++
++    assert forge.parent == root / "frg"
++    assert neoforge.parent == root / "neo"
++    assert modrinth == root / "mrd"
++    assert len(str(forge)) < len(str(Paths.CACHE_ROOT / "modloaders" / "forge" / "staging" / "1.20.1-47.4.21"))
++
++
++def test_diagnostic_long_paths_fit_inside_short_workspace() -> None:
++    long_root = Path(r"C:\Users\Administrator\Downloads\MCW-Launcher-v1.3.0-windows-x64\MCW-Launcher-v1.3.0-windows-x64")
++    short_root = Path(r"C:\Users\Administrator\AppData\Local\MCW\t")
++    java_relative = Path(r"jdk8u502-b07\sample\jmx\jmx-scandir\src\com\sun\jmx\examples\scandir\config\DirectoryScannerConfig.java")
++    modrinth_relative = Path(r"config\modpack_defaults\config\crash_assistant\crash_assistant_localization_overrides\zlm_arab.json")
++
++    old_java = long_root / "runtimes" / (".java-8.installing-" + "3" * 32) / java_relative
++    new_java = short_root / "jvm" / "a31f42c0" / java_relative
++    old_modrinth = long_root / "cache" / "content" / "modrinth" / "staging" / ("b" * 32) / modrinth_relative
++    new_modrinth = short_root / "mrd" / "b0f92b34" / modrinth_relative
++
++    assert len(str(old_java)) >= 260
++    assert len(str(old_modrinth)) >= 260
++    assert len(str(new_java)) < 260
++    assert len(str(new_modrinth)) < 260
++
++
++def test_cleanup_short_workspace_rejects_parent_escape(monkeypatch, tmp_path: Path) -> None:
++    root = tmp_path / "short"
++    victim = tmp_path / "victim"
++    victim.mkdir()
++    (victim / "keep.txt").write_text("keep", encoding="utf-8")
++    monkeypatch.setattr(Paths, "SHORT_WORKSPACE_ROOT", root)
++
++    escaped = root / "jvm" / ".." / ".." / "victim"
++    try:
++        Paths.cleanup_short_workspace(escaped)
++    except ValueError:
++        pass
++    else:
++        raise AssertionError("cleanup_short_workspace accepted a path that resolves outside the short workspace root")
++
++    assert (victim / "keep.txt").read_text(encoding="utf-8") == "keep"
++
++
++def test_cleanup_short_workspace_rejects_root_itself(monkeypatch, tmp_path: Path) -> None:
++    root = tmp_path / "short"
++    root.mkdir()
++    (root / "keep.txt").write_text("keep", encoding="utf-8")
++    monkeypatch.setattr(Paths, "SHORT_WORKSPACE_ROOT", root)
++
++    try:
++        Paths.cleanup_short_workspace(root)
++    except ValueError:
++        pass
++    else:
++        raise AssertionError("cleanup_short_workspace accepted the short workspace root itself")
++
++    assert (root / "keep.txt").is_file()
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/test/core/theme/test_theme_authoring.py mcw-launcher-v1.3.2/test/core/theme/test_theme_authoring.py
+--- mcw-launcher-v1.3.2-base/test/core/theme/test_theme_authoring.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/test/core/theme/test_theme_authoring.py	2026-08-11 13:43:36.177197470 +0000
+@@ -192,3 +192,28 @@
+         service.import_archive(archive)
+ 
+     assert captured.value.code == "THEME_PACKAGE_ID_MISMATCH"
++
++
++def test_import_overwrite_restores_previous_theme_when_publish_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
++    source_root = tmp_path / "source-themes"
++    write_theme(source_root / "portable", "portable", "Replacement Theme")
++    archive = ThemeAuthoringService(ThemeManager(source_root)).export("portable", tmp_path / "portable.zip")
++
++    target_root = tmp_path / "target-themes"
++    existing_root = write_theme(target_root / "portable", "portable", "Original Theme")
++    original_manifest = (existing_root / "theme.json").read_text(encoding="utf-8")
++    service = ThemeAuthoringService(ThemeManager(target_root))
++    real_replace = Path.replace
++
++    def fail_staging_publish(self: Path, target: Path):
++        if self.name.startswith(".theme-import-") and Path(target).name == "portable":
++            raise OSError("simulated publish failure")
++        return real_replace(self, target)
++
++    monkeypatch.setattr(Path, "replace", fail_staging_publish)
++
++    with pytest.raises(ThemeAuthoringError, match="Unable to import theme archive"):
++        service.import_archive(archive, overwrite=True)
++
++    assert (target_root / "portable" / "theme.json").read_text(encoding="utf-8") == original_manifest
++    assert not list(target_root.glob(".theme-backup-*"))
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/test/core/update/test_github_release_client.py mcw-launcher-v1.3.2/test/core/update/test_github_release_client.py
+--- mcw-launcher-v1.3.2-base/test/core/update/test_github_release_client.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/test/core/update/test_github_release_client.py	2026-08-11 13:43:37.003500404 +0000
+@@ -69,3 +69,18 @@
+ 
+     assert update is not None
+     assert update.version == "0.5.0-beta.3"
++
++
++def test_select_asset_links_matching_sha256_sidecar(tmp_path: Path) -> None:
++    client = GitHubReleaseClient("example/repo", "1.3.1", "stable", tmp_path / "cache.json")
++    update = client._select_update([
++        release("v1.3.2", False, [
++            asset("MCW-Launcher-v1.3.2-windows-x64.zip"),
++            asset("MCW-Launcher-v1.3.2-windows-x64.zip.sha256"),
++        ]),
++    ])
++
++    assert update is not None
++    assert update.asset.sha256 is None
++    assert update.asset.sha256_url is not None
++    assert update.asset.sha256_url.endswith(".zip.sha256")
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/test/core/update/test_update_applier.py mcw-launcher-v1.3.2/test/core/update/test_update_applier.py
+--- mcw-launcher-v1.3.2-base/test/core/update/test_update_applier.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/test/core/update/test_update_applier.py	2026-08-11 13:43:37.201197436 +0000
+@@ -123,3 +123,56 @@
+     assert calls[0][0] == [str(executable), "--cleanup-update", str(request.updater_directory), "9876"]
+     assert calls[0][1]["stdout"] is not None
+     assert calls[0][1]["stderr"] is not None
++
++
++def write_update_manifest(root: Path, files: list[str], version: str) -> None:
 +    import json
 +
-+    base = make_version(tmp_path)
-+    cache = tmp_path / "forge-1.20.1-47.3.0.json"
-+    artifact = {
-+        "path": "net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar",
-+        "url": "https://libraries.minecraft.net/net/java/dev/jna/jna-platform/5.10.0/jna-platform-5.10.0.jar",
-+        "sha1": "8" * 40,
-+        "size": 1,
-+    }
-+    cached_profile = json.loads(json.dumps(base.raw_json))
-+    cached_profile.update({
-+        "id": "forge-1.20.1-47.3.0",
-+        "mainClass": "cpw.mods.bootstraplauncher.BootstrapLauncher",
-+        "arguments": {"game": ["--fml.forgeVersion", "47.3.0"], "jvm": []},
-+        "libraries": [
-+            {"name": "net.minecraftforge:forge:1.20.1-47.3.0", "downloads": {"artifact": {"path": "net/minecraftforge/forge/1.20.1-47.3.0/forge-1.20.1-47.3.0.jar", "url": "https://maven.minecraftforge.net/forge.jar", "sha1": "7" * 40, "size": 1}}},
-+            {"name": "net.java.dev.jna:jna-platform:5.10.0", "natives": {"windows": "natives-windows"}, "downloads": {"artifact": artifact}},
-+        ],
-+        "forge": {"schemaVersion": 1, "gameVersion": "1.20.1", "loaderVersion": "47.3.0"},
-+    })
-+    cache.write_text(json.dumps(cached_profile), encoding="utf-8")
-+
-+    monkeypatch.setattr(Paths, "forge_version_json", staticmethod(lambda *_args: cache))
-+    monkeypatch.setattr(ForgeVersionManager, "_download_installer", staticmethod(lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Forge installer must not run"))))
-+    monkeypatch.setattr(
-+        "src.core.modloader.forge.forge_version_manager.HttpDownloader.download_and_hash",
-+        staticmethod(lambda **kwargs: (_ for _ in ()).throw(AssertionError("No library download should be needed"))),
++    (root / "mcw-update.json").write_text(
++        json.dumps({
++            "schema_version": 1,
++            "version": version,
++            "platform": "windows-x64",
++            "executable": "MCW Launcher.exe",
++            "files": files,
++        }),
++        encoding="utf-8",
 +    )
 +
-+    version = ForgeVersionManager.install(base, "47.3.0")
-+    repaired = json.loads(cache.read_text(encoding="utf-8"))
-+    jna = next(item for item in repaired["libraries"] if item["name"].startswith("net.java.dev.jna:jna-platform:"))
 +
-+    assert version.id == "forge-1.20.1-47.3.0"
-+    assert "natives" not in jna
-+    assert jna["downloads"] == {"artifact": artifact}
++def test_update_applier_removes_files_managed_by_previous_release(tmp_path, monkeypatch) -> None:
++    request = make_request(tmp_path)
++    (request.source_directory / "MCW Launcher.exe").write_bytes(b"new-exe")
++    (request.destination_directory / "MCW Launcher.exe").write_bytes(b"old-exe")
++    stale = request.destination_directory / "docs" / "obsolete.md"
++    stale.parent.mkdir()
++    stale.write_text("obsolete", encoding="utf-8")
++    write_update_manifest(request.destination_directory, ["MCW Launcher.exe", "docs/obsolete.md", "mcw-update.json"], "1.3.1")
++    write_update_manifest(request.source_directory, ["MCW Launcher.exe", "mcw-update.json"], "1.3.2")
++
++    applier = UpdateApplier(request)
++    monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
++    monkeypatch.setattr(applier, "_start_launcher", lambda: None)
++
++    assert applier.run() == 0
++    assert not stale.exists()
++
++
++def test_update_applier_restores_removed_managed_file_on_rollback(tmp_path, monkeypatch) -> None:
++    request = make_request(tmp_path)
++    (request.source_directory / "MCW Launcher.exe").write_bytes(b"new-exe")
++    (request.destination_directory / "MCW Launcher.exe").write_bytes(b"old-exe")
++    stale = request.destination_directory / "docs" / "obsolete.md"
++    stale.parent.mkdir()
++    stale.write_text("obsolete", encoding="utf-8")
++    write_update_manifest(request.destination_directory, ["MCW Launcher.exe", "docs/obsolete.md", "mcw-update.json"], "1.3.1")
++    write_update_manifest(request.source_directory, ["MCW Launcher.exe", "mcw-update.json"], "1.3.2")
++
++    applier = UpdateApplier(request)
++    monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
++    monkeypatch.setattr(applier, "_start_launcher", lambda: None)
++    monkeypatch.setattr(applier, "_show_error", lambda _message: None)
++    monkeypatch.setattr(applier, "_verify_updated_executable", lambda: (_ for _ in ()).throw(RuntimeError("verify failed")))
++
++    assert applier.run() == 1
++    assert stale.read_text(encoding="utf-8") == "obsolete"
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/test/core/update/test_update_manager.py mcw-launcher-v1.3.2/test/core/update/test_update_manager.py
+--- mcw-launcher-v1.3.2-base/test/core/update/test_update_manager.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/test/core/update/test_update_manager.py	2026-08-11 13:43:37.003330426 +0000
+@@ -59,7 +59,7 @@
+     content = tmp_path / "content"
+     content.mkdir()
+     (content / "MCW Launcher.exe").write_bytes(b"exe")
+-    (content / "mcw-update.json").write_text('{"schema_version": 1, "version": "0.5.0-beta.3", "executable": "MCW Launcher.exe"}', encoding="utf-8")
++    (content / "mcw-update.json").write_text('{"schema_version": 1, "version": "0.5.0-beta.3", "executable": "MCW Launcher.exe", "files": ["MCW Launcher.exe", "mcw-update.json"]}', encoding="utf-8")
+     from src.models.update.update_info import ReleaseAsset, UpdateInfo
  
+     info = UpdateInfo(current_version="0.5.0-beta.2", version="0.5.0-beta.3", tag_name="v0.5.0-beta.3", title="Beta 3", release_notes="", release_url="", published_at="", prerelease=True, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", 1))
+@@ -71,7 +71,7 @@
+     content = tmp_path / "content"
+     content.mkdir()
+     (content / "MCW Launcher.exe").write_bytes(b"exe")
+-    (content / "mcw-update.json").write_text('{"schema_version": 1, "version": "0.5.0-beta.4", "executable": "MCW Launcher.exe"}', encoding="utf-8")
++    (content / "mcw-update.json").write_text('{"schema_version": 1, "version": "0.5.0-beta.4", "executable": "MCW Launcher.exe", "files": ["MCW Launcher.exe", "mcw-update.json"]}', encoding="utf-8")
+     from src.models.update.update_info import ReleaseAsset, UpdateInfo
  
- def test_normalize_skips_osx_only_nightly_native_on_windows(monkeypatch, tmp_path: Path) -> None:
-@@ -559,3 +653,39 @@
-         ForgeVersionManager._run_installer(make_version(tmp_path), "47.3.0", installer, tmp_path / "staging", None)
+     info = UpdateInfo(current_version="0.5.0-beta.2", version="0.5.0-beta.3", tag_name="v0.5.0-beta.3", title="Beta 3", release_notes="", release_url="", published_at="", prerelease=True, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", 1))
+@@ -130,3 +130,48 @@
  
-     assert "final Forge detail" in (forge_root / "logs" / "forge-1.20.1-47.3.0.log").read_text(encoding="utf-8")
+     assert archive_path.read_bytes() == content
+     assert sum(throttled) == len(content)
 +
 +
-+def test_incomplete_cached_profile_is_refreshed_without_rerunning_forge_installer(monkeypatch, tmp_path: Path) -> None:
-+    import json
++def test_rejects_update_package_without_manifest(tmp_path: Path) -> None:
++    content = tmp_path / "content"
++    content.mkdir()
++    (content / "MCW Launcher.exe").write_bytes(b"exe")
++    from src.models.update.update_info import ReleaseAsset, UpdateInfo
 +
-+    cache = tmp_path / "forge-1.20.1-47.3.0.json"
-+    raw = make_version(tmp_path).raw_json.copy()
-+    raw.update({
-+        "id": "forge-1.20.1-47.3.0",
-+        "mainClass": "cpw.mods.bootstraplauncher.BootstrapLauncher",
-+        "libraries": [
-+            {"name": "net.minecraftforge:forge:1.20.1-47.3.0", "downloads": {"artifact": {"path": "net/minecraftforge/forge/1.20.1-47.3.0/forge-1.20.1-47.3.0.jar", "url": "https://maven.minecraftforge.net/forge.jar", "sha1": "a" * 40, "size": 1}}},
-+            {"name": "org.lwjgl:lwjgl:3.3.1", "natives": {"windows": "natives-windows"}, "downloads": {}},
-+        ],
-+        "forge": {"schemaVersion": 1, "gameVersion": "1.20.1", "loaderVersion": "47.3.0"},
-+    })
-+    cache.write_text(json.dumps(raw), encoding="utf-8")
++    info = UpdateInfo(current_version="0.5.0-beta.2", version="0.5.0-beta.3", tag_name="v0.5.0-beta.3", title="Beta 3", release_notes="", release_url="", published_at="", prerelease=True, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", 1))
 +
-+    monkeypatch.setattr(Paths, "forge_version_json", staticmethod(lambda *_args: cache))
-+    monkeypatch.setattr("src.core.modloader.forge.forge_version_manager.VersionManager.load", staticmethod(lambda _version: make_version(tmp_path)))
-+    monkeypatch.setattr(ForgeVersionManager, "_download_installer", staticmethod(lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Forge installer must not run"))))
-+
-+    def refresh(data, _reporter=None):
-+        refreshed = json.loads(json.dumps(data))
-+        refreshed["libraries"][1]["downloads"] = {
-+            "artifact": {"path": "org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1.jar", "url": "https://libraries.minecraft.net/lwjgl.jar", "sha1": "b" * 40, "size": 1},
-+            "classifiers": {"natives-windows": {"path": "org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-windows.jar", "url": "https://libraries.minecraft.net/lwjgl-native.jar", "sha1": "c" * 40, "size": 1}},
-+        }
-+        return refreshed
-+
-+    monkeypatch.setattr(ForgeVersionManager, "_normalize_libraries", staticmethod(refresh))
-+
-+    version = ForgeVersionManager.load("1.20.1", "47.3.0")
-+
-+    assert version.id == "forge-1.20.1-47.3.0"
-+    assert ForgeVersionManager._load_cached(cache, "1.20.1", "47.3.0") is not None
---- a/test/core/modrinth/test_modrinth_content_manager.py
-+++ b/test/core/modrinth/test_modrinth_content_manager.py
-@@ -334,3 +334,64 @@
-     assert requirement.failure_reason == "NO_DOWNLOAD_URL"
-     assert requirement.direct_url == ""
-     assert requirement.version_url.endswith("/version/pack-version")
++    with pytest.raises(RuntimeError, match="missing mcw-update.json"):
++        manager()._validate_package_manifest(content, info)
 +
 +
-+def test_expected_dependency_mod_id_blocks_wrong_provider_file(tmp_path, monkeypatch):
-+    instance = make_instance(tmp_path)
-+    content = b"provider-file"
-+    save_mod_entry(instance, content, "dependency.jar")
-+    registry = ModrinthRegistry.load(instance)
-+    registry["mods"]["manual-project"]["expectedModId"] = "kotlinforforge"
-+    ModrinthRegistry.save(instance, registry)
++def test_update_download_uses_sha256_sidecar_when_digest_missing(tmp_path: Path, monkeypatch) -> None:
++    import hashlib
++    import httpx
 +
-+    cache = tmp_path / "cache" / "dependency.jar"
-+    monkeypatch.setattr(Paths, "modrinth_file_cache", lambda *_args: cache)
++    from src.core.network.httpx_downloader import HttpDownloader
++    from src.models.update.update_info import ReleaseAsset, UpdateInfo
 +
-+    def fake_download(urls, destination, **_kwargs):
-+        destination.parent.mkdir(parents=True, exist_ok=True)
-+        destination.write_bytes(content)
-+        return destination
++    content = b"verified-by-sidecar"
++    digest = hashlib.sha256(content).hexdigest()
 +
-+    monkeypatch.setattr(ModrinthDownloader, "download_urls", fake_download)
-+    monkeypatch.setattr(ModManager, "read_mod", lambda *_args, **_kwargs: SimpleNamespace(mod_id="wrong_mod"))
-+    monkeypatch.setattr(ModManager, "add_mods", lambda *_args, **_kwargs: pytest.fail("wrong dependency must not be installed"))
++    def handler(request: httpx.Request) -> httpx.Response:
++        if str(request.url).endswith(".sha256"):
++            return httpx.Response(200, content=f"{digest}  update.zip\n".encode())
++        return httpx.Response(200, headers={"Content-Length": str(len(content))}, content=content)
 +
-+    warnings = ModrinthContentManager.ensure(instance, block_launch_on_failure=False)
++    monkeypatch.setattr(HttpDownloader, "_client", httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True))
++    info = UpdateInfo(current_version="1.3.2", version="1.3.3", tag_name="v1.3.3", title="1.3.3", release_notes="", release_url="", published_at="", prerelease=False, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", len(content), sha256_url="https://example.com/update.zip.sha256"))
++    archive_path = tmp_path / "update.zip"
 +
-+    assert any("requires 'kotlinforforge'" in warning for warning in warnings)
-+    saved = ModrinthRegistry.load(instance)["mods"]["manual-project"]
-+    assert saved["pendingDownload"] is True
-+    assert "provides mod ID 'wrong_mod'" in saved["lastDownloadError"]
++    manager()._download_archive(info, archive_path, max_retry=1)
++
++    assert archive_path.read_bytes() == content
 +
 +
-+def test_expected_dependency_mod_id_accepts_forge_jarjar_provided_mod(tmp_path, monkeypatch):
-+    instance = make_instance(tmp_path)
-+    content = b"provider-file"
-+    save_mod_entry(instance, content, "kotlinforforge-3.9.1-all.jar")
-+    registry = ModrinthRegistry.load(instance)
-+    registry["mods"]["manual-project"]["expectedModId"] = "kotlinforforge"
-+    ModrinthRegistry.save(instance, registry)
++def test_update_download_refuses_unverified_archive(tmp_path: Path) -> None:
++    from src.models.update.update_info import ReleaseAsset, UpdateInfo
 +
-+    cache = tmp_path / "cache" / "kotlinforforge-3.9.1-all.jar"
-+    monkeypatch.setattr(Paths, "modrinth_file_cache", lambda *_args: cache)
++    info = UpdateInfo(current_version="1.3.2", version="1.3.3", tag_name="v1.3.3", title="1.3.3", release_notes="", release_url="", published_at="", prerelease=False, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", 123))
 +
-+    def fake_download(urls, destination, **_kwargs):
-+        destination.parent.mkdir(parents=True, exist_ok=True)
-+        destination.write_bytes(content)
-+        return destination
-+
-+    def fake_add_mods(current_instance, source_paths, **_kwargs):
-+        source = next(iter(source_paths))
-+        target = current_instance.instance_dir / "mods" / source.name
-+        target.parent.mkdir(parents=True, exist_ok=True)
-+        target.write_bytes(source.read_bytes())
-+        return [SimpleNamespace(file_name=target.name)]
-+
-+    monkeypatch.setattr(ModrinthDownloader, "download_urls", fake_download)
-+    monkeypatch.setattr(ModManager, "read_mod", lambda *_args, **_kwargs: SimpleNamespace(mod_id="unknown", provided_mods=(("kotlinforforge", "3.9.1"),)))
-+    monkeypatch.setattr(ModManager, "add_mods", fake_add_mods)
-+
-+    assert ModrinthContentManager.ensure(instance) == ()
-+    saved = ModrinthRegistry.load(instance)["mods"]["manual-project"]
-+    assert saved["pendingDownload"] is False
-+    assert saved["lastDownloadError"] == ""
---- a/test/test_public_api.py
-+++ b/test/test_public_api.py
++    with pytest.raises(RuntimeError, match="require a trusted SHA-256"):
++        manager()._download_archive(info, tmp_path / "update.zip", max_retry=1)
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/test/test_public_api.py mcw-launcher-v1.3.2/test/test_public_api.py
+--- mcw-launcher-v1.3.2-base/test/test_public_api.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/test/test_public_api.py	2026-08-11 13:46:06.402827917 +0000
 @@ -8,7 +8,7 @@
  
  
- def test_bundled_core_runtime_version_follows_launcher_beta() -> None:
--    assert mcw_core.__version__ == "1.1.1-beta.5"
-+    assert mcw_core.__version__ == "1.1.1-beta.6"
+ def test_bundled_core_runtime_version_follows_launcher_release() -> None:
+-    assert mcw_core.__version__ == "1.3.1"
++    assert mcw_core.__version__ == "1.3.2"
  
  
  def test_distribution_version_when_installed() -> None:
+@@ -16,7 +16,7 @@
+         installed = version("mcw-core")
+     except PackageNotFoundError:
+         return
+-    assert installed == "1.3.1"
++    assert installed == "1.3.2"
+ 
+ 
+ def test_optifine_public_api_is_import_only() -> None:
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/test/tools/test_release_preflight.py mcw-launcher-v1.3.2/test/tools/test_release_preflight.py
+--- mcw-launcher-v1.3.2-base/test/tools/test_release_preflight.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/test/tools/test_release_preflight.py	2026-08-11 13:45:13.425833963 +0000
+@@ -5,7 +5,7 @@
+ 
+ from src.config import VERSION_TAG
+ import tools.release_preflight as release_preflight
+-from tools.release_preflight import audit_language_packs, audit_launcher_icon, audit_private_gateway_bundling, audit_theme_contract, find_merge_markers
++from tools.release_preflight import audit_gui_core_boundary, audit_language_packs, audit_launcher_icon, audit_private_gateway_bundling, audit_release_evidence, audit_theme_contract, find_merge_markers
+ 
+ 
+ def write_pack(path: Path, locale: str, translations: dict[str, str]) -> None:
+@@ -120,3 +120,22 @@
+     assert "Missing launcher icon asset: assets/icons/mcw_launcher.png" in normalized_errors
+     assert "mcw_launcher.spec does not configure the Windows executable icon" in errors
+     assert "QApplication does not configure the launcher window icon" in errors
++
++
++def test_release_evidence_rejects_stale_version(monkeypatch, tmp_path: Path) -> None:
++    monkeypatch.setattr(release_preflight, "VERSION_ID", "1.3.2")
++    (tmp_path / "TEST-RESULTS.txt").write_text("mcw-core 1.3.1\n", encoding="utf-8")
++    (tmp_path / "CHANGES.diff").write_text("diff for 1.3.1\n", encoding="utf-8")
++
++    errors = audit_release_evidence(tmp_path)
++
++    assert "TEST-RESULTS.txt does not reference current version 1.3.2" in errors
++    assert "CHANGES.diff does not reference current version 1.3.2" in errors
++
++
++def test_gui_core_boundary_rejects_direct_src_core_import(tmp_path: Path) -> None:
++    gui = tmp_path / "src" / "gui"
++    gui.mkdir(parents=True)
++    (gui / "bad.py").write_text("from src.core.foo import Bar\n", encoding="utf-8")
++
++    assert audit_gui_core_boundary(tmp_path) == ["src/gui/bad.py:1: GUI must not import src.core directly"]
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/tools/build_release_zip.py mcw-launcher-v1.3.2/tools/build_release_zip.py
+--- mcw-launcher-v1.3.2-base/tools/build_release_zip.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/tools/build_release_zip.py	2026-08-11 13:42:16.859537097 +0000
+@@ -61,11 +61,18 @@
+         payload_root = Path(temporary) / package_name
+         payload_root.mkdir(parents=True)
+         copy_payload(project_root, payload_root, executable)
++        managed_files = sorted(
++            path.relative_to(payload_root).as_posix()
++            for path in payload_root.rglob("*")
++            if path.is_file()
++        )
++        managed_files.append("mcw-update.json")
+         manifest = {
+             "schema_version": 1,
+             "version": version,
+             "platform": "windows-x64",
+             "executable": executable.name,
++            "files": sorted(set(managed_files)),
+         }
+         (payload_root / "mcw-update.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+ 
+diff -ruN '--exclude=.pytest_cache' '--exclude=__pycache__' '--exclude=*.pyc' '--exclude=dist' '--exclude=build' '--exclude=CHANGES.diff' mcw-launcher-v1.3.2-base/tools/release_preflight.py mcw-launcher-v1.3.2/tools/release_preflight.py
+--- mcw-launcher-v1.3.2-base/tools/release_preflight.py	2026-08-09 16:37:46.000000000 +0000
++++ mcw-launcher-v1.3.2/tools/release_preflight.py	2026-08-11 13:45:13.425648824 +0000
+@@ -333,6 +333,48 @@
+     return errors
+ 
+ 
++
++
++def audit_release_evidence(project_root: Path) -> list[str]:
++    errors: list[str] = []
++    test_results = project_root / "TEST-RESULTS.txt"
++    if test_results.is_file():
++        try:
++            text = test_results.read_text(encoding="utf-8")
++        except OSError as error:
++            errors.append(f"Unable to inspect TEST-RESULTS.txt: {error}")
++        else:
++            if VERSION_ID not in text:
++                errors.append(f"TEST-RESULTS.txt does not reference current version {VERSION_ID}")
++    changes = project_root / "CHANGES.diff"
++    if changes.is_file():
++        try:
++            text = changes.read_text(encoding="utf-8", errors="replace")
++        except OSError as error:
++            errors.append(f"Unable to inspect CHANGES.diff: {error}")
++        else:
++            if VERSION_ID not in text:
++                errors.append(f"CHANGES.diff does not reference current version {VERSION_ID}")
++    return errors
++
++
++def audit_gui_core_boundary(project_root: Path) -> list[str]:
++    errors: list[str] = []
++    gui_root = project_root / "src" / "gui"
++    if not gui_root.is_dir():
++        return ["Missing GUI source directory: src/gui"]
++    direct_import = re.compile(r"^\s*(?:from\s+src\.core(?:\.|\s)|import\s+src\.core(?:\.|\s|$))")
++    for path in sorted(gui_root.rglob("*.py")):
++        try:
++            lines = path.read_text(encoding="utf-8").splitlines()
++        except OSError as error:
++            errors.append(f"Unable to inspect GUI dependency boundary in {path.relative_to(project_root)}: {error}")
++            continue
++        for line_number, line in enumerate(lines, start=1):
++            if direct_import.match(line):
++                errors.append(f"{path.relative_to(project_root)}:{line_number}: GUI must not import src.core directly")
++    return errors
++
+ def audit_version_metadata(project_root: Path) -> list[str]:
+     errors: list[str] = []
+     if VERSION_TAG != f"v{VERSION_ID}":
+@@ -360,6 +402,8 @@
+ def run_preflight(project_root: Path = PROJECT_ROOT) -> list[str]:
+     errors: list[str] = []
+     errors.extend(audit_version_metadata(project_root))
++    errors.extend(audit_release_evidence(project_root))
++    errors.extend(audit_gui_core_boundary(project_root))
+     errors.extend(audit_private_gateway_bundling(project_root))
+     errors.extend(audit_theme_contract(project_root))
+     errors.extend(audit_lan_agent(project_root))

@@ -59,7 +59,7 @@ def test_validates_matching_update_package_manifest(tmp_path: Path) -> None:
     content = tmp_path / "content"
     content.mkdir()
     (content / "MCW Launcher.exe").write_bytes(b"exe")
-    (content / "mcw-update.json").write_text('{"schema_version": 1, "version": "0.5.0-beta.3", "executable": "MCW Launcher.exe"}', encoding="utf-8")
+    (content / "mcw-update.json").write_text('{"schema_version": 1, "version": "0.5.0-beta.3", "executable": "MCW Launcher.exe", "files": ["MCW Launcher.exe", "mcw-update.json"]}', encoding="utf-8")
     from src.models.update.update_info import ReleaseAsset, UpdateInfo
 
     info = UpdateInfo(current_version="0.5.0-beta.2", version="0.5.0-beta.3", tag_name="v0.5.0-beta.3", title="Beta 3", release_notes="", release_url="", published_at="", prerelease=True, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", 1))
@@ -71,7 +71,7 @@ def test_rejects_update_package_version_mismatch(tmp_path: Path) -> None:
     content = tmp_path / "content"
     content.mkdir()
     (content / "MCW Launcher.exe").write_bytes(b"exe")
-    (content / "mcw-update.json").write_text('{"schema_version": 1, "version": "0.5.0-beta.4", "executable": "MCW Launcher.exe"}', encoding="utf-8")
+    (content / "mcw-update.json").write_text('{"schema_version": 1, "version": "0.5.0-beta.4", "executable": "MCW Launcher.exe", "files": ["MCW Launcher.exe", "mcw-update.json"]}', encoding="utf-8")
     from src.models.update.update_info import ReleaseAsset, UpdateInfo
 
     info = UpdateInfo(current_version="0.5.0-beta.2", version="0.5.0-beta.3", tag_name="v0.5.0-beta.3", title="Beta 3", release_notes="", release_url="", published_at="", prerelease=True, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", 1))
@@ -130,3 +130,48 @@ def test_update_download_uses_shared_bandwidth_limiter(tmp_path: Path, monkeypat
 
     assert archive_path.read_bytes() == content
     assert sum(throttled) == len(content)
+
+
+def test_rejects_update_package_without_manifest(tmp_path: Path) -> None:
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "MCW Launcher.exe").write_bytes(b"exe")
+    from src.models.update.update_info import ReleaseAsset, UpdateInfo
+
+    info = UpdateInfo(current_version="0.5.0-beta.2", version="0.5.0-beta.3", tag_name="v0.5.0-beta.3", title="Beta 3", release_notes="", release_url="", published_at="", prerelease=True, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", 1))
+
+    with pytest.raises(RuntimeError, match="missing mcw-update.json"):
+        manager()._validate_package_manifest(content, info)
+
+
+def test_update_download_uses_sha256_sidecar_when_digest_missing(tmp_path: Path, monkeypatch) -> None:
+    import hashlib
+    import httpx
+
+    from src.core.network.httpx_downloader import HttpDownloader
+    from src.models.update.update_info import ReleaseAsset, UpdateInfo
+
+    content = b"verified-by-sidecar"
+    digest = hashlib.sha256(content).hexdigest()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).endswith(".sha256"):
+            return httpx.Response(200, content=f"{digest}  update.zip\n".encode())
+        return httpx.Response(200, headers={"Content-Length": str(len(content))}, content=content)
+
+    monkeypatch.setattr(HttpDownloader, "_client", httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True))
+    info = UpdateInfo(current_version="1.3.2", version="1.3.3", tag_name="v1.3.3", title="1.3.3", release_notes="", release_url="", published_at="", prerelease=False, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", len(content), sha256_url="https://example.com/update.zip.sha256"))
+    archive_path = tmp_path / "update.zip"
+
+    manager()._download_archive(info, archive_path, max_retry=1)
+
+    assert archive_path.read_bytes() == content
+
+
+def test_update_download_refuses_unverified_archive(tmp_path: Path) -> None:
+    from src.models.update.update_info import ReleaseAsset, UpdateInfo
+
+    info = UpdateInfo(current_version="1.3.2", version="1.3.3", tag_name="v1.3.3", title="1.3.3", release_notes="", release_url="", published_at="", prerelease=False, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", 123))
+
+    with pytest.raises(RuntimeError, match="require a trusted SHA-256"):
+        manager()._download_archive(info, tmp_path / "update.zip", max_retry=1)

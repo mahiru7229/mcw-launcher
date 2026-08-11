@@ -1,37 +1,32 @@
-MCW Launcher v1.1.1 stable release
+MCW Launcher / MCW Core v1.3.2 release candidate
 
 Release metadata
-- Launcher runtime: v1.1.1
+- Launcher runtime: v1.3.2
 - Update channel: stable
-- MCW Core distribution: 1.1.1
+- MCW Core distribution: 1.3.2
 
-Validated source changes for stable promotion
-- src/config.py
-- pyproject.toml
-- test/core/config/test_version_metadata.py
-- test/test_public_api.py
-- README.md
-- docs/RELEASE-v1.1.1.md
-- config/curseforge.example.json
-- .gitignore
-- TEST-RESULTS.txt
-- DELIVERY-MANIFEST.txt
+Primary fixes
+- Windows WinError 32 fixed-temp race for Mojang manifest and instance registry/metadata
+- Canonical short-workspace recursive-delete guard
+- Verified-only launcher auto-update with GitHub digest/.sha256 fallback
+- Managed release-file inventory and rollback-aware stale file cleanup for v1.3.2+ updater
+- Unified Windows-safe modpack archive paths
+- Transactional theme overwrite publish
+- Release evidence and GUI/core boundary preflight checks
 
 Generated deliverables
-- MCW-Launcher-v1.1.1-source.zip
-- mcw-launcher-v1.1.1-stable-promotion-changed-files.zip
-- mcw_core-1.1.1-py3-none-any.whl
-- mcw-core-v1.1.1-source.zip
-- README-launcher-v1.1.1.md
-- README-core-v1.1.1.md
-- RELEASE-v1.1.1.md
-- RELEASE-core-v1.1.1.md
-- TEST-RESULTS.txt
+- MCW-Launcher-v1.3.2-source.zip
+- MCW-Launcher-v1.3.2-changed-files.zip
+- README-launcher-v1.3.2.md
+- RELEASE-v1.3.2.md
+- mcw-core-v1.3.2-source.zip
+- mcw_core-1.3.2-py3-none-any.whl
+- README-core-v1.3.2.md
+- RELEASE-core-v1.3.2.md
 - SHA256SUMS.txt
-- MCW-Launcher-v1.1.1-release-bundle.zip
 
-Not generated in this environment
+Not generated in this Linux environment
 - MCW Launcher.exe
-- MCW-Launcher-v1.1.1-windows-x64.zip
+- MCW-Launcher-v1.3.2-windows-x64.zip
 
-Those two Windows artifacts require PyInstaller on Windows and are built by build_release.ps1.
+The Windows executable/update ZIP still requires the existing Windows PyInstaller build workflow. The source, tests, release preflight, and pure-Python Core wheel are validated here.
