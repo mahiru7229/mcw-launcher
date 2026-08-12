@@ -168,7 +168,11 @@ def test_motion_mode_is_normalized_to_supported_values(tmp_path: Path) -> None:
 def test_download_limit_is_unlimited_by_default_and_normalized(tmp_path: Path) -> None:
     manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
 
-    assert manager.load()["network"] == {"download_limit_mbps": 0.0, "download_concurrency": 0}
+    assert manager.load()["network"] == {
+        "download_limit_mbps": 0.0,
+        "download_concurrency": 0,
+        "download_performance_mode": "automatic",
+    }
 
     manager.update_section("network", {"download_limit_mbps": "12.5"})
     assert manager.load()["network"]["download_limit_mbps"] == 12.5
@@ -187,6 +191,12 @@ def test_download_limit_is_unlimited_by_default_and_normalized(tmp_path: Path) -
 
     manager.update_section("network", {"download_concurrency": 99})
     assert manager.load()["network"]["download_concurrency"] == 16
+
+    manager.update_section("network", {"download_performance_mode": "responsive"})
+    assert manager.load()["network"]["download_performance_mode"] == "responsive"
+
+    manager.update_section("network", {"download_performance_mode": "unknown"})
+    assert manager.load()["network"]["download_performance_mode"] == "automatic"
 
 
 def test_rc_tester_channel_is_forced_to_stable_for_first_stable_release(tmp_path: Path) -> None:

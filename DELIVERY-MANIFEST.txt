@@ -1,35 +1,23 @@
-MCW Launcher / MCW Core v1.4.0-beta.1 beta delivery
+MCW Launcher v1.4.0-beta.2 beta delivery
 
-Release metadata
-- Launcher runtime: v1.4.0-beta.1
-- Update channel: beta
-- MCW Core runtime: 1.4.0-beta.1
-- MCW Core distribution: 1.4.0b1
+Delivery policy:
+- Launcher source ZIP only for beta releases.
+- No standalone MCW Core ZIP/WHL/README/RELEASE artifact is produced for beta.2.
+- Standalone Core artifacts resume when v1.4 is declared stable.
 
-Beta 1 scope
-- TaskRunner v2 foundation with cooperative cancellation and replaceable background/network work
-- Shutdown cancellation boundary: launcher work no longer blocks window close
-- Kill Instance action with confirmation and supervised force-kill semantics
-- User-killed Minecraft sessions are not classified as crashes
-- Forge issue #20 strict profile selection, validate-before-cache and poisoned-cache invalidation
-- v1.3.2 issue #19/atomic-write/update-integrity hardening retained
+Launcher runtime: v1.4.0-beta.2
+Update channel: beta
 
-Three-beta roadmap
-- beta.1: task lifecycle/shutdown + Kill Instance + Forge #20
-- beta.2: adaptive modpack downloader + one-pass hashing/I/O/progress/journal optimization
-- beta.3: Diagnostics v2 + Create Issue Report + privacy/task timeline + benchmark/Windows soak
+Primary beta.2 scope:
+- Update Priority Mode: cancel/drop competing tasks and reserve scheduling for update.* work.
+- Adaptive Modrinth .mrpack artifact downloads.
+- One-pass multi-hash with bounded hash I/O concurrency.
+- Download journal progress batching.
+- Automatic / Responsive / Balanced / Maximum download performance profiles.
+- Automatic low-impact download concurrency while Minecraft is running.
 
-Validation in this environment
-- Full pytest: 1551 passed, 90 skipped, 0 failed, 2 intentional ZIP-fixture warnings
-- compileall: PASS
-- release_preflight: PASS
-- language parity: 2092 / 2092
-- Core wheel isolated install/import: PASS
-
-Not generated/tested in this Linux environment
-- MCW Launcher.exe
-- Windows x64 update ZIP
-- Real PySide6 close/shutdown soak test
-- Real Minecraft Windows process-tree Kill smoke test
-
-These Windows-specific checks remain required before promotion to beta.2/stable.
+Inherited beta.1 scope:
+- Task lifecycle/shutdown cancellation foundation.
+- Kill Instance.
+- Forge issue #20 profile/cache hardening.
+- v1.3.2 issue #19 and update-integrity hardening.

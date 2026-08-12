@@ -11,7 +11,6 @@ from mcw_core.api.instance.settings_manager import SettingsManager, default_inst
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.network.download_bandwidth_limiter import download_bandwidth_limiter
 from mcw_core.api.network.download_manager import download_manager
-from mcw_core.api.network.network_session import DEFAULT_MAX_CONCURRENT_DOWNLOADS
 from src.gui.controllers.base_controller import BaseController
 
 
@@ -46,6 +45,7 @@ class GuiSettingsController(BaseController):
         "curseforge_gateway_urls": (),
         "download_limit_mbps": 0.0,
         "download_concurrency": 0,
+        "download_performance_mode": "automatic",
         "notify_legacy_cache_cleanup": True,
         "unused_version_retention_days": 14,
         "instance_defaults": default_instance_settings(),
@@ -55,6 +55,7 @@ class GuiSettingsController(BaseController):
         super().__init__()
         self._settings = LauncherSettingsManager()
         self._current = copy.deepcopy(self.DEFAULTS)
+        self._game_running = False
 
     @property
     def current(self) -> dict:
@@ -105,12 +106,13 @@ class GuiSettingsController(BaseController):
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": float(network.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]) or 0.0),
             "download_concurrency": int(network.get("download_concurrency", self.DEFAULTS["download_concurrency"]) or 0),
+            "download_performance_mode": self._normalize_download_performance_mode(network.get("download_performance_mode")),
             "notify_legacy_cache_cleanup": bool(storage.get("notify_legacy_cache_cleanup", self.DEFAULTS["notify_legacy_cache_cleanup"])),
             "unused_version_retention_days": int(storage.get("unused_version_retention_days", self.DEFAULTS["unused_version_retention_days"]) or self.DEFAULTS["unused_version_retention_days"]),
             "instance_defaults": SettingsManager.normalize_dict(data.get("instance_defaults")),
         }
         download_bandwidth_limiter.configure_mbps(self._current["download_limit_mbps"])
-        download_manager.configure(self._current["download_concurrency"] or DEFAULT_MAX_CONCURRENT_DOWNLOADS)
+        self._apply_download_policy()
         self.settings_changed.emit(copy.deepcopy(self._current))
         return copy.deepcopy(self._current)
 
@@ -127,7 +129,7 @@ class GuiSettingsController(BaseController):
         except (TypeError, ValueError):
             download_concurrency = 0
         download_concurrency = 0 if download_concurrency <= 0 else min(download_concurrency, 16)
-        download_manager.configure(download_concurrency or DEFAULT_MAX_CONCURRENT_DOWNLOADS)
+        download_performance_mode = self._normalize_download_performance_mode(data.get("download_performance_mode"))
         tester_mode = bool(data.get("tester_mode", self.DEFAULTS["tester_mode"]))
         update_channel = "beta" if tester_mode else "stable"
         self._current = {
@@ -161,10 +163,12 @@ class GuiSettingsController(BaseController):
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": download_limit_mbps,
             "download_concurrency": download_concurrency,
+            "download_performance_mode": download_performance_mode,
             "notify_legacy_cache_cleanup": bool(data.get("notify_legacy_cache_cleanup", self.DEFAULTS["notify_legacy_cache_cleanup"])),
             "unused_version_retention_days": max(1, min(int(data.get("unused_version_retention_days", self.DEFAULTS["unused_version_retention_days"]) or self.DEFAULTS["unused_version_retention_days"]), 365)),
             "instance_defaults": SettingsManager.normalize_dict(data.get("instance_defaults")),
         }
+        self._apply_download_policy()
         self._settings.save({
             "gui": {
                 "start_page": self._current["start_page"],
@@ -191,6 +195,7 @@ class GuiSettingsController(BaseController):
             "network": {
                 "download_limit_mbps": self._current["download_limit_mbps"],
                 "download_concurrency": self._current["download_concurrency"],
+                "download_performance_mode": self._current["download_performance_mode"],
             },
             "storage": {
                 "notify_legacy_cache_cleanup": self._current["notify_legacy_cache_cleanup"],
@@ -202,6 +207,27 @@ class GuiSettingsController(BaseController):
         self.status_changed.emit(tr("Launcher settings saved"))
         self.log_created.emit(tr("GUI preferences saved"))
 
+
+    def set_game_running(self, running: bool) -> None:
+        normalized = bool(running)
+        if normalized == self._game_running:
+            return
+        self._game_running = normalized
+        self._apply_download_policy()
+
+    def _apply_download_policy(self) -> int:
+        concurrency = download_manager.recommended_concurrency(
+            self._current.get("download_performance_mode", "automatic"),
+            self._current.get("download_concurrency", 0),
+            game_running=self._game_running,
+        )
+        download_manager.configure(concurrency)
+        return concurrency
+
+    @staticmethod
+    def _normalize_download_performance_mode(value: object) -> str:
+        normalized = str(value or "automatic").strip().lower()
+        return normalized if normalized in {"automatic", "responsive", "balanced", "maximum"} else "automatic"
 
     @classmethod
     def _normalize_start_page(cls, value: object) -> str:

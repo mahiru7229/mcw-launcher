@@ -16,7 +16,7 @@ from src.core.theme.theme_palette import normalize_hex_color
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 18
+    SCHEMA_VERSION = 19
     UPDATE_CHANNEL_POLICY_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
@@ -60,6 +60,7 @@ class LauncherSettingsManager:
         "network": {
             "download_limit_mbps": 0.0,
             "download_concurrency": 0,
+            "download_performance_mode": "automatic",
         },
         "storage": {
             "notify_legacy_cache_cleanup": True,
@@ -237,6 +238,7 @@ class LauncherSettingsManager:
         network = normalized.setdefault("network", {})
         network["download_limit_mbps"] = self._as_download_limit(network.get("download_limit_mbps"))
         network["download_concurrency"] = self._as_download_concurrency(network.get("download_concurrency"))
+        network["download_performance_mode"] = self._as_download_performance_mode(network.get("download_performance_mode"))
 
         storage = normalized.setdefault("storage", {})
         storage["notify_legacy_cache_cleanup"] = self._as_bool(storage.get("notify_legacy_cache_cleanup"), True)
@@ -295,6 +297,11 @@ class LauncherSettingsManager:
         if parsed <= 0:
             return 0
         return min(max(parsed, 1), 16)
+
+    @staticmethod
+    def _as_download_performance_mode(value: Any) -> str:
+        normalized = str(value or "automatic").strip().lower()
+        return normalized if normalized in {"automatic", "responsive", "balanced", "maximum"} else "automatic"
 
     @staticmethod
     def _as_bool(value: Any, default: bool) -> bool:

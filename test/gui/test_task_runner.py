@@ -90,3 +90,30 @@ def test_shutdown_requests_cancellation_and_rejects_new_work(gui_app) -> None:
     assert runner.is_shutting_down is True
     assert token.cancelled is True
     assert runner.run("later", lambda: None, "later", blocking=False) is False
+
+
+def test_priority_mode_cancels_competing_tasks_and_rejects_new_non_priority_work(gui_app) -> None:
+    runner = TaskRunner()
+    token = TaskCancellationToken()
+    context = TaskContext(
+        context_id="context-1",
+        task_id="java.scan",
+        group="java.scan",
+        thread=Thread(target=lambda: None, daemon=True),
+        token=token,
+        blocking=False,
+        cooperative=True,
+    )
+    runner._contexts[context.context_id] = context
+    rejected = []
+    runner.task_rejected.connect(rejected.append)
+
+    assert runner.begin_priority_mode("update.") == ("java.scan",)
+    assert runner.is_priority_mode is True
+    assert runner.priority_prefix == "update."
+    assert token.cancelled is True
+    assert runner.run("modrinth.search", lambda: None, "search", blocking=False) is False
+    assert rejected
+
+    assert runner.end_priority_mode("update.") is True
+    assert runner.is_priority_mode is False

@@ -9,8 +9,8 @@
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.2">
     <img src="https://img.shields.io/badge/Stable-v1.3.2-brightgreen" alt="Stable version">
   </a>
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.1">
-    <img src="https://img.shields.io/badge/Beta-v1.4.0--beta.1-orange" alt="Beta version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.2">
+    <img src="https://img.shields.io/badge/Beta-v1.4.0--beta.2-orange" alt="Beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -50,6 +50,21 @@ Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh b
 Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.4.0-beta.2
+
+**v1.4.0-beta.2** tập trung vào hiệu năng tải modpack và ưu tiên cập nhật launcher. Khi người dùng chọn cập nhật, launcher chuyển sang **Update Priority Mode**, hủy/drop các task khác theo cùng nguyên tắc shutdown, chặn task mới chen vào và chỉ bước sang apply sau khi các worker cũ đã dừng ở safe point.
+
+- Modrinth pack artifacts tải song song thích ứng theo CPU và giới hạn download đã cấu hình.
+- SHA-1/SHA-512/SHA-256 được tính trong một lượt đọc file; hashing có I/O budget riêng để giảm giật trên máy yếu/HDD.
+- Download journal batch progress writes để giảm `fsync` cạnh tranh khi nhiều file đang tải.
+- Thêm profile **Automatic / Responsive / Balanced / Maximum**; Automatic tự giảm concurrency khi Minecraft đang chạy.
+- Update Priority Mode cancel task khác, khóa scheduler cho `update.*`, nhưng vẫn đợi mutation cũ drain an toàn trước bước apply.
+- Các mutation nặng trên cùng instance vẫn giữ tuần tự trong beta.2 để tránh đổi hiệu năng lấy rủi ro dữ liệu.
+
+Beta.3 sẽ tập trung Diagnostics v2, Create Issue Report, privacy/task timeline và benchmark/Windows soak.
+
+Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.2.md`](docs/RELEASE-v1.4.0-beta.2.md).
 
 ## Có gì mới trong v1.4.0-beta.1
 

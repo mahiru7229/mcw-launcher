@@ -1,28 +1,31 @@
-MCW Launcher / MCW Core v1.4.0-beta.1
-Test run date: 2026-08-12
-Environment: Linux / Python 3.13 (release-build workspace)
+MCW Launcher v1.4.0-beta.2
 
-Full regression suite:
-  python -m pytest -q
-  1551 passed, 90 skipped, 2 warnings, 0 failed
+Validation date: 2026-08-12
+Environment: Linux headless build/test environment (PySide6 not installed)
 
-Focused integration regression after v1.4 changes:
-  66 passed
-  - runtime translation/static text coverage
-  - version metadata
-  - Forge profile/cache regression including issue #20 (1.12.2 / 14.23.5.2860)
-  - ProcessSupervisor/GameRuntimeManager force-kill semantics
-  - cancellation-aware network retry
+Full pytest regression:
+  1555 passed, 91 skipped, 2 warnings, 0 failed
 
-MCW Core wheel:
-  mcw_core-1.4.0b1-py3-none-any.whl
-  isolated target install: PASS
-  runtime version: 1.4.0-beta.1
-  distribution version: 1.4.0b1
-  src.gui bundled: no
-  public InstanceService.kill: available
+Warnings:
+  2 intentional duplicate-ZIP-member warnings from package security fixtures.
 
-Notes:
-- 90 tests are skipped in this environment where PySide6/Windows GUI runtime is unavailable.
-- The 2 warnings are intentional duplicate ZIP-member fixtures in package security tests.
-- Windows GUI shutdown, Qt signal delivery, and real Minecraft process-tree kill require Windows smoke/soak validation before stable.
+Additional validation:
+  python -m compileall -q src mcw_core tools launcher.py: PASS
+  Translation/static GUI coverage after beta.2 additions: PASS
+  Update Priority + adaptive download/hash/journal targeted regression: PASS
+
+Beta.2 scope validated:
+  - Update Priority Mode cancels competing launcher tasks and rejects new non-update work.
+  - Update prepare waits for cancelled workers to settle before exclusive update handoff.
+  - Adaptive Modrinth .mrpack artifact concurrency remains bounded by configured download limits.
+  - SHA-1/SHA-512/SHA-256 can be calculated in one file pass with bounded hash I/O concurrency.
+  - Download journal progress updates are batched while terminal/critical states flush immediately.
+  - Automatic/Responsive/Balanced/Maximum download performance modes normalize correctly.
+  - Automatic mode downshifts download concurrency while Minecraft is running.
+
+Platform note:
+  91 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
+  Windows smoke testing is still required for the GUI update handoff and live performance-profile behavior.
+
+Release policy:
+  This beta delivery contains Launcher source only. No standalone MCW Core ZIP/WHL is built or published for beta.2.

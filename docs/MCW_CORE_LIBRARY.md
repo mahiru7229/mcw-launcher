@@ -1,6 +1,6 @@
 # MCW Core Library
 
-Current distribution: **mcw-core 1.4.0b1** (runtime `1.4.0-beta.1`). Beta 1 adds cancellable launcher task foundations, force-kill support for supervised instance processes, and strict Forge profile/cache validation without adding a GUI dependency.
+Bundled runtime for Launcher beta.2: **1.4.0-beta.2**. No separate MCW Core beta artifact is published for beta.2; standalone Core artifacts are reserved for the stable v1.4 release.
 
 MCW Core is the GUI-independent runtime used by MCW Launcher. It can be imported from a Python program without installing PySide6.
 

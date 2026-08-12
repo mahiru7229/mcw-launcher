@@ -154,6 +154,7 @@ class MainWindow(QMainWindow):
         self._content_tasks: set[str] = set()
         self._suppress_loader_progress = False
         self._prompted_update_versions: set[str] = set()
+        self._pending_prepared_update: PreparedUpdate | None = None
         self._selected_instance: object | None = None
         self._restoring_instance_selection = False
         self._pending_mod_install_after_create: dict[str, object] | None = None
@@ -635,6 +636,7 @@ class MainWindow(QMainWindow):
         self.lan_hosting_controller.prepared.connect(self._on_lan_hosting_prepared)
         self.launch_controller.launch_finished.connect(self.launch_control.set_result)
         self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
+        self.launch_controller.launch_finished.connect(lambda _result: self.gui_settings_controller.set_game_running(True))
         self.launch_controller.game_exited.connect(self._on_game_exited)
         self.launch_controller.pause_requested.connect(self.launch_control.set_pause_pending)
         self.launch_controller.launch_paused.connect(self._on_launch_paused)
@@ -726,6 +728,7 @@ class MainWindow(QMainWindow):
         self.account_controller.audit_security()
         self.instance_controller.refresh()
         self.instance_controller.refresh_running(force=True)
+        self.gui_settings_controller.set_game_running(bool(InstanceRunLock.list_active()))
         self.running_instances_timer.start()
         self.version_controller.refresh()
         self.java_controller.scan()
@@ -1175,6 +1178,9 @@ class MainWindow(QMainWindow):
         self.modrinth_controller.install_mod(instance_name, str(getattr(version, "version_id", "")), tuple(allowed_version_types))
 
     def _on_task_settled(self, task_id: str, succeeded: bool, result: object) -> None:
+        if self._pending_prepared_update is not None and not task_id.startswith("update."):
+            QTimer.singleShot(0, self._try_launch_pending_update)
+
         if task_id != self.instance_controller.CREATE_TASK_ID:
             return
 
@@ -2054,6 +2060,7 @@ class MainWindow(QMainWindow):
             self.launch_control.set_exit_result(result)
         self.instance_controller.refresh_running(force=True)
         self.instance_controller.refresh(selected_name=result_name or selected_name)
+        self.gui_settings_controller.set_game_running(bool(InstanceRunLock.list_active()))
         crashed = bool(getattr(result, "crashed", False))
         instance_name = str(getattr(result, "instance_name", "Minecraft"))
         exit_code = int(getattr(result, "exit_code", -1))
@@ -2098,7 +2105,7 @@ class MainWindow(QMainWindow):
             if not WindowsUpdateInstaller.is_supported():
                 QMessageBox.information(self, tr("update.error.title"), tr("update.error.packaged_only"))
                 return
-            blocked_reason = self._update_install_block_reason()
+            blocked_reason = self._update_install_block_reason(include_tasks=False)
             if blocked_reason:
                 QMessageBox.warning(self, tr("update.error.title"), blocked_reason)
                 self.launcher_settings_page.set_update_status(tr("update.status.waiting"))
@@ -2116,18 +2123,33 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("update.error.title"), tr("update.error.check_failed", error=error))
 
     def _on_update_prepared(self, prepared: PreparedUpdate) -> None:
-        blocked_reason = self._update_install_block_reason()
+        self._pending_prepared_update = prepared
+        self._try_launch_pending_update()
+
+    def _try_launch_pending_update(self) -> None:
+        prepared = self._pending_prepared_update
+        if prepared is None:
+            return
+
+        active_tasks = [task_id for task_id in self.task_runner.active_task_ids if not task_id.startswith("update.")]
+        if active_tasks:
+            self.launcher_settings_page.set_update_status(tr("update.status.priority_waiting", count=len(active_tasks)))
+            return
+
+        blocked_reason = self._update_install_block_reason(include_tasks=False)
         if blocked_reason:
             self.launcher_settings_page.set_update_status(tr("update.status.waiting"))
-            QMessageBox.warning(self, tr("update.error.title"), blocked_reason)
             return
+
+        self._pending_prepared_update = None
         self.launcher_settings_page.set_update_status(tr("update.status.installing"))
         QTimer.singleShot(0, lambda: self._launch_prepared_update(prepared))
 
-    def _update_install_block_reason(self) -> str | None:
-        active_tasks = [task_id for task_id in self.task_runner.active_task_ids if not task_id.startswith("update.")]
-        if active_tasks:
-            return tr("update.error.tasks_running", count=len(active_tasks))
+    def _update_install_block_reason(self, *, include_tasks: bool = True) -> str | None:
+        if include_tasks:
+            active_tasks = [task_id for task_id in self.task_runner.active_task_ids if not task_id.startswith("update.")]
+            if active_tasks:
+                return tr("update.error.tasks_running", count=len(active_tasks))
         running_instances = InstanceRunLock.list_active()
         if running_instances:
             names = ", ".join(item.name for item in running_instances[:4])
@@ -2140,6 +2162,7 @@ class MainWindow(QMainWindow):
         try:
             WindowsUpdateInstaller.launch(prepared)
         except (AutomaticUpdateUnsupportedError, OSError, RuntimeError) as error:
+            self.update_controller.release_priority()
             self._show_error(tr("update.error.title"), str(error))
             self.launcher_settings_page.set_update_status(tr("update.status.failed"))
             return

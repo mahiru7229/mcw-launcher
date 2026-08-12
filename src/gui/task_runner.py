@@ -95,6 +95,7 @@ class TaskRunner(QObject):
         self._contexts: dict[str, TaskContext] = {}
         self._blocking_tasks = 0
         self._shutting_down = False
+        self._priority_prefix: str | None = None
         self._worker_settled.connect(self._finish_worker, Qt.ConnectionType.QueuedConnection)
 
     @property
@@ -108,6 +109,14 @@ class TaskRunner(QObject):
     @property
     def has_active_tasks(self) -> bool:
         return bool(self._contexts)
+
+    @property
+    def is_priority_mode(self) -> bool:
+        return self._priority_prefix is not None
+
+    @property
+    def priority_prefix(self) -> str | None:
+        return self._priority_prefix
 
     @property
     def active_task_ids(self) -> tuple[str, ...]:
@@ -134,6 +143,9 @@ class TaskRunner(QObject):
             raise ValueError("A task id is required.")
         if self._shutting_down:
             self.task_rejected.emit(tr("task.shutting_down"))
+            return False
+        if self._priority_prefix is not None and not normalized_id.startswith(self._priority_prefix):
+            self.task_rejected.emit(tr("task.priority_mode"))
             return False
 
         normalized_group = str(group or normalized_id).strip() or normalized_id
@@ -238,19 +250,53 @@ class TaskRunner(QObject):
             self._request_cancel_context(context)
         return len(contexts)
 
-    def cancel_all(self) -> tuple[str, ...]:
+    def cancel_all(self, *, exclude_prefix: str | None = None) -> tuple[str, ...]:
+        normalized_exclude = str(exclude_prefix or "").strip()
         cancelled: list[str] = []
         for context in tuple(self._contexts.values()):
             if context.state is not TaskState.RUNNING:
+                continue
+            if normalized_exclude and context.task_id.startswith(normalized_exclude):
                 continue
             self._request_cancel_context(context)
             cancelled.append(context.task_id)
         return tuple(dict.fromkeys(cancelled))
 
+    def begin_priority_mode(self, allowed_prefix: str = "update.") -> tuple[str, ...]:
+        """Cancel competing work and reserve the runner for one task family.
+
+        Priority mode is intentionally softer than shutdown: the application remains
+        alive, but new tasks outside ``allowed_prefix`` are rejected until the mode is
+        released. Existing tasks receive cooperative cancellation requests. A worker
+        that is already inside a non-interruptible/legacy section may drain in the
+        background; callers must still wait for those contexts to settle before an
+        exclusive commit such as applying a launcher update.
+        """
+
+        if self._shutting_down:
+            return ()
+        normalized = str(allowed_prefix or "").strip()
+        if not normalized:
+            raise ValueError("A priority task prefix is required.")
+        if self._priority_prefix not in {None, normalized}:
+            raise RuntimeError(f"Task priority mode is already reserved for '{self._priority_prefix}'.")
+        self._priority_prefix = normalized
+        return self.cancel_all(exclude_prefix=normalized)
+
+    def end_priority_mode(self, allowed_prefix: str | None = None) -> bool:
+        if self._priority_prefix is None:
+            return False
+        normalized = str(allowed_prefix or "").strip()
+        if normalized and normalized != self._priority_prefix:
+            return False
+        self._priority_prefix = None
+        return True
+
     def begin_shutdown(self) -> tuple[str, ...]:
         if self._shutting_down:
             return ()
         self._shutting_down = True
+        self._priority_prefix = None
         self.shutdown_started.emit()
         return self.cancel_all()
 

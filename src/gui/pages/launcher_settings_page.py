@@ -115,12 +115,17 @@ class LauncherSettingsPage(BasePage):
         self.download_limit_mbps.setValue(10.0)
         self.download_limit_mbps.setEnabled(False)
         self.limit_download_speed.toggled.connect(self.download_limit_mbps.setEnabled)
+        self.download_performance_label = QLabel(tr("network.performance.label"))
+        self.download_performance_mode = QComboBox()
+        self._reload_download_performance_modes()
         self.download_concurrency = QComboBox()
         self.download_concurrency.addItem(tr("network.concurrency.auto"), 0)
         for value in (2, 4, 6, 8, 12, 16):
             self.download_concurrency.addItem(tr("network.concurrency.value", count=value), value)
         bandwidth_card.layout.addWidget(self.limit_download_speed)
         bandwidth_card.layout.addWidget(self.download_limit_mbps)
+        bandwidth_card.layout.addWidget(self.download_performance_label)
+        bandwidth_card.layout.addWidget(self.download_performance_mode)
         bandwidth_card.layout.addWidget(QLabel(tr("network.concurrency.label")))
         bandwidth_card.layout.addWidget(self.download_concurrency)
         downloads_section.add_card(bandwidth_card)
@@ -499,6 +504,7 @@ class LauncherSettingsPage(BasePage):
         self.prefer_dedicated_gpu.toggled.connect(self._refresh_dirty_state)
         self.limit_download_speed.toggled.connect(self._refresh_dirty_state)
         self.download_limit_mbps.valueChanged.connect(self._refresh_dirty_state)
+        self.download_performance_mode.currentIndexChanged.connect(self._refresh_dirty_state)
         self.download_concurrency.currentIndexChanged.connect(self._refresh_dirty_state)
         self.language_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         self.show_content_descriptions.toggled.connect(self._refresh_dirty_state)
@@ -895,6 +901,7 @@ class LauncherSettingsPage(BasePage):
             "allow_launch_on_forge_preflight_failure": self.current_forge_preflight_policy() == ManagedContentPolicy.ALLOW,
             "curseforge_gateway_urls": [field.text().strip() for field in self.curseforge_gateway_inputs],
             "download_limit_mbps": self.download_limit_mbps.value() if self.limit_download_speed.isChecked() else 0.0,
+            "download_performance_mode": str(self.download_performance_mode.currentData() or "automatic"),
             "download_concurrency": int(self.download_concurrency.currentData() or 0),
             "instance_defaults": copy.deepcopy(self._instance_defaults),
         }
@@ -931,6 +938,16 @@ class LauncherSettingsPage(BasePage):
 
     def set_update_busy(self, busy: bool) -> None:
         self.check_updates_button.setEnabled(not busy)
+
+    def _reload_download_performance_modes(self) -> None:
+        current = str(self.download_performance_mode.currentData() or "automatic") if self.download_performance_mode.count() else "automatic"
+        self.download_performance_mode.blockSignals(True)
+        self.download_performance_mode.clear()
+        for mode in ("automatic", "responsive", "balanced", "maximum"):
+            self.download_performance_mode.addItem(tr(f"network.performance.{mode}"), mode)
+        index = self.download_performance_mode.findData(current)
+        self.download_performance_mode.setCurrentIndex(max(0, index))
+        self.download_performance_mode.blockSignals(False)
 
     def retranslate_dynamic(self) -> None:
         self.title_label.setText(tr("launcher_settings.page.title"))
@@ -1035,6 +1052,8 @@ class LauncherSettingsPage(BasePage):
         self.preview_primary_button.setText(tr("theme.authoring.preview.primary_button"))
         self.preview_disabled_button.setText(tr("theme.authoring.preview.disabled_button"))
         self.preview_dialog_button.setText(tr("theme.authoring.preview.dialog_button"))
+        self.download_performance_label.setText(tr("network.performance.label"))
+        self._reload_download_performance_modes()
         self._reload_motion_modes()
         self._update_instance_defaults_summary()
         self._update_save_button_text()
@@ -1057,6 +1076,7 @@ class LauncherSettingsPage(BasePage):
             self.forge_preflight_policy_combo,
             self.limit_download_speed,
             self.download_limit_mbps,
+            self.download_performance_mode,
             self.download_concurrency,
             self.join_tester_program,
             self.language_combo,
@@ -1097,6 +1117,9 @@ class LauncherSettingsPage(BasePage):
         self.limit_download_speed.setChecked(download_limit > 0)
         self.download_limit_mbps.setValue(download_limit if download_limit > 0 else 10.0)
         self.download_limit_mbps.setEnabled(download_limit > 0)
+        performance_mode = str(settings.get("download_performance_mode", "automatic") or "automatic").strip().lower()
+        performance_index = self.download_performance_mode.findData(performance_mode)
+        self.download_performance_mode.setCurrentIndex(max(0, performance_index))
         concurrency = int(settings.get("download_concurrency", 0) or 0)
         concurrency_index = self.download_concurrency.findData(concurrency)
         self.download_concurrency.setCurrentIndex(max(0, concurrency_index))
