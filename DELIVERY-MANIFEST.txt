@@ -1,20 +1,21 @@
-MCW Launcher v1.4.0-beta.3 beta delivery
+MCW Launcher v1.4.0-beta.4 beta delivery
 
 Delivery policy:
 - One Launcher changed-files ZIP only for beta/RC releases.
-- No full-source delivery ZIP and no standalone MCW Core artifact for beta.3.
+- No full-source delivery ZIP and no standalone MCW Core artifact for beta.4.
 - Standalone Core artifacts resume only when v1.4 is declared stable.
 
-Launcher runtime: v1.4.0-beta.3
+Launcher runtime: v1.4.0-beta.4
 Update channel: beta
 
-Primary beta.3 scope:
-- Diagnostics v2 with system/Java/task/instance/runtime context and bounded privacy-filtered logs.
-- Background diagnostics export.
-- Two-step Report Issue wizard: collect user details first, guidance second.
-- Prefilled privacy-filtered GitHub issue draft and local ZIP attachment guidance.
-- Report Issue action from error dialogs.
+Primary beta.4 scope:
+- Global progress ownership so stale task completions cannot overwrite newer work.
+- Generic running/success/failure/cancel progress for tasks without dedicated profiles.
+- Cancel/supersede UI cleanup through the same settled lifecycle as success/failure.
+- Busy-state reconciliation from TaskRunner active task ids.
+- Legacy Storage probe/scan/cleanup terminal progress coverage.
 
 Inherited scope:
 - Beta.1 task lifecycle, shutdown cancellation, Kill Instance and Forge issue #20 hardening.
 - Beta.2 Update Priority Mode, adaptive modpack download, one-pass hashing and journal batching.
+- Beta.3 Diagnostics v2 and guided Report Issue workflow.

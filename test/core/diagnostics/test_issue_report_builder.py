@@ -15,12 +15,12 @@ def test_issue_report_builder_redacts_and_includes_diagnostics_filename() -> Non
     }
     body = IssueReportBuilder.build_body(
         details,
-        launcher_version="1.4.0-beta.3",
+        launcher_version="1.4.0-beta.4",
         diagnostics_path=Path("MCW-Diagnostics-20260812-190000.zip"),
     )
 
     assert "MCW-Diagnostics-20260812-190000.zip" in body
-    assert "1.4.0-beta.3" in body
+    assert "1.4.0-beta.4" in body
     assert "secret-token" not in body
     assert "<redacted>" in body
 
@@ -29,7 +29,7 @@ def test_github_new_issue_url_prefills_title_and_body() -> None:
     url = IssueReportBuilder.github_new_issue_url(
         "mahiru7229/mcw-launcher",
         {"title": "Forge profile issue", "what_happened": "Forge failed"},
-        launcher_version="1.4.0-beta.3",
+        launcher_version="1.4.0-beta.4",
     )
     parsed = urlparse(url)
     query = parse_qs(parsed.query)

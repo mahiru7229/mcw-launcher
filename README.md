@@ -9,7 +9,7 @@
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.2">
     <img src="https://img.shields.io/badge/Stable-v1.3.2-brightgreen" alt="Stable version">
   </a>
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.3">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.4">
     <img src="https://img.shields.io/badge/Beta-v1.4.0--beta.2-orange" alt="Beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
@@ -51,6 +51,14 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.2 hỗ trợ nâng cấp
 
 ---
 
+## Có gì mới trong v1.4.0-beta.4
+
+**v1.4.0-beta.4** là beta bổ sung tập trung vào tính nhất quán của progress/task state. Thanh tiến trình toàn cục giờ được reset khi task mới bắt đầu, không còn giữ `READY / 100% / detail` của task trước; kết quả của task cũ hoàn tất muộn không được phép ghi đè task mới; cancel/supersede cũng đi qua cùng đường cleanup busy/progress như success/failure. Legacy Storage probe/scan/cleanup có terminal progress riêng để thao tác bỏ qua hoặc dọn dữ liệu phản ánh đúng trạng thái.
+
+Beta.4 giữ toàn bộ TaskRunner/Kill Instance/Forge hardening, download performance, Update Priority và Diagnostics v2 từ beta.1–beta.3.
+
+Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.4.md`](docs/RELEASE-v1.4.0-beta.4.md).
+
 ## Có gì mới trong v1.4.0-beta.3
 
 **v1.4.0-beta.3** tập trung vào Diagnostics v2 và quy trình báo lỗi. Nút **Báo cáo lỗi** mở màn hình nhập thông tin trước, sau đó launcher thu thập diagnostics ở background và mới hiện hướng dẫn tạo GitHub issue/đính kèm ZIP. Bundle mới bổ sung system info, Java runtime, task timeline, runtime/crash logs gần nhất và issue context đã lọc thông tin nhạy cảm.
@@ -70,7 +78,7 @@ Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.3.md`](docs/RELEASE-v1.4.0-beta.
 - Forge installer/profile cache không còn fallback sang vanilla profile; poisoned cache tự invalidated.
 - Regression riêng cho Forge 1.12.2 / 14.23.5.2860.
 
-Ba beta v1.4 được chia theo dependency: beta.1 = lifecycle/runtime stability; beta.2 = modpack download/I/O performance; beta.3 = Diagnostics v2 + Create Issue Report + polish/benchmark.
+Nhánh v1.4 hiện có bốn beta: beta.1 = lifecycle/runtime stability; beta.2 = modpack download/I/O performance; beta.3 = Diagnostics v2 + Create Issue Report; beta.4 = progress/task-state consistency trước RC.
 
 Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.1.md`](docs/RELEASE-v1.4.0-beta.1.md).
 

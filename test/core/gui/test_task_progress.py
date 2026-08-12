@@ -12,7 +12,9 @@ def test_profiles_cover_requested_long_running_tasks() -> None:
         "modpack.import": ProgressStage.IMPORTING_INSTANCE,
         "lan.hosting.prepare": ProgressStage.PREPARING,
         "update.prepare": ProgressStage.DOWNLOADING_UPDATE,
+        "storage.legacy.probe": ProgressStage.PREPARING,
         "storage.legacy.scan": ProgressStage.PREPARING,
+        "storage.legacy.clean": ProgressStage.PREPARING,
         "modrinth.install.modpack": ProgressStage.DOWNLOADING_MODPACK,
         "curseforge.install.mod": ProgressStage.DOWNLOADING_MODS,
         "content.install.modrinth": ProgressStage.DOWNLOADING_CONTENT,
@@ -31,3 +33,14 @@ def test_legacy_storage_scan_has_its_own_completion_detail() -> None:
 
 def test_profile_lookup_ignores_unrelated_background_searches() -> None:
     assert task_progress_profile("mod_catalog.search.fabric") is None
+
+
+def test_legacy_storage_probe_and_cleanup_have_terminal_progress_profiles() -> None:
+    probe = task_progress_profile("storage.legacy.probe")
+    cleanup = task_progress_profile("storage.legacy.clean")
+
+    assert probe is not None
+    assert probe.success_message == "storage.legacy.scan.completed"
+    assert cleanup is not None
+    assert cleanup.success_message == "storage.legacy.clean.completed"
+    assert cleanup.success_detail == "storage.legacy.clean.completed_detail"

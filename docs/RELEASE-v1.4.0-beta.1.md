@@ -28,11 +28,12 @@ MCW Launcher **v1.4.0-beta.1** mở nhánh v1.4 với nền tảng **Task Lifecy
 - Cache Forge có metadata loader nhưng thiếu runtime bị coi là poisoned cache và tự invalidated/rebuilt.
 - Regression bao phủ Forge 1.12.2 / 14.23.5.2860: vanilla fallback bị reject, profile có `net.minecraftforge:forge:1.12.2-14.23.5.2860` được chọn đúng.
 
-### Kế hoạch 3 beta
+### Kế hoạch beta v1.4
 
 - **Beta 1:** Task lifecycle/shutdown, Kill Instance, Forge issue #20, giữ toàn bộ hardening issue #19 từ v1.3.2.
 - **Beta 2:** adaptive modpack download, multi-hash one-pass, network/disk/hash resource budget, progress coalescing, journal batching và scheduler/resource conflict nâng cao.
 - **Beta 3:** Diagnostics v2 (launcher/runtime/loader/hardware/task timeline), secret redaction, Create Issue Report, polish/benchmark và Windows soak trước RC/stable.
+- **Beta 4 (bổ sung):** progress/task-state consistency, stale-result protection và cancel/busy cleanup trước RC.
 
 ### Metadata
 
@@ -49,7 +50,7 @@ Beta 1 thay đổi nền threading của GUI. Core/runtime regression có thể 
 
 ## English
 
-MCW Launcher **v1.4.0-beta.1** starts the v1.4 line with a new **Task Lifecycle & Shutdown** foundation, a **Kill Instance** action for running games, and Forge profile/cache hardening for issue #20. Modpack performance work and Diagnostics v2 are intentionally split into beta.2 and beta.3 so each beta has a bounded regression surface.
+MCW Launcher **v1.4.0-beta.1** starts the v1.4 line with a new **Task Lifecycle & Shutdown** foundation, a **Kill Instance** action for running games, and Forge profile/cache hardening for issue #20. Modpack performance work and Diagnostics v2 are split into beta.2 and beta.3; beta.4 was added afterward to harden progress/task-state consistency before RC.
 
 ### Task lifecycle / threading
 

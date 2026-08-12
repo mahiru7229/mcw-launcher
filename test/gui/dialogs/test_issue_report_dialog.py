@@ -8,7 +8,7 @@ from src.gui.dialogs.issue_report_dialog import IssueReportDialog
 
 
 def test_issue_report_collects_information_before_guidance(gui_app) -> None:
-    dialog = IssueReportDialog("MCW 1.4.0-beta.3; instance=RLCraft")
+    dialog = IssueReportDialog("MCW 1.4.0-beta.4; instance=RLCraft")
     submitted = []
     dialog.information_submitted.connect(submitted.append)
 

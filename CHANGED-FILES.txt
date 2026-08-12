@@ -1,26 +1,24 @@
-MCW Launcher v1.4.0-beta.3 changed files from v1.4.0-beta.2 baseline
+MCW Launcher v1.4.0-beta.4 changed files from v1.4.0-beta.3 baseline
 
-A	docs/RELEASE-v1.4.0-beta.3.md
-A	mcw_core/api/diagnostics/issue_report_builder.py
-A	src/core/diagnostics/issue_report_builder.py
-A	src/gui/dialogs/issue_report_dialog.py
-A	test/core/diagnostics/test_issue_report_builder.py
-A	test/gui/dialogs/test_issue_report_dialog.py
 M	COMMIT-NAME.txt
 M	DELIVERY-MANIFEST.txt
 M	README.md
 M	TEST-RESULTS.txt
 M	docs/MCW_CORE_LIBRARY.md
+M	docs/RELEASE-v1.4.0-beta.1.md
+M	docs/RELEASE-v1.4.0-beta.3.md
+A	docs/RELEASE-v1.4.0-beta.4.md
 M	docs/V1.4-BETA-ROADMAP.md
 M	lang/en-US.json
 M	lang/vi-VN.json
 M	pyproject.toml
 M	src/config.py
-M	src/core/diagnostics/diagnostics_manager.py
 M	src/gui/main_window_2.py
-M	src/gui/pages/logs_page.py
-M	src/gui/task_runner.py
+M	src/gui/task_progress.py
 M	test/core/config/test_version_metadata.py
 M	test/core/diagnostics/test_diagnostics_manager.py
-M	test/gui/test_task_runner.py
+M	test/core/diagnostics/test_issue_report_builder.py
+M	test/core/gui/test_task_progress.py
+M	test/gui/dialogs/test_issue_report_dialog.py
+A	test/gui/test_global_progress_lifecycle.py
 M	test/test_public_api.py

@@ -1,1330 +1,824 @@
-# MCW Launcher v1.4.0-beta.2 -> v1.4.0-beta.3
+# MCW Launcher v1.4.0-beta.3 -> v1.4.0-beta.4
 
-diff --git a/CHANGED-FILES.txt b/CHANGED-FILES.txt
-index 46464a4..19de8c0 100644
---- a/CHANGED-FILES.txt
-+++ b/CHANGED-FILES.txt
-@@ -1,28 +1,26 @@
--MCW Launcher v1.4.0-beta.2 changed files from v1.4.0-beta.1 baseline
-+MCW Launcher v1.4.0-beta.3 changed files from v1.4.0-beta.2 baseline
- 
-+A	docs/RELEASE-v1.4.0-beta.3.md
-+A	mcw_core/api/diagnostics/issue_report_builder.py
-+A	src/core/diagnostics/issue_report_builder.py
-+A	src/gui/dialogs/issue_report_dialog.py
-+A	test/core/diagnostics/test_issue_report_builder.py
-+A	test/gui/dialogs/test_issue_report_dialog.py
- M	COMMIT-NAME.txt
-+M	DELIVERY-MANIFEST.txt
- M	README.md
-+M	TEST-RESULTS.txt
- M	docs/MCW_CORE_LIBRARY.md
--A	docs/RELEASE-v1.4.0-beta.2.md
- M	docs/V1.4-BETA-ROADMAP.md
- M	lang/en-US.json
- M	lang/vi-VN.json
- M	pyproject.toml
- M	src/config.py
--M	src/core/config/launcher_settings_manager.py
--M	src/core/modrinth/modrinth_content_manager.py
--M	src/core/network/download_journal.py
--M	src/core/network/download_manager.py
--M	src/gui/controllers/gui_settings_controller.py
--M	src/gui/controllers/update_controller.py
-+M	src/core/diagnostics/diagnostics_manager.py
- M	src/gui/main_window_2.py
--M	src/gui/pages/launcher_settings_page.py
-+M	src/gui/pages/logs_page.py
- M	src/gui/task_runner.py
--M	test/core/config/test_launcher_settings_manager.py
- M	test/core/config/test_version_metadata.py
--M	test/core/modrinth/test_modrinth_content_manager.py
--M	test/core/network/test_download_journal.py
--M	test/core/network/test_unified_download_manager.py
--A	test/gui/controllers/test_update_controller_priority.py
-+M	test/core/diagnostics/test_diagnostics_manager.py
- M	test/gui/test_task_runner.py
- M	test/test_public_api.py
-diff --git a/COMMIT-NAME.txt b/COMMIT-NAME.txt
-index c867dd0..506ab4f 100644
 --- a/COMMIT-NAME.txt
 +++ b/COMMIT-NAME.txt
 @@ -1 +1 @@
--feat(beta): mcw-launcher v1.4.0-beta.2 adaptive downloads and update priority
-+feat(beta): mcw-launcher v1.4.0-beta.3 diagnostics v2 and guided issue reporting
-diff --git a/DELIVERY-MANIFEST.txt b/DELIVERY-MANIFEST.txt
-index 8b5f2f9..892638c 100644
+-feat(beta): mcw-launcher v1.4.0-beta.3 diagnostics v2 and guided issue reporting
++fix(beta): mcw-launcher v1.4.0-beta.4 synchronize progress and task state
 --- a/DELIVERY-MANIFEST.txt
 +++ b/DELIVERY-MANIFEST.txt
-@@ -1,23 +1,20 @@
--MCW Launcher v1.4.0-beta.2 beta delivery
-+MCW Launcher v1.4.0-beta.3 beta delivery
+@@ -1,20 +1,21 @@
+-MCW Launcher v1.4.0-beta.3 beta delivery
++MCW Launcher v1.4.0-beta.4 beta delivery
  
  Delivery policy:
--- Launcher source ZIP only for beta releases.
--- No standalone MCW Core ZIP/WHL/README/RELEASE artifact is produced for beta.2.
--- Standalone Core artifacts resume when v1.4 is declared stable.
-+- One Launcher changed-files ZIP only for beta/RC releases.
-+- No full-source delivery ZIP and no standalone MCW Core artifact for beta.3.
-+- Standalone Core artifacts resume only when v1.4 is declared stable.
+ - One Launcher changed-files ZIP only for beta/RC releases.
+-- No full-source delivery ZIP and no standalone MCW Core artifact for beta.3.
++- No full-source delivery ZIP and no standalone MCW Core artifact for beta.4.
+ - Standalone Core artifacts resume only when v1.4 is declared stable.
  
--Launcher runtime: v1.4.0-beta.2
-+Launcher runtime: v1.4.0-beta.3
+-Launcher runtime: v1.4.0-beta.3
++Launcher runtime: v1.4.0-beta.4
  Update channel: beta
  
--Primary beta.2 scope:
--- Update Priority Mode: cancel/drop competing tasks and reserve scheduling for update.* work.
--- Adaptive Modrinth .mrpack artifact downloads.
--- One-pass multi-hash with bounded hash I/O concurrency.
--- Download journal progress batching.
--- Automatic / Responsive / Balanced / Maximum download performance profiles.
--- Automatic low-impact download concurrency while Minecraft is running.
-+Primary beta.3 scope:
-+- Diagnostics v2 with system/Java/task/instance/runtime context and bounded privacy-filtered logs.
-+- Background diagnostics export.
-+- Two-step Report Issue wizard: collect user details first, guidance second.
-+- Prefilled privacy-filtered GitHub issue draft and local ZIP attachment guidance.
-+- Report Issue action from error dialogs.
+-Primary beta.3 scope:
+-- Diagnostics v2 with system/Java/task/instance/runtime context and bounded privacy-filtered logs.
+-- Background diagnostics export.
+-- Two-step Report Issue wizard: collect user details first, guidance second.
+-- Prefilled privacy-filtered GitHub issue draft and local ZIP attachment guidance.
+-- Report Issue action from error dialogs.
++Primary beta.4 scope:
++- Global progress ownership so stale task completions cannot overwrite newer work.
++- Generic running/success/failure/cancel progress for tasks without dedicated profiles.
++- Cancel/supersede UI cleanup through the same settled lifecycle as success/failure.
++- Busy-state reconciliation from TaskRunner active task ids.
++- Legacy Storage probe/scan/cleanup terminal progress coverage.
  
--Inherited beta.1 scope:
--- Task lifecycle/shutdown cancellation foundation.
--- Kill Instance.
--- Forge issue #20 profile/cache hardening.
--- v1.3.2 issue #19 and update-integrity hardening.
-+Inherited scope:
-+- Beta.1 task lifecycle, shutdown cancellation, Kill Instance and Forge issue #20 hardening.
-+- Beta.2 Update Priority Mode, adaptive modpack download, one-pass hashing and journal batching.
-diff --git a/README.md b/README.md
-index f1dc15a..b82a47b 100644
+ Inherited scope:
+ - Beta.1 task lifecycle, shutdown cancellation, Kill Instance and Forge issue #20 hardening.
+ - Beta.2 Update Priority Mode, adaptive modpack download, one-pass hashing and journal batching.
++- Beta.3 Diagnostics v2 and guided Report Issue workflow.
 --- a/README.md
 +++ b/README.md
 @@ -9,7 +9,7 @@
    <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.2">
      <img src="https://img.shields.io/badge/Stable-v1.3.2-brightgreen" alt="Stable version">
    </a>
--  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.2">
-+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.3">
+-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.3">
++  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.4">
      <img src="https://img.shields.io/badge/Beta-v1.4.0--beta.2-orange" alt="Beta version">
    </a>
    <a href="https://github.com/mahiru7229/mcw-launcher/actions">
-@@ -51,20 +51,13 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.2 hỗ trợ nâng cấp
+@@ -51,6 +51,14 @@
  
  ---
  
--## Có gì mới trong v1.4.0-beta.2
-+## Có gì mới trong v1.4.0-beta.3
++## Có gì mới trong v1.4.0-beta.4
++
++**v1.4.0-beta.4** là beta bổ sung tập trung vào tính nhất quán của progress/task state. Thanh tiến trình toàn cục giờ được reset khi task mới bắt đầu, không còn giữ `READY / 100% / detail` của task trước; kết quả của task cũ hoàn tất muộn không được phép ghi đè task mới; cancel/supersede cũng đi qua cùng đường cleanup busy/progress như success/failure. Legacy Storage probe/scan/cleanup có terminal progress riêng để thao tác bỏ qua hoặc dọn dữ liệu phản ánh đúng trạng thái.
++
++Beta.4 giữ toàn bộ TaskRunner/Kill Instance/Forge hardening, download performance, Update Priority và Diagnostics v2 từ beta.1–beta.3.
++
++Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.4.md`](docs/RELEASE-v1.4.0-beta.4.md).
++
+ ## Có gì mới trong v1.4.0-beta.3
  
--**v1.4.0-beta.2** tập trung vào hiệu năng tải modpack và ưu tiên cập nhật launcher. Khi người dùng chọn cập nhật, launcher chuyển sang **Update Priority Mode**, hủy/drop các task khác theo cùng nguyên tắc shutdown, chặn task mới chen vào và chỉ bước sang apply sau khi các worker cũ đã dừng ở safe point.
-+**v1.4.0-beta.3** tập trung vào Diagnostics v2 và quy trình báo lỗi. Nút **Báo cáo lỗi** mở màn hình nhập thông tin trước, sau đó launcher thu thập diagnostics ở background và mới hiện hướng dẫn tạo GitHub issue/đính kèm ZIP. Bundle mới bổ sung system info, Java runtime, task timeline, runtime/crash logs gần nhất và issue context đã lọc thông tin nhạy cảm.
+ **v1.4.0-beta.3** tập trung vào Diagnostics v2 và quy trình báo lỗi. Nút **Báo cáo lỗi** mở màn hình nhập thông tin trước, sau đó launcher thu thập diagnostics ở background và mới hiện hướng dẫn tạo GitHub issue/đính kèm ZIP. Bundle mới bổ sung system info, Java runtime, task timeline, runtime/crash logs gần nhất và issue context đã lọc thông tin nhạy cảm.
+@@ -70,7 +78,7 @@
+ - Forge installer/profile cache không còn fallback sang vanilla profile; poisoned cache tự invalidated.
+ - Regression riêng cho Forge 1.12.2 / 14.23.5.2860.
  
--- Modrinth pack artifacts tải song song thích ứng theo CPU và giới hạn download đã cấu hình.
--- SHA-1/SHA-512/SHA-256 được tính trong một lượt đọc file; hashing có I/O budget riêng để giảm giật trên máy yếu/HDD.
--- Download journal batch progress writes để giảm `fsync` cạnh tranh khi nhiều file đang tải.
--- Thêm profile **Automatic / Responsive / Balanced / Maximum**; Automatic tự giảm concurrency khi Minecraft đang chạy.
--- Update Priority Mode cancel task khác, khóa scheduler cho `update.*`, nhưng vẫn đợi mutation cũ drain an toàn trước bước apply.
--- Các mutation nặng trên cùng instance vẫn giữ tuần tự trong beta.2 để tránh đổi hiệu năng lấy rủi ro dữ liệu.
-+Beta.3 giữ toàn bộ TaskRunner/Kill Instance/Forge hardening từ beta.1 và adaptive download/Update Priority từ beta.2.
+-Ba beta v1.4 được chia theo dependency: beta.1 = lifecycle/runtime stability; beta.2 = modpack download/I/O performance; beta.3 = Diagnostics v2 + Create Issue Report + polish/benchmark.
++Nhánh v1.4 hiện có bốn beta: beta.1 = lifecycle/runtime stability; beta.2 = modpack download/I/O performance; beta.3 = Diagnostics v2 + Create Issue Report; beta.4 = progress/task-state consistency trước RC.
  
--Beta.3 sẽ tập trung Diagnostics v2, Create Issue Report, privacy/task timeline và benchmark/Windows soak.
--
--Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.2.md`](docs/RELEASE-v1.4.0-beta.2.md).
-+Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.3.md`](docs/RELEASE-v1.4.0-beta.3.md).
+ Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.1.md`](docs/RELEASE-v1.4.0-beta.1.md).
  
- ## Có gì mới trong v1.4.0-beta.1
- 
-diff --git a/TEST-RESULTS.txt b/TEST-RESULTS.txt
-index 77b6e5b..b701cac 100644
 --- a/TEST-RESULTS.txt
 +++ b/TEST-RESULTS.txt
-@@ -1,31 +1,30 @@
--MCW Launcher v1.4.0-beta.2
-+MCW Launcher v1.4.0-beta.3
+@@ -1,30 +1,31 @@
+-MCW Launcher v1.4.0-beta.3
++MCW Launcher v1.4.0-beta.4
  
  Validation date: 2026-08-12
  Environment: Linux headless build/test environment (PySide6 not installed)
  
  Full pytest regression:
--  1555 passed, 91 skipped, 2 warnings, 0 failed
-+  1558 passed, 92 skipped, 2 warnings, 0 failed
+-  1558 passed, 92 skipped, 2 warnings, 0 failed
++  1559 passed, 93 skipped, 2 warnings, 0 failed
  
  Warnings:
    2 intentional duplicate-ZIP-member warnings from package security fixtures.
  
  Additional validation:
--  python -m compileall -q src mcw_core tools launcher.py: PASS
--  Translation/static GUI coverage after beta.2 additions: PASS
--  Update Priority + adaptive download/hash/journal targeted regression: PASS
-+  python -m compileall -q src mcw_core tools test: PASS
-+  Translation/static GUI coverage after beta.3 additions: PASS
-+  Diagnostics v2 + issue draft privacy tests: PASS
+-  python -m compileall -q src mcw_core tools test: PASS
+-  Translation/static GUI coverage after beta.3 additions: PASS
+-  Diagnostics v2 + issue draft privacy tests: PASS
++  python -m compileall -q launcher.py src mcw_core tools test: PASS
++  Translation/static GUI coverage after beta.4 additions: PASS
++  Task progress profile regression: PASS
  
--Beta.2 scope validated:
--  - Update Priority Mode cancels competing launcher tasks and rejects new non-update work.
--  - Update prepare waits for cancelled workers to settle before exclusive update handoff.
--  - Adaptive Modrinth .mrpack artifact concurrency remains bounded by configured download limits.
--  - SHA-1/SHA-512/SHA-256 can be calculated in one file pass with bounded hash I/O concurrency.
--  - Download journal progress updates are batched while terminal/critical states flush immediately.
--  - Automatic/Responsive/Balanced/Maximum download performance modes normalize correctly.
--  - Automatic mode downshifts download concurrency while Minecraft is running.
-+Beta.3 scope validated:
-+  - Diagnostics schema v2 includes system info, Java runtimes, task timeline, issue context and bounded runtime/crash logs.
-+  - Diagnostics export is dispatched through TaskRunner instead of blocking the GUI thread.
-+  - Report Issue workflow collects user context before diagnostics and guidance.
-+  - GitHub issue title/body generation is privacy-filtered and references the generated ZIP by filename only.
-+  - TaskRunner diagnostics snapshot is bounded and records lifecycle/cancellation/supersede metadata.
-+  - Existing beta.1/beta.2 task lifecycle, Forge, update-priority and download-performance regressions remain green.
+-Beta.3 scope validated:
+-  - Diagnostics schema v2 includes system info, Java runtimes, task timeline, issue context and bounded runtime/crash logs.
+-  - Diagnostics export is dispatched through TaskRunner instead of blocking the GUI thread.
+-  - Report Issue workflow collects user context before diagnostics and guidance.
+-  - GitHub issue title/body generation is privacy-filtered and references the generated ZIP by filename only.
+-  - TaskRunner diagnostics snapshot is bounded and records lifecycle/cancellation/supersede metadata.
+-  - Existing beta.1/beta.2 task lifecycle, Forge, update-priority and download-performance regressions remain green.
++Beta.4 scope validated:
++  - Profile-less tasks reset stale global progress on start and receive terminal states.
++  - Older task completion does not own newer task progress.
++  - REPLACE cancellation cannot clear a newer generation with the same task id.
++  - Legacy Storage probe/scan/cleanup have explicit terminal progress profiles.
++  - Cancelled tasks use TaskRunner settled cleanup so provider/dialog busy state is rebuilt from active tasks.
++  - Blocking tasks keep ownership of the global progress area over background metadata work.
++  - Existing beta.1-beta.3 lifecycle, performance, Forge and diagnostics regressions remain green.
  
  Platform note:
--  91 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
--  Windows smoke testing is still required for the GUI update handoff and live performance-profile behavior.
-+  92 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
-+  Windows GUI smoke testing is still required for the two-step Report Issue dialog and browser handoff.
+-  92 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
+-  Windows GUI smoke testing is still required for the two-step Report Issue dialog and browser handoff.
++  93 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
++  Windows GUI smoke testing remains required for visual progress transitions and cancellation behavior.
  
  Release policy:
--  This beta delivery contains Launcher source only. No standalone MCW Core ZIP/WHL is built or published for beta.2.
-+  Beta/RC delivery is a Launcher changed-files ZIP only. No standalone MCW Core artifact is built for beta.3.
-diff --git a/docs/MCW_CORE_LIBRARY.md b/docs/MCW_CORE_LIBRARY.md
-index 5b7b7da..535dd79 100644
+-  Beta/RC delivery is a Launcher changed-files ZIP only. No standalone MCW Core artifact is built for beta.3.
++  Beta/RC delivery is a Launcher changed-files ZIP only. No standalone MCW Core artifact is built for beta.4.
 --- a/docs/MCW_CORE_LIBRARY.md
 +++ b/docs/MCW_CORE_LIBRARY.md
 @@ -1,6 +1,6 @@
  # MCW Core Library
  
--Bundled runtime for Launcher beta.2: **1.4.0-beta.2**. No separate MCW Core beta artifact is published for beta.2; standalone Core artifacts are reserved for the stable v1.4 release.
-+Bundled runtime for Launcher beta.3: **1.4.0-beta.3**. No separate MCW Core beta artifact is published for beta.3; standalone Core artifacts are reserved for the stable v1.4 release.
+-Bundled runtime for Launcher beta.3: **1.4.0-beta.3**. No separate MCW Core beta artifact is published for beta.3; standalone Core artifacts are reserved for the stable v1.4 release.
++Bundled runtime for Launcher beta.4: **1.4.0-beta.4**. No separate MCW Core beta artifact is published for beta.4; standalone Core artifacts are reserved for the stable v1.4 release.
  
  MCW Core is the GUI-independent runtime used by MCW Launcher. It can be imported from a Python program without installing PySide6.
  
-diff --git a/docs/RELEASE-v1.4.0-beta.3.md b/docs/RELEASE-v1.4.0-beta.3.md
-new file mode 100644
-index 0000000..10e2e96
---- /dev/null
+--- a/docs/RELEASE-v1.4.0-beta.1.md
++++ b/docs/RELEASE-v1.4.0-beta.1.md
+@@ -28,11 +28,12 @@
+ - Cache Forge có metadata loader nhưng thiếu runtime bị coi là poisoned cache và tự invalidated/rebuilt.
+ - Regression bao phủ Forge 1.12.2 / 14.23.5.2860: vanilla fallback bị reject, profile có `net.minecraftforge:forge:1.12.2-14.23.5.2860` được chọn đúng.
+ 
+-### Kế hoạch 3 beta
++### Kế hoạch beta v1.4
+ 
+ - **Beta 1:** Task lifecycle/shutdown, Kill Instance, Forge issue #20, giữ toàn bộ hardening issue #19 từ v1.3.2.
+ - **Beta 2:** adaptive modpack download, multi-hash one-pass, network/disk/hash resource budget, progress coalescing, journal batching và scheduler/resource conflict nâng cao.
+ - **Beta 3:** Diagnostics v2 (launcher/runtime/loader/hardware/task timeline), secret redaction, Create Issue Report, polish/benchmark và Windows soak trước RC/stable.
++- **Beta 4 (bổ sung):** progress/task-state consistency, stale-result protection và cancel/busy cleanup trước RC.
+ 
+ ### Metadata
+ 
+@@ -49,7 +50,7 @@
+ 
+ ## English
+ 
+-MCW Launcher **v1.4.0-beta.1** starts the v1.4 line with a new **Task Lifecycle & Shutdown** foundation, a **Kill Instance** action for running games, and Forge profile/cache hardening for issue #20. Modpack performance work and Diagnostics v2 are intentionally split into beta.2 and beta.3 so each beta has a bounded regression surface.
++MCW Launcher **v1.4.0-beta.1** starts the v1.4 line with a new **Task Lifecycle & Shutdown** foundation, a **Kill Instance** action for running games, and Forge profile/cache hardening for issue #20. Modpack performance work and Diagnostics v2 are split into beta.2 and beta.3; beta.4 was added afterward to harden progress/task-state consistency before RC.
+ 
+ ### Task lifecycle / threading
+ 
+--- a/docs/RELEASE-v1.4.0-beta.3.md
 +++ b/docs/RELEASE-v1.4.0-beta.3.md
-@@ -0,0 +1,37 @@
-+# MCW Launcher v1.4.0-beta.3
+@@ -2,7 +2,7 @@
+ 
+ ## Tiếng Việt
+ 
+-MCW Launcher **v1.4.0-beta.3** là beta cuối của nhánh v1.4 trước RC/stable, tập trung vào Diagnostics v2 và quy trình báo lỗi có hướng dẫn.
++MCW Launcher **v1.4.0-beta.3** tập trung vào Diagnostics v2 và quy trình báo lỗi có hướng dẫn.
+ 
+ ### Thay đổi chính
+ 
+@@ -23,7 +23,7 @@
+ 
+ ## English
+ 
+-MCW Launcher **v1.4.0-beta.3** is the final v1.4 beta before RC/stable, focused on Diagnostics v2 and a guided issue-reporting workflow.
++MCW Launcher **v1.4.0-beta.3** is focused on Diagnostics v2 and a guided issue-reporting workflow.
+ 
+ ### Highlights
+ 
+--- a/docs/RELEASE-v1.4.0-beta.4.md
++++ b/docs/RELEASE-v1.4.0-beta.4.md
+@@ -0,0 +1,35 @@
++# MCW Launcher v1.4.0-beta.4
 +
 +## Tiếng Việt
 +
-+MCW Launcher **v1.4.0-beta.3** là beta cuối của nhánh v1.4 trước RC/stable, tập trung vào Diagnostics v2 và quy trình báo lỗi có hướng dẫn.
++MCW Launcher **v1.4.0-beta.4** là beta bổ sung tập trung vào độ chính xác của progress và trạng thái task trên toàn launcher.
 +
 +### Thay đổi chính
 +
-+- **Report Issue wizard**: bấm Báo cáo lỗi sẽ mở bước nhập tiêu đề, mô tả, cách tái hiện, kết quả mong đợi và thực tế trước khi thu thập diagnostics.
-+- Diagnostics được tạo bằng background task để không khóa UI; sau khi xong mới chuyển sang bước hướng dẫn.
-+- Bước hướng dẫn hiển thị vị trí ZIP, mẫu issue đã điền, nút copy, mở thư mục ZIP và mở GitHub New Issue đã prefill title/body.
-+- Error dialog có nút **Báo cáo lỗi** để prefill lỗi gần nhất vào wizard.
-+- Diagnostics schema v2 bổ sung `system-info.json`, `java-runtimes.json`, `task-timeline.json`, `issue-context.json`, runtime Minecraft log/crash report gần nhất, bên cạnh launcher log, process sessions, instance health và recovery journals.
-+- TaskRunner giữ timeline bounded 100 task gần nhất, gồm trạng thái, thời lượng, cancellation/supersede và loại lỗi.
-+- Secret redaction tiếp tục áp dụng cho issue text, settings, logs và JSON diagnostics; bundle vẫn giới hạn log size/count.
-+- Giữ toàn bộ fix/tối ưu của beta.1 và beta.2, gồm issue #19/#20, Kill Instance, shutdown cancellation, Update Priority Mode, adaptive Modrinth download, one-pass hashing và journal batching.
++- Task mới khi chiếm vùng progress sẽ reset trạng thái cũ thay vì chỉ đổi tiêu đề và giữ lại `READY`, `100%` hoặc detail của task trước.
++- Task cũ hoàn tất muộn không còn được phép ghi đè progress của task mới đang chạy.
++- Task bị cancel/supersede đi qua cùng đường cleanup UI như success/failure, tránh dialog/provider bị kẹt trạng thái busy.
++- Busy state Modrinth, CurseForge, FTB, ATLauncher, content, mod catalog, modpack và update được đồng bộ lại từ danh sách task thực sự còn active.
++- Blocking user operation được ưu tiên sở hữu progress; metadata/background task không chen vào progress khi operation blocking đang chạy.
++- Legacy Storage probe/scan/cleanup có completion/failure progress riêng, bao gồm flow bỏ qua review và dọn dữ liệu.
++- Giữ toàn bộ cải tiến từ beta.1–beta.3: TaskRunner v2, Kill Instance, Forge issue #20 hardening, Update Priority, adaptive modpack downloads và Diagnostics v2.
 +
 +### Ghi chú beta
 +
-+Beta/RC chỉ phát hành Launcher patch/source theo workflow dự án; standalone MCW Core artifact chỉ được build lại khi v1.4 stable.
++Beta/RC chỉ phát hành Launcher changed-files ZIP. Standalone MCW Core artifact chỉ được build khi v1.4 stable.
 +
 +---
 +
 +## English
 +
-+MCW Launcher **v1.4.0-beta.3** is the final v1.4 beta before RC/stable, focused on Diagnostics v2 and a guided issue-reporting workflow.
++MCW Launcher **v1.4.0-beta.4** is an additional beta focused on consistent progress and task state across the launcher.
 +
 +### Highlights
 +
-+- The **Report Issue** action first opens a form for title, description, reproduction steps, expected behavior and actual behavior.
-+- Diagnostic collection runs in a background launcher task; guidance is shown only after collection completes.
-+- The guidance step shows the ZIP path, a generated issue draft, copy/open-folder actions and a prefilled GitHub New Issue action.
-+- Error dialogs expose a **Report issue** action that prefills the most recent error context.
-+- Diagnostics schema v2 adds system info, Java runtimes, task timeline, issue context and recent Minecraft runtime/crash logs.
-+- The TaskRunner keeps a bounded 100-entry lifecycle timeline with duration/cancellation/supersede/error metadata.
-+- Privacy redaction and bounded log collection remain enforced.
-+- All beta.1/beta.2 fixes and performance work remain included.
-diff --git a/docs/V1.4-BETA-ROADMAP.md b/docs/V1.4-BETA-ROADMAP.md
-index 5c2ec4b..a17524d 100644
++- A newly displayed task resets stale global progress instead of inheriting the previous task's READY/100%/detail state.
++- Late completion from an older concurrent task can no longer overwrite a newer task's progress.
++- Cancelled and superseded tasks now follow the same UI busy cleanup path as success/failure.
++- Provider/dialog busy state is rebuilt from actual TaskRunner activity.
++- Blocking user operations own the global progress area; background metadata work cannot steal it while blocking work is active.
++- Legacy Storage probe/scan/cleanup now expose explicit terminal progress states.
++- All beta.1–beta.3 lifecycle, performance, update-priority and diagnostics work remains included.
 --- a/docs/V1.4-BETA-ROADMAP.md
 +++ b/docs/V1.4-BETA-ROADMAP.md
-@@ -21,7 +21,7 @@
- - Mutation-heavy per-instance content changes intentionally remain serialized for safety.
- - Deeper streamed-hash reuse/resource-aware mutation scheduling is deferred unless beta benchmarks justify it.
- 
--## v1.4.0-beta.3 — Diagnostics & release hardening
-+## v1.4.0-beta.3 — Diagnostics & release hardening (implemented)
- 
- - Diagnostics v2 bundle with launcher/runtime/loader logs, hardware/configuration, task timeline and relevant instance state.
- - Robust collector isolation, log size limits and centralized secret/path redaction.
-diff --git a/lang/en-US.json b/lang/en-US.json
-index 9eb211f..6a36d88 100644
+@@ -29,3 +29,12 @@
+ - Loader/runtime integrity context, including Forge installer/profile/cache diagnostics.
+ - Task Center polish, stale-result/error UX review, benchmarks and Windows soak testing.
+ - RC/stable readiness pass after all beta regressions are green.
++
++
++## v1.4.0-beta.4 — Progress/state consistency (implemented)
++
++- Global progress ownership prevents older concurrent tasks from overwriting newer task state.
++- Profile-less tasks reset stale progress when they start and receive generic success/failure/cancel terminal states.
++- Cancelled/superseded tasks run the same UI busy cleanup path as success/failure.
++- Provider/dialog busy state is rebuilt from TaskRunner active tasks to stay correct across REPLACE generations.
++- Legacy Storage probe, scan and cleanup expose explicit progress completion states.
 --- a/lang/en-US.json
 +++ b/lang/en-US.json
-@@ -2105,7 +2105,32 @@
-     "status.instance.killed": "Killed '{name}'",
-     "task.shutting_down": "The launcher is shutting down.",
-     "task.priority_mode": "Launcher update priority mode is active. Other tasks are temporarily disabled.",
--    "task.group_running": "Task group '{group}' is already running."
-+    "task.group_running": "Task group '{group}' is already running.",
-+    "issue_report.title": "Report an issue",
-+    "issue_report.details.heading": "Tell us what happened first. MCW will collect privacy-filtered diagnostics only after you continue.",
-+    "issue_report.details.title": "Issue title",
-+    "issue_report.details.title_placeholder": "Short summary of the problem",
-+    "issue_report.details.what_happened": "What happened",
-+    "issue_report.details.what_happened_placeholder": "Describe what you were doing and what went wrong.",
-+    "issue_report.details.steps": "Steps to reproduce",
-+    "issue_report.details.steps_placeholder": "1. Open ...\n2. Click ...\n3. ...",
-+    "issue_report.details.expected": "Expected behavior",
-+    "issue_report.details.actual": "Actual behavior",
-+    "issue_report.details.context": "Detected context: {context}",
-+    "issue_report.details.context_none": "no instance context",
-+    "issue_report.details.continue": "Continue and collect diagnostics",
-+    "issue_report.details.required": "Please enter an issue title and describe what happened before continuing.",
-+    "issue_report.details.collecting": "Collecting launcher, runtime, system, task, and instance diagnostics...",
-+    "issue_report.details.collect_failed": "Diagnostics could not be created: {error}",
-+    "issue_report.guide.heading": "Diagnostics are ready. Review the draft, then create the GitHub issue and attach the ZIP.",
-+    "issue_report.guide.instructions": "1. Review or copy the issue draft below. 2. Open GitHub. 3. Drag the diagnostic ZIP into the issue editor before submitting.",
-+    "issue_report.guide.bundle": "Diagnostic bundle: {path}",
-+    "issue_report.guide.copy": "Copy issue draft",
-+    "issue_report.guide.open_folder": "Open ZIP folder",
-+    "issue_report.guide.open_github": "Open GitHub issue",
-+    "issue_report.error.report": "Report issue",
-+    "diagnostics.collecting": "Collecting diagnostics...",
-+    "diagnostics.busy": "A diagnostics export is already running."
+@@ -2130,7 +2130,12 @@
+     "issue_report.guide.open_github": "Open GitHub issue",
+     "issue_report.error.report": "Report issue",
+     "diagnostics.collecting": "Collecting diagnostics...",
+-    "diagnostics.busy": "A diagnostics export is already running."
++    "diagnostics.busy": "A diagnostics export is already running.",
++    "progress.task.failed": "Task failed",
++    "storage.legacy.clean.completed": "Storage cleanup complete",
++    "storage.legacy.clean.completed_detail": "The selected legacy storage cleanup finished. Removed, skipped, and failed items are summarized in the result dialog.",
++    "storage.legacy.clean.failed": "Storage cleanup failed",
++    "progress.task.working": "Working..."
    },
    "aliases": {
      "MCW Launcher": "app.name",
-diff --git a/lang/vi-VN.json b/lang/vi-VN.json
-index fc7b1a0..0b5594e 100644
 --- a/lang/vi-VN.json
 +++ b/lang/vi-VN.json
-@@ -2105,7 +2105,32 @@
-     "status.instance.killed": "Đã buộc dừng '{name}'",
-     "task.shutting_down": "Launcher đang tắt.",
-     "task.priority_mode": "Chế độ ưu tiên cập nhật launcher đang hoạt động. Các tác vụ khác tạm thời bị khóa.",
--    "task.group_running": "Nhóm tác vụ '{group}' đang chạy."
-+    "task.group_running": "Nhóm tác vụ '{group}' đang chạy.",
-+    "issue_report.title": "Báo cáo lỗi",
-+    "issue_report.details.heading": "Trước tiên hãy cho biết lỗi đã xảy ra như thế nào. MCW chỉ thu thập chẩn đoán đã lọc thông tin riêng tư sau khi bạn tiếp tục.",
-+    "issue_report.details.title": "Tiêu đề lỗi",
-+    "issue_report.details.title_placeholder": "Mô tả ngắn vấn đề",
-+    "issue_report.details.what_happened": "Điều gì đã xảy ra",
-+    "issue_report.details.what_happened_placeholder": "Mô tả thao tác bạn đang thực hiện và lỗi đã xảy ra.",
-+    "issue_report.details.steps": "Các bước tái hiện",
-+    "issue_report.details.steps_placeholder": "1. Mở ...\n2. Bấm ...\n3. ...",
-+    "issue_report.details.expected": "Kết quả mong đợi",
-+    "issue_report.details.actual": "Kết quả thực tế",
-+    "issue_report.details.context": "Ngữ cảnh phát hiện được: {context}",
-+    "issue_report.details.context_none": "không có ngữ cảnh instance",
-+    "issue_report.details.continue": "Tiếp tục và thu thập chẩn đoán",
-+    "issue_report.details.required": "Hãy nhập tiêu đề lỗi và mô tả điều đã xảy ra trước khi tiếp tục.",
-+    "issue_report.details.collecting": "Đang thu thập log launcher, runtime, cấu hình máy, task và trạng thái instance...",
-+    "issue_report.details.collect_failed": "Không thể tạo gói chẩn đoán: {error}",
-+    "issue_report.guide.heading": "Chẩn đoán đã sẵn sàng. Hãy kiểm tra mẫu báo lỗi, sau đó tạo issue GitHub và đính kèm ZIP.",
-+    "issue_report.guide.instructions": "1. Kiểm tra hoặc sao chép mẫu bên dưới. 2. Mở GitHub. 3. Kéo thả ZIP chẩn đoán vào trình soạn issue trước khi gửi.",
-+    "issue_report.guide.bundle": "Gói chẩn đoán: {path}",
-+    "issue_report.guide.copy": "Sao chép mẫu báo lỗi",
-+    "issue_report.guide.open_folder": "Mở thư mục ZIP",
-+    "issue_report.guide.open_github": "Mở issue GitHub",
-+    "issue_report.error.report": "Báo cáo lỗi",
-+    "diagnostics.collecting": "Đang thu thập chẩn đoán...",
-+    "diagnostics.busy": "Một tác vụ xuất chẩn đoán đang chạy."
+@@ -2130,7 +2130,12 @@
+     "issue_report.guide.open_github": "Mở issue GitHub",
+     "issue_report.error.report": "Báo cáo lỗi",
+     "diagnostics.collecting": "Đang thu thập chẩn đoán...",
+-    "diagnostics.busy": "Một tác vụ xuất chẩn đoán đang chạy."
++    "diagnostics.busy": "Một tác vụ xuất chẩn đoán đang chạy.",
++    "progress.task.failed": "Tác vụ thất bại",
++    "storage.legacy.clean.completed": "Dọn lưu trữ hoàn tất",
++    "storage.legacy.clean.completed_detail": "Đã hoàn tất dọn dữ liệu lưu trữ cũ đã chọn. Các mục đã xóa, bỏ qua và lỗi được tổng hợp trong hộp kết quả.",
++    "storage.legacy.clean.failed": "Dọn lưu trữ thất bại",
++    "progress.task.working": "Đang xử lý..."
    },
    "aliases": {
      "Show static text over themed controls": "launcher_settings.theme.show_static_text",
-diff --git a/mcw_core/api/diagnostics/issue_report_builder.py b/mcw_core/api/diagnostics/issue_report_builder.py
-new file mode 100644
-index 0000000..093be6c
---- /dev/null
-+++ b/mcw_core/api/diagnostics/issue_report_builder.py
-@@ -0,0 +1,3 @@
-+"""Public re-export of :mod:`src.core.diagnostics.issue_report_builder`."""
-+
-+from src.core.diagnostics.issue_report_builder import *  # noqa: F401,F403
-diff --git a/pyproject.toml b/pyproject.toml
-index 057edea..d62c954 100644
 --- a/pyproject.toml
 +++ b/pyproject.toml
-@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+@@ -4,7 +4,7 @@
  
  [project]
  name = "mcw-core"
--version = "1.4.0b2"
-+version = "1.4.0b3"
+-version = "1.4.0b3"
++version = "1.4.0b4"
  description = "Headless Minecraft runtime, instance, loader, modpack, repair, and launch core used by MCW Launcher"
  readme = "docs/MCW_CORE_LIBRARY.md"
  requires-python = ">=3.12"
-diff --git a/src/config.py b/src/config.py
-index 3d1ee1e..5d2589d 100644
 --- a/src/config.py
 +++ b/src/config.py
 @@ -1,7 +1,7 @@
  from __future__ import annotations
  
--VERSION = "v1.4.0-beta.2"
--VERSION_ID = "1.4.0-beta.2"
-+VERSION = "v1.4.0-beta.3"
-+VERSION_ID = "1.4.0-beta.3"
+-VERSION = "v1.4.0-beta.3"
+-VERSION_ID = "1.4.0-beta.3"
++VERSION = "v1.4.0-beta.4"
++VERSION_ID = "1.4.0-beta.4"
  VERSION_TAG = f"v{VERSION_ID}"
  UPDATE_CHANNEL = "beta"
  GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
-diff --git a/src/core/diagnostics/diagnostics_manager.py b/src/core/diagnostics/diagnostics_manager.py
-index 3195872..bb99006 100644
---- a/src/core/diagnostics/diagnostics_manager.py
-+++ b/src/core/diagnostics/diagnostics_manager.py
-@@ -6,6 +6,7 @@ import json
- import os
- from pathlib import Path
- import platform
-+import shutil
- import sys
- from typing import Any
- import zipfile
-@@ -14,14 +15,18 @@ from src.core.fs.paths import Paths
- from src.core.instance.instance_manager import InstanceManager
- from src.core.instance.instance_health_manager import InstanceHealthManager
- from src.core.instance.instance_run_lock import InstanceRunLock
-+from src.core.hardware.gpu_preference_manager import GpuPreferenceManager
-+from src.core.java.java_diagnostics_manager import JavaDiagnosticsManager
- from src.core.network.download_recovery import download_recovery_manager
-+from src.core.runtime.game_runtime_manager import GameRuntimeManager
- from src.core.runtime.process_supervisor import ProcessSupervisor
-+from src.core.system.memory import SystemMemory
- from src.core.security.sensitive_data_redactor import SensitiveDataRedactor
- 
- 
- class DiagnosticsManager:
--    REPORT_SCHEMA_VERSION = 1
--    BUNDLE_SCHEMA_VERSION = 1
-+    REPORT_SCHEMA_VERSION = 2
-+    BUNDLE_SCHEMA_VERSION = 2
-     MAX_LOG_FILES = 8
-     MAX_LOG_BYTES = 256 * 1024
-     MAX_TOTAL_LOG_BYTES = 2 * 1024 * 1024
-@@ -58,17 +63,17 @@ class DiagnosticsManager:
-             f"python: {platform.python_version()}",
-             f"platform: {platform.platform()}",
-             f"architecture: {platform.machine() or 'unknown'}",
--            f"executable: {Path(sys.executable).resolve()}",
--            f"working_directory: {Path.cwd().resolve()}",
--            f"application_root: {Paths.root().resolve()}",
-+            f"executable: {cls._safe_path(Path(sys.executable))}",
-+            f"working_directory: {cls._safe_path(Path.cwd())}",
-+            f"application_root: {cls._safe_path(Paths.root())}",
-             "",
-             "Data directories",
-             "----------------",
--            f"config: {Paths.CONFIG_ROOT.resolve()}",
--            f"instances: {Paths.INSTANCES_ROOT.resolve()}",
--            f"cache: {Paths.CACHE_ROOT.resolve()}",
--            f"accounts: {Paths.ACCOUNTS_ROOT.resolve()}",
--            f"logs: {Paths.LOGS_ROOT.resolve()}",
-+            f"config: {cls._safe_path(Paths.CONFIG_ROOT)}",
-+            f"instances: {cls._safe_path(Paths.INSTANCES_ROOT)}",
-+            f"cache: {cls._safe_path(Paths.CACHE_ROOT)}",
-+            f"accounts: {cls._safe_path(Paths.ACCOUNTS_ROOT)}",
-+            f"logs: {cls._safe_path(Paths.LOGS_ROOT)}",
-             "",
-             "Runtime state",
-             "-------------",
-@@ -117,7 +122,16 @@ class DiagnosticsManager:
-         return destination
- 
-     @classmethod
--    def write_bundle(cls, path: Path, launcher_version: str, settings: dict[str, Any] | None = None, activity_log: str = "") -> Path:
-+    def write_bundle(
-+        cls,
-+        path: Path,
-+        launcher_version: str,
-+        settings: dict[str, Any] | None = None,
-+        activity_log: str = "",
-+        *,
-+        task_timeline: tuple[dict[str, object], ...] | list[dict[str, object]] = (),
-+        issue_context: dict[str, Any] | None = None,
-+    ) -> Path:
-         destination = Path(path)
-         if destination.suffix.lower() != ".zip":
-             destination = destination.with_suffix(".zip")
-@@ -134,8 +148,13 @@ class DiagnosticsManager:
-             "instance-health.json": cls._instance_health_json(),
-             "process-sessions.json": cls._process_sessions_json(),
-             "operation-journals.json": cls._operation_journals_json(),
-+            "system-info.json": cls._system_info_json(),
-+            "java-runtimes.json": cls._java_runtimes_json(),
-+            "task-timeline.json": cls._task_timeline_json(task_timeline),
-+            "issue-context.json": cls._issue_context_json(issue_context or {}),
-         }
-         entries.update(cls._safe_log_entries())
-+        entries.update(cls._safe_runtime_entries())
-         manifest_entries = [
-             {
-                 "path": name,
-@@ -175,6 +194,105 @@ class DiagnosticsManager:
-             temporary.unlink(missing_ok=True)
-         return destination
- 
-+
-+    @classmethod
-+    def _system_info_json(cls) -> bytes:
-+        try:
-+            usage = shutil.disk_usage(Paths.root())
-+            gpu = GpuPreferenceManager.detect()
-+            payload: dict[str, Any] = {
-+                "schema_version": 1,
-+                "platform": platform.platform(),
-+                "system": platform.system(),
-+                "release": platform.release(),
-+                "machine": platform.machine(),
-+                "python": platform.python_version(),
-+                "cpu": platform.processor() or "unknown",
-+                "cpu_logical_count": os.cpu_count() or 0,
-+                "memory_total_mb": SystemMemory.total_physical_memory_mb(),
-+                "disk": {
-+                    "total_bytes": int(usage.total),
-+                    "free_bytes": int(usage.free),
-+                },
-+                "gpu": {
-+                    "supported": gpu.supported,
-+                    "error": SensitiveDataRedactor.redact_text(gpu.error),
-+                    "adapters": [
-+                        {
-+                            "name": item.name,
-+                            "vendor": item.vendor,
-+                            "adapter_ram": item.adapter_ram,
-+                            "dedicated": item.dedicated,
-+                        }
-+                        for item in gpu.adapters
-+                    ],
-+                },
-+            }
-+        except Exception as error:
-+            payload = {"schema_version": 1, "error": SensitiveDataRedactor.redact_text(error)}
-+        return (json.dumps(SensitiveDataRedactor.redact_value(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
-+
-+    @classmethod
-+    def _java_runtimes_json(cls) -> bytes:
-+        try:
-+            rows = []
-+            for item in JavaDiagnosticsManager.scan():
-+                rows.append({
-+                    "major_version": item.major_version,
-+                    "version_string": item.version_string,
-+                    "vendor": item.vendor,
-+                    "architecture": item.architecture,
-+                    "java_home": cls._safe_path(Path(item.java_home)) if item.java_home else "",
-+                    "executable": cls._safe_path(Path(item.executable)),
-+                    "source": str(getattr(item.source, "value", item.source)),
-+                    "valid": item.valid,
-+                })
-+            payload: dict[str, Any] = {"schema_version": 1, "runtimes": rows}
-+        except Exception as error:
-+            payload = {"schema_version": 1, "error": SensitiveDataRedactor.redact_text(error), "runtimes": []}
-+        return (json.dumps(SensitiveDataRedactor.redact_value(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
-+
-+    @classmethod
-+    def _task_timeline_json(cls, timeline: object) -> bytes:
-+        try:
-+            rows = list(timeline) if isinstance(timeline, (list, tuple)) else []
-+            payload: dict[str, Any] = {"schema_version": 1, "tasks": SensitiveDataRedactor.redact_value(rows[-100:])}
-+        except Exception as error:
-+            payload = {"schema_version": 1, "error": SensitiveDataRedactor.redact_text(error), "tasks": []}
-+        return (json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
-+
-+    @classmethod
-+    def _issue_context_json(cls, context: dict[str, Any]) -> bytes:
-+        payload = {"schema_version": 1, "issue": SensitiveDataRedactor.redact_value(dict(context))}
-+        return (json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
-+
-+    @classmethod
-+    def _safe_runtime_entries(cls) -> dict[str, bytes]:
-+        entries: dict[str, bytes] = {}
-+        try:
-+            instances = InstanceManager.list_instances()
-+        except Exception:
-+            return entries
-+        candidates: list[tuple[float, str, Path]] = []
-+        for instance in instances:
-+            for kind, path in (("game", GameRuntimeManager.latest_game_log(instance)), ("crash", GameRuntimeManager.latest_crash_report(instance))):
-+                if path is None or not path.is_file() or path.is_symlink():
-+                    continue
-+                try:
-+                    modified = path.stat().st_mtime
-+                except OSError:
-+                    modified = 0.0
-+                safe_instance = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in instance.name)[:48] or "instance"
-+                candidates.append((modified, f"runtime/{safe_instance}-{kind}-{path.name}", path))
-+        for _modified, name, path in sorted(candidates, reverse=True)[:6]:
-+            try:
-+                raw = path.read_bytes()[-cls.MAX_LOG_BYTES:]
-+            except OSError:
-+                continue
-+            text = raw.decode("utf-8", errors="replace")
-+            entries[name] = cls._truncate_utf8(SensitiveDataRedactor.redact_text(text).encode("utf-8"), cls.MAX_LOG_BYTES)
-+        return entries
-+
-     @classmethod
-     def _download_recovery_json(cls) -> bytes:
-         try:
-diff --git a/src/core/diagnostics/issue_report_builder.py b/src/core/diagnostics/issue_report_builder.py
-new file mode 100644
-index 0000000..6fec991
---- /dev/null
-+++ b/src/core/diagnostics/issue_report_builder.py
-@@ -0,0 +1,62 @@
-+from __future__ import annotations
-+
-+from pathlib import Path
-+from typing import Any
-+from urllib.parse import urlencode
-+
-+from src.core.security.sensitive_data_redactor import SensitiveDataRedactor
-+
-+
-+class IssueReportBuilder:
-+    """Build a privacy-filtered GitHub issue draft from user-provided context."""
-+
-+    @staticmethod
-+    def normalize(details: dict[str, Any]) -> dict[str, str]:
-+        fields = ("title", "what_happened", "steps", "expected", "actual", "context")
-+        return {
-+            field: SensitiveDataRedactor.redact_text(str(details.get(field) or "").strip())
-+            for field in fields
-+        }
-+
-+    @classmethod
-+    def build_body(cls, details: dict[str, Any], *, launcher_version: str, diagnostics_path: Path | None = None) -> str:
-+        safe = cls.normalize(details)
-+        diagnostics_name = Path(diagnostics_path).name if diagnostics_path is not None else "MCW-Diagnostics-YYYYMMDD-HHMMSS.zip"
-+        lines = [
-+            "## What happened",
-+            safe["what_happened"] or "(please describe the problem)",
-+            "",
-+            "## Steps to reproduce",
-+            safe["steps"] or "1. ",
-+            "",
-+            "## Expected behavior",
-+            safe["expected"] or "(what did you expect to happen?)",
-+            "",
-+            "## Actual behavior",
-+            safe["actual"] or "(what happened instead?)",
-+            "",
-+            "## Launcher context",
-+            f"- MCW Launcher: {launcher_version}",
-+        ]
-+        if safe["context"]:
-+            lines.append(f"- Context: {safe['context']}")
-+        lines.extend(
-+            [
-+                "",
-+                "## Diagnostics",
-+                f"Attach `{diagnostics_name}` to this issue by dragging the ZIP into the GitHub issue editor.",
-+                "",
-+                "> The diagnostic bundle is privacy-filtered, but you should still review the issue text and attachments before submitting.",
-+            ]
-+        )
-+        return "\n".join(lines).rstrip() + "\n"
-+
-+    @classmethod
-+    def github_new_issue_url(cls, repository: str, details: dict[str, Any], *, launcher_version: str, diagnostics_path: Path | None = None) -> str:
-+        repo = str(repository or "").strip().strip("/")
-+        if not repo or "/" not in repo:
-+            raise ValueError("A GitHub owner/repository name is required.")
-+        safe = cls.normalize(details)
-+        title = safe["title"] or f"Bug report - MCW Launcher {launcher_version}"
-+        body = cls.build_body(details, launcher_version=launcher_version, diagnostics_path=diagnostics_path)
-+        return f"https://github.com/{repo}/issues/new?{urlencode({'title': title, 'body': body})}"
-diff --git a/src/gui/dialogs/issue_report_dialog.py b/src/gui/dialogs/issue_report_dialog.py
-new file mode 100644
-index 0000000..003d577
---- /dev/null
-+++ b/src/gui/dialogs/issue_report_dialog.py
-@@ -0,0 +1,166 @@
-+from __future__ import annotations
-+
-+from pathlib import Path
-+
-+from PySide6.QtCore import QUrl, Signal
-+from PySide6.QtGui import QDesktopServices, QGuiApplication
-+from PySide6.QtWidgets import (
-+    QDialog,
-+    QFormLayout,
-+    QHBoxLayout,
-+    QLabel,
-+    QLineEdit,
-+    QMessageBox,
-+    QPushButton,
-+    QStackedWidget,
-+    QTextEdit,
-+    QVBoxLayout,
-+    QWidget,
-+)
-+
-+from mcw_core.api.language.language_manager import tr
-+
-+
-+class IssueReportDialog(QDialog):
-+    information_submitted = Signal(object)
-+
-+    def __init__(self, context: str = "", parent=None) -> None:
-+        super().__init__(parent)
-+        self._context = str(context or "").strip()
-+        self._issue_url = ""
-+        self._bundle_path: Path | None = None
-+        self.setWindowTitle(tr("issue_report.title"))
-+        self.resize(720, 620)
-+
-+        root = QVBoxLayout(self)
-+        self.stack = QStackedWidget()
-+        root.addWidget(self.stack, 1)
-+        self._build_information_page()
-+        self._build_guidance_page()
-+
-+    def _build_information_page(self) -> None:
-+        page = QWidget()
-+        layout = QVBoxLayout(page)
-+        heading = QLabel(tr("issue_report.details.heading"))
-+        heading.setWordWrap(True)
-+        layout.addWidget(heading)
-+
-+        form = QFormLayout()
-+        self.title_edit = QLineEdit()
-+        self.title_edit.setPlaceholderText(tr("issue_report.details.title_placeholder"))
-+        self.what_happened_edit = QTextEdit()
-+        self.what_happened_edit.setPlaceholderText(tr("issue_report.details.what_happened_placeholder"))
-+        self.steps_edit = QTextEdit()
-+        self.steps_edit.setPlaceholderText(tr("issue_report.details.steps_placeholder"))
-+        self.expected_edit = QTextEdit()
-+        self.actual_edit = QTextEdit()
-+        for editor in (self.what_happened_edit, self.steps_edit, self.expected_edit, self.actual_edit):
-+            editor.setMinimumHeight(76)
-+        form.addRow(tr("issue_report.details.title"), self.title_edit)
-+        form.addRow(tr("issue_report.details.what_happened"), self.what_happened_edit)
-+        form.addRow(tr("issue_report.details.steps"), self.steps_edit)
-+        form.addRow(tr("issue_report.details.expected"), self.expected_edit)
-+        form.addRow(tr("issue_report.details.actual"), self.actual_edit)
-+        layout.addLayout(form)
-+
-+        self.context_label = QLabel(tr("issue_report.details.context", context=self._context or tr("issue_report.details.context_none")))
-+        self.context_label.setWordWrap(True)
-+        layout.addWidget(self.context_label)
-+
-+        self.status_label = QLabel("")
-+        self.status_label.setWordWrap(True)
-+        layout.addWidget(self.status_label)
-+
-+        buttons = QHBoxLayout()
-+        buttons.addStretch()
-+        cancel = QPushButton(tr("common.cancel"))
-+        self.continue_button = QPushButton(tr("issue_report.details.continue"))
-+        cancel.clicked.connect(self.reject)
-+        self.continue_button.clicked.connect(self._submit_information)
-+        buttons.addWidget(cancel)
-+        buttons.addWidget(self.continue_button)
-+        layout.addLayout(buttons)
-+        self.stack.addWidget(page)
-+
-+    def _build_guidance_page(self) -> None:
-+        page = QWidget()
-+        layout = QVBoxLayout(page)
-+        heading = QLabel(tr("issue_report.guide.heading"))
-+        heading.setWordWrap(True)
-+        layout.addWidget(heading)
-+
-+        self.bundle_label = QLabel("")
-+        self.bundle_label.setWordWrap(True)
-+        self.bundle_label.setTextInteractionFlags(self.bundle_label.textInteractionFlags())
-+        layout.addWidget(self.bundle_label)
-+
-+        instructions = QLabel(tr("issue_report.guide.instructions"))
-+        instructions.setWordWrap(True)
-+        layout.addWidget(instructions)
-+
-+        self.preview = QTextEdit()
-+        self.preview.setReadOnly(True)
-+        layout.addWidget(self.preview, 1)
-+
-+        buttons = QHBoxLayout()
-+        copy_button = QPushButton(tr("issue_report.guide.copy"))
-+        open_folder_button = QPushButton(tr("issue_report.guide.open_folder"))
-+        open_github_button = QPushButton(tr("issue_report.guide.open_github"))
-+        close_button = QPushButton(tr("common.close"))
-+        copy_button.clicked.connect(lambda: QGuiApplication.clipboard().setText(self.preview.toPlainText()))
-+        open_folder_button.clicked.connect(self._open_bundle_folder)
-+        open_github_button.clicked.connect(self._open_github)
-+        close_button.clicked.connect(self.accept)
-+        buttons.addWidget(copy_button)
-+        buttons.addWidget(open_folder_button)
-+        buttons.addStretch()
-+        buttons.addWidget(open_github_button)
-+        buttons.addWidget(close_button)
-+        layout.addLayout(buttons)
-+        self.stack.addWidget(page)
-+
-+    def _submit_information(self) -> None:
-+        title = self.title_edit.text().strip()
-+        what_happened = self.what_happened_edit.toPlainText().strip()
-+        if not title or not what_happened:
-+            QMessageBox.information(self, tr("issue_report.title"), tr("issue_report.details.required"))
-+            return
-+        self.continue_button.setEnabled(False)
-+        self.status_label.setText(tr("issue_report.details.collecting"))
-+        self.information_submitted.emit(self.details())
-+
-+
-+    def prefill(self, *, title: str = "", what_happened: str = "") -> None:
-+        if title:
-+            self.title_edit.setText(str(title))
-+        if what_happened:
-+            self.what_happened_edit.setPlainText(str(what_happened))
-+
-+    def details(self) -> dict[str, str]:
-+        return {
-+            "title": self.title_edit.text().strip(),
-+            "what_happened": self.what_happened_edit.toPlainText().strip(),
-+            "steps": self.steps_edit.toPlainText().strip(),
-+            "expected": self.expected_edit.toPlainText().strip(),
-+            "actual": self.actual_edit.toPlainText().strip(),
-+            "context": self._context,
-+        }
-+
-+    def set_collection_failed(self, message: str) -> None:
-+        self.continue_button.setEnabled(True)
-+        self.status_label.setText(tr("issue_report.details.collect_failed", error=message))
-+
-+    def show_guidance(self, bundle_path: Path, issue_body: str, issue_url: str) -> None:
-+        self._bundle_path = Path(bundle_path)
-+        self._issue_url = str(issue_url)
-+        self.bundle_label.setText(tr("issue_report.guide.bundle", path=self._bundle_path))
-+        self.preview.setPlainText(issue_body)
-+        self.stack.setCurrentIndex(1)
-+
-+    def _open_bundle_folder(self) -> None:
-+        if self._bundle_path is not None:
-+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._bundle_path.parent.resolve())))
-+
-+    def _open_github(self) -> None:
-+        if self._issue_url:
-+            QDesktopServices.openUrl(QUrl(self._issue_url))
-diff --git a/src/gui/main_window_2.py b/src/gui/main_window_2.py
-index 4d51cde..756ac95 100644
 --- a/src/gui/main_window_2.py
 +++ b/src/gui/main_window_2.py
-@@ -15,6 +15,7 @@ from mcw_core.api.content.installed_content_library import InstalledContentLibra
- from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
- from mcw_core.api.curseforge.curseforge_errors import CurseForgeManagedFilesRequired, CurseForgeModpackManualDownloadRequired
- from mcw_core.api.diagnostics.diagnostics_manager import DiagnosticsManager
-+from mcw_core.api.diagnostics.issue_report_builder import IssueReportBuilder
- from mcw_core.api.fs.paths import Paths
- from mcw_core.api.hardware.gpu_preference_manager import GraphicsDetectionResult
- from mcw_core.api.instance.instance_manager import InstanceManager
-@@ -30,7 +31,7 @@ from mcw_core.api.update.windows_update_installer import AutomaticUpdateUnsuppor
- from src.gui.application import create_application
- from src.gui.animation.motion_runtime import MotionRuntime
- from src.gui.app_restart import start_restarted_process
--from src.gui.config import LAUNCHER_NAME, VERSION_ID
-+from src.gui.config import GITHUB_REPOSITORY, LAUNCHER_NAME, VERSION_ID
- from src.gui.controllers.account_controller import AccountController
- from src.gui.controllers.curseforge_controller import CurseForgeController
- from src.gui.controllers.content_pack_controller import ContentPackController
-@@ -64,6 +65,7 @@ from src.gui.dialogs.atlauncher_browser_dialog import ATLauncherBrowserDialog
- from src.gui.dialogs.lan_agent_log_dialog import LanAgentLogDialog
- from src.gui.dialogs.legacy_storage_cleanup_dialog import LegacyStorageCleanupDialog, format_bytes
- from src.gui.dialogs.instance_import_settings_dialog import InstanceImportSettingsDialog
-+from src.gui.dialogs.issue_report_dialog import IssueReportDialog
- from src.gui.dialogs.modpack_export_dialog import ModpackExportDialog
- from src.gui.dialogs.modpack_import_settings_dialog import ModpackImportSettingsDialog
- from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
-@@ -165,6 +167,10 @@ class MainWindow(QMainWindow):
-         self._manual_launch_provider = ""
-         self._manual_launch_lock_token = ""
-         self._portable_manual_request: object | None = None
-+        self._diagnostics_mode = ""
-+        self._pending_issue_dialog: IssueReportDialog | None = None
-+        self._pending_issue_details: dict[str, str] = {}
-+        self._last_error_context = ""
-         self._page_history: list[str] = []
-         self._page_history_index = -1
-         self.running_instances_timer.setInterval(1000)
-@@ -429,6 +435,7 @@ class MainWindow(QMainWindow):
-         self.launcher_settings_page.install_java_requested.connect(self.java_controller.install)
-         self.launcher_settings_page.open_java_requested.connect(self._open_java_folder)
-         self.logs_page.export_diagnostics_requested.connect(self._export_diagnostics)
-+        self.logs_page.report_issue_requested.connect(self._open_issue_report)
-         self.logs_page.open_logs_folder_requested.connect(self._open_logs_folder)
-         self.logs_page.open_latest_game_log_requested.connect(self._open_latest_game_log)
-         self.logs_page.open_latest_crash_report_requested.connect(self._open_latest_crash_report)
-@@ -671,6 +678,8 @@ class MainWindow(QMainWindow):
+@@ -154,6 +154,10 @@
+         self._atlauncher_tasks: set[str] = set()
+         self._curseforge_catalog_tasks: set[str] = set()
+         self._content_tasks: set[str] = set()
++        self._progress_task_id = ""
++        self._progress_task_order: list[str] = []
++        self._progress_task_messages: dict[str, str] = {}
++        self._progress_revision = 0
+         self._suppress_loader_progress = False
+         self._prompted_update_versions: set[str] = set()
+         self._pending_prepared_update: PreparedUpdate | None = None
+@@ -676,11 +680,10 @@
+ 
+         self.task_runner.task_started.connect(self._on_task_started)
          self.task_runner.task_failed.connect(self._on_task_failed)
-         self.task_runner.task_succeeded.connect(self._on_task_completed)
+-        self.task_runner.task_succeeded.connect(self._on_task_completed)
          self.task_runner.task_succeeded.connect(self._on_task_succeeded)
-+        self.task_runner.task_succeeded.connect(self._on_diagnostics_task_succeeded)
-+        self.task_runner.task_failed.connect(self._on_diagnostics_task_failed)
-         self.task_runner.task_failed.connect(self._on_task_completed)
++        self.task_runner.task_cancelled.connect(self._on_task_cancelled)
+         self.task_runner.task_succeeded.connect(self._on_diagnostics_task_succeeded)
+         self.task_runner.task_failed.connect(self._on_diagnostics_task_failed)
+-        self.task_runner.task_failed.connect(self._on_task_completed)
          self.task_runner.task_settled.connect(self._on_task_settled)
          self.task_runner.busy_changed.connect(self._set_busy)
-@@ -2671,13 +2680,90 @@ class MainWindow(QMainWindow):
-         selected, _ = QFileDialog.getSaveFileName(self, tr("diagnostics.export.title"), str(suggested), tr("diagnostics.file_filter"))
-         if not selected:
-             return
--        try:
--            path = DiagnosticsManager.write_bundle(Path(selected), launcher_version=VERSION_ID, settings=self.gui_settings_controller.raw_settings(), activity_log=self.logs_page.activity_text())
--        except Exception as error:
--            self._show_error(tr("diagnostics.export.title"), str(error))
-+        self._start_diagnostics_export(Path(selected), mode="export")
-+
-+    def _open_issue_report(self, *, initial_title: str = "", initial_what_happened: str = "") -> None:
-+        instance = self._selected_instance
-+        context_parts = [f"MCW {VERSION_ID}"]
-+        if instance is not None:
-+            name = str(getattr(instance, "name", "") or "").strip()
-+            game_version = str(getattr(instance, "minecraft_version", "") or "").strip()
-+            loader = str(getattr(instance, "mod_loader", "") or "").strip()
-+            if name:
-+                context_parts.append(f"instance={name}")
-+            if game_version:
-+                context_parts.append(f"minecraft={game_version}")
-+            if loader:
-+                context_parts.append(f"loader={loader}")
-+        if self._last_error_context:
-+            context_parts.append(f"last_error={self._last_error_context}")
-+        dialog = IssueReportDialog("; ".join(context_parts), self)
-+        dialog.prefill(title=initial_title, what_happened=initial_what_happened)
-+        dialog.information_submitted.connect(lambda details, owner=dialog: self._collect_issue_report(owner, details))
-+        self._pending_issue_dialog = dialog
-+        dialog.exec()
-+        if self._pending_issue_dialog is dialog:
-+            self._pending_issue_dialog = None
-+
-+    def _collect_issue_report(self, dialog: IssueReportDialog, details: object) -> None:
-+        if dialog is not self._pending_issue_dialog or not isinstance(details, dict):
+         self.task_runner.busy_changed.connect(self.mod_manager_dialog.set_busy)
+@@ -1187,6 +1190,7 @@
+         self.modrinth_controller.install_mod(instance_name, str(getattr(version, "version_id", "")), tuple(allowed_version_types))
+ 
+     def _on_task_settled(self, task_id: str, succeeded: bool, result: object) -> None:
++        self._on_task_completed(task_id, result)
+         if self._pending_prepared_update is not None and not task_id.startswith("update."):
+             QTimer.singleShot(0, self._try_launch_pending_update)
+ 
+@@ -2431,6 +2435,69 @@
+                 retranslate_dynamic()
+         self.theme_runtime.reapply_assets(self)
+ 
++    def _track_progress_task(self, task_id: str, message: str) -> None:
++        order = getattr(self, "_progress_task_order", None)
++        messages = getattr(self, "_progress_task_messages", None)
++        if order is None or messages is None:
 +            return
-+        self._pending_issue_details = {str(key): str(value) for key, value in details.items()}
-+        self._start_diagnostics_export(Paths.diagnostics_default_path(), mode="issue")
++        while task_id in order:
++            order.remove(task_id)
++        order.append(task_id)
++        messages[task_id] = str(message)
++        self._progress_task_id = task_id
++        self._progress_revision = int(getattr(self, "_progress_revision", 0)) + 1
 +
-+    def _start_diagnostics_export(self, path: Path, *, mode: str) -> None:
-+        if self.task_runner.is_task_active("diagnostics.export"):
-+            if mode == "issue" and self._pending_issue_dialog is not None:
-+                self._pending_issue_dialog.set_collection_failed(tr("diagnostics.busy"))
-+            else:
-+                QMessageBox.information(self, tr("diagnostics.export.title"), tr("diagnostics.busy"))
-+            return
-+        self._diagnostics_mode = mode
-+        settings = self.gui_settings_controller.raw_settings()
-+        activity = self.logs_page.activity_text()
-+        timeline = self.task_runner.diagnostics_snapshot()
-+        issue_context = dict(self._pending_issue_details) if mode == "issue" else {}
++    def _show_tracked_task_running(self, task_id: str, message: str) -> None:
++        profile = task_progress_profile(task_id)
++        stage = profile.stage if profile is not None else ProgressStage.PREPARING
++        self._on_progress(ProgressEvent(stage=stage, message=message))
 +
-+        def task() -> Path:
-+            return DiagnosticsManager.write_bundle(
-+                Path(path),
-+                launcher_version=VERSION_ID,
-+                settings=settings,
-+                activity_log=activity,
-+                task_timeline=timeline,
-+                issue_context=issue_context,
-+            )
++    def _prepare_progress_terminal(self, task_id: str) -> int | None:
++        runner = getattr(self, "task_runner", None)
++        current = str(getattr(self, "_progress_task_id", "") or "")
++        order = getattr(self, "_progress_task_order", None)
++        messages = getattr(self, "_progress_task_messages", None)
 +
-+        started = self.task_runner.run("diagnostics.export", task, tr("diagnostics.collecting"), blocking=False)
-+        if not started and mode == "issue" and self._pending_issue_dialog is not None:
-+            self._pending_issue_dialog.set_collection_failed(tr("diagnostics.busy"))
++        # A REPLACE task may settle an obsolete generation after the new generation
++        # has already started under the same public task id. Never let that old
++        # generation clear or overwrite the new task's progress.
++        if runner is not None and runner.is_task_active(task_id):
++            return None
 +
-+    def _on_diagnostics_task_succeeded(self, task_id: str, result: object) -> None:
-+        if task_id != "diagnostics.export":
-             return
-+        path = Path(result)
-+        mode = self._diagnostics_mode
-+        self._diagnostics_mode = ""
-         self.logs_page.append(tr("diagnostics.export.success", path=path))
--        QMessageBox.information(self, tr("diagnostics.export.title"), tr("diagnostics.export.success", path=path))
-+        if mode != "issue":
-+            QMessageBox.information(self, tr("diagnostics.export.title"), tr("diagnostics.export.success", path=path))
-+            return
-+        dialog = self._pending_issue_dialog
-+        if dialog is None:
-+            return
-+        body = IssueReportBuilder.build_body(self._pending_issue_details, launcher_version=VERSION_ID, diagnostics_path=path)
-+        url = IssueReportBuilder.github_new_issue_url(GITHUB_REPOSITORY, self._pending_issue_details, launcher_version=VERSION_ID, diagnostics_path=path)
-+        dialog.show_guidance(path, body, url)
++        if order is None or messages is None:
++            return 0 if not current or current == task_id else None
 +
-+    def _on_diagnostics_task_failed(self, task_id: str, error: object) -> None:
-+        if task_id != "diagnostics.export":
-+            return
-+        mode = self._diagnostics_mode
-+        self._diagnostics_mode = ""
-+        if mode == "issue" and self._pending_issue_dialog is not None:
-+            self._pending_issue_dialog.set_collection_failed(str(error))
-+            return
-+        self._show_error(tr("diagnostics.export.title"), str(error))
- 
-     def _open_forge_logs(self, name: str) -> None:
-         try:
-@@ -2743,7 +2829,16 @@ class MainWindow(QMainWindow):
-         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.resolve())))
- 
-     def _show_error(self, title: str, message: str) -> None:
--        QMessageBox.critical(self, title, message)
-+        self._last_error_context = f"{title}: {message}"[:1200]
-+        box = QMessageBox(self)
-+        box.setIcon(QMessageBox.Icon.Critical)
-+        box.setWindowTitle(title)
-+        box.setText(message)
-+        report_button = box.addButton(tr("issue_report.error.report"), QMessageBox.ButtonRole.ActionRole)
-+        box.addButton(QMessageBox.StandardButton.Ok)
-+        box.exec()
-+        if box.clickedButton() is report_button:
-+            self._open_issue_report(initial_title=title, initial_what_happened=message)
- 
-     def _show_network_retry(self, controller: object, task_id: str, title: str, message: str) -> None:
-         box = QMessageBox(self)
-diff --git a/src/gui/pages/logs_page.py b/src/gui/pages/logs_page.py
-index 8a1f84e..b582bf7 100644
---- a/src/gui/pages/logs_page.py
-+++ b/src/gui/pages/logs_page.py
-@@ -7,6 +7,7 @@ from PySide6.QtGui import QGuiApplication
- from PySide6.QtWidgets import QHBoxLayout, QPushButton, QTextEdit
- 
- from src.gui.pages.base_page import BasePage
-+from mcw_core.api.language.language_manager import tr
- from mcw_core.api.security.sensitive_data_redactor import SensitiveDataRedactor
- from src.gui.widget.card_widget import CardWidget
- from src.gui.theme.runtime import set_theme_icon
-@@ -17,6 +18,7 @@ class LogsPage(BasePage):
-     open_logs_folder_requested = Signal()
-     open_latest_game_log_requested = Signal()
-     open_latest_crash_report_requested = Signal()
-+    report_issue_requested = Signal()
- 
-     def __init__(self) -> None:
-         super().__init__("Logs", "Frontend activity and structured progress events appear here.", "logs")
-@@ -31,12 +33,14 @@ class LogsPage(BasePage):
-         copy_button = set_theme_icon(QPushButton("Copy all"), "icon.action.copy")
-         clear_button = set_theme_icon(QPushButton("Clear"), "icon.action.clear")
-         export_button = set_theme_icon(QPushButton("Export diagnostics"), "icon.action.export")
-+        report_button = set_theme_icon(QPushButton(tr("issue_report.error.report")), "icon.state.error")
-         open_folder_button = set_theme_icon(QPushButton("Open logs folder"), "icon.action.folder")
-         open_game_log_button = set_theme_icon(QPushButton("Open latest game log"), "icon.action.folder")
-         open_crash_report_button = set_theme_icon(QPushButton("Open latest crash report"), "icon.state.error")
-         copy_button.clicked.connect(lambda: QGuiApplication.clipboard().setText(self.output.toPlainText()))
-         clear_button.clicked.connect(self.output.clear)
-         export_button.clicked.connect(self.export_diagnostics_requested.emit)
-+        report_button.clicked.connect(self.report_issue_requested.emit)
-         open_folder_button.clicked.connect(self.open_logs_folder_requested.emit)
-         open_game_log_button.clicked.connect(self.open_latest_game_log_requested.emit)
-         open_crash_report_button.clicked.connect(self.open_latest_crash_report_requested.emit)
-@@ -47,6 +51,7 @@ class LogsPage(BasePage):
-         buttons.addWidget(open_crash_report_button)
-         buttons.addWidget(open_folder_button)
-         buttons.addWidget(export_button)
-+        buttons.addWidget(report_button)
-         card.layout.addWidget(self.output, 1)
-         card.layout.addLayout(buttons)
-         self.root_layout.addWidget(card, 1)
-diff --git a/src/gui/task_runner.py b/src/gui/task_runner.py
-index 81650da..aa598c9 100644
---- a/src/gui/task_runner.py
-+++ b/src/gui/task_runner.py
-@@ -1,9 +1,11 @@
- from __future__ import annotations
- 
-+from collections import deque
- from collections.abc import Callable
- from dataclasses import dataclass
- from enum import StrEnum
- from threading import Event, Thread
-+from datetime import datetime, timezone
- from time import monotonic
- from typing import Any
- from uuid import uuid4
-@@ -96,6 +98,8 @@ class TaskRunner(QObject):
-         self._blocking_tasks = 0
-         self._shutting_down = False
-         self._priority_prefix: str | None = None
-+        self._timeline: deque[dict[str, object]] = deque(maxlen=100)
-+        self._timeline_active: dict[str, dict[str, object]] = {}
-         self._worker_settled.connect(self._finish_worker, Qt.ConnectionType.QueuedConnection)
- 
-     @property
-@@ -123,6 +127,21 @@ class TaskRunner(QObject):
-         # Keep the public contract unique even while an obsolete generation drains.
-         return tuple(dict.fromkeys(context.task_id for context in self._contexts.values()))
- 
-+    def diagnostics_snapshot(self) -> tuple[dict[str, object], ...]:
-+        """Return a bounded, serialization-safe task timeline for diagnostics."""
++        while task_id in order:
++            order.remove(task_id)
++        messages.pop(task_id, None)
++        if current and current != task_id:
++            return None
 +
-+        rows = [dict(item) for item in self._timeline]
-+        for context_id, item in self._timeline_active.items():
-+            row = dict(item)
-+            context = self._contexts.get(context_id)
-+            if context is not None:
-+                row["state"] = context.state.value
-+                row["cancel_requested"] = context.token.cancelled
-+                row["superseded"] = context.superseded
-+                row["duration_seconds"] = round(max(0.0, monotonic() - context.started_at), 3)
-+            rows.append(row)
-+        return tuple(rows[-100:])
++        next_task = ""
++        if runner is not None:
++            for candidate in reversed(order):
++                if runner.is_task_active(candidate):
++                    next_task = candidate
++                    break
++        if next_task:
++            self._progress_task_id = next_task
++            self._progress_revision = int(getattr(self, "_progress_revision", 0)) + 1
++            MainWindow._show_tracked_task_running(self, next_task, messages.get(next_task, tr("progress.task.working")))
++            return None
 +
-     def is_task_active(self, task_id: str) -> bool:
-         normalized = str(task_id).strip()
-         return any(context.task_id == normalized for context in self._contexts.values())
-@@ -213,6 +232,16 @@ class TaskRunner(QObject):
-             started_at=monotonic(),
-         )
-         self._contexts[context_id] = context
-+        self._timeline_active[context_id] = {
-+            "task_id": normalized_id,
-+            "group": normalized_group,
-+            "blocking": bool(blocking),
-+            "cooperative": bool(cooperative),
-+            "state": TaskState.RUNNING.value,
-+            "started_at": datetime.now(timezone.utc).isoformat(),
-+            "cancel_requested": False,
-+            "superseded": False,
-+        }
- 
++        self._progress_task_id = ""
++        self._progress_revision = int(getattr(self, "_progress_revision", 0)) + 1
++        return self._progress_revision
++
++    def _schedule_terminal_progress(self, revision: int, callback) -> None:
++        def apply_if_current() -> None:
++            current_revision = int(getattr(self, "_progress_revision", revision))
++            current_task = str(getattr(self, "_progress_task_id", "") or "")
++            if current_revision == revision and not current_task:
++                callback()
++
++        QTimer.singleShot(0, apply_if_current)
++
+     def _on_task_started(self, task_id: str, message: str, blocking: bool) -> None:
          if blocking:
-             self._blocking_tasks += 1
-@@ -310,6 +339,11 @@ class TaskRunner(QObject):
-             return
-         context.state = TaskState.CANCEL_REQUESTED
-         context.superseded = bool(superseded)
-+        timeline = self._timeline_active.get(context.context_id)
-+        if timeline is not None:
-+            timeline["state"] = TaskState.CANCEL_REQUESTED.value
-+            timeline["cancel_requested"] = True
-+            timeline["superseded"] = bool(superseded)
-         context.token.cancel()
-         self.task_cancel_requested.emit(context.task_id)
+             self._suppress_loader_progress = False
+@@ -2438,8 +2505,12 @@
+             self._set_launch_active(True)
  
-@@ -320,6 +354,16 @@ class TaskRunner(QObject):
-             return
-         self._release_blocking(context)
+         profile = task_progress_profile(task_id)
+-        if profile is not None:
+-            self._on_progress(ProgressEvent(stage=profile.stage, message=message))
++        # A blocking user operation owns the global progress area. Background
++        # metadata work may update it only while no blocking task is active.
++        should_show_progress = blocking or not self.task_runner.is_busy
++        if should_show_progress:
++            MainWindow._track_progress_task(self, task_id, message)
++            MainWindow._show_tracked_task_running(self, task_id, message)
  
-+        timeline = self._timeline_active.pop(context_id, None) or {
-+            "task_id": context.task_id,
-+            "group": context.group,
-+            "started_at": "",
-+        }
-+        timeline["ended_at"] = datetime.now(timezone.utc).isoformat()
-+        timeline["duration_seconds"] = round(max(0.0, monotonic() - context.started_at), 3)
-+        timeline["cancel_requested"] = context.token.cancelled
-+        timeline["superseded"] = context.superseded
+         if task_id == "mods.update.check":
+             self.mod_manager_dialog.set_update_checking(True)
+@@ -2474,10 +2545,12 @@
+             if ".catalog." in task_id or task_id.endswith(".catalog"):
+                 self._curseforge_catalog_tasks.add(task_id)
+                 self.mods_page.set_busy(True)
+-        if profile is None and (blocking or not self.task_runner.is_busy):
+-            self._set_status(message)
+ 
+     def _on_task_succeeded(self, task_id: str, _result: object) -> None:
++        revision = MainWindow._prepare_progress_terminal(self, task_id)
++        if revision is None:
++            return
 +
-         cancelled = (
-             context.token.cancelled
-             or context.superseded
-@@ -327,6 +371,9 @@ class TaskRunner(QObject):
-         )
-         if cancelled:
-             context.state = TaskState.CANCELLED
-+            timeline["state"] = TaskState.CANCELLED.value
-+            timeline["result"] = "cancelled"
-+            self._timeline.append(timeline)
-             self.task_cancelled.emit(context.task_id)
-             self.task_settled.emit(
-                 context.task_id,
-@@ -337,12 +384,19 @@ class TaskRunner(QObject):
- 
-         if succeeded:
-             context.state = TaskState.SUCCEEDED
-+            timeline["state"] = TaskState.SUCCEEDED.value
-+            timeline["result"] = "success"
-+            self._timeline.append(timeline)
-             self.task_succeeded.emit(context.task_id, payload)
-             self.task_settled.emit(context.task_id, True, payload)
+         completion_messages = {
+             self.instance_controller.CREATE_TASK_ID: ("loader.progress.instance_ready", "loader.progress.instance_ready_detail"),
+             self.instance_controller.LOADER_CHANGE_TASK_ID: ("loader.progress.ready", "loader.progress.ready_detail"),
+@@ -2488,21 +2561,45 @@
+         if completion is not None:
+             self._suppress_loader_progress = True
+             status, detail = completion
+-            QTimer.singleShot(0, lambda: self.launch_control.set_operation_completed(status, detail))
++            MainWindow._schedule_terminal_progress(self, revision, lambda: self.launch_control.set_operation_completed(status, detail))
++            return
++
++        if task_id == self.launch_controller.TASK_ID:
              return
  
-         context.state = TaskState.FAILED
-         error = payload if isinstance(payload, Exception) else RuntimeError(str(payload))
-+        timeline["state"] = TaskState.FAILED.value
-+        timeline["result"] = "failed"
-+        timeline["error_type"] = type(error).__name__
-+        self._timeline.append(timeline)
-         self.task_failed.emit(context.task_id, error)
-         self.task_settled.emit(context.task_id, False, error)
+         profile = task_progress_profile(task_id)
+-        if profile is None or task_id == self.launch_controller.TASK_ID:
+-            return
+-        event = ProgressEvent(stage=profile.stage, message=profile.success_message, state=ProgressState.SUCCEEDED, detail=profile.success_detail)
+-        QTimer.singleShot(0, lambda event=event: self._on_progress(event))
++        if profile is not None:
++            event = ProgressEvent(stage=profile.stage, message=profile.success_message, state=ProgressState.SUCCEEDED, detail=profile.success_detail)
++        else:
++            event = ProgressEvent(
++                stage=ProgressStage.PREPARING,
++                message="progress.task.completed",
++                state=ProgressState.SUCCEEDED,
++                detail="progress.task.completed_detail",
++            )
++        MainWindow._schedule_terminal_progress(self, revision, lambda event=event: self._on_progress(event))
++
++    def _on_task_cancelled(self, task_id: str) -> None:
++        revision = MainWindow._prepare_progress_terminal(self, task_id)
++        if revision is None:
++            return
++        profile = task_progress_profile(task_id)
++        event = ProgressEvent(
++            stage=profile.stage if profile is not None else ProgressStage.PREPARING,
++            message="progress.task.cancelled",
++            state=ProgressState.CANCELLED,
++            detail="progress.cancelled.detail",
++        )
++        MainWindow._schedule_terminal_progress(self, revision, lambda event=event: self._on_progress(event))
  
-diff --git a/test/core/config/test_version_metadata.py b/test/core/config/test_version_metadata.py
-index 7dcd7b4..173169c 100644
+     def _on_task_completed(self, task_id: str, _result: object) -> None:
++        active_ids = set(getattr(self.task_runner, "active_task_ids", ()))
++
+         if task_id == "curseforge.install.manual.batch":
+-            self.curseforge_manual_dialog.set_import_busy(False)
++            self.curseforge_manual_dialog.set_import_busy(task_id in active_ids)
+         elif task_id == "modrinth.install.manual.batch":
+-            self.modrinth_manual_dialog.set_import_busy(False)
+-        if task_id == self.launch_controller.TASK_ID:
++            self.modrinth_manual_dialog.set_import_busy(task_id in active_ids)
++        if task_id == self.launch_controller.TASK_ID and task_id not in active_ids:
+             self._set_launch_active(False)
+             if self._manual_launch_provider:
+                 dialog = self.curseforge_manual_dialog if self._manual_launch_provider == "curseforge" else self.modrinth_manual_dialog
+@@ -2510,47 +2607,57 @@
+                 self._manual_launch_provider = ""
+                 self._manual_launch_lock_token = ""
+         if task_id == "mods.update.check":
+-            self.mod_manager_dialog.set_update_checking(False)
++            self.mod_manager_dialog.set_update_checking(task_id in active_ids)
++
++        modpack_busy = any(value.startswith("modpack.") for value in active_ids)
++        update_busy = any(value.startswith("update.") for value in active_ids)
+         if task_id.startswith("modpack."):
+-            self.instances_page.set_modpack_busy(False)
++            self.instances_page.set_modpack_busy(modpack_busy)
+         if task_id.startswith("update."):
+-            self.launcher_settings_page.set_update_busy(False)
++            self.launcher_settings_page.set_update_busy(update_busy)
++
++        self._modrinth_tasks = {value for value in active_ids if value.startswith("modrinth.")}
++        self._mod_catalog_tasks = {value for value in active_ids if value.startswith("mod_catalog.")}
++        self._ftb_tasks = {value for value in active_ids if value.startswith("ftb.")}
++        self._atlauncher_tasks = {value for value in active_ids if value.startswith("atlauncher.")}
++        self._content_tasks = {value for value in active_ids if value.startswith("content.")}
++        self._curseforge_tasks = {value for value in active_ids if value.startswith("curseforge.")}
++        self._curseforge_catalog_tasks = {
++            value for value in self._curseforge_tasks
++            if ".catalog." in value or value.endswith(".catalog")
++        }
++
+         if task_id.startswith("modrinth."):
+-            self._modrinth_tasks.discard(task_id)
+             busy = bool(self._modrinth_tasks)
+             self.modrinth_mod_dialog.set_busy(busy)
+             self.modrinth_modpack_dialog.set_busy(busy)
+-        if task_id.startswith("mod_catalog."):
+-            self._mod_catalog_tasks.discard(task_id)
+-            self.mods_page.set_busy(self.task_runner.is_busy or bool(self._mod_catalog_tasks) or bool(self._curseforge_catalog_tasks))
+         if task_id.startswith("ftb."):
+-            self._ftb_tasks.discard(task_id)
+             self.ftb_modpack_dialog.set_busy(bool(self._ftb_tasks))
+         if task_id.startswith("atlauncher."):
+-            self._atlauncher_tasks.discard(task_id)
+             self.atlauncher_modpack_dialog.set_busy(bool(self._atlauncher_tasks))
+         if task_id.startswith("content."):
+-            self._content_tasks.discard(task_id)
+             busy = bool(self._content_tasks)
+             self.content_pack_manager_dialog.set_busy(busy)
+             self.content_library_dialog.set_busy(busy)
+             self.resource_pack_browser_dialog.set_busy(busy)
+             self.shader_pack_browser_dialog.set_busy(busy)
+         if task_id.startswith("curseforge."):
+-            self._curseforge_tasks.discard(task_id)
+             busy = bool(self._curseforge_tasks)
+             self.curseforge_mod_dialog.set_busy(busy)
+             self.curseforge_modpack_dialog.set_busy(busy)
+-            if ".catalog." in task_id or task_id.endswith(".catalog"):
+-                self._curseforge_catalog_tasks.discard(task_id)
+-                self.mods_page.set_busy(self.task_runner.is_busy or bool(self._mod_catalog_tasks) or bool(self._curseforge_catalog_tasks))
++
++        if task_id.startswith("mod_catalog.") or task_id.startswith("curseforge."):
++            self.mods_page.set_busy(self.task_runner.is_busy or bool(self._mod_catalog_tasks) or bool(self._curseforge_catalog_tasks))
+ 
+     def _on_task_failed(self, task_id: str, error: Exception) -> None:
++        revision = MainWindow._prepare_progress_terminal(self, task_id)
+         if task_id == self.instance_controller.CREATE_TASK_ID:
+             self._pending_mod_install_after_create = None
+         if task_id == "mods.update.check":
+             self.mod_manager_dialog.set_update_error(str(error))
+         if task_id == self.launch_controller.TASK_ID:
++            if revision is None:
++                return
+             if isinstance(error, CompatibilityConfirmationRequired):
+                 self.instance_controller.refresh_running(force=True)
+                 return
+@@ -2603,6 +2710,8 @@
+             self.instance_controller.LOADER_REPAIR_TASK_ID,
+             self.instance_controller.FORGE_RESTORE_TASK_ID,
+         }:
++            if revision is None:
++                return
+             if task_id != self.instance_controller.REPAIR_TASK_ID:
+                 self._suppress_loader_progress = True
+             status = tr("loader.progress.failed" if task_id != self.instance_controller.REPAIR_TASK_ID else "Repair failed")
+@@ -2611,10 +2720,16 @@
+             self.right_panel.set_status(status)
+             return
+ 
++        if revision is None:
++            return
+         profile = task_progress_profile(task_id)
+-        if profile is None:
+-            return
+-        self._on_progress(ProgressEvent(stage=profile.stage, message=profile.failure_message, state=ProgressState.FAILED, detail=str(error)))
++        event = ProgressEvent(
++            stage=profile.stage if profile is not None else ProgressStage.PREPARING,
++            message=profile.failure_message if profile is not None else "progress.task.failed",
++            state=ProgressState.FAILED,
++            detail=str(error),
++        )
++        MainWindow._schedule_terminal_progress(self, revision, lambda event=event: self._on_progress(event))
+ 
+     def _on_launch_paused(self) -> None:
+         self.launch_control.set_paused()
+@@ -2644,8 +2759,30 @@
+         self.launch_control.set_launch_active(active)
+         self.theme_runtime.reapply_assets(self.launch_control)
+ 
++    def _progress_event_belongs_to_current_task(self, event: object) -> bool:
++        current = str(getattr(self, "_progress_task_id", "") or "")
++        if not current or current == self.launch_controller.TASK_ID:
++            return True
++
++        stage = getattr(event, "stage", None)
++        order = tuple(getattr(self, "_progress_task_order", ()) or ())
++        runner = getattr(self, "task_runner", None)
++        if runner is None or stage is None:
++            return True
++
++        stage_owners: list[str] = []
++        for task_id in order:
++            if not runner.is_task_active(task_id):
++                continue
++            profile = task_progress_profile(task_id)
++            if profile is not None and profile.stage == stage:
++                stage_owners.append(task_id)
++        return not stage_owners or current in stage_owners
++
+     def _on_progress(self, event: object) -> None:
+         if self._closing or self.task_runner.is_shutting_down:
++            return
++        if not MainWindow._progress_event_belongs_to_current_task(self, event):
+             return
+         stage = getattr(event, "stage", None)
+         stage_value = str(getattr(stage, "value", stage or ""))
+--- a/src/gui/task_progress.py
++++ b/src/gui/task_progress.py
+@@ -37,7 +37,9 @@
+         "instance.repair.execute": TaskProgressProfile(ProgressStage.APPLYING_REPAIR, "repair.center.repair_task_completed", "repair.center.repair_task_detail", "repair.center.repair_task_failed"),
+         "lan.hosting.prepare": TaskProgressProfile(ProgressStage.PREPARING, "lan.prepare.completed", "lan.prepare.completed_detail", "lan.prepare.failed"),
+         "update.prepare": TaskProgressProfile(ProgressStage.DOWNLOADING_UPDATE, "update.prepare.completed", "update.prepare.completed_detail", "update.prepare.failed"),
++        "storage.legacy.probe": TaskProgressProfile(ProgressStage.PREPARING, "storage.legacy.scan.completed", "storage.legacy.scan.completed_detail", "storage.legacy.scan.failed"),
+         "storage.legacy.scan": TaskProgressProfile(ProgressStage.PREPARING, "storage.legacy.scan.completed", "storage.legacy.scan.completed_detail", "storage.legacy.scan.failed"),
++        "storage.legacy.clean": TaskProgressProfile(ProgressStage.PREPARING, "storage.legacy.clean.completed", "storage.legacy.clean.completed_detail", "storage.legacy.clean.failed"),
+     }
+     if task in exact:
+         return exact[task]
 --- a/test/core/config/test_version_metadata.py
 +++ b/test/core/config/test_version_metadata.py
-@@ -6,9 +6,9 @@ from src.gui.config import VERSION_ID as GUI_VERSION_ID
+@@ -6,9 +6,9 @@
  
  
  def test_launcher_version_metadata_has_one_source_of_truth() -> None:
--    assert VERSION == "v1.4.0-beta.2"
--    assert VERSION_ID == "1.4.0-beta.2"
--    assert VERSION_TAG == "v1.4.0-beta.2"
-+    assert VERSION == "v1.4.0-beta.3"
-+    assert VERSION_ID == "1.4.0-beta.3"
-+    assert VERSION_TAG == "v1.4.0-beta.3"
+-    assert VERSION == "v1.4.0-beta.3"
+-    assert VERSION_ID == "1.4.0-beta.3"
+-    assert VERSION_TAG == "v1.4.0-beta.3"
++    assert VERSION == "v1.4.0-beta.4"
++    assert VERSION_ID == "1.4.0-beta.4"
++    assert VERSION_TAG == "v1.4.0-beta.4"
      assert UPDATE_CHANNEL == "beta"
      assert GUI_VERSION == VERSION
      assert GUI_VERSION_ID == VERSION_ID
-diff --git a/test/core/diagnostics/test_diagnostics_manager.py b/test/core/diagnostics/test_diagnostics_manager.py
-index b71f6e5..dcb4ee7 100644
 --- a/test/core/diagnostics/test_diagnostics_manager.py
 +++ b/test/core/diagnostics/test_diagnostics_manager.py
-@@ -205,3 +205,30 @@ def test_instance_health_bundle_uses_safe_relative_paths(tmp_path, monkeypatch):
+@@ -215,7 +215,7 @@
  
-     assert payload["instances"][0]["issues"][0]["path"] == "instances/Example/mods/missing.jar"
-     assert str(tmp_path) not in json.dumps(payload)
-+
-+
-+def test_v2_bundle_contains_system_task_and_issue_context(tmp_path: Path, monkeypatch) -> None:
-+    monkeypatch.setattr(diagnostics_manager.DiagnosticsManager, "_safe_log_entries", classmethod(lambda cls: {}))
-+    monkeypatch.setattr(diagnostics_manager.DiagnosticsManager, "_safe_runtime_entries", classmethod(lambda cls: {}))
-+    monkeypatch.setattr(diagnostics_manager.DiagnosticsManager, "_system_info_json", classmethod(lambda cls: b'{"schema_version": 1}\n'))
-+    monkeypatch.setattr(diagnostics_manager.DiagnosticsManager, "_java_runtimes_json", classmethod(lambda cls: b'{"schema_version": 1, "runtimes": []}\n'))
-+
-+    result = DiagnosticsManager.write_bundle(
-+        tmp_path / "v2.zip",
-+        "1.4.0-beta.3",
-+        task_timeline=({"task_id": "java.scan", "state": "cancelled"},),
-+        issue_context={"title": "Example", "what_happened": "Failure"},
-+    )
-+
-+    with zipfile.ZipFile(result, "r") as archive:
-+        names = set(archive.namelist())
-+        assert "system-info.json" in names
-+        assert "java-runtimes.json" in names
-+        assert "task-timeline.json" in names
-+        assert "issue-context.json" in names
-+        timeline = json.loads(archive.read("task-timeline.json"))
-+        issue = json.loads(archive.read("issue-context.json"))
-+        manifest = json.loads(archive.read("manifest.json"))
-+    assert timeline["tasks"][0]["task_id"] == "java.scan"
-+    assert issue["issue"]["title"] == "Example"
-+    assert manifest["schema_version"] == 2
-diff --git a/test/core/diagnostics/test_issue_report_builder.py b/test/core/diagnostics/test_issue_report_builder.py
-new file mode 100644
-index 0000000..6f67515
---- /dev/null
+     result = DiagnosticsManager.write_bundle(
+         tmp_path / "v2.zip",
+-        "1.4.0-beta.3",
++        "1.4.0-beta.4",
+         task_timeline=({"task_id": "java.scan", "state": "cancelled"},),
+         issue_context={"title": "Example", "what_happened": "Failure"},
+     )
+--- a/test/core/diagnostics/test_issue_report_builder.py
 +++ b/test/core/diagnostics/test_issue_report_builder.py
-@@ -0,0 +1,40 @@
-+from pathlib import Path
-+from urllib.parse import parse_qs, urlparse
+@@ -15,12 +15,12 @@
+     }
+     body = IssueReportBuilder.build_body(
+         details,
+-        launcher_version="1.4.0-beta.3",
++        launcher_version="1.4.0-beta.4",
+         diagnostics_path=Path("MCW-Diagnostics-20260812-190000.zip"),
+     )
+ 
+     assert "MCW-Diagnostics-20260812-190000.zip" in body
+-    assert "1.4.0-beta.3" in body
++    assert "1.4.0-beta.4" in body
+     assert "secret-token" not in body
+     assert "<redacted>" in body
+ 
+@@ -29,7 +29,7 @@
+     url = IssueReportBuilder.github_new_issue_url(
+         "mahiru7229/mcw-launcher",
+         {"title": "Forge profile issue", "what_happened": "Forge failed"},
+-        launcher_version="1.4.0-beta.3",
++        launcher_version="1.4.0-beta.4",
+     )
+     parsed = urlparse(url)
+     query = parse_qs(parsed.query)
+--- a/test/core/gui/test_task_progress.py
++++ b/test/core/gui/test_task_progress.py
+@@ -12,7 +12,9 @@
+         "modpack.import": ProgressStage.IMPORTING_INSTANCE,
+         "lan.hosting.prepare": ProgressStage.PREPARING,
+         "update.prepare": ProgressStage.DOWNLOADING_UPDATE,
++        "storage.legacy.probe": ProgressStage.PREPARING,
+         "storage.legacy.scan": ProgressStage.PREPARING,
++        "storage.legacy.clean": ProgressStage.PREPARING,
+         "modrinth.install.modpack": ProgressStage.DOWNLOADING_MODPACK,
+         "curseforge.install.mod": ProgressStage.DOWNLOADING_MODS,
+         "content.install.modrinth": ProgressStage.DOWNLOADING_CONTENT,
+@@ -31,3 +33,14 @@
+ 
+ def test_profile_lookup_ignores_unrelated_background_searches() -> None:
+     assert task_progress_profile("mod_catalog.search.fabric") is None
 +
-+from src.core.diagnostics.issue_report_builder import IssueReportBuilder
 +
++def test_legacy_storage_probe_and_cleanup_have_terminal_progress_profiles() -> None:
++    probe = task_progress_profile("storage.legacy.probe")
++    cleanup = task_progress_profile("storage.legacy.clean")
 +
-+def test_issue_report_builder_redacts_and_includes_diagnostics_filename() -> None:
-+    details = {
-+        "title": "Launch failed",
-+        "what_happened": "Authorization: Bearer secret-token",
-+        "steps": "1. Launch instance",
-+        "expected": "Game opens",
-+        "actual": "Launcher reports an error",
-+        "context": "instance=RLCraft",
-+    }
-+    body = IssueReportBuilder.build_body(
-+        details,
-+        launcher_version="1.4.0-beta.3",
-+        diagnostics_path=Path("MCW-Diagnostics-20260812-190000.zip"),
-+    )
-+
-+    assert "MCW-Diagnostics-20260812-190000.zip" in body
-+    assert "1.4.0-beta.3" in body
-+    assert "secret-token" not in body
-+    assert "<redacted>" in body
-+
-+
-+def test_github_new_issue_url_prefills_title_and_body() -> None:
-+    url = IssueReportBuilder.github_new_issue_url(
-+        "mahiru7229/mcw-launcher",
-+        {"title": "Forge profile issue", "what_happened": "Forge failed"},
-+        launcher_version="1.4.0-beta.3",
-+    )
-+    parsed = urlparse(url)
-+    query = parse_qs(parsed.query)
-+
-+    assert parsed.netloc == "github.com"
-+    assert parsed.path == "/mahiru7229/mcw-launcher/issues/new"
-+    assert query["title"] == ["Forge profile issue"]
-+    assert "Forge failed" in query["body"][0]
-diff --git a/test/gui/dialogs/test_issue_report_dialog.py b/test/gui/dialogs/test_issue_report_dialog.py
-new file mode 100644
-index 0000000..961c252
---- /dev/null
++    assert probe is not None
++    assert probe.success_message == "storage.legacy.scan.completed"
++    assert cleanup is not None
++    assert cleanup.success_message == "storage.legacy.clean.completed"
++    assert cleanup.success_detail == "storage.legacy.clean.completed_detail"
+--- a/test/gui/dialogs/test_issue_report_dialog.py
 +++ b/test/gui/dialogs/test_issue_report_dialog.py
-@@ -0,0 +1,29 @@
+@@ -8,7 +8,7 @@
+ 
+ 
+ def test_issue_report_collects_information_before_guidance(gui_app) -> None:
+-    dialog = IssueReportDialog("MCW 1.4.0-beta.3; instance=RLCraft")
++    dialog = IssueReportDialog("MCW 1.4.0-beta.4; instance=RLCraft")
+     submitted = []
+     dialog.information_submitted.connect(submitted.append)
+ 
+--- a/test/gui/test_global_progress_lifecycle.py
++++ b/test/gui/test_global_progress_lifecycle.py
+@@ -0,0 +1,92 @@
 +from __future__ import annotations
++
++import os
++from types import SimpleNamespace
 +
 +import pytest
 +
++os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 +pytest.importorskip("PySide6")
 +
-+from src.gui.dialogs.issue_report_dialog import IssueReportDialog
++import src.gui.main_window_2 as main_window_module
++from src.gui.main_window_2 import MainWindow
++from src.models.progress.progress_state import ProgressState
 +
 +
-+def test_issue_report_collects_information_before_guidance(gui_app) -> None:
-+    dialog = IssueReportDialog("MCW 1.4.0-beta.3; instance=RLCraft")
-+    submitted = []
-+    dialog.information_submitted.connect(submitted.append)
++class _Runner:
++    def __init__(self, active: tuple[str, ...] = (), *, busy: bool = False) -> None:
++        self.active_task_ids = active
++        self.is_busy = busy
 +
-+    assert dialog.stack.currentIndex() == 0
-+    dialog.prefill(title="Forge failed", what_happened="Runtime missing")
-+    dialog.steps_edit.setPlainText("1. Launch")
-+    dialog._submit_information()
-+
-+    assert submitted[0]["title"] == "Forge failed"
-+    assert dialog.stack.currentIndex() == 0
-+
-+    dialog.show_guidance(
-+        __import__("pathlib").Path("MCW-Diagnostics.zip"),
-+        "issue body",
-+        "https://github.com/mahiru7229/mcw-launcher/issues/new",
-+    )
-+    assert dialog.stack.currentIndex() == 1
-+    assert dialog.preview.toPlainText() == "issue body"
-diff --git a/test/gui/test_task_runner.py b/test/gui/test_task_runner.py
-index 3345848..9cdce59 100644
---- a/test/gui/test_task_runner.py
-+++ b/test/gui/test_task_runner.py
-@@ -117,3 +117,31 @@ def test_priority_mode_cancels_competing_tasks_and_rejects_new_non_priority_work
- 
-     assert runner.end_priority_mode("update.") is True
-     assert runner.is_priority_mode is False
++    def is_task_active(self, task_id: str) -> bool:
++        return task_id in self.active_task_ids
 +
 +
-+def test_diagnostics_snapshot_reports_active_cancellation_state(gui_app) -> None:
-+    runner = TaskRunner()
-+    token = TaskCancellationToken()
-+    context = TaskContext(
-+        context_id="diagnostic-context",
-+        task_id="java.scan",
-+        group="java.scan",
-+        thread=Thread(target=lambda: None, daemon=True),
-+        token=token,
-+        blocking=False,
-+        cooperative=True,
-+        started_at=1.0,
-+    )
-+    runner._contexts[context.context_id] = context
-+    runner._timeline_active[context.context_id] = {
-+        "task_id": context.task_id,
-+        "group": context.group,
-+        "state": TaskState.RUNNING.value,
-+    }
++def _window(*, active: tuple[str, ...] = (), busy: bool = False):
++    events: list[object] = []
++    return SimpleNamespace(
++        task_runner=_Runner(active, busy=busy),
++        launch_controller=SimpleNamespace(TASK_ID="minecraft.launch"),
++        _suppress_loader_progress=False,
++        _progress_task_id="",
++        _progress_task_order=[],
++        _progress_task_messages={},
++        _progress_revision=0,
++        _on_progress=events.append,
++    ), events
 +
-+    runner.cancel("java.scan")
-+    snapshot = runner.diagnostics_snapshot()
 +
-+    assert snapshot[-1]["task_id"] == "java.scan"
-+    assert snapshot[-1]["state"] == TaskState.CANCEL_REQUESTED.value
-+    assert snapshot[-1]["cancel_requested"] is True
-diff --git a/test/test_public_api.py b/test/test_public_api.py
-index b86eb1e..ff4d381 100644
++def test_profileless_task_start_replaces_stale_terminal_progress() -> None:
++    window, events = _window()
++
++    MainWindow._on_task_started(window, "versions.load", "Loading Minecraft versions...", False)
++
++    assert window._progress_task_id == "versions.load"
++    assert len(events) == 1
++    assert events[0].state is ProgressState.RUNNING
++    assert events[0].message == "Loading Minecraft versions..."
++    assert events[0].percentage is None
++
++
++def test_older_task_completion_does_not_overwrite_newer_progress(monkeypatch) -> None:
++    window, events = _window(active=("storage.legacy.probe",))
++    window._progress_task_id = "storage.legacy.probe"
++    window._progress_task_order[:] = ["update.check.auto", "storage.legacy.probe"]
++    window._progress_task_messages.update({
++        "update.check.auto": "Checking for updates...",
++        "storage.legacy.probe": "Analyzing legacy launcher storage...",
++    })
++    monkeypatch.setattr(main_window_module.QTimer, "singleShot", lambda _delay, callback: callback())
++
++    MainWindow._on_task_succeeded(window, "update.check.auto", object())
++
++    assert events == []
++    assert window._progress_task_id == "storage.legacy.probe"
++
++
++def test_current_legacy_probe_completion_reaches_ready_state(monkeypatch) -> None:
++    window, events = _window()
++    window._progress_task_id = "storage.legacy.probe"
++    window._progress_task_order[:] = ["storage.legacy.probe"]
++    window._progress_task_messages["storage.legacy.probe"] = "Analyzing legacy launcher storage..."
++    monkeypatch.setattr(main_window_module.QTimer, "singleShot", lambda _delay, callback: callback())
++
++    MainWindow._on_task_succeeded(window, "storage.legacy.probe", object())
++
++    assert len(events) == 1
++    assert events[0].state is ProgressState.SUCCEEDED
++    assert events[0].message == "storage.legacy.scan.completed"
++    assert window._progress_task_id == ""
++
++
++def test_cancelled_replaced_generation_cannot_clear_new_generation(monkeypatch) -> None:
++    window, events = _window(active=("java.scan",))
++    window._progress_task_id = "java.scan"
++    window._progress_task_order[:] = ["java.scan"]
++    window._progress_task_messages["java.scan"] = "Scanning Java installations..."
++    monkeypatch.setattr(main_window_module.QTimer, "singleShot", lambda _delay, callback: callback())
++
++    MainWindow._on_task_cancelled(window, "java.scan")
++
++    assert events == []
++    assert window._progress_task_id == "java.scan"
 --- a/test/test_public_api.py
 +++ b/test/test_public_api.py
-@@ -8,7 +8,7 @@ from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, derive_custo
+@@ -8,7 +8,7 @@
  
  
  def test_bundled_core_runtime_version_follows_launcher_release() -> None:
--    assert mcw_core.__version__ == "1.4.0-beta.2"
-+    assert mcw_core.__version__ == "1.4.0-beta.3"
+-    assert mcw_core.__version__ == "1.4.0-beta.3"
++    assert mcw_core.__version__ == "1.4.0-beta.4"
  
  
  def test_distribution_version_when_installed() -> None:
-@@ -16,7 +16,7 @@ def test_distribution_version_when_installed() -> None:
+@@ -16,7 +16,7 @@
          installed = version("mcw-core")
      except PackageNotFoundError:
          return
--    assert installed == "1.4.0b2"
-+    assert installed == "1.4.0b3"
+-    assert installed == "1.4.0b3"
++    assert installed == "1.4.0b4"
  
  
  def test_optifine_public_api_is_import_only() -> None:

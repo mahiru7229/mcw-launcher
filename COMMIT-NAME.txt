@@ -1,1 +1,1 @@
-feat(beta): mcw-launcher v1.4.0-beta.3 diagnostics v2 and guided issue reporting
+fix(beta): mcw-launcher v1.4.0-beta.4 synchronize progress and task state

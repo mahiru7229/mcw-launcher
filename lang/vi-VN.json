@@ -2130,7 +2130,12 @@
     "issue_report.guide.open_github": "Mở issue GitHub",
     "issue_report.error.report": "Báo cáo lỗi",
     "diagnostics.collecting": "Đang thu thập chẩn đoán...",
-    "diagnostics.busy": "Một tác vụ xuất chẩn đoán đang chạy."
+    "diagnostics.busy": "Một tác vụ xuất chẩn đoán đang chạy.",
+    "progress.task.failed": "Tác vụ thất bại",
+    "storage.legacy.clean.completed": "Dọn lưu trữ hoàn tất",
+    "storage.legacy.clean.completed_detail": "Đã hoàn tất dọn dữ liệu lưu trữ cũ đã chọn. Các mục đã xóa, bỏ qua và lỗi được tổng hợp trong hộp kết quả.",
+    "storage.legacy.clean.failed": "Dọn lưu trữ thất bại",
+    "progress.task.working": "Đang xử lý..."
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

@@ -2130,7 +2130,12 @@
     "issue_report.guide.open_github": "Open GitHub issue",
     "issue_report.error.report": "Report issue",
     "diagnostics.collecting": "Collecting diagnostics...",
-    "diagnostics.busy": "A diagnostics export is already running."
+    "diagnostics.busy": "A diagnostics export is already running.",
+    "progress.task.failed": "Task failed",
+    "storage.legacy.clean.completed": "Storage cleanup complete",
+    "storage.legacy.clean.completed_detail": "The selected legacy storage cleanup finished. Removed, skipped, and failed items are summarized in the result dialog.",
+    "storage.legacy.clean.failed": "Storage cleanup failed",
+    "progress.task.working": "Working..."
   },
   "aliases": {
     "MCW Launcher": "app.name",

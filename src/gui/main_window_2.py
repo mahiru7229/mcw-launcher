@@ -154,6 +154,10 @@ class MainWindow(QMainWindow):
         self._atlauncher_tasks: set[str] = set()
         self._curseforge_catalog_tasks: set[str] = set()
         self._content_tasks: set[str] = set()
+        self._progress_task_id = ""
+        self._progress_task_order: list[str] = []
+        self._progress_task_messages: dict[str, str] = {}
+        self._progress_revision = 0
         self._suppress_loader_progress = False
         self._prompted_update_versions: set[str] = set()
         self._pending_prepared_update: PreparedUpdate | None = None
@@ -676,11 +680,10 @@ class MainWindow(QMainWindow):
 
         self.task_runner.task_started.connect(self._on_task_started)
         self.task_runner.task_failed.connect(self._on_task_failed)
-        self.task_runner.task_succeeded.connect(self._on_task_completed)
         self.task_runner.task_succeeded.connect(self._on_task_succeeded)
+        self.task_runner.task_cancelled.connect(self._on_task_cancelled)
         self.task_runner.task_succeeded.connect(self._on_diagnostics_task_succeeded)
         self.task_runner.task_failed.connect(self._on_diagnostics_task_failed)
-        self.task_runner.task_failed.connect(self._on_task_completed)
         self.task_runner.task_settled.connect(self._on_task_settled)
         self.task_runner.busy_changed.connect(self._set_busy)
         self.task_runner.busy_changed.connect(self.mod_manager_dialog.set_busy)
@@ -1187,6 +1190,7 @@ class MainWindow(QMainWindow):
         self.modrinth_controller.install_mod(instance_name, str(getattr(version, "version_id", "")), tuple(allowed_version_types))
 
     def _on_task_settled(self, task_id: str, succeeded: bool, result: object) -> None:
+        self._on_task_completed(task_id, result)
         if self._pending_prepared_update is not None and not task_id.startswith("update."):
             QTimer.singleShot(0, self._try_launch_pending_update)
 
@@ -2431,6 +2435,69 @@ class MainWindow(QMainWindow):
                 retranslate_dynamic()
         self.theme_runtime.reapply_assets(self)
 
+    def _track_progress_task(self, task_id: str, message: str) -> None:
+        order = getattr(self, "_progress_task_order", None)
+        messages = getattr(self, "_progress_task_messages", None)
+        if order is None or messages is None:
+            return
+        while task_id in order:
+            order.remove(task_id)
+        order.append(task_id)
+        messages[task_id] = str(message)
+        self._progress_task_id = task_id
+        self._progress_revision = int(getattr(self, "_progress_revision", 0)) + 1
+
+    def _show_tracked_task_running(self, task_id: str, message: str) -> None:
+        profile = task_progress_profile(task_id)
+        stage = profile.stage if profile is not None else ProgressStage.PREPARING
+        self._on_progress(ProgressEvent(stage=stage, message=message))
+
+    def _prepare_progress_terminal(self, task_id: str) -> int | None:
+        runner = getattr(self, "task_runner", None)
+        current = str(getattr(self, "_progress_task_id", "") or "")
+        order = getattr(self, "_progress_task_order", None)
+        messages = getattr(self, "_progress_task_messages", None)
+
+        # A REPLACE task may settle an obsolete generation after the new generation
+        # has already started under the same public task id. Never let that old
+        # generation clear or overwrite the new task's progress.
+        if runner is not None and runner.is_task_active(task_id):
+            return None
+
+        if order is None or messages is None:
+            return 0 if not current or current == task_id else None
+
+        while task_id in order:
+            order.remove(task_id)
+        messages.pop(task_id, None)
+        if current and current != task_id:
+            return None
+
+        next_task = ""
+        if runner is not None:
+            for candidate in reversed(order):
+                if runner.is_task_active(candidate):
+                    next_task = candidate
+                    break
+        if next_task:
+            self._progress_task_id = next_task
+            self._progress_revision = int(getattr(self, "_progress_revision", 0)) + 1
+            MainWindow._show_tracked_task_running(self, next_task, messages.get(next_task, tr("progress.task.working")))
+            return None
+
+        self._progress_task_id = ""
+        self._progress_revision = int(getattr(self, "_progress_revision", 0)) + 1
+        return self._progress_revision
+
+    def _schedule_terminal_progress(self, revision: int, callback) -> None:
+        def apply_if_current() -> None:
+            current_revision = int(getattr(self, "_progress_revision", revision))
+            current_task = str(getattr(self, "_progress_task_id", "") or "")
+            if current_revision == revision and not current_task:
+                callback()
+
+        QTimer.singleShot(0, apply_if_current)
+
     def _on_task_started(self, task_id: str, message: str, blocking: bool) -> None:
         if blocking:
             self._suppress_loader_progress = False
@@ -2438,8 +2505,12 @@ class MainWindow(QMainWindow):
             self._set_launch_active(True)
 
         profile = task_progress_profile(task_id)
-        if profile is not None:
-            self._on_progress(ProgressEvent(stage=profile.stage, message=message))
+        # A blocking user operation owns the global progress area. Background
+        # metadata work may update it only while no blocking task is active.
+        should_show_progress = blocking or not self.task_runner.is_busy
+        if should_show_progress:
+            MainWindow._track_progress_task(self, task_id, message)
+            MainWindow._show_tracked_task_running(self, task_id, message)
 
         if task_id == "mods.update.check":
             self.mod_manager_dialog.set_update_checking(True)
@@ -2474,10 +2545,12 @@ class MainWindow(QMainWindow):
             if ".catalog." in task_id or task_id.endswith(".catalog"):
                 self._curseforge_catalog_tasks.add(task_id)
                 self.mods_page.set_busy(True)
-        if profile is None and (blocking or not self.task_runner.is_busy):
-            self._set_status(message)
 
     def _on_task_succeeded(self, task_id: str, _result: object) -> None:
+        revision = MainWindow._prepare_progress_terminal(self, task_id)
+        if revision is None:
+            return
+
         completion_messages = {
             self.instance_controller.CREATE_TASK_ID: ("loader.progress.instance_ready", "loader.progress.instance_ready_detail"),
             self.instance_controller.LOADER_CHANGE_TASK_ID: ("loader.progress.ready", "loader.progress.ready_detail"),
@@ -2488,21 +2561,45 @@ class MainWindow(QMainWindow):
         if completion is not None:
             self._suppress_loader_progress = True
             status, detail = completion
-            QTimer.singleShot(0, lambda: self.launch_control.set_operation_completed(status, detail))
+            MainWindow._schedule_terminal_progress(self, revision, lambda: self.launch_control.set_operation_completed(status, detail))
+            return
+
+        if task_id == self.launch_controller.TASK_ID:
             return
 
         profile = task_progress_profile(task_id)
-        if profile is None or task_id == self.launch_controller.TASK_ID:
+        if profile is not None:
+            event = ProgressEvent(stage=profile.stage, message=profile.success_message, state=ProgressState.SUCCEEDED, detail=profile.success_detail)
+        else:
+            event = ProgressEvent(
+                stage=ProgressStage.PREPARING,
+                message="progress.task.completed",
+                state=ProgressState.SUCCEEDED,
+                detail="progress.task.completed_detail",
+            )
+        MainWindow._schedule_terminal_progress(self, revision, lambda event=event: self._on_progress(event))
+
+    def _on_task_cancelled(self, task_id: str) -> None:
+        revision = MainWindow._prepare_progress_terminal(self, task_id)
+        if revision is None:
             return
-        event = ProgressEvent(stage=profile.stage, message=profile.success_message, state=ProgressState.SUCCEEDED, detail=profile.success_detail)
-        QTimer.singleShot(0, lambda event=event: self._on_progress(event))
+        profile = task_progress_profile(task_id)
+        event = ProgressEvent(
+            stage=profile.stage if profile is not None else ProgressStage.PREPARING,
+            message="progress.task.cancelled",
+            state=ProgressState.CANCELLED,
+            detail="progress.cancelled.detail",
+        )
+        MainWindow._schedule_terminal_progress(self, revision, lambda event=event: self._on_progress(event))
 
     def _on_task_completed(self, task_id: str, _result: object) -> None:
+        active_ids = set(getattr(self.task_runner, "active_task_ids", ()))
+
         if task_id == "curseforge.install.manual.batch":
-            self.curseforge_manual_dialog.set_import_busy(False)
+            self.curseforge_manual_dialog.set_import_busy(task_id in active_ids)
         elif task_id == "modrinth.install.manual.batch":
-            self.modrinth_manual_dialog.set_import_busy(False)
-        if task_id == self.launch_controller.TASK_ID:
+            self.modrinth_manual_dialog.set_import_busy(task_id in active_ids)
+        if task_id == self.launch_controller.TASK_ID and task_id not in active_ids:
             self._set_launch_active(False)
             if self._manual_launch_provider:
                 dialog = self.curseforge_manual_dialog if self._manual_launch_provider == "curseforge" else self.modrinth_manual_dialog
@@ -2510,47 +2607,57 @@ class MainWindow(QMainWindow):
                 self._manual_launch_provider = ""
                 self._manual_launch_lock_token = ""
         if task_id == "mods.update.check":
-            self.mod_manager_dialog.set_update_checking(False)
+            self.mod_manager_dialog.set_update_checking(task_id in active_ids)
+
+        modpack_busy = any(value.startswith("modpack.") for value in active_ids)
+        update_busy = any(value.startswith("update.") for value in active_ids)
         if task_id.startswith("modpack."):
-            self.instances_page.set_modpack_busy(False)
+            self.instances_page.set_modpack_busy(modpack_busy)
         if task_id.startswith("update."):
-            self.launcher_settings_page.set_update_busy(False)
+            self.launcher_settings_page.set_update_busy(update_busy)
+
+        self._modrinth_tasks = {value for value in active_ids if value.startswith("modrinth.")}
+        self._mod_catalog_tasks = {value for value in active_ids if value.startswith("mod_catalog.")}
+        self._ftb_tasks = {value for value in active_ids if value.startswith("ftb.")}
+        self._atlauncher_tasks = {value for value in active_ids if value.startswith("atlauncher.")}
+        self._content_tasks = {value for value in active_ids if value.startswith("content.")}
+        self._curseforge_tasks = {value for value in active_ids if value.startswith("curseforge.")}
+        self._curseforge_catalog_tasks = {
+            value for value in self._curseforge_tasks
+            if ".catalog." in value or value.endswith(".catalog")
+        }
+
         if task_id.startswith("modrinth."):
-            self._modrinth_tasks.discard(task_id)
             busy = bool(self._modrinth_tasks)
             self.modrinth_mod_dialog.set_busy(busy)
             self.modrinth_modpack_dialog.set_busy(busy)
-        if task_id.startswith("mod_catalog."):
-            self._mod_catalog_tasks.discard(task_id)
-            self.mods_page.set_busy(self.task_runner.is_busy or bool(self._mod_catalog_tasks) or bool(self._curseforge_catalog_tasks))
         if task_id.startswith("ftb."):
-            self._ftb_tasks.discard(task_id)
             self.ftb_modpack_dialog.set_busy(bool(self._ftb_tasks))
         if task_id.startswith("atlauncher."):
-            self._atlauncher_tasks.discard(task_id)
             self.atlauncher_modpack_dialog.set_busy(bool(self._atlauncher_tasks))
         if task_id.startswith("content."):
-            self._content_tasks.discard(task_id)
             busy = bool(self._content_tasks)
             self.content_pack_manager_dialog.set_busy(busy)
             self.content_library_dialog.set_busy(busy)
             self.resource_pack_browser_dialog.set_busy(busy)
             self.shader_pack_browser_dialog.set_busy(busy)
         if task_id.startswith("curseforge."):
-            self._curseforge_tasks.discard(task_id)
             busy = bool(self._curseforge_tasks)
             self.curseforge_mod_dialog.set_busy(busy)
             self.curseforge_modpack_dialog.set_busy(busy)
-            if ".catalog." in task_id or task_id.endswith(".catalog"):
-                self._curseforge_catalog_tasks.discard(task_id)
-                self.mods_page.set_busy(self.task_runner.is_busy or bool(self._mod_catalog_tasks) or bool(self._curseforge_catalog_tasks))
+
+        if task_id.startswith("mod_catalog.") or task_id.startswith("curseforge."):
+            self.mods_page.set_busy(self.task_runner.is_busy or bool(self._mod_catalog_tasks) or bool(self._curseforge_catalog_tasks))
 
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
+        revision = MainWindow._prepare_progress_terminal(self, task_id)
         if task_id == self.instance_controller.CREATE_TASK_ID:
             self._pending_mod_install_after_create = None
         if task_id == "mods.update.check":
             self.mod_manager_dialog.set_update_error(str(error))
         if task_id == self.launch_controller.TASK_ID:
+            if revision is None:
+                return
             if isinstance(error, CompatibilityConfirmationRequired):
                 self.instance_controller.refresh_running(force=True)
                 return
@@ -2603,6 +2710,8 @@ class MainWindow(QMainWindow):
             self.instance_controller.LOADER_REPAIR_TASK_ID,
             self.instance_controller.FORGE_RESTORE_TASK_ID,
         }:
+            if revision is None:
+                return
             if task_id != self.instance_controller.REPAIR_TASK_ID:
                 self._suppress_loader_progress = True
             status = tr("loader.progress.failed" if task_id != self.instance_controller.REPAIR_TASK_ID else "Repair failed")
@@ -2611,10 +2720,16 @@ class MainWindow(QMainWindow):
             self.right_panel.set_status(status)
             return
 
-        profile = task_progress_profile(task_id)
-        if profile is None:
+        if revision is None:
             return
-        self._on_progress(ProgressEvent(stage=profile.stage, message=profile.failure_message, state=ProgressState.FAILED, detail=str(error)))
+        profile = task_progress_profile(task_id)
+        event = ProgressEvent(
+            stage=profile.stage if profile is not None else ProgressStage.PREPARING,
+            message=profile.failure_message if profile is not None else "progress.task.failed",
+            state=ProgressState.FAILED,
+            detail=str(error),
+        )
+        MainWindow._schedule_terminal_progress(self, revision, lambda event=event: self._on_progress(event))
 
     def _on_launch_paused(self) -> None:
         self.launch_control.set_paused()
@@ -2644,8 +2759,30 @@ class MainWindow(QMainWindow):
         self.launch_control.set_launch_active(active)
         self.theme_runtime.reapply_assets(self.launch_control)
 
+    def _progress_event_belongs_to_current_task(self, event: object) -> bool:
+        current = str(getattr(self, "_progress_task_id", "") or "")
+        if not current or current == self.launch_controller.TASK_ID:
+            return True
+
+        stage = getattr(event, "stage", None)
+        order = tuple(getattr(self, "_progress_task_order", ()) or ())
+        runner = getattr(self, "task_runner", None)
+        if runner is None or stage is None:
+            return True
+
+        stage_owners: list[str] = []
+        for task_id in order:
+            if not runner.is_task_active(task_id):
+                continue
+            profile = task_progress_profile(task_id)
+            if profile is not None and profile.stage == stage:
+                stage_owners.append(task_id)
+        return not stage_owners or current in stage_owners
+
     def _on_progress(self, event: object) -> None:
         if self._closing or self.task_runner.is_shutting_down:
+            return
+        if not MainWindow._progress_event_belongs_to_current_task(self, event):
             return
         stage = getattr(event, "stage", None)
         stage_value = str(getattr(stage, "value", stage or ""))

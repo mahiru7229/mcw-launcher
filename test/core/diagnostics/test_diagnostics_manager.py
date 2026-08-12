@@ -215,7 +215,7 @@ def test_v2_bundle_contains_system_task_and_issue_context(tmp_path: Path, monkey
 
     result = DiagnosticsManager.write_bundle(
         tmp_path / "v2.zip",
-        "1.4.0-beta.3",
+        "1.4.0-beta.4",
         task_timeline=({"task_id": "java.scan", "state": "cancelled"},),
         issue_context={"title": "Example", "what_happened": "Failure"},
     )

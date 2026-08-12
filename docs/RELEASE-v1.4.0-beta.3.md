@@ -2,7 +2,7 @@
 
 ## Tiếng Việt
 
-MCW Launcher **v1.4.0-beta.3** là beta cuối của nhánh v1.4 trước RC/stable, tập trung vào Diagnostics v2 và quy trình báo lỗi có hướng dẫn.
+MCW Launcher **v1.4.0-beta.3** tập trung vào Diagnostics v2 và quy trình báo lỗi có hướng dẫn.
 
 ### Thay đổi chính
 
@@ -23,7 +23,7 @@ Beta/RC chỉ phát hành Launcher patch/source theo workflow dự án; standalo
 
 ## English
 
-MCW Launcher **v1.4.0-beta.3** is the final v1.4 beta before RC/stable, focused on Diagnostics v2 and a guided issue-reporting workflow.
+MCW Launcher **v1.4.0-beta.3** is focused on Diagnostics v2 and a guided issue-reporting workflow.
 
 ### Highlights
 

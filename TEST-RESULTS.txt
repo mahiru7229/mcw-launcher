@@ -1,30 +1,31 @@
-MCW Launcher v1.4.0-beta.3
+MCW Launcher v1.4.0-beta.4
 
 Validation date: 2026-08-12
 Environment: Linux headless build/test environment (PySide6 not installed)
 
 Full pytest regression:
-  1558 passed, 92 skipped, 2 warnings, 0 failed
+  1559 passed, 93 skipped, 2 warnings, 0 failed
 
 Warnings:
   2 intentional duplicate-ZIP-member warnings from package security fixtures.
 
 Additional validation:
-  python -m compileall -q src mcw_core tools test: PASS
-  Translation/static GUI coverage after beta.3 additions: PASS
-  Diagnostics v2 + issue draft privacy tests: PASS
+  python -m compileall -q launcher.py src mcw_core tools test: PASS
+  Translation/static GUI coverage after beta.4 additions: PASS
+  Task progress profile regression: PASS
 
-Beta.3 scope validated:
-  - Diagnostics schema v2 includes system info, Java runtimes, task timeline, issue context and bounded runtime/crash logs.
-  - Diagnostics export is dispatched through TaskRunner instead of blocking the GUI thread.
-  - Report Issue workflow collects user context before diagnostics and guidance.
-  - GitHub issue title/body generation is privacy-filtered and references the generated ZIP by filename only.
-  - TaskRunner diagnostics snapshot is bounded and records lifecycle/cancellation/supersede metadata.
-  - Existing beta.1/beta.2 task lifecycle, Forge, update-priority and download-performance regressions remain green.
+Beta.4 scope validated:
+  - Profile-less tasks reset stale global progress on start and receive terminal states.
+  - Older task completion does not own newer task progress.
+  - REPLACE cancellation cannot clear a newer generation with the same task id.
+  - Legacy Storage probe/scan/cleanup have explicit terminal progress profiles.
+  - Cancelled tasks use TaskRunner settled cleanup so provider/dialog busy state is rebuilt from active tasks.
+  - Blocking tasks keep ownership of the global progress area over background metadata work.
+  - Existing beta.1-beta.3 lifecycle, performance, Forge and diagnostics regressions remain green.
 
 Platform note:
-  92 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
-  Windows GUI smoke testing is still required for the two-step Report Issue dialog and browser handoff.
+  93 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
+  Windows GUI smoke testing remains required for visual progress transitions and cancellation behavior.
 
 Release policy:
-  Beta/RC delivery is a Launcher changed-files ZIP only. No standalone MCW Core artifact is built for beta.3.
+  Beta/RC delivery is a Launcher changed-files ZIP only. No standalone MCW Core artifact is built for beta.4.
