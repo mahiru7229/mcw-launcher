@@ -97,6 +97,7 @@ from src.gui.widget.sidebar_widget import SidebarWidget
 from src.gui.widget.toast_notification import ToastManager
 from src.models.progress.progress_event import ProgressEvent
 from src.models.progress.progress_state import ProgressState
+from src.models.progress.progress_stage import ProgressStage
 from src.models.update.update_info import PreparedUpdate, UpdateInfo
 
 
