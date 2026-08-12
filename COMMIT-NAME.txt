@@ -1,1 +1,1 @@
-fix(beta): mcw-launcher v1.4.0-beta.4 synchronize progress and task state
+release: mcw-launcher v1.4.0 stable lifecycle, performance, diagnostics and progress hardening

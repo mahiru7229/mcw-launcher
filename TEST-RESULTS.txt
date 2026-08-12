@@ -1,31 +1,31 @@
-MCW Launcher v1.4.0-beta.4
+MCW Launcher / MCW Core v1.4.0 stable release validation
+Date: 2026-08-12
 
-Validation date: 2026-08-12
-Environment: Linux headless build/test environment (PySide6 not installed)
+Source regression
+- Command: PYTHONPATH=. pytest -q
+- Result: 1560 passed, 93 skipped, 2 warnings, 0 failed
+- Warnings: two intentional duplicate-member ZIP security fixtures in test/core/package/test_package_manager_security.py
+- Skips: GUI/platform tests requiring PySide6 and/or Windows-specific runtime support unavailable in this Linux build environment
 
-Full pytest regression:
-  1559 passed, 93 skipped, 2 warnings, 0 failed
+Static/runtime validation
+- python -m compileall launcher.py src mcw_core tools test: PASS
+- python -m tools.release_preflight: PASS (after release evidence generation)
+- Language parity: 2131 / 2131 translation keys
+- Unresolved merge markers: 0
 
-Warnings:
-  2 intentional duplicate-ZIP-member warnings from package security fixtures.
+MCW Core wheel
+- Built with: python -m pip wheel . --no-deps --no-build-isolation
+- Artifact: mcw_core-1.4.0-py3-none-any.whl
+- Installed into isolated target: PASS
+- mcw_core.__version__: 1.4.0
+- importlib.metadata version("mcw-core"): 1.4.0
+- public InstanceService.kill(): available
+- src.gui entries in wheel: 0
 
-Additional validation:
-  python -m compileall -q launcher.py src mcw_core tools test: PASS
-  Translation/static GUI coverage after beta.4 additions: PASS
-  Task progress profile regression: PASS
+Release notes
+- Launcher runtime: v1.4.0
+- Update channel: stable
+- Python distribution: mcw-core 1.4.0
 
-Beta.4 scope validated:
-  - Profile-less tasks reset stale global progress on start and receive terminal states.
-  - Older task completion does not own newer task progress.
-  - REPLACE cancellation cannot clear a newer generation with the same task id.
-  - Legacy Storage probe/scan/cleanup have explicit terminal progress profiles.
-  - Cancelled tasks use TaskRunner settled cleanup so provider/dialog busy state is rebuilt from active tasks.
-  - Blocking tasks keep ownership of the global progress area over background metadata work.
-  - Existing beta.1-beta.3 lifecycle, performance, Forge and diagnostics regressions remain green.
-
-Platform note:
-  93 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
-  Windows GUI smoke testing remains required for visual progress transitions and cancellation behavior.
-
-Release policy:
-  Beta/RC delivery is a Launcher changed-files ZIP only. No standalone MCW Core artifact is built for beta.4.
+Platform note
+- This environment cannot build or smoke-test the Windows PyInstaller EXE. Windows CI/smoke testing remains required before publishing the final Windows binary/update package.

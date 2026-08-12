@@ -6,7 +6,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
 from src.gui.controllers.curseforge_controller import CurseForgeController
-from src.gui.task_runner import TaskRunner
+from src.gui.task_runner import TaskCancellationToken, TaskRunner
 
 
 def test_controller_loads_project_details_through_core_client(gui_app, monkeypatch):
@@ -14,7 +14,7 @@ def test_controller_loads_project_details_through_core_client(gui_app, monkeypat
     controller = CurseForgeController(task_runner)
     calls = []
     project = object()
-    monkeypatch.setattr(task_runner, "run", lambda task_id, task, message, blocking=False: calls.append((task_id, task(), message, blocking)) or True)
+    monkeypatch.setattr(task_runner, "run", lambda task_id, task, message, blocking=False, **_kwargs: calls.append((task_id, task(TaskCancellationToken()), message, blocking)) or True)
 
     from src.core.curseforge.curseforge_client import CurseForgeClient
     monkeypatch.setattr(CurseForgeClient, "get_project_details", lambda project_id: project)

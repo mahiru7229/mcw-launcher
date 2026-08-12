@@ -20,7 +20,7 @@ def test_install_runs_managed_java_task(gui_app, monkeypatch: pytest.MonkeyPatch
 
     captured = {}
 
-    def run(task_id, task, message, blocking=True):
+    def run(task_id, task, message, blocking=True, **_kwargs):
         captured.update(task_id=task_id, message=message, blocking=blocking, result=task())
         return True
 
@@ -45,7 +45,7 @@ def test_install_accepts_latest_java_feature_release(gui_app, monkeypatch: pytes
 
     captured = {}
 
-    def run(task_id, task, message, blocking=True):
+    def run(task_id, task, message, blocking=True, **_kwargs):
         captured.update(task_id=task_id, blocking=blocking, result=task())
         return True
 
@@ -63,7 +63,7 @@ def test_scan_requests_java_diagnostics_and_latest_release(gui_app, monkeypatch:
     controller = JavaController(runner)
     task_ids = []
 
-    def run(task_id, task, message, blocking=True):
+    def run(task_id, task, message, blocking=True, **_kwargs):
         task_ids.append((task_id, blocking))
         return True
 

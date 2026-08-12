@@ -41,6 +41,7 @@ class _ModController:
 def _window_stub(started: bool = True) -> SimpleNamespace:
     return SimpleNamespace(
         instance_controller=SimpleNamespace(CREATE_TASK_ID="instance.create"),
+        _pending_prepared_update=None,
         _pending_mod_install_after_create={
             "instance_name": "Fabric Mods",
             "version_id": "mod-version",
@@ -51,6 +52,7 @@ def _window_stub(started: bool = True) -> SimpleNamespace:
         mod_controller=_ModController(),
         logs_page=_Logs(),
         errors=[],
+        _on_task_completed=lambda task_id, result: None,
         _show_error=lambda title, message: None,
     )
 

@@ -26,6 +26,12 @@ def _window(*, active: tuple[str, ...] = (), busy: bool = False):
     events: list[object] = []
     return SimpleNamespace(
         task_runner=_Runner(active, busy=busy),
+        instance_controller=SimpleNamespace(
+            CREATE_TASK_ID="instance.create",
+            LOADER_CHANGE_TASK_ID="instance.loader",
+            LOADER_REPAIR_TASK_ID="instance.loader.repair",
+            FORGE_RESTORE_TASK_ID="instance.loader.restore",
+        ),
         launch_controller=SimpleNamespace(TASK_ID="minecraft.launch"),
         _suppress_loader_progress=False,
         _progress_task_id="",

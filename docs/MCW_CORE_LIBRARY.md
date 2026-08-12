@@ -1,6 +1,6 @@
 # MCW Core Library
 
-Bundled runtime for Launcher beta.4: **1.4.0-beta.4**. No separate MCW Core beta artifact is published for beta.4; standalone Core artifacts are reserved for the stable v1.4 release.
+Stable runtime for MCW Launcher v1.4: **1.4.0**. The stable release publishes standalone MCW Core source and wheel artifacts in addition to the Core bundled with the launcher.
 
 MCW Core is the GUI-independent runtime used by MCW Launcher. It can be imported from a Python program without installing PySide6.
 
