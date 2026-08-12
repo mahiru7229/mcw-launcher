@@ -61,11 +61,18 @@ def build_release_zip(project_root: Path, executable: Path, version: str, output
         payload_root = Path(temporary) / package_name
         payload_root.mkdir(parents=True)
         copy_payload(project_root, payload_root, executable)
+        managed_files = sorted(
+            path.relative_to(payload_root).as_posix()
+            for path in payload_root.rglob("*")
+            if path.is_file()
+        )
+        managed_files.append("mcw-update.json")
         manifest = {
             "schema_version": 1,
             "version": version,
             "platform": "windows-x64",
             "executable": executable.name,
+            "files": sorted(set(managed_files)),
         }
         (payload_root / "mcw-update.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 

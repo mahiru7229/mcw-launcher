@@ -333,6 +333,48 @@ def audit_launcher_icon(project_root: Path) -> list[str]:
     return errors
 
 
+
+
+def audit_release_evidence(project_root: Path) -> list[str]:
+    errors: list[str] = []
+    test_results = project_root / "TEST-RESULTS.txt"
+    if test_results.is_file():
+        try:
+            text = test_results.read_text(encoding="utf-8")
+        except OSError as error:
+            errors.append(f"Unable to inspect TEST-RESULTS.txt: {error}")
+        else:
+            if VERSION_ID not in text:
+                errors.append(f"TEST-RESULTS.txt does not reference current version {VERSION_ID}")
+    changes = project_root / "CHANGES.diff"
+    if changes.is_file():
+        try:
+            text = changes.read_text(encoding="utf-8", errors="replace")
+        except OSError as error:
+            errors.append(f"Unable to inspect CHANGES.diff: {error}")
+        else:
+            if VERSION_ID not in text:
+                errors.append(f"CHANGES.diff does not reference current version {VERSION_ID}")
+    return errors
+
+
+def audit_gui_core_boundary(project_root: Path) -> list[str]:
+    errors: list[str] = []
+    gui_root = project_root / "src" / "gui"
+    if not gui_root.is_dir():
+        return ["Missing GUI source directory: src/gui"]
+    direct_import = re.compile(r"^\s*(?:from\s+src\.core(?:\.|\s)|import\s+src\.core(?:\.|\s|$))")
+    for path in sorted(gui_root.rglob("*.py")):
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError as error:
+            errors.append(f"Unable to inspect GUI dependency boundary in {path.relative_to(project_root)}: {error}")
+            continue
+        for line_number, line in enumerate(lines, start=1):
+            if direct_import.match(line):
+                errors.append(f"{path.relative_to(project_root)}:{line_number}: GUI must not import src.core directly")
+    return errors
+
 def audit_version_metadata(project_root: Path) -> list[str]:
     errors: list[str] = []
     if VERSION_TAG != f"v{VERSION_ID}":
@@ -360,6 +402,8 @@ def audit_version_metadata(project_root: Path) -> list[str]:
 def run_preflight(project_root: Path = PROJECT_ROOT) -> list[str]:
     errors: list[str] = []
     errors.extend(audit_version_metadata(project_root))
+    errors.extend(audit_release_evidence(project_root))
+    errors.extend(audit_gui_core_boundary(project_root))
     errors.extend(audit_private_gateway_bundling(project_root))
     errors.extend(audit_theme_contract(project_root))
     errors.extend(audit_lan_agent(project_root))

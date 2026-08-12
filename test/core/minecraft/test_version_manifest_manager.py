@@ -473,3 +473,45 @@ def test_download_manifest_does_not_replace_cache_with_invalid_response(monkeypa
 
     assert VersionManifestManager._download_manifest() == manifest_path
     assert manifest_path.read_text(encoding="utf-8") == cached_text
+
+
+def test_download_manifest_falls_back_to_existing_cache_when_atomic_publish_is_locked(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.json"
+    cached = json.dumps(make_manifest_data())
+    manifest_path.write_text(cached, encoding="utf-8")
+    monkeypatch.setattr(Paths, "version_manifest", lambda: manifest_path)
+    monkeypatch.setattr(
+        requests,
+        "get",
+        lambda url, timeout: SimpleNamespace(text=json.dumps(make_manifest_data()), raise_for_status=lambda: None),
+    )
+    monkeypatch.setattr(
+        "src.core.minecraft.version_manifest_manager.atomic_write_text",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(PermissionError("sharing violation")),
+    )
+
+    assert VersionManifestManager._download_manifest() == manifest_path
+    assert manifest_path.read_text(encoding="utf-8") == cached
+
+
+def test_concurrent_manifest_refreshes_use_independent_temporary_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    manifest_path = tmp_path / "manifest.json"
+    payload = json.dumps(make_manifest_data())
+    barrier = Barrier(2)
+    monkeypatch.setattr(Paths, "version_manifest", lambda: manifest_path)
+
+    def fake_get(url: str, timeout: int):
+        barrier.wait(timeout=2)
+        return SimpleNamespace(text=payload, raise_for_status=lambda: None)
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _value: VersionManifestManager._download_manifest(), range(2)))
+
+    assert results == [manifest_path, manifest_path]
+    assert json.loads(manifest_path.read_text(encoding="utf-8")) == make_manifest_data()
+    assert not list(tmp_path.glob(".*.tmp"))
