@@ -1,1 +1,1 @@
-fix(release): mcw-launcher v1.3.2 stability and update hardening
+release: mcw-launcher v1.4.0 stable lifecycle, performance, diagnostics and progress hardening

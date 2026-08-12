@@ -10,6 +10,7 @@ pytest.importorskip("PySide6")
 from PySide6.QtCore import QObject, Signal
 
 from src.gui.controllers.base_controller import BaseController
+from src.gui.task_runner import TaskCancellationToken
 
 
 class _Runner(QObject):
@@ -21,7 +22,7 @@ class _Runner(QObject):
         self.calls: list[tuple[str, object, str, bool]] = []
         self.active = False
 
-    def run(self, task_id, task, message, blocking=False):
+    def run(self, task_id, task, message, blocking=False, **_kwargs):
         self.calls.append((task_id, task, message, blocking))
         return True
 
@@ -43,7 +44,7 @@ def test_retryable_failure_offers_and_restarts_same_network_task(gui_app) -> Non
     assert len(runner.calls) == 2
     assert runner.calls[-1][0] == "metadata.load"
     assert runner.calls[-1][2:] == ("Loading metadata", False)
-    assert runner.calls[-1][1]() == "ok"
+    assert runner.calls[-1][1](TaskCancellationToken()) == "ok"
 
 
 def test_permanent_failure_does_not_offer_manual_retry(gui_app) -> None:

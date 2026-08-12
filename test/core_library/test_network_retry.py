@@ -85,3 +85,29 @@ def test_permanent_http_status_text_is_not_retryable() -> None:
 
 def test_missing_manifest_without_cache_is_retryable() -> None:
     assert is_retryable_network_error(RuntimeError("Minecraft version manifest is unavailable.")) is True
+
+
+def test_checkpoint_can_cancel_before_retry_attempt() -> None:
+    calls = 0
+    checkpoints = 0
+
+    def task() -> None:
+        nonlocal calls
+        calls += 1
+        raise TimeoutError("metadata request timed out")
+
+    def checkpoint() -> None:
+        nonlocal checkpoints
+        checkpoints += 1
+        if checkpoints >= 2:
+            raise RuntimeError("cancelled")
+
+    with pytest.raises(RuntimeError, match="cancelled"):
+        run_with_network_retries(
+            task,
+            policy=NetworkRetryPolicy(max_attempts=3, initial_delay_seconds=0),
+            sleep=lambda _delay: None,
+            checkpoint=checkpoint,
+        )
+
+    assert calls == 1

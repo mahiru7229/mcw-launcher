@@ -6,7 +6,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
 from src.gui.controllers.modrinth_controller import ModrinthController
-from src.gui.task_runner import TaskRunner
+from src.gui.task_runner import TaskCancellationToken, TaskRunner
 
 
 def test_controller_ignores_unrelated_task_result(gui_app):
@@ -34,7 +34,7 @@ def test_controller_passes_forge_filter_to_client(gui_app, monkeypatch):
     task_runner = TaskRunner()
     controller = ModrinthController(task_runner)
     calls = []
-    monkeypatch.setattr(task_runner, "run", lambda task_id, task, message, blocking=False: calls.append((task_id, task(), message, blocking)))
+    monkeypatch.setattr(task_runner, "run", lambda task_id, task, message, blocking=False, **_kwargs: calls.append((task_id, task(TaskCancellationToken()), message, blocking)))
 
     from src.core.modrinth.modrinth_client import ModrinthClient
     monkeypatch.setattr(ModrinthClient, "search_projects", lambda **kwargs: kwargs)
@@ -50,7 +50,7 @@ def test_controller_forces_live_search_refresh(gui_app, monkeypatch):
     task_runner = TaskRunner()
     controller = ModrinthController(task_runner)
     calls = []
-    monkeypatch.setattr(task_runner, "run", lambda task_id, task, message, blocking=False: calls.append(task()))
+    monkeypatch.setattr(task_runner, "run", lambda task_id, task, message, blocking=False, **_kwargs: calls.append(task(TaskCancellationToken())))
 
     from src.core.modrinth.modrinth_client import ModrinthClient
     monkeypatch.setattr(ModrinthClient, "search_projects", lambda **kwargs: kwargs)
@@ -75,7 +75,7 @@ def test_controller_loads_project_details_through_core_client(gui_app, monkeypat
     controller = ModrinthController(task_runner)
     calls = []
     project = object()
-    monkeypatch.setattr(task_runner, "run", lambda task_id, task, message, blocking=False: calls.append((task_id, task(), message, blocking)))
+    monkeypatch.setattr(task_runner, "run", lambda task_id, task, message, blocking=False, **_kwargs: calls.append((task_id, task(TaskCancellationToken()), message, blocking)))
 
     from src.core.modrinth.modrinth_client import ModrinthClient
     monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: project)

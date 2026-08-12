@@ -1,36 +1,62 @@
-COMMIT-NAME.txt
-CHANGED-FILES.txt
-DELIVERY-MANIFEST.txt
-TEST-RESULTS.txt
-CHANGES.diff
-GUI_ARCHITECTURE.md
-README.md
-docs/MCW_CORE_LIBRARY.md
-docs/MCW_CORE_RELEASE-v1.3.2.md
-docs/RELEASE-v1.3.2.md
-pyproject.toml
-src/config.py
-src/core/fs/atomic_file.py
-src/core/fs/paths.py
-src/core/instance/instance_manager.py
-src/core/minecraft/version_manifest_manager.py
-src/core/package/modpack_package_manager.py
-src/core/theme/theme_authoring.py
-src/core/update/github_release_client.py
-src/core/update/update_applier.py
-src/core/update/update_manager.py
-src/models/update/update_info.py
-test/core/config/test_version_metadata.py
-test/core/fs_test_short_workspaces.py -> removed/renamed
-test/core/test_short_workspaces.py
-test/core/test_atomic_file.py
-test/core/minecraft/test_version_manifest_manager.py
-test/core/package/test_modpack_package_manager.py
-test/core/theme/test_theme_authoring.py
-test/core/update/test_github_release_client.py
-test/core/update/test_update_applier.py
-test/core/update/test_update_manager.py
-test/test_public_api.py
-test/tools/test_release_preflight.py
-tools/build_release_zip.py
-tools/release_preflight.py
+MCW Launcher v1.4.0 changes from v1.3.2 baseline
+
+M	COMMIT-NAME.txt
+M	README.md
+M	docs/MCW_CORE_LIBRARY.md
+A	docs/MCW_CORE_RELEASE-v1.4.0-beta.1.md
+A	docs/MCW_CORE_RELEASE-v1.4.0.md
+A	docs/RELEASE-CORE-v1.4.0.md
+A	docs/RELEASE-v1.4.0-beta.1.md
+A	docs/RELEASE-v1.4.0-beta.2.md
+A	docs/RELEASE-v1.4.0-beta.3.md
+A	docs/RELEASE-v1.4.0-beta.4.md
+A	docs/RELEASE-v1.4.0.md
+A	docs/V1.4-BETA-ROADMAP.md
+M	lang/en-US.json
+M	lang/vi-VN.json
+A	mcw_core/api/diagnostics/issue_report_builder.py
+M	mcw_core/services.py
+M	pyproject.toml
+M	src/config.py
+M	src/core/config/launcher_settings_manager.py
+M	src/core/diagnostics/diagnostics_manager.py
+A	src/core/diagnostics/issue_report_builder.py
+M	src/core/modloader/forge/forge_version_manager.py
+M	src/core/modrinth/modrinth_content_manager.py
+M	src/core/network/download_journal.py
+M	src/core/network/download_manager.py
+M	src/core/runtime/game_runtime_manager.py
+M	src/core/runtime/process_supervisor.py
+M	src/gui/controllers/base_controller.py
+M	src/gui/controllers/gui_settings_controller.py
+M	src/gui/controllers/instance_controller.py
+M	src/gui/controllers/java_controller.py
+M	src/gui/controllers/update_controller.py
+A	src/gui/dialogs/issue_report_dialog.py
+M	src/gui/main_window_2.py
+M	src/gui/network_retry.py
+M	src/gui/pages/instance_workspace_page.py
+M	src/gui/pages/launcher_settings_page.py
+M	src/gui/pages/logs_page.py
+M	src/gui/task_progress.py
+M	src/gui/task_runner.py
+M	src/models/runtime/game_exit_result.py
+M	src/models/runtime/process_session.py
+M	test/core/config/test_launcher_settings_manager.py
+M	test/core/config/test_version_metadata.py
+M	test/core/diagnostics/test_diagnostics_manager.py
+A	test/core/diagnostics/test_issue_report_builder.py
+A	test/core/gui/test_main_window_progress_import_contract.py
+M	test/core/gui/test_task_progress.py
+M	test/core/modloader/forge/test_forge_version_manager.py
+M	test/core/modrinth/test_modrinth_content_manager.py
+M	test/core/network/test_download_journal.py
+M	test/core/network/test_unified_download_manager.py
+M	test/core/runtime/test_game_runtime_manager.py
+M	test/core/runtime/test_process_supervisor.py
+M	test/core_library/test_network_retry.py
+A	test/gui/controllers/test_update_controller_priority.py
+A	test/gui/dialogs/test_issue_report_dialog.py
+A	test/gui/test_global_progress_lifecycle.py
+M	test/gui/test_task_runner.py
+M	test/test_public_api.py

@@ -89,6 +89,7 @@ class InstanceWorkspacePage(BasePage):
     java_runtime_apply_requested = Signal(str, str)
 
     launch_requested = Signal()
+    kill_instance_requested = Signal(str)
     instance_settings_requested = Signal(str)
     manage_accounts_requested = Signal()
 
@@ -245,7 +246,7 @@ class InstanceWorkspacePage(BasePage):
         self.delete_button = set_theme_icon(QPushButton(), "icon.action.remove")
         self.delete_button.setObjectName("DangerButton")
 
-        self.launch_button.clicked.connect(self._request_launch)
+        self.launch_button.clicked.connect(self._request_primary_action)
         self.edit_button.clicked.connect(self._open_management_dialog)
         self.favorite_button.clicked.connect(self._toggle_favorite)
         self.manage_mods_button.clicked.connect(lambda: self.manage_mods_requested.emit(self.current_instance_name()))
@@ -657,8 +658,8 @@ class InstanceWorkspacePage(BasePage):
     def _render_selected(self) -> None:
         instance = self._instances.get(self.current_instance_name())
         enabled = instance is not None and not self._busy
+        state = self._instance_state(instance) if instance is not None else "ready"
         for button in (
-            self.launch_button,
             self.edit_button,
             self.favorite_button,
             self.settings_button,
@@ -670,6 +671,17 @@ class InstanceWorkspacePage(BasePage):
             self.delete_button,
         ):
             button.setEnabled(enabled)
+        self.launch_button.setEnabled(instance is not None and (state == "running" or not self._busy))
+        if state == "running":
+            self.launch_button.setObjectName("DangerButton")
+            self.launch_button.setText(tr("workspace.action.kill"))
+            set_theme_icon(self.launch_button, "icon.action.remove")
+        else:
+            self.launch_button.setObjectName("PrimaryButton")
+            self.launch_button.setText(tr("workspace.action.launch"))
+            set_theme_icon(self.launch_button, "icon.action.launch")
+        self.launch_button.style().unpolish(self.launch_button)
+        self.launch_button.style().polish(self.launch_button)
 
         if instance is None:
             self.instance_icon.clear()
@@ -697,7 +709,6 @@ class InstanceWorkspacePage(BasePage):
                 path=str(Path(getattr(instance, "instance_dir", ""))),
             )
         )
-        state = self._instance_state(instance)
         self.running_label.setText(self._state_text(state))
         self.running_label.setProperty("state", {"crashed": "error", "loading": "busy", "running": "success", "finished": "success"}.get(state, "ready"))
         self.running_label.style().unpolish(self.running_label)
@@ -837,9 +848,18 @@ class InstanceWorkspacePage(BasePage):
         self.advanced_dialog.raise_()
         self.advanced_dialog.activateWindow()
 
+    def _request_primary_action(self) -> None:
+        name = self.current_instance_name()
+        if not name:
+            return
+        instance = self._instances.get(name)
+        if instance is not None and self._instance_state(instance) == "running":
+            self.kill_instance_requested.emit(name)
+            return
+        self.launch_requested.emit()
+
     def _request_launch(self) -> None:
-        if self.current_instance_name():
-            self.launch_requested.emit()
+        self._request_primary_action()
 
     def _choose_icon(self) -> None:
         name = self.current_instance_name()
@@ -938,9 +958,10 @@ class InstanceWorkspacePage(BasePage):
             return
         self.instance_list.setCurrentItem(item)
         menu = QMenu(self)
-        launch = menu.addAction(tr("workspace.action.launch"))
-        edit = menu.addAction(tr("workspace.action.edit"))
         instance = self._instances.get(self.current_instance_name())
+        running = instance is not None and self._instance_state(instance) == "running"
+        launch = menu.addAction(tr("workspace.action.kill") if running else tr("workspace.action.launch"))
+        edit = menu.addAction(tr("workspace.action.edit"))
         favorite = menu.addAction(tr("workspace.action.favorite_remove") if bool(getattr(instance, "favorite", False)) else tr("workspace.action.favorite_add"))
         set_group = menu.addAction(tr("workspace.action.set_group"))
         edit_tags = menu.addAction(tr("workspace.action.edit_tags"))
@@ -962,7 +983,7 @@ class InstanceWorkspacePage(BasePage):
         manage_content.setEnabled(self.manage_content_packs_button.isEnabled())
         chosen = menu.exec(self.instance_list.mapToGlobal(position))
         if chosen is launch:
-            self._request_launch()
+            self._request_primary_action()
         elif chosen is edit:
             self._open_management_dialog()
         elif chosen is favorite:
@@ -1007,7 +1028,6 @@ class InstanceWorkspacePage(BasePage):
         self.favorite_only_checkbox.setText(tr("workspace.library.favorites_only"))
         self._sync_group_filter()
         self._sync_sort_options()
-        self.launch_button.setText(tr("workspace.action.launch"))
         self.edit_button.setText(tr("workspace.action.edit"))
         self.manage_content_library_button.setText(tr("workspace.action.manage_content_library"))
         self.manage_mods_button.setText(tr("workspace.action.manage_mods"))
@@ -1023,6 +1043,7 @@ class InstanceWorkspacePage(BasePage):
         self.set_account(self._account)
         self.create_dialog.retranslate_dynamic()
         self.management_dialog.retranslate_dynamic()
+        self._render_selected()
         self.advanced_page.retranslate_dynamic()
         self.advanced_dialog.set_instance_name(self.current_instance_name())
         self._render_selected()

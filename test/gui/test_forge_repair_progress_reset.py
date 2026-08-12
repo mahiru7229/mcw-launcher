@@ -40,6 +40,11 @@ class _StatusTarget:
 
 def _window_stub() -> SimpleNamespace:
     return SimpleNamespace(
+        task_runner=SimpleNamespace(
+            is_shutting_down=False,
+            is_task_active=lambda _task_id: False,
+        ),
+        _closing=False,
         instance_controller=SimpleNamespace(
             CREATE_TASK_ID="instance.create",
             REPAIR_TASK_ID="instance.repair.full",

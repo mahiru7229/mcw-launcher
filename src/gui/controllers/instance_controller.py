@@ -11,7 +11,7 @@ from mcw_core.api.language.language_manager import tr
 
 from mcw_core import InstanceCreateRequest, InstanceDeletionError, LoaderService, get_default_core
 from src.gui.controllers.base_controller import BaseController
-from src.gui.task_runner import TaskRunner
+from src.gui.task_runner import TaskConflictPolicy, TaskRunner
 from src.config import VERSION_ID
 
 
@@ -35,6 +35,7 @@ class InstanceController(BaseController):
     modpack_import_preview_ready = Signal(object)
     modpack_export_finished = Signal(object)
     portable_manual_files_installed = Signal(object)
+    instance_killed = Signal(str)
 
     CREATE_TASK_ID = "instance.create"
     IMPORT_INSPECT_TASK_ID = "instance.import.inspect"
@@ -54,6 +55,7 @@ class InstanceController(BaseController):
     ICON_RESET_TASK_ID = "instance.icon.reset"
     RUNTIME_PROFILE_TASK_PREFIX = "instance.runtime.profile."
     JAVA_RUNTIME_TASK_ID = "instance.java.runtime"
+    KILL_TASK_PREFIX = "instance.kill."
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
 
     def __init__(self, task_runner: TaskRunner) -> None:
@@ -411,6 +413,20 @@ class InstanceController(BaseController):
             return
         self._task_runner.run("instance.export", lambda: self._core.instances.export_package(name, output_path, include_saves, self._on_package_progress), tr("task.instance.export", name=name))
 
+    def kill_instance(self, name: str) -> None:
+        instance_name = str(name or "").strip()
+        if not instance_name:
+            return
+        task_id = f"{self.KILL_TASK_PREFIX}{instance_name}"
+        self._task_runner.run(
+            task_id,
+            lambda: (instance_name, self._core.instances.kill(instance_name)),
+            tr("status.instance.killing", name=instance_name),
+            blocking=False,
+            group=task_id,
+            conflict_policy=TaskConflictPolicy.REPLACE,
+        )
+
     def _on_package_progress(self, event: object) -> None:
         self.package_progress.emit(event)
         stage = getattr(getattr(event, "stage", None), "value", "package")
@@ -435,6 +451,17 @@ class InstanceController(BaseController):
             self.modpack_import_preview_ready.emit(result)
             self.status_changed.emit(tr("status.instance.ready_import_modpack", name=result.name))
             self.log_created.emit(f"Provider modpack package inspected: {result.package_path}")
+            return
+
+        if task_id.startswith(self.KILL_TASK_PREFIX):
+            instance_name, killed = result
+            if not killed:
+                self._emit_error(tr("workspace.kill.title"), tr("workspace.kill.not_running", name=instance_name))
+                return
+            self.instance_killed.emit(instance_name)
+            self.status_changed.emit(tr("status.instance.killed", name=instance_name))
+            self.log_created.emit(f"Instance killed by user: {instance_name}")
+            self.refresh_running(force=True)
             return
 
         if task_id.startswith(self.RUNTIME_PROFILE_TASK_PREFIX):
@@ -527,6 +554,17 @@ class InstanceController(BaseController):
 
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
+        if task_id.startswith(self.KILL_TASK_PREFIX):
+            instance_name, killed = result
+            if not killed:
+                self._emit_error(tr("workspace.kill.title"), tr("workspace.kill.not_running", name=instance_name))
+                return
+            self.instance_killed.emit(instance_name)
+            self.status_changed.emit(tr("status.instance.killed", name=instance_name))
+            self.log_created.emit(f"Instance killed by user: {instance_name}")
+            self.refresh_running(force=True)
+            return
+
         if task_id.startswith(self.RUNTIME_PROFILE_TASK_PREFIX):
             self.log_created.emit(f"Instance runtime profile unavailable: {type(error).__name__}: {error}")
             if task_id == f"{self.RUNTIME_PROFILE_TASK_PREFIX}{self._selected_name}":

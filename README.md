@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.2">
-    <img src="https://img.shields.io/badge/Stable-v1.3.2-brightgreen" alt="Stable version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0">
+    <img src="https://img.shields.io/badge/Stable-v1.4.0-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -44,9 +44,56 @@ Mỗi instance có riêng:
 
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 ---
-Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
+Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.4.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.4.0
+
+**v1.4.0** là bản stable hợp nhất toàn bộ nhánh v1.4: task lifecycle/cancellation mới, **Kill Instance**, hardening Forge issue #20, Update Priority, tối ưu tải modpack/I/O, Diagnostics v2 + quy trình báo lỗi có hướng dẫn, và progress ownership để trạng thái task đồng thời không ghi đè lẫn nhau.
+
+- Launcher có thể ưu tiên shutdown, cancel/drop task nền thay vì bắt người dùng chờ task metadata/scan hoàn tất.
+- Task mới có thể replace/supersede task đọc nền; stale result không được cập nhật UI.
+- Instance đang chạy có **Kill Instance** với confirmation và supervised process kill; user-killed session không bị báo nhầm là crash.
+- Forge profile/cache được validate trước khi dùng, poisoned cache tự invalidate; regression khóa Forge 1.12.2 / 14.23.5.2860.
+- **Update Priority Mode** hủy task không liên quan và dành scheduler cho update trước khi apply.
+- Modrinth `.mrpack` dùng adaptive parallel download; multi-hash SHA-1/SHA-512/SHA-256 chạy một lượt đọc, có hash-I/O budget và performance profile.
+- Diagnostics v2 thu thập launcher/runtime/loader log, hardware/Java/task timeline với privacy redaction; **Báo cáo lỗi** yêu cầu nhập thông tin trước rồi mới tạo bundle và hướng dẫn GitHub issue.
+- Progress global có ownership/generation guard; cancel/supersede/success/failure cleanup nhất quán, Legacy Storage probe/scan/clean có terminal state đúng.
+- Giữ toàn bộ filesystem/update-integrity hardening của v1.3.2, bao gồm fix issue #19.
+
+Xem chi tiết tại [`docs/RELEASE-v1.4.0.md`](docs/RELEASE-v1.4.0.md).
+
+## Có gì mới trong v1.4.0-beta.4
+
+**v1.4.0-beta.4** là beta bổ sung tập trung vào tính nhất quán của progress/task state. Thanh tiến trình toàn cục giờ được reset khi task mới bắt đầu, không còn giữ `READY / 100% / detail` của task trước; kết quả của task cũ hoàn tất muộn không được phép ghi đè task mới; cancel/supersede cũng đi qua cùng đường cleanup busy/progress như success/failure. Legacy Storage probe/scan/cleanup có terminal progress riêng để thao tác bỏ qua hoặc dọn dữ liệu phản ánh đúng trạng thái.
+
+Beta.4 giữ toàn bộ TaskRunner/Kill Instance/Forge hardening, download performance, Update Priority và Diagnostics v2 từ beta.1–beta.3.
+
+Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.4.md`](docs/RELEASE-v1.4.0-beta.4.md).
+
+## Có gì mới trong v1.4.0-beta.3
+
+**v1.4.0-beta.3** tập trung vào Diagnostics v2 và quy trình báo lỗi. Nút **Báo cáo lỗi** mở màn hình nhập thông tin trước, sau đó launcher thu thập diagnostics ở background và mới hiện hướng dẫn tạo GitHub issue/đính kèm ZIP. Bundle mới bổ sung system info, Java runtime, task timeline, runtime/crash logs gần nhất và issue context đã lọc thông tin nhạy cảm.
+
+Beta.3 giữ toàn bộ TaskRunner/Kill Instance/Forge hardening từ beta.1 và adaptive download/Update Priority từ beta.2.
+
+Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.3.md`](docs/RELEASE-v1.4.0-beta.3.md).
+
+## Có gì mới trong v1.4.0-beta.1
+
+**v1.4.0-beta.1** mở nhánh v1.4 với nền tảng task lifecycle/shutdown mới, **Kill Instance** cho Minecraft đang chạy và fix Forge profile/cache cho issue #20. Background/network task có thể bị cancel hoặc supersede thay vì luôn chặn task mới; khi đóng launcher, launcher ưu tiên hủy work của chính nó và thoát mà không tự kill game đang chạy.
+
+- Cooperative cancellation token + `REPLACE` policy cho request nền/network.
+- Shutdown không còn bị task metadata/scan chậm giữ cửa sổ lại.
+- Instance Workspace đổi **Launch → Kill Instance** khi game đang chạy, có cảnh báo trước force-kill.
+- User-killed session không bị báo nhầm thành crash.
+- Forge installer/profile cache không còn fallback sang vanilla profile; poisoned cache tự invalidated.
+- Regression riêng cho Forge 1.12.2 / 14.23.5.2860.
+
+Ba beta v1.4 được chia theo dependency: beta.1 = lifecycle/runtime stability; beta.2 = modpack download/I/O performance; beta.3 = Diagnostics v2 + Create Issue Report + polish/benchmark.
+
+Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.1.md`](docs/RELEASE-v1.4.0-beta.1.md).
 
 ## Có gì mới trong v1.3.2
 

@@ -1,119 +1,408 @@
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum
+from threading import Event, Thread
+from datetime import datetime, timezone
+from time import monotonic
 from typing import Any
+from uuid import uuid4
 
-from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
+from PySide6.QtCore import QObject, Qt, Signal, Slot
+
+from mcw_core.api.language.language_manager import tr
 
 
-class TaskWorker(QObject):
-    succeeded = Signal(str, object)
-    failed = Signal(str, object)
+class TaskCancelledError(RuntimeError):
+    """Raised by cooperative launcher tasks after cancellation is requested."""
 
-    def __init__(self, task_id: str, task: Callable[[], Any]) -> None:
-        super().__init__()
-        self._task_id = task_id
-        self._task = task
 
-    @Slot()
-    def run(self) -> None:
-        try:
-            self.succeeded.emit(self._task_id, self._task())
-        except Exception as error:
-            self.failed.emit(self._task_id, error)
+class TaskConflictPolicy(StrEnum):
+    """How a task should behave when another task in the same group is active."""
+
+    REJECT = "reject"
+    REPLACE = "replace"
+    PARALLEL = "parallel"
+
+
+class TaskState(StrEnum):
+    RUNNING = "running"
+    CANCEL_REQUESTED = "cancel_requested"
+    CANCELLED = "cancelled"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class TaskCancellationToken:
+    """Thread-safe cooperative cancellation primitive for launcher work."""
+
+    def __init__(self) -> None:
+        self._cancelled = Event()
+
+    @property
+    def cancelled(self) -> bool:
+        return self._cancelled.is_set()
+
+    def cancel(self) -> None:
+        self._cancelled.set()
+
+    def checkpoint(self) -> None:
+        if self.cancelled:
+            raise TaskCancelledError("Launcher task cancelled.")
+
+    def wait(self, seconds: float) -> None:
+        if self._cancelled.wait(max(0.0, float(seconds))):
+            self.checkpoint()
 
 
 @dataclass(slots=True)
 class TaskContext:
+    context_id: str
     task_id: str
-    thread: QThread
-    worker: TaskWorker
+    group: str
+    thread: Thread
+    token: TaskCancellationToken
     blocking: bool
+    cooperative: bool
+    state: TaskState = TaskState.RUNNING
+    superseded: bool = False
+    started_at: float = 0.0
 
 
 class TaskRunner(QObject):
+    """Run launcher tasks on daemon worker threads with cooperative lifecycle control.
+
+    v1.4 deliberately uses daemon Python worker threads instead of parenting a QThread
+    to the main window. Closing the launcher therefore cannot be held hostage by a slow
+    metadata request. Cooperative tasks still receive a cancellation token so they can
+    release resources before the process exits.
+    """
+
     task_started = Signal(str, str, bool)
     task_succeeded = Signal(str, object)
     task_failed = Signal(str, object)
+    task_cancel_requested = Signal(str)
+    task_cancelled = Signal(str)
     busy_changed = Signal(bool)
     task_rejected = Signal(str)
     task_settled = Signal(str, bool, object)
+    shutdown_started = Signal()
+
+    _worker_settled = Signal(str, bool, object)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._contexts: dict[str, TaskContext] = {}
         self._blocking_tasks = 0
+        self._shutting_down = False
+        self._priority_prefix: str | None = None
+        self._timeline: deque[dict[str, object]] = deque(maxlen=100)
+        self._timeline_active: dict[str, dict[str, object]] = {}
+        self._worker_settled.connect(self._finish_worker, Qt.ConnectionType.QueuedConnection)
 
     @property
     def is_busy(self) -> bool:
         return self._blocking_tasks > 0
 
     @property
+    def is_shutting_down(self) -> bool:
+        return self._shutting_down
+
+    @property
     def has_active_tasks(self) -> bool:
         return bool(self._contexts)
 
     @property
+    def is_priority_mode(self) -> bool:
+        return self._priority_prefix is not None
+
+    @property
+    def priority_prefix(self) -> str | None:
+        return self._priority_prefix
+
+    @property
     def active_task_ids(self) -> tuple[str, ...]:
-        return tuple(self._contexts)
+        # Keep the public contract unique even while an obsolete generation drains.
+        return tuple(dict.fromkeys(context.task_id for context in self._contexts.values()))
+
+    def diagnostics_snapshot(self) -> tuple[dict[str, object], ...]:
+        """Return a bounded, serialization-safe task timeline for diagnostics."""
+
+        rows = [dict(item) for item in self._timeline]
+        for context_id, item in self._timeline_active.items():
+            row = dict(item)
+            context = self._contexts.get(context_id)
+            if context is not None:
+                row["state"] = context.state.value
+                row["cancel_requested"] = context.token.cancelled
+                row["superseded"] = context.superseded
+                row["duration_seconds"] = round(max(0.0, monotonic() - context.started_at), 3)
+            rows.append(row)
+        return tuple(rows[-100:])
 
     def is_task_active(self, task_id: str) -> bool:
-        return task_id in self._contexts
+        normalized = str(task_id).strip()
+        return any(context.task_id == normalized for context in self._contexts.values())
 
-    def run(self, task_id: str, task: Callable[[], Any], message: str, blocking: bool = True) -> bool:
-        if self.is_task_active(task_id):
-            self.task_rejected.emit(f"Task '{task_id}' is already running.")
+    def run(
+        self,
+        task_id: str,
+        task: Callable[..., Any],
+        message: str,
+        blocking: bool = True,
+        *,
+        group: str | None = None,
+        conflict_policy: TaskConflictPolicy | str = TaskConflictPolicy.REJECT,
+        cooperative: bool = False,
+    ) -> bool:
+        normalized_id = str(task_id).strip()
+        if not normalized_id:
+            raise ValueError("A task id is required.")
+        if self._shutting_down:
+            self.task_rejected.emit(tr("task.shutting_down"))
             return False
-        if blocking and self.is_busy:
-            self.task_rejected.emit("Another task is still running.")
+        if self._priority_prefix is not None and not normalized_id.startswith(self._priority_prefix):
+            self.task_rejected.emit(tr("task.priority_mode"))
             return False
 
-        thread = QThread(self)
-        worker = TaskWorker(task_id, task)
-        worker.moveToThread(thread)
-        self._contexts[task_id] = TaskContext(task_id=task_id, thread=thread, worker=worker, blocking=blocking)
+        normalized_group = str(group or normalized_id).strip() or normalized_id
+        policy = TaskConflictPolicy(conflict_policy)
+        conflicts = [
+            context
+            for context in self._contexts.values()
+            if context.group == normalized_group and not context.superseded
+        ]
+
+        if conflicts and policy is TaskConflictPolicy.REJECT:
+            if any(context.task_id == normalized_id for context in conflicts):
+                self.task_rejected.emit(tr("task.already_running", task_id=normalized_id))
+            else:
+                self.task_rejected.emit(tr("task.group_running", group=normalized_group))
+            return False
+
+        if conflicts and policy is TaskConflictPolicy.REPLACE:
+            for context in conflicts:
+                self._request_cancel_context(context, superseded=True)
+
+        if blocking and self.is_busy and policy is not TaskConflictPolicy.PARALLEL:
+            # Blocking mutations remain conservative in Beta 1. Resource-aware queuing
+            # for unrelated instance mutations is intentionally deferred to Beta 2.
+            active_blocking = [
+                context for context in self._contexts.values()
+                if context.blocking and not context.superseded
+            ]
+            if active_blocking:
+                self.task_rejected.emit(tr("task.busy"))
+                return False
+
+        context_id = uuid4().hex
+        token = TaskCancellationToken()
+
+        def worker_entry() -> None:
+            try:
+                token.checkpoint()
+                result = task(token) if cooperative else task()
+                token.checkpoint()
+            except Exception as error:
+                try:
+                    self._worker_settled.emit(context_id, False, error)
+                except RuntimeError:
+                    pass
+                return
+            try:
+                self._worker_settled.emit(context_id, True, result)
+            except RuntimeError:
+                pass
+
+        thread = Thread(
+            target=worker_entry,
+            name=f"mcw-task-{normalized_id[:48]}",
+            daemon=True,
+        )
+        context = TaskContext(
+            context_id=context_id,
+            task_id=normalized_id,
+            group=normalized_group,
+            thread=thread,
+            token=token,
+            blocking=bool(blocking),
+            cooperative=bool(cooperative),
+            started_at=monotonic(),
+        )
+        self._contexts[context_id] = context
+        self._timeline_active[context_id] = {
+            "task_id": normalized_id,
+            "group": normalized_group,
+            "blocking": bool(blocking),
+            "cooperative": bool(cooperative),
+            "state": TaskState.RUNNING.value,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "cancel_requested": False,
+            "superseded": False,
+        }
 
         if blocking:
             self._blocking_tasks += 1
             if self._blocking_tasks == 1:
                 self.busy_changed.emit(True)
 
-        thread.started.connect(worker.run)
-        worker.succeeded.connect(self._finish_success, Qt.ConnectionType.QueuedConnection)
-        worker.failed.connect(self._finish_failure, Qt.ConnectionType.QueuedConnection)
-        worker.succeeded.connect(worker.deleteLater)
-        worker.failed.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-
-        self.task_started.emit(task_id, message, blocking)
-        thread.start()
+        self.task_started.emit(normalized_id, str(message), bool(blocking))
+        try:
+            thread.start()
+        except Exception as error:
+            self._contexts.pop(context_id, None)
+            self._release_blocking(context)
+            self.task_failed.emit(normalized_id, error)
+            self.task_settled.emit(normalized_id, False, error)
+            return False
         return True
 
+    def cancel(self, task_id: str) -> bool:
+        normalized = str(task_id).strip()
+        contexts = [
+            context for context in self._contexts.values()
+            if context.task_id == normalized and context.state is TaskState.RUNNING
+        ]
+        for context in contexts:
+            self._request_cancel_context(context)
+        return bool(contexts)
+
+    def cancel_group(self, group: str) -> int:
+        normalized = str(group).strip()
+        contexts = [
+            context for context in self._contexts.values()
+            if context.group == normalized and context.state is TaskState.RUNNING
+        ]
+        for context in contexts:
+            self._request_cancel_context(context)
+        return len(contexts)
+
+    def cancel_all(self, *, exclude_prefix: str | None = None) -> tuple[str, ...]:
+        normalized_exclude = str(exclude_prefix or "").strip()
+        cancelled: list[str] = []
+        for context in tuple(self._contexts.values()):
+            if context.state is not TaskState.RUNNING:
+                continue
+            if normalized_exclude and context.task_id.startswith(normalized_exclude):
+                continue
+            self._request_cancel_context(context)
+            cancelled.append(context.task_id)
+        return tuple(dict.fromkeys(cancelled))
+
+    def begin_priority_mode(self, allowed_prefix: str = "update.") -> tuple[str, ...]:
+        """Cancel competing work and reserve the runner for one task family.
+
+        Priority mode is intentionally softer than shutdown: the application remains
+        alive, but new tasks outside ``allowed_prefix`` are rejected until the mode is
+        released. Existing tasks receive cooperative cancellation requests. A worker
+        that is already inside a non-interruptible/legacy section may drain in the
+        background; callers must still wait for those contexts to settle before an
+        exclusive commit such as applying a launcher update.
+        """
+
+        if self._shutting_down:
+            return ()
+        normalized = str(allowed_prefix or "").strip()
+        if not normalized:
+            raise ValueError("A priority task prefix is required.")
+        if self._priority_prefix not in {None, normalized}:
+            raise RuntimeError(f"Task priority mode is already reserved for '{self._priority_prefix}'.")
+        self._priority_prefix = normalized
+        return self.cancel_all(exclude_prefix=normalized)
+
+    def end_priority_mode(self, allowed_prefix: str | None = None) -> bool:
+        if self._priority_prefix is None:
+            return False
+        normalized = str(allowed_prefix or "").strip()
+        if normalized and normalized != self._priority_prefix:
+            return False
+        self._priority_prefix = None
+        return True
+
+    def begin_shutdown(self) -> tuple[str, ...]:
+        if self._shutting_down:
+            return ()
+        self._shutting_down = True
+        self._priority_prefix = None
+        self.shutdown_started.emit()
+        return self.cancel_all()
+
     def close(self) -> None:
-        if self.has_active_tasks:
-            raise RuntimeError("Cannot close TaskRunner while a task is active.")
+        # v1.3 refused to close while work was active. v1.4 makes shutdown a
+        # cancellation boundary instead; daemon workers cannot keep the app alive.
+        self.begin_shutdown()
 
-    @Slot(str, object)
-    def _finish_success(self, task_id: str, result: Any) -> None:
-        context = self._contexts.pop(task_id, None)
+    def _request_cancel_context(self, context: TaskContext, *, superseded: bool = False) -> None:
+        if context.state is not TaskState.RUNNING:
+            return
+        context.state = TaskState.CANCEL_REQUESTED
+        context.superseded = bool(superseded)
+        timeline = self._timeline_active.get(context.context_id)
+        if timeline is not None:
+            timeline["state"] = TaskState.CANCEL_REQUESTED.value
+            timeline["cancel_requested"] = True
+            timeline["superseded"] = bool(superseded)
+        context.token.cancel()
+        self.task_cancel_requested.emit(context.task_id)
+
+    @Slot(str, bool, object)
+    def _finish_worker(self, context_id: str, succeeded: bool, payload: object) -> None:
+        context = self._contexts.pop(context_id, None)
         if context is None:
             return
-        self._finish_context(context)
-        self.task_succeeded.emit(task_id, result)
-        self.task_settled.emit(task_id, True, result)
+        self._release_blocking(context)
 
-    @Slot(str, object)
-    def _finish_failure(self, task_id: str, error: Exception) -> None:
-        context = self._contexts.pop(task_id, None)
-        if context is None:
+        timeline = self._timeline_active.pop(context_id, None) or {
+            "task_id": context.task_id,
+            "group": context.group,
+            "started_at": "",
+        }
+        timeline["ended_at"] = datetime.now(timezone.utc).isoformat()
+        timeline["duration_seconds"] = round(max(0.0, monotonic() - context.started_at), 3)
+        timeline["cancel_requested"] = context.token.cancelled
+        timeline["superseded"] = context.superseded
+
+        cancelled = (
+            context.token.cancelled
+            or context.superseded
+            or isinstance(payload, TaskCancelledError)
+        )
+        if cancelled:
+            context.state = TaskState.CANCELLED
+            timeline["state"] = TaskState.CANCELLED.value
+            timeline["result"] = "cancelled"
+            self._timeline.append(timeline)
+            self.task_cancelled.emit(context.task_id)
+            self.task_settled.emit(
+                context.task_id,
+                False,
+                payload if isinstance(payload, Exception) else TaskCancelledError("Launcher task cancelled."),
+            )
             return
-        self._finish_context(context)
-        self.task_failed.emit(task_id, error)
-        self.task_settled.emit(task_id, False, error)
 
-    def _finish_context(self, context: TaskContext) -> None:
-        if context.blocking:
-            self._blocking_tasks = max(0, self._blocking_tasks - 1)
-            if self._blocking_tasks == 0:
-                self.busy_changed.emit(False)
-        context.thread.quit()
+        if succeeded:
+            context.state = TaskState.SUCCEEDED
+            timeline["state"] = TaskState.SUCCEEDED.value
+            timeline["result"] = "success"
+            self._timeline.append(timeline)
+            self.task_succeeded.emit(context.task_id, payload)
+            self.task_settled.emit(context.task_id, True, payload)
+            return
+
+        context.state = TaskState.FAILED
+        error = payload if isinstance(payload, Exception) else RuntimeError(str(payload))
+        timeline["state"] = TaskState.FAILED.value
+        timeline["result"] = "failed"
+        timeline["error_type"] = type(error).__name__
+        self._timeline.append(timeline)
+        self.task_failed.emit(context.task_id, error)
+        self.task_settled.emit(context.task_id, False, error)
+
+    def _release_blocking(self, context: TaskContext) -> None:
+        if not context.blocking:
+            return
+        self._blocking_tasks = max(0, self._blocking_tasks - 1)
+        if self._blocking_tasks == 0:
+            self.busy_changed.emit(False)
