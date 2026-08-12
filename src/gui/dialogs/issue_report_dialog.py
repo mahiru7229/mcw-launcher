@@ -30,32 +30,62 @@ class IssueReportDialog(QDialog):
         self._issue_url = ""
         self._bundle_path: Path | None = None
         self.setWindowTitle(tr("issue_report.title"))
-        self.resize(720, 620)
+        self.setMinimumSize(620, 500)
+        self.setSizeGripEnabled(True)
 
         root = QVBoxLayout(self)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSpacing(10)
         self.stack = QStackedWidget()
         root.addWidget(self.stack, 1)
         self._build_information_page()
         self._build_guidance_page()
+        self._apply_initial_size()
+
+
+    def _available_geometry(self):
+        screen = self.screen() or QGuiApplication.primaryScreen()
+        return screen.availableGeometry() if screen is not None else None
+
+    def _apply_initial_size(self) -> None:
+        available = self._available_geometry()
+        width, height = 760, 600
+        if available is not None:
+            width = min(width, max(620, available.width() - 96))
+            height = min(height, max(500, available.height() - 96))
+        self.resize(width, height)
+
+    def _editor_min_height(self, *, primary: bool = False) -> int:
+        available = self._available_geometry()
+        compact = available is not None and available.height() <= 800
+        if primary:
+            return 72 if compact else 88
+        return 56 if compact else 72
 
     def _build_information_page(self) -> None:
         page = QWidget()
         layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
         heading = QLabel(tr("issue_report.details.heading"))
         heading.setWordWrap(True)
         layout.addWidget(heading)
 
         form = QFormLayout()
+        form.setContentsMargins(0, 0, 0, 0)
+        form.setSpacing(8)
         self.title_edit = QLineEdit()
         self.title_edit.setPlaceholderText(tr("issue_report.details.title_placeholder"))
         self.what_happened_edit = QTextEdit()
         self.what_happened_edit.setPlaceholderText(tr("issue_report.details.what_happened_placeholder"))
+        self.what_happened_edit.setMinimumHeight(self._editor_min_height(primary=True))
         self.steps_edit = QTextEdit()
         self.steps_edit.setPlaceholderText(tr("issue_report.details.steps_placeholder"))
+        self.steps_edit.setMinimumHeight(self._editor_min_height())
         self.expected_edit = QTextEdit()
+        self.expected_edit.setMinimumHeight(self._editor_min_height())
         self.actual_edit = QTextEdit()
-        for editor in (self.what_happened_edit, self.steps_edit, self.expected_edit, self.actual_edit):
-            editor.setMinimumHeight(76)
+        self.actual_edit.setMinimumHeight(self._editor_min_height())
         form.addRow(tr("issue_report.details.title"), self.title_edit)
         form.addRow(tr("issue_report.details.what_happened"), self.what_happened_edit)
         form.addRow(tr("issue_report.details.steps"), self.steps_edit)
@@ -85,6 +115,8 @@ class IssueReportDialog(QDialog):
     def _build_guidance_page(self) -> None:
         page = QWidget()
         layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
         heading = QLabel(tr("issue_report.guide.heading"))
         heading.setWordWrap(True)
         layout.addWidget(heading)
