@@ -1,23 +1,20 @@
-MCW Launcher v1.4.0-beta.2 beta delivery
+MCW Launcher v1.4.0-beta.3 beta delivery
 
 Delivery policy:
-- Launcher source ZIP only for beta releases.
-- No standalone MCW Core ZIP/WHL/README/RELEASE artifact is produced for beta.2.
-- Standalone Core artifacts resume when v1.4 is declared stable.
+- One Launcher changed-files ZIP only for beta/RC releases.
+- No full-source delivery ZIP and no standalone MCW Core artifact for beta.3.
+- Standalone Core artifacts resume only when v1.4 is declared stable.
 
-Launcher runtime: v1.4.0-beta.2
+Launcher runtime: v1.4.0-beta.3
 Update channel: beta
 
-Primary beta.2 scope:
-- Update Priority Mode: cancel/drop competing tasks and reserve scheduling for update.* work.
-- Adaptive Modrinth .mrpack artifact downloads.
-- One-pass multi-hash with bounded hash I/O concurrency.
-- Download journal progress batching.
-- Automatic / Responsive / Balanced / Maximum download performance profiles.
-- Automatic low-impact download concurrency while Minecraft is running.
+Primary beta.3 scope:
+- Diagnostics v2 with system/Java/task/instance/runtime context and bounded privacy-filtered logs.
+- Background diagnostics export.
+- Two-step Report Issue wizard: collect user details first, guidance second.
+- Prefilled privacy-filtered GitHub issue draft and local ZIP attachment guidance.
+- Report Issue action from error dialogs.
 
-Inherited beta.1 scope:
-- Task lifecycle/shutdown cancellation foundation.
-- Kill Instance.
-- Forge issue #20 profile/cache hardening.
-- v1.3.2 issue #19 and update-integrity hardening.
+Inherited scope:
+- Beta.1 task lifecycle, shutdown cancellation, Kill Instance and Forge issue #20 hardening.
+- Beta.2 Update Priority Mode, adaptive modpack download, one-pass hashing and journal batching.

@@ -205,3 +205,30 @@ def test_instance_health_bundle_uses_safe_relative_paths(tmp_path, monkeypatch):
 
     assert payload["instances"][0]["issues"][0]["path"] == "instances/Example/mods/missing.jar"
     assert str(tmp_path) not in json.dumps(payload)
+
+
+def test_v2_bundle_contains_system_task_and_issue_context(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(diagnostics_manager.DiagnosticsManager, "_safe_log_entries", classmethod(lambda cls: {}))
+    monkeypatch.setattr(diagnostics_manager.DiagnosticsManager, "_safe_runtime_entries", classmethod(lambda cls: {}))
+    monkeypatch.setattr(diagnostics_manager.DiagnosticsManager, "_system_info_json", classmethod(lambda cls: b'{"schema_version": 1}\n'))
+    monkeypatch.setattr(diagnostics_manager.DiagnosticsManager, "_java_runtimes_json", classmethod(lambda cls: b'{"schema_version": 1, "runtimes": []}\n'))
+
+    result = DiagnosticsManager.write_bundle(
+        tmp_path / "v2.zip",
+        "1.4.0-beta.3",
+        task_timeline=({"task_id": "java.scan", "state": "cancelled"},),
+        issue_context={"title": "Example", "what_happened": "Failure"},
+    )
+
+    with zipfile.ZipFile(result, "r") as archive:
+        names = set(archive.namelist())
+        assert "system-info.json" in names
+        assert "java-runtimes.json" in names
+        assert "task-timeline.json" in names
+        assert "issue-context.json" in names
+        timeline = json.loads(archive.read("task-timeline.json"))
+        issue = json.loads(archive.read("issue-context.json"))
+        manifest = json.loads(archive.read("manifest.json"))
+    assert timeline["tasks"][0]["task_id"] == "java.scan"
+    assert issue["issue"]["title"] == "Example"
+    assert manifest["schema_version"] == 2

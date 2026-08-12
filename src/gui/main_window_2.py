@@ -15,6 +15,7 @@ from mcw_core.api.content.installed_content_library import InstalledContentLibra
 from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
 from mcw_core.api.curseforge.curseforge_errors import CurseForgeManagedFilesRequired, CurseForgeModpackManualDownloadRequired
 from mcw_core.api.diagnostics.diagnostics_manager import DiagnosticsManager
+from mcw_core.api.diagnostics.issue_report_builder import IssueReportBuilder
 from mcw_core.api.fs.paths import Paths
 from mcw_core.api.hardware.gpu_preference_manager import GraphicsDetectionResult
 from mcw_core.api.instance.instance_manager import InstanceManager
@@ -30,7 +31,7 @@ from mcw_core.api.update.windows_update_installer import AutomaticUpdateUnsuppor
 from src.gui.application import create_application
 from src.gui.animation.motion_runtime import MotionRuntime
 from src.gui.app_restart import start_restarted_process
-from src.gui.config import LAUNCHER_NAME, VERSION_ID
+from src.gui.config import GITHUB_REPOSITORY, LAUNCHER_NAME, VERSION_ID
 from src.gui.controllers.account_controller import AccountController
 from src.gui.controllers.curseforge_controller import CurseForgeController
 from src.gui.controllers.content_pack_controller import ContentPackController
@@ -64,6 +65,7 @@ from src.gui.dialogs.atlauncher_browser_dialog import ATLauncherBrowserDialog
 from src.gui.dialogs.lan_agent_log_dialog import LanAgentLogDialog
 from src.gui.dialogs.legacy_storage_cleanup_dialog import LegacyStorageCleanupDialog, format_bytes
 from src.gui.dialogs.instance_import_settings_dialog import InstanceImportSettingsDialog
+from src.gui.dialogs.issue_report_dialog import IssueReportDialog
 from src.gui.dialogs.modpack_export_dialog import ModpackExportDialog
 from src.gui.dialogs.modpack_import_settings_dialog import ModpackImportSettingsDialog
 from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
@@ -165,6 +167,10 @@ class MainWindow(QMainWindow):
         self._manual_launch_provider = ""
         self._manual_launch_lock_token = ""
         self._portable_manual_request: object | None = None
+        self._diagnostics_mode = ""
+        self._pending_issue_dialog: IssueReportDialog | None = None
+        self._pending_issue_details: dict[str, str] = {}
+        self._last_error_context = ""
         self._page_history: list[str] = []
         self._page_history_index = -1
         self.running_instances_timer.setInterval(1000)
@@ -429,6 +435,7 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.install_java_requested.connect(self.java_controller.install)
         self.launcher_settings_page.open_java_requested.connect(self._open_java_folder)
         self.logs_page.export_diagnostics_requested.connect(self._export_diagnostics)
+        self.logs_page.report_issue_requested.connect(self._open_issue_report)
         self.logs_page.open_logs_folder_requested.connect(self._open_logs_folder)
         self.logs_page.open_latest_game_log_requested.connect(self._open_latest_game_log)
         self.logs_page.open_latest_crash_report_requested.connect(self._open_latest_crash_report)
@@ -671,6 +678,8 @@ class MainWindow(QMainWindow):
         self.task_runner.task_failed.connect(self._on_task_failed)
         self.task_runner.task_succeeded.connect(self._on_task_completed)
         self.task_runner.task_succeeded.connect(self._on_task_succeeded)
+        self.task_runner.task_succeeded.connect(self._on_diagnostics_task_succeeded)
+        self.task_runner.task_failed.connect(self._on_diagnostics_task_failed)
         self.task_runner.task_failed.connect(self._on_task_completed)
         self.task_runner.task_settled.connect(self._on_task_settled)
         self.task_runner.busy_changed.connect(self._set_busy)
@@ -2671,13 +2680,90 @@ class MainWindow(QMainWindow):
         selected, _ = QFileDialog.getSaveFileName(self, tr("diagnostics.export.title"), str(suggested), tr("diagnostics.file_filter"))
         if not selected:
             return
-        try:
-            path = DiagnosticsManager.write_bundle(Path(selected), launcher_version=VERSION_ID, settings=self.gui_settings_controller.raw_settings(), activity_log=self.logs_page.activity_text())
-        except Exception as error:
-            self._show_error(tr("diagnostics.export.title"), str(error))
+        self._start_diagnostics_export(Path(selected), mode="export")
+
+    def _open_issue_report(self, *, initial_title: str = "", initial_what_happened: str = "") -> None:
+        instance = self._selected_instance
+        context_parts = [f"MCW {VERSION_ID}"]
+        if instance is not None:
+            name = str(getattr(instance, "name", "") or "").strip()
+            game_version = str(getattr(instance, "minecraft_version", "") or "").strip()
+            loader = str(getattr(instance, "mod_loader", "") or "").strip()
+            if name:
+                context_parts.append(f"instance={name}")
+            if game_version:
+                context_parts.append(f"minecraft={game_version}")
+            if loader:
+                context_parts.append(f"loader={loader}")
+        if self._last_error_context:
+            context_parts.append(f"last_error={self._last_error_context}")
+        dialog = IssueReportDialog("; ".join(context_parts), self)
+        dialog.prefill(title=initial_title, what_happened=initial_what_happened)
+        dialog.information_submitted.connect(lambda details, owner=dialog: self._collect_issue_report(owner, details))
+        self._pending_issue_dialog = dialog
+        dialog.exec()
+        if self._pending_issue_dialog is dialog:
+            self._pending_issue_dialog = None
+
+    def _collect_issue_report(self, dialog: IssueReportDialog, details: object) -> None:
+        if dialog is not self._pending_issue_dialog or not isinstance(details, dict):
             return
+        self._pending_issue_details = {str(key): str(value) for key, value in details.items()}
+        self._start_diagnostics_export(Paths.diagnostics_default_path(), mode="issue")
+
+    def _start_diagnostics_export(self, path: Path, *, mode: str) -> None:
+        if self.task_runner.is_task_active("diagnostics.export"):
+            if mode == "issue" and self._pending_issue_dialog is not None:
+                self._pending_issue_dialog.set_collection_failed(tr("diagnostics.busy"))
+            else:
+                QMessageBox.information(self, tr("diagnostics.export.title"), tr("diagnostics.busy"))
+            return
+        self._diagnostics_mode = mode
+        settings = self.gui_settings_controller.raw_settings()
+        activity = self.logs_page.activity_text()
+        timeline = self.task_runner.diagnostics_snapshot()
+        issue_context = dict(self._pending_issue_details) if mode == "issue" else {}
+
+        def task() -> Path:
+            return DiagnosticsManager.write_bundle(
+                Path(path),
+                launcher_version=VERSION_ID,
+                settings=settings,
+                activity_log=activity,
+                task_timeline=timeline,
+                issue_context=issue_context,
+            )
+
+        started = self.task_runner.run("diagnostics.export", task, tr("diagnostics.collecting"), blocking=False)
+        if not started and mode == "issue" and self._pending_issue_dialog is not None:
+            self._pending_issue_dialog.set_collection_failed(tr("diagnostics.busy"))
+
+    def _on_diagnostics_task_succeeded(self, task_id: str, result: object) -> None:
+        if task_id != "diagnostics.export":
+            return
+        path = Path(result)
+        mode = self._diagnostics_mode
+        self._diagnostics_mode = ""
         self.logs_page.append(tr("diagnostics.export.success", path=path))
-        QMessageBox.information(self, tr("diagnostics.export.title"), tr("diagnostics.export.success", path=path))
+        if mode != "issue":
+            QMessageBox.information(self, tr("diagnostics.export.title"), tr("diagnostics.export.success", path=path))
+            return
+        dialog = self._pending_issue_dialog
+        if dialog is None:
+            return
+        body = IssueReportBuilder.build_body(self._pending_issue_details, launcher_version=VERSION_ID, diagnostics_path=path)
+        url = IssueReportBuilder.github_new_issue_url(GITHUB_REPOSITORY, self._pending_issue_details, launcher_version=VERSION_ID, diagnostics_path=path)
+        dialog.show_guidance(path, body, url)
+
+    def _on_diagnostics_task_failed(self, task_id: str, error: object) -> None:
+        if task_id != "diagnostics.export":
+            return
+        mode = self._diagnostics_mode
+        self._diagnostics_mode = ""
+        if mode == "issue" and self._pending_issue_dialog is not None:
+            self._pending_issue_dialog.set_collection_failed(str(error))
+            return
+        self._show_error(tr("diagnostics.export.title"), str(error))
 
     def _open_forge_logs(self, name: str) -> None:
         try:
@@ -2743,7 +2829,16 @@ class MainWindow(QMainWindow):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.resolve())))
 
     def _show_error(self, title: str, message: str) -> None:
-        QMessageBox.critical(self, title, message)
+        self._last_error_context = f"{title}: {message}"[:1200]
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Critical)
+        box.setWindowTitle(title)
+        box.setText(message)
+        report_button = box.addButton(tr("issue_report.error.report"), QMessageBox.ButtonRole.ActionRole)
+        box.addButton(QMessageBox.StandardButton.Ok)
+        box.exec()
+        if box.clickedButton() is report_button:
+            self._open_issue_report(initial_title=title, initial_what_happened=message)
 
     def _show_network_retry(self, controller: object, task_id: str, title: str, message: str) -> None:
         box = QMessageBox(self)

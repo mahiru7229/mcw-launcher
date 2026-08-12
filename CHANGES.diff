@@ -1,1442 +1,1321 @@
-MCW Launcher v1.4.0-beta.2 changes from v1.4.0-beta.1 baseline
+# MCW Launcher v1.4.0-beta.2 -> v1.4.0-beta.3
 
+diff --git a/CHANGED-FILES.txt b/CHANGED-FILES.txt
+index 46464a4..19de8c0 100644
+--- a/CHANGED-FILES.txt
++++ b/CHANGED-FILES.txt
+@@ -1,28 +1,26 @@
+-MCW Launcher v1.4.0-beta.2 changed files from v1.4.0-beta.1 baseline
++MCW Launcher v1.4.0-beta.3 changed files from v1.4.0-beta.2 baseline
+ 
++A	docs/RELEASE-v1.4.0-beta.3.md
++A	mcw_core/api/diagnostics/issue_report_builder.py
++A	src/core/diagnostics/issue_report_builder.py
++A	src/gui/dialogs/issue_report_dialog.py
++A	test/core/diagnostics/test_issue_report_builder.py
++A	test/gui/dialogs/test_issue_report_dialog.py
+ M	COMMIT-NAME.txt
++M	DELIVERY-MANIFEST.txt
+ M	README.md
++M	TEST-RESULTS.txt
+ M	docs/MCW_CORE_LIBRARY.md
+-A	docs/RELEASE-v1.4.0-beta.2.md
+ M	docs/V1.4-BETA-ROADMAP.md
+ M	lang/en-US.json
+ M	lang/vi-VN.json
+ M	pyproject.toml
+ M	src/config.py
+-M	src/core/config/launcher_settings_manager.py
+-M	src/core/modrinth/modrinth_content_manager.py
+-M	src/core/network/download_journal.py
+-M	src/core/network/download_manager.py
+-M	src/gui/controllers/gui_settings_controller.py
+-M	src/gui/controllers/update_controller.py
++M	src/core/diagnostics/diagnostics_manager.py
+ M	src/gui/main_window_2.py
+-M	src/gui/pages/launcher_settings_page.py
++M	src/gui/pages/logs_page.py
+ M	src/gui/task_runner.py
+-M	test/core/config/test_launcher_settings_manager.py
+ M	test/core/config/test_version_metadata.py
+-M	test/core/modrinth/test_modrinth_content_manager.py
+-M	test/core/network/test_download_journal.py
+-M	test/core/network/test_unified_download_manager.py
+-A	test/gui/controllers/test_update_controller_priority.py
++M	test/core/diagnostics/test_diagnostics_manager.py
+ M	test/gui/test_task_runner.py
+ M	test/test_public_api.py
 diff --git a/COMMIT-NAME.txt b/COMMIT-NAME.txt
-index 12d83e5..c867dd0 100644
+index c867dd0..506ab4f 100644
 --- a/COMMIT-NAME.txt
 +++ b/COMMIT-NAME.txt
 @@ -1 +1 @@
--feat(beta): mcw-launcher v1.4.0-beta.1 task lifecycle and runtime safety
-+feat(beta): mcw-launcher v1.4.0-beta.2 adaptive downloads and update priority
+-feat(beta): mcw-launcher v1.4.0-beta.2 adaptive downloads and update priority
++feat(beta): mcw-launcher v1.4.0-beta.3 diagnostics v2 and guided issue reporting
+diff --git a/DELIVERY-MANIFEST.txt b/DELIVERY-MANIFEST.txt
+index 8b5f2f9..892638c 100644
+--- a/DELIVERY-MANIFEST.txt
++++ b/DELIVERY-MANIFEST.txt
+@@ -1,23 +1,20 @@
+-MCW Launcher v1.4.0-beta.2 beta delivery
++MCW Launcher v1.4.0-beta.3 beta delivery
+ 
+ Delivery policy:
+-- Launcher source ZIP only for beta releases.
+-- No standalone MCW Core ZIP/WHL/README/RELEASE artifact is produced for beta.2.
+-- Standalone Core artifacts resume when v1.4 is declared stable.
++- One Launcher changed-files ZIP only for beta/RC releases.
++- No full-source delivery ZIP and no standalone MCW Core artifact for beta.3.
++- Standalone Core artifacts resume only when v1.4 is declared stable.
+ 
+-Launcher runtime: v1.4.0-beta.2
++Launcher runtime: v1.4.0-beta.3
+ Update channel: beta
+ 
+-Primary beta.2 scope:
+-- Update Priority Mode: cancel/drop competing tasks and reserve scheduling for update.* work.
+-- Adaptive Modrinth .mrpack artifact downloads.
+-- One-pass multi-hash with bounded hash I/O concurrency.
+-- Download journal progress batching.
+-- Automatic / Responsive / Balanced / Maximum download performance profiles.
+-- Automatic low-impact download concurrency while Minecraft is running.
++Primary beta.3 scope:
++- Diagnostics v2 with system/Java/task/instance/runtime context and bounded privacy-filtered logs.
++- Background diagnostics export.
++- Two-step Report Issue wizard: collect user details first, guidance second.
++- Prefilled privacy-filtered GitHub issue draft and local ZIP attachment guidance.
++- Report Issue action from error dialogs.
+ 
+-Inherited beta.1 scope:
+-- Task lifecycle/shutdown cancellation foundation.
+-- Kill Instance.
+-- Forge issue #20 profile/cache hardening.
+-- v1.3.2 issue #19 and update-integrity hardening.
++Inherited scope:
++- Beta.1 task lifecycle, shutdown cancellation, Kill Instance and Forge issue #20 hardening.
++- Beta.2 Update Priority Mode, adaptive modpack download, one-pass hashing and journal batching.
 diff --git a/README.md b/README.md
-index 40a33e7..f1dc15a 100644
+index f1dc15a..b82a47b 100644
 --- a/README.md
 +++ b/README.md
-@@ -9,8 +9,8 @@
+@@ -9,7 +9,7 @@
    <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.2">
      <img src="https://img.shields.io/badge/Stable-v1.3.2-brightgreen" alt="Stable version">
    </a>
--  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.1">
--    <img src="https://img.shields.io/badge/Beta-v1.4.0--beta.1-orange" alt="Beta version">
-+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.2">
-+    <img src="https://img.shields.io/badge/Beta-v1.4.0--beta.2-orange" alt="Beta version">
+-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.2">
++  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.3">
+     <img src="https://img.shields.io/badge/Beta-v1.4.0--beta.2-orange" alt="Beta version">
    </a>
    <a href="https://github.com/mahiru7229/mcw-launcher/actions">
-     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
-@@ -51,6 +51,21 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.2 hỗ trợ nâng cấp
+@@ -51,20 +51,13 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.2 hỗ trợ nâng cấp
  
  ---
  
-+## Có gì mới trong v1.4.0-beta.2
-+
-+**v1.4.0-beta.2** tập trung vào hiệu năng tải modpack và ưu tiên cập nhật launcher. Khi người dùng chọn cập nhật, launcher chuyển sang **Update Priority Mode**, hủy/drop các task khác theo cùng nguyên tắc shutdown, chặn task mới chen vào và chỉ bước sang apply sau khi các worker cũ đã dừng ở safe point.
-+
-+- Modrinth pack artifacts tải song song thích ứng theo CPU và giới hạn download đã cấu hình.
-+- SHA-1/SHA-512/SHA-256 được tính trong một lượt đọc file; hashing có I/O budget riêng để giảm giật trên máy yếu/HDD.
-+- Download journal batch progress writes để giảm `fsync` cạnh tranh khi nhiều file đang tải.
-+- Thêm profile **Automatic / Responsive / Balanced / Maximum**; Automatic tự giảm concurrency khi Minecraft đang chạy.
-+- Update Priority Mode cancel task khác, khóa scheduler cho `update.*`, nhưng vẫn đợi mutation cũ drain an toàn trước bước apply.
-+- Các mutation nặng trên cùng instance vẫn giữ tuần tự trong beta.2 để tránh đổi hiệu năng lấy rủi ro dữ liệu.
-+
-+Beta.3 sẽ tập trung Diagnostics v2, Create Issue Report, privacy/task timeline và benchmark/Windows soak.
-+
-+Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.2.md`](docs/RELEASE-v1.4.0-beta.2.md).
-+
+-## Có gì mới trong v1.4.0-beta.2
++## Có gì mới trong v1.4.0-beta.3
+ 
+-**v1.4.0-beta.2** tập trung vào hiệu năng tải modpack và ưu tiên cập nhật launcher. Khi người dùng chọn cập nhật, launcher chuyển sang **Update Priority Mode**, hủy/drop các task khác theo cùng nguyên tắc shutdown, chặn task mới chen vào và chỉ bước sang apply sau khi các worker cũ đã dừng ở safe point.
++**v1.4.0-beta.3** tập trung vào Diagnostics v2 và quy trình báo lỗi. Nút **Báo cáo lỗi** mở màn hình nhập thông tin trước, sau đó launcher thu thập diagnostics ở background và mới hiện hướng dẫn tạo GitHub issue/đính kèm ZIP. Bundle mới bổ sung system info, Java runtime, task timeline, runtime/crash logs gần nhất và issue context đã lọc thông tin nhạy cảm.
+ 
+-- Modrinth pack artifacts tải song song thích ứng theo CPU và giới hạn download đã cấu hình.
+-- SHA-1/SHA-512/SHA-256 được tính trong một lượt đọc file; hashing có I/O budget riêng để giảm giật trên máy yếu/HDD.
+-- Download journal batch progress writes để giảm `fsync` cạnh tranh khi nhiều file đang tải.
+-- Thêm profile **Automatic / Responsive / Balanced / Maximum**; Automatic tự giảm concurrency khi Minecraft đang chạy.
+-- Update Priority Mode cancel task khác, khóa scheduler cho `update.*`, nhưng vẫn đợi mutation cũ drain an toàn trước bước apply.
+-- Các mutation nặng trên cùng instance vẫn giữ tuần tự trong beta.2 để tránh đổi hiệu năng lấy rủi ro dữ liệu.
++Beta.3 giữ toàn bộ TaskRunner/Kill Instance/Forge hardening từ beta.1 và adaptive download/Update Priority từ beta.2.
+ 
+-Beta.3 sẽ tập trung Diagnostics v2, Create Issue Report, privacy/task timeline và benchmark/Windows soak.
+-
+-Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.2.md`](docs/RELEASE-v1.4.0-beta.2.md).
++Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.3.md`](docs/RELEASE-v1.4.0-beta.3.md).
+ 
  ## Có gì mới trong v1.4.0-beta.1
  
- **v1.4.0-beta.1** mở nhánh v1.4 với nền tảng task lifecycle/shutdown mới, **Kill Instance** cho Minecraft đang chạy và fix Forge profile/cache cho issue #20. Background/network task có thể bị cancel hoặc supersede thay vì luôn chặn task mới; khi đóng launcher, launcher ưu tiên hủy work của chính nó và thoát mà không tự kill game đang chạy.
+diff --git a/TEST-RESULTS.txt b/TEST-RESULTS.txt
+index 77b6e5b..b701cac 100644
+--- a/TEST-RESULTS.txt
++++ b/TEST-RESULTS.txt
+@@ -1,31 +1,30 @@
+-MCW Launcher v1.4.0-beta.2
++MCW Launcher v1.4.0-beta.3
+ 
+ Validation date: 2026-08-12
+ Environment: Linux headless build/test environment (PySide6 not installed)
+ 
+ Full pytest regression:
+-  1555 passed, 91 skipped, 2 warnings, 0 failed
++  1558 passed, 92 skipped, 2 warnings, 0 failed
+ 
+ Warnings:
+   2 intentional duplicate-ZIP-member warnings from package security fixtures.
+ 
+ Additional validation:
+-  python -m compileall -q src mcw_core tools launcher.py: PASS
+-  Translation/static GUI coverage after beta.2 additions: PASS
+-  Update Priority + adaptive download/hash/journal targeted regression: PASS
++  python -m compileall -q src mcw_core tools test: PASS
++  Translation/static GUI coverage after beta.3 additions: PASS
++  Diagnostics v2 + issue draft privacy tests: PASS
+ 
+-Beta.2 scope validated:
+-  - Update Priority Mode cancels competing launcher tasks and rejects new non-update work.
+-  - Update prepare waits for cancelled workers to settle before exclusive update handoff.
+-  - Adaptive Modrinth .mrpack artifact concurrency remains bounded by configured download limits.
+-  - SHA-1/SHA-512/SHA-256 can be calculated in one file pass with bounded hash I/O concurrency.
+-  - Download journal progress updates are batched while terminal/critical states flush immediately.
+-  - Automatic/Responsive/Balanced/Maximum download performance modes normalize correctly.
+-  - Automatic mode downshifts download concurrency while Minecraft is running.
++Beta.3 scope validated:
++  - Diagnostics schema v2 includes system info, Java runtimes, task timeline, issue context and bounded runtime/crash logs.
++  - Diagnostics export is dispatched through TaskRunner instead of blocking the GUI thread.
++  - Report Issue workflow collects user context before diagnostics and guidance.
++  - GitHub issue title/body generation is privacy-filtered and references the generated ZIP by filename only.
++  - TaskRunner diagnostics snapshot is bounded and records lifecycle/cancellation/supersede metadata.
++  - Existing beta.1/beta.2 task lifecycle, Forge, update-priority and download-performance regressions remain green.
+ 
+ Platform note:
+-  91 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
+-  Windows smoke testing is still required for the GUI update handoff and live performance-profile behavior.
++  92 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
++  Windows GUI smoke testing is still required for the two-step Report Issue dialog and browser handoff.
+ 
+ Release policy:
+-  This beta delivery contains Launcher source only. No standalone MCW Core ZIP/WHL is built or published for beta.2.
++  Beta/RC delivery is a Launcher changed-files ZIP only. No standalone MCW Core artifact is built for beta.3.
 diff --git a/docs/MCW_CORE_LIBRARY.md b/docs/MCW_CORE_LIBRARY.md
-index 1533860..5b7b7da 100644
+index 5b7b7da..535dd79 100644
 --- a/docs/MCW_CORE_LIBRARY.md
 +++ b/docs/MCW_CORE_LIBRARY.md
 @@ -1,6 +1,6 @@
  # MCW Core Library
  
--Current distribution: **mcw-core 1.4.0b1** (runtime `1.4.0-beta.1`). Beta 1 adds cancellable launcher task foundations, force-kill support for supervised instance processes, and strict Forge profile/cache validation without adding a GUI dependency.
-+Bundled runtime for Launcher beta.2: **1.4.0-beta.2**. No separate MCW Core beta artifact is published for beta.2; standalone Core artifacts are reserved for the stable v1.4 release.
+-Bundled runtime for Launcher beta.2: **1.4.0-beta.2**. No separate MCW Core beta artifact is published for beta.2; standalone Core artifacts are reserved for the stable v1.4 release.
++Bundled runtime for Launcher beta.3: **1.4.0-beta.3**. No separate MCW Core beta artifact is published for beta.3; standalone Core artifacts are reserved for the stable v1.4 release.
  
  MCW Core is the GUI-independent runtime used by MCW Launcher. It can be imported from a Python program without installing PySide6.
  
-diff --git a/docs/RELEASE-v1.4.0-beta.2.md b/docs/RELEASE-v1.4.0-beta.2.md
+diff --git a/docs/RELEASE-v1.4.0-beta.3.md b/docs/RELEASE-v1.4.0-beta.3.md
 new file mode 100644
-index 0000000..a84a023
+index 0000000..10e2e96
 --- /dev/null
-+++ b/docs/RELEASE-v1.4.0-beta.2.md
-@@ -0,0 +1,75 @@
-+# MCW Launcher v1.4.0-beta.2
++++ b/docs/RELEASE-v1.4.0-beta.3.md
+@@ -0,0 +1,37 @@
++# MCW Launcher v1.4.0-beta.3
 +
 +## Tiếng Việt
 +
-+MCW Launcher **v1.4.0-beta.2** là beta hiệu năng của nhánh v1.4. Bản này giữ TaskRunner/Kill Instance/Forge hardening từ beta.1, đồng thời giảm contention khi tải modpack và thêm **Update Priority Mode** để việc cập nhật launcher được ưu tiên tương tự shutdown.
++MCW Launcher **v1.4.0-beta.3** là beta cuối của nhánh v1.4 trước RC/stable, tập trung vào Diagnostics v2 và quy trình báo lỗi có hướng dẫn.
 +
-+### Update Priority Mode
++### Thay đổi chính
 +
-+- Khi người dùng xác nhận **Update now**, `TaskRunner` chuyển sang priority scope `update.*`.
-+- Các task launcher đang chạy ngoài scope update nhận cooperative cancellation; queued/background work không được phép chen task mới vào trong thời gian update.
-+- Core operation hiện tại cũng nhận cancel request để download/install/launch preparation có thể dừng ở checkpoint an toàn.
-+- Update download/prepare chỉ bắt đầu exclusive phase sau khi các task cạnh tranh đã settle; không force-kill worker đang ở critical filesystem commit.
-+- Minecraft process đang chạy không bị kill bởi Update Priority Mode. Launcher vẫn yêu cầu đóng instance game trước bước update như policy an toàn hiện tại.
-+- Nếu prepare/apply thất bại hoặc bị hủy, priority mode được release để launcher trở lại scheduling bình thường.
++- **Report Issue wizard**: bấm Báo cáo lỗi sẽ mở bước nhập tiêu đề, mô tả, cách tái hiện, kết quả mong đợi và thực tế trước khi thu thập diagnostics.
++- Diagnostics được tạo bằng background task để không khóa UI; sau khi xong mới chuyển sang bước hướng dẫn.
++- Bước hướng dẫn hiển thị vị trí ZIP, mẫu issue đã điền, nút copy, mở thư mục ZIP và mở GitHub New Issue đã prefill title/body.
++- Error dialog có nút **Báo cáo lỗi** để prefill lỗi gần nhất vào wizard.
++- Diagnostics schema v2 bổ sung `system-info.json`, `java-runtimes.json`, `task-timeline.json`, `issue-context.json`, runtime Minecraft log/crash report gần nhất, bên cạnh launcher log, process sessions, instance health và recovery journals.
++- TaskRunner giữ timeline bounded 100 task gần nhất, gồm trạng thái, thời lượng, cancellation/supersede và loại lỗi.
++- Secret redaction tiếp tục áp dụng cho issue text, settings, logs và JSON diagnostics; bundle vẫn giới hạn log size/count.
++- Giữ toàn bộ fix/tối ưu của beta.1 và beta.2, gồm issue #19/#20, Kill Instance, shutdown cancellation, Update Priority Mode, adaptive Modrinth download, one-pass hashing và journal batching.
 +
-+### Modpack / download performance
++### Ghi chú beta
 +
-+- Managed files của Modrinth `.mrpack` được download song song với concurrency thích ứng: thấp trên CPU ít core, tăng dần trên máy mạnh, và luôn bị cap bởi giới hạn download hiện tại.
-+- Mutation-heavy mod installation vẫn tuần tự trong beta.2 để tránh nhiều worker cùng thay đổi registry/content state của một instance.
-+- Thêm profile **Automatic / Responsive / Balanced / Maximum** trong Launcher Settings.
-+- `Automatic` tự giảm download concurrency khi Minecraft đang chạy để ưu tiên game; manual concurrency vẫn là explicit override.
-+- Hash verification hỗ trợ SHA-1/SHA-512/SHA-256 trong **một lượt đọc file** thay vì đọc lại artifact theo từng algorithm.
-+- Hash I/O có semaphore riêng: máy <=4 core mặc định chỉ một hash-heavy operation; máy mạnh hơn tối đa hai operation đồng thời.
-+- Download journal batch các cập nhật progress ngắn hạn và vẫn flush ngay các state quan trọng như start/cancel/fail/complete, giảm `fsync` cạnh tranh trên HDD.
-+- Progress reporter/coalescing hiện có tiếp tục giới hạn repaint/signal churn thay vì phát UI update theo từng chunk.
-+
-+### Giới hạn beta.2
-+
-+- Streamed hash reuse trực tiếp từ network sang Content Store và scheduler mutation/resource-lock sâu hơn chưa được coi là hoàn tất; chúng chỉ được đưa tiếp nếu benchmark beta cho thấy cần thiết.
-+- Beta.2 không phát hành MCW Core ZIP/WHL riêng. Core source bundled trong Launcher tiếp tục được regression-test, còn standalone Core artifact sẽ được build lại khi v1.4 stable.
-+- PySide6/Windows behavior cần smoke test thực tế cho Update Priority Mode, profile switching và installer handoff trước beta.3.
-+
-+### Metadata
-+
-+- Launcher runtime: `v1.4.0-beta.2`
-+- Update channel: `beta`
-+- Bundled Core runtime: `1.4.0-beta.2`
++Beta/RC chỉ phát hành Launcher patch/source theo workflow dự án; standalone MCW Core artifact chỉ được build lại khi v1.4 stable.
 +
 +---
 +
 +## English
 +
-+MCW Launcher **v1.4.0-beta.2** is the performance beta of the v1.4 line. It retains beta.1 task lifecycle, Kill Instance, and Forge hardening while reducing modpack download contention and adding **Update Priority Mode**.
++MCW Launcher **v1.4.0-beta.3** is the final v1.4 beta before RC/stable, focused on Diagnostics v2 and a guided issue-reporting workflow.
 +
-+### Update Priority Mode
++### Highlights
 +
-+- Confirming **Update now** switches `TaskRunner` into an `update.*` priority scope.
-+- Non-update launcher tasks receive cooperative cancellation and new unrelated tasks are rejected while update priority is active.
-+- The current Core operation is also asked to cancel so download/install/launch preparation can stop at safe checkpoints.
-+- Exclusive update preparation/application waits for competing workers to settle rather than force-terminating critical filesystem work.
-+- Running Minecraft processes are never force-killed by update priority; the existing close-game requirement remains in place.
-+- Failed/cancelled update preparation releases priority mode cleanly.
-+
-+### Modpack / download performance
-+
-+- Modrinth `.mrpack` managed artifacts use adaptive parallel downloads bounded by CPU class and the configured download cap.
-+- Mutation-heavy instance mod installation remains serialized in beta.2 for data safety.
-+- Add **Automatic / Responsive / Balanced / Maximum** download profiles.
-+- Automatic mode downshifts concurrency while Minecraft is running; an explicit manual concurrency remains an override.
-+- SHA-1/SHA-512/SHA-256 verification is computed in one file pass.
-+- Hash I/O has its own small concurrency budget to reduce HDD/low-core contention.
-+- Download journal progress writes are batched while important state transitions remain immediately persisted.
-+- Existing progress coalescing continues to bound GUI update frequency.
-+
-+### Beta limitations
-+
-+- Direct streamed-hash reuse into Content Store and deeper mutation/resource-lock scheduling are not claimed complete in beta.2; they will only be extended if beta benchmarks justify the extra complexity.
-+- No separate MCW Core ZIP/WHL is published for beta.2. Standalone Core artifacts are reserved for the v1.4 stable release.
-+- Windows/PySide smoke testing remains required before beta.3.
-+
-+### Metadata
-+
-+- Launcher runtime: `v1.4.0-beta.2`
-+- Update channel: `beta`
-+- Bundled Core runtime: `1.4.0-beta.2`
++- The **Report Issue** action first opens a form for title, description, reproduction steps, expected behavior and actual behavior.
++- Diagnostic collection runs in a background launcher task; guidance is shown only after collection completes.
++- The guidance step shows the ZIP path, a generated issue draft, copy/open-folder actions and a prefilled GitHub New Issue action.
++- Error dialogs expose a **Report issue** action that prefills the most recent error context.
++- Diagnostics schema v2 adds system info, Java runtimes, task timeline, issue context and recent Minecraft runtime/crash logs.
++- The TaskRunner keeps a bounded 100-entry lifecycle timeline with duration/cancellation/supersede/error metadata.
++- Privacy redaction and bounded log collection remain enforced.
++- All beta.1/beta.2 fixes and performance work remain included.
 diff --git a/docs/V1.4-BETA-ROADMAP.md b/docs/V1.4-BETA-ROADMAP.md
-index 60f94fd..5c2ec4b 100644
+index 5c2ec4b..a17524d 100644
 --- a/docs/V1.4-BETA-ROADMAP.md
 +++ b/docs/V1.4-BETA-ROADMAP.md
-@@ -10,15 +10,16 @@
- - Fix Forge issue #20: strict profile selection, validate-before-cache, poisoned-cache invalidation.
- - Retain v1.3.2 issue #19/atomic-write/update-integrity hardening.
+@@ -21,7 +21,7 @@
+ - Mutation-heavy per-instance content changes intentionally remain serialized for safety.
+ - Deeper streamed-hash reuse/resource-aware mutation scheduling is deferred unless beta benchmarks justify it.
  
--## v1.4.0-beta.2 — Modpack performance & resource scheduling
-+## v1.4.0-beta.2 — Modpack performance & update priority
+-## v1.4.0-beta.3 — Diagnostics & release hardening
++## v1.4.0-beta.3 — Diagnostics & release hardening (implemented)
  
--- Adaptive Modrinth/modpack concurrency.
--- Network/disk/hash resource budgets for weak/mid/high-end machines.
--- One-pass multi-hash and streamed hash reuse for Content Store.
--- Progress coalescing/throttling and journal batching.
--- Deeper cooperative cancellation checkpoints for scan/download/install paths.
--- Resource-aware task conflict/queue policy for heavy mutations.
--- Responsive/Balanced/Maximum performance profiles and automatic low-impact behavior while Minecraft is running.
-+- **Update Priority Mode**: cancel unrelated launcher work, reject new non-update tasks, drain safe checkpoints, then prepare/apply the update.
-+- Adaptive parallel download for Modrinth `.mrpack` managed files.
-+- One-pass SHA-1/SHA-512/SHA-256 verification with a conservative hash I/O budget.
-+- Progress coalescing retained and download-journal progress writes batched to reduce UI/disk contention.
-+- **Automatic / Responsive / Balanced / Maximum** performance profiles.
-+- Automatic low-impact download concurrency while Minecraft is running.
-+- Mutation-heavy per-instance content changes intentionally remain serialized for safety.
-+- Deeper streamed-hash reuse/resource-aware mutation scheduling is deferred unless beta benchmarks justify it.
- 
- ## v1.4.0-beta.3 — Diagnostics & release hardening
- 
+ - Diagnostics v2 bundle with launcher/runtime/loader logs, hardware/configuration, task timeline and relevant instance state.
+ - Robust collector isolation, log size limits and centralized secret/path redaction.
 diff --git a/lang/en-US.json b/lang/en-US.json
-index 69b5def..9eb211f 100644
+index 9eb211f..6a36d88 100644
 --- a/lang/en-US.json
 +++ b/lang/en-US.json
-@@ -372,6 +372,7 @@
-     "update.status.installing": "Installing the update and restarting MCW Launcher...",
-     "update.status.failed": "Update check failed",
-     "update.log.prepared": "Launcher update downloaded and verified",
-+    "update.log.priority": "Launcher update priority mode requested cancellation of {count} competing task(s)",
-     "update.log.available": "Launcher update {version} is available",
-     "update.log.check_failed": "Update check failed: {error}",
-     "update.dialog.title": "MCW Launcher update",
-@@ -391,6 +392,8 @@
-     "update.channel.beta": "Beta",
-     "update.channel.stable": "Stable",
-     "update.status.waiting": "Update is ready, but the launcher must be idle before installation",
-+    "update.status.priority": "Prioritizing launcher update and cancelling {count} other task(s)...",
-+    "update.status.priority_waiting": "Update is ready; waiting for {count} cancelled task(s) to reach a safe stop...",
-     "update.error.tasks_running": "The update cannot be installed while {count} launcher task(s) are still running. Finish or cancel them, then check again.",
-     "update.error.instances_running": "Close the running Minecraft instance(s) before updating: {names}",
-     "update.dialog.package_details": "Package: {asset} • {size}",
-@@ -1054,6 +1057,11 @@
-     "repair.status.repaired": "Repaired",
-     "repair.status.failed": "Failed",
-     "repair.status.skipped": "Skipped",
-+    "network.performance.label": "Download performance",
-+    "network.performance.automatic": "Automatic (recommended)",
-+    "network.performance.responsive": "Responsive — lower CPU and disk usage",
-+    "network.performance.balanced": "Balanced — moderate parallelism",
-+    "network.performance.maximum": "Maximum speed — higher resource usage",
-     "network.concurrency.label": "Simultaneous downloads",
-     "network.concurrency.auto": "Automatic (recommended)",
-     "network.concurrency.value": "{count} simultaneous downloads",
-@@ -2096,6 +2104,7 @@
-     "status.instance.killing": "Killing '{name}'...",
+@@ -2105,7 +2105,32 @@
      "status.instance.killed": "Killed '{name}'",
      "task.shutting_down": "The launcher is shutting down.",
-+    "task.priority_mode": "Launcher update priority mode is active. Other tasks are temporarily disabled.",
-     "task.group_running": "Task group '{group}' is already running."
+     "task.priority_mode": "Launcher update priority mode is active. Other tasks are temporarily disabled.",
+-    "task.group_running": "Task group '{group}' is already running."
++    "task.group_running": "Task group '{group}' is already running.",
++    "issue_report.title": "Report an issue",
++    "issue_report.details.heading": "Tell us what happened first. MCW will collect privacy-filtered diagnostics only after you continue.",
++    "issue_report.details.title": "Issue title",
++    "issue_report.details.title_placeholder": "Short summary of the problem",
++    "issue_report.details.what_happened": "What happened",
++    "issue_report.details.what_happened_placeholder": "Describe what you were doing and what went wrong.",
++    "issue_report.details.steps": "Steps to reproduce",
++    "issue_report.details.steps_placeholder": "1. Open ...\n2. Click ...\n3. ...",
++    "issue_report.details.expected": "Expected behavior",
++    "issue_report.details.actual": "Actual behavior",
++    "issue_report.details.context": "Detected context: {context}",
++    "issue_report.details.context_none": "no instance context",
++    "issue_report.details.continue": "Continue and collect diagnostics",
++    "issue_report.details.required": "Please enter an issue title and describe what happened before continuing.",
++    "issue_report.details.collecting": "Collecting launcher, runtime, system, task, and instance diagnostics...",
++    "issue_report.details.collect_failed": "Diagnostics could not be created: {error}",
++    "issue_report.guide.heading": "Diagnostics are ready. Review the draft, then create the GitHub issue and attach the ZIP.",
++    "issue_report.guide.instructions": "1. Review or copy the issue draft below. 2. Open GitHub. 3. Drag the diagnostic ZIP into the issue editor before submitting.",
++    "issue_report.guide.bundle": "Diagnostic bundle: {path}",
++    "issue_report.guide.copy": "Copy issue draft",
++    "issue_report.guide.open_folder": "Open ZIP folder",
++    "issue_report.guide.open_github": "Open GitHub issue",
++    "issue_report.error.report": "Report issue",
++    "diagnostics.collecting": "Collecting diagnostics...",
++    "diagnostics.busy": "A diagnostics export is already running."
    },
    "aliases": {
+     "MCW Launcher": "app.name",
 diff --git a/lang/vi-VN.json b/lang/vi-VN.json
-index 62bf420..fc7b1a0 100644
+index fc7b1a0..0b5594e 100644
 --- a/lang/vi-VN.json
 +++ b/lang/vi-VN.json
-@@ -372,6 +372,7 @@
-     "update.status.installing": "Đang cài cập nhật và khởi động lại MCW Launcher...",
-     "update.status.failed": "Kiểm tra cập nhật thất bại",
-     "update.log.prepared": "Đã tải và xác minh bản cập nhật launcher",
-+    "update.log.priority": "Chế độ ưu tiên cập nhật đã yêu cầu hủy {count} tác vụ đang cạnh tranh",
-     "update.log.available": "Đã có bản cập nhật launcher {version}",
-     "update.log.check_failed": "Kiểm tra cập nhật thất bại: {error}",
-     "update.dialog.title": "Cập nhật MCW Launcher",
-@@ -391,6 +392,8 @@
-     "update.channel.beta": "Beta",
-     "update.channel.stable": "Ổn định",
-     "update.status.waiting": "Bản cập nhật đã sẵn sàng, nhưng launcher phải rảnh trước khi cài đặt",
-+    "update.status.priority": "Đang ưu tiên cập nhật launcher và hủy {count} tác vụ khác...",
-+    "update.status.priority_waiting": "Bản cập nhật đã sẵn sàng; đang chờ {count} tác vụ đã hủy dừng tại điểm an toàn...",
-     "update.error.tasks_running": "Không thể cài cập nhật khi còn {count} tác vụ launcher đang chạy. Hãy hoàn tất hoặc hủy chúng rồi kiểm tra lại.",
-     "update.error.instances_running": "Hãy đóng các instance Minecraft đang chạy trước khi cập nhật: {names}",
-     "update.dialog.package_details": "Gói cập nhật: {asset} • {size}",
-@@ -1054,6 +1057,11 @@
-     "repair.status.repaired": "Đã sửa",
-     "repair.status.failed": "Thất bại",
-     "repair.status.skipped": "Đã bỏ qua",
-+    "network.performance.label": "Hiệu năng tải xuống",
-+    "network.performance.automatic": "Tự động (khuyên dùng)",
-+    "network.performance.responsive": "Mượt mà — giảm tải CPU và ổ đĩa",
-+    "network.performance.balanced": "Cân bằng — tải song song vừa phải",
-+    "network.performance.maximum": "Tốc độ tối đa — dùng nhiều tài nguyên hơn",
-     "network.concurrency.label": "Số lượt tải đồng thời",
-     "network.concurrency.auto": "Tự động (khuyên dùng)",
-     "network.concurrency.value": "{count} lượt tải đồng thời",
-@@ -2096,6 +2104,7 @@
-     "status.instance.killing": "Đang buộc dừng '{name}'...",
+@@ -2105,7 +2105,32 @@
      "status.instance.killed": "Đã buộc dừng '{name}'",
      "task.shutting_down": "Launcher đang tắt.",
-+    "task.priority_mode": "Chế độ ưu tiên cập nhật launcher đang hoạt động. Các tác vụ khác tạm thời bị khóa.",
-     "task.group_running": "Nhóm tác vụ '{group}' đang chạy."
+     "task.priority_mode": "Chế độ ưu tiên cập nhật launcher đang hoạt động. Các tác vụ khác tạm thời bị khóa.",
+-    "task.group_running": "Nhóm tác vụ '{group}' đang chạy."
++    "task.group_running": "Nhóm tác vụ '{group}' đang chạy.",
++    "issue_report.title": "Báo cáo lỗi",
++    "issue_report.details.heading": "Trước tiên hãy cho biết lỗi đã xảy ra như thế nào. MCW chỉ thu thập chẩn đoán đã lọc thông tin riêng tư sau khi bạn tiếp tục.",
++    "issue_report.details.title": "Tiêu đề lỗi",
++    "issue_report.details.title_placeholder": "Mô tả ngắn vấn đề",
++    "issue_report.details.what_happened": "Điều gì đã xảy ra",
++    "issue_report.details.what_happened_placeholder": "Mô tả thao tác bạn đang thực hiện và lỗi đã xảy ra.",
++    "issue_report.details.steps": "Các bước tái hiện",
++    "issue_report.details.steps_placeholder": "1. Mở ...\n2. Bấm ...\n3. ...",
++    "issue_report.details.expected": "Kết quả mong đợi",
++    "issue_report.details.actual": "Kết quả thực tế",
++    "issue_report.details.context": "Ngữ cảnh phát hiện được: {context}",
++    "issue_report.details.context_none": "không có ngữ cảnh instance",
++    "issue_report.details.continue": "Tiếp tục và thu thập chẩn đoán",
++    "issue_report.details.required": "Hãy nhập tiêu đề lỗi và mô tả điều đã xảy ra trước khi tiếp tục.",
++    "issue_report.details.collecting": "Đang thu thập log launcher, runtime, cấu hình máy, task và trạng thái instance...",
++    "issue_report.details.collect_failed": "Không thể tạo gói chẩn đoán: {error}",
++    "issue_report.guide.heading": "Chẩn đoán đã sẵn sàng. Hãy kiểm tra mẫu báo lỗi, sau đó tạo issue GitHub và đính kèm ZIP.",
++    "issue_report.guide.instructions": "1. Kiểm tra hoặc sao chép mẫu bên dưới. 2. Mở GitHub. 3. Kéo thả ZIP chẩn đoán vào trình soạn issue trước khi gửi.",
++    "issue_report.guide.bundle": "Gói chẩn đoán: {path}",
++    "issue_report.guide.copy": "Sao chép mẫu báo lỗi",
++    "issue_report.guide.open_folder": "Mở thư mục ZIP",
++    "issue_report.guide.open_github": "Mở issue GitHub",
++    "issue_report.error.report": "Báo cáo lỗi",
++    "diagnostics.collecting": "Đang thu thập chẩn đoán...",
++    "diagnostics.busy": "Một tác vụ xuất chẩn đoán đang chạy."
    },
    "aliases": {
+     "Show static text over themed controls": "launcher_settings.theme.show_static_text",
+diff --git a/mcw_core/api/diagnostics/issue_report_builder.py b/mcw_core/api/diagnostics/issue_report_builder.py
+new file mode 100644
+index 0000000..093be6c
+--- /dev/null
++++ b/mcw_core/api/diagnostics/issue_report_builder.py
+@@ -0,0 +1,3 @@
++"""Public re-export of :mod:`src.core.diagnostics.issue_report_builder`."""
++
++from src.core.diagnostics.issue_report_builder import *  # noqa: F401,F403
 diff --git a/pyproject.toml b/pyproject.toml
-index b15adf3..057edea 100644
+index 057edea..d62c954 100644
 --- a/pyproject.toml
 +++ b/pyproject.toml
 @@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
  
  [project]
  name = "mcw-core"
--version = "1.4.0b1"
-+version = "1.4.0b2"
+-version = "1.4.0b2"
++version = "1.4.0b3"
  description = "Headless Minecraft runtime, instance, loader, modpack, repair, and launch core used by MCW Launcher"
  readme = "docs/MCW_CORE_LIBRARY.md"
  requires-python = ">=3.12"
 diff --git a/src/config.py b/src/config.py
-index b54e4bf..3d1ee1e 100644
+index 3d1ee1e..5d2589d 100644
 --- a/src/config.py
 +++ b/src/config.py
 @@ -1,7 +1,7 @@
  from __future__ import annotations
  
--VERSION = "v1.4.0-beta.1"
--VERSION_ID = "1.4.0-beta.1"
-+VERSION = "v1.4.0-beta.2"
-+VERSION_ID = "1.4.0-beta.2"
+-VERSION = "v1.4.0-beta.2"
+-VERSION_ID = "1.4.0-beta.2"
++VERSION = "v1.4.0-beta.3"
++VERSION_ID = "1.4.0-beta.3"
  VERSION_TAG = f"v{VERSION_ID}"
  UPDATE_CHANNEL = "beta"
  GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
-diff --git a/src/core/config/launcher_settings_manager.py b/src/core/config/launcher_settings_manager.py
-index 132d2f3..7d21d1b 100644
---- a/src/core/config/launcher_settings_manager.py
-+++ b/src/core/config/launcher_settings_manager.py
-@@ -16,7 +16,7 @@ from src.core.theme.theme_palette import normalize_hex_color
- 
- 
- class LauncherSettingsManager:
--    SCHEMA_VERSION = 18
-+    SCHEMA_VERSION = 19
-     UPDATE_CHANNEL_POLICY_VERSION = 2
-     DEFAULT_SETTINGS = {
-         "schema_version": SCHEMA_VERSION,
-@@ -60,6 +60,7 @@ class LauncherSettingsManager:
-         "network": {
-             "download_limit_mbps": 0.0,
-             "download_concurrency": 0,
-+            "download_performance_mode": "automatic",
-         },
-         "storage": {
-             "notify_legacy_cache_cleanup": True,
-@@ -237,6 +238,7 @@ class LauncherSettingsManager:
-         network = normalized.setdefault("network", {})
-         network["download_limit_mbps"] = self._as_download_limit(network.get("download_limit_mbps"))
-         network["download_concurrency"] = self._as_download_concurrency(network.get("download_concurrency"))
-+        network["download_performance_mode"] = self._as_download_performance_mode(network.get("download_performance_mode"))
- 
-         storage = normalized.setdefault("storage", {})
-         storage["notify_legacy_cache_cleanup"] = self._as_bool(storage.get("notify_legacy_cache_cleanup"), True)
-@@ -296,6 +298,11 @@ class LauncherSettingsManager:
-             return 0
-         return min(max(parsed, 1), 16)
- 
-+    @staticmethod
-+    def _as_download_performance_mode(value: Any) -> str:
-+        normalized = str(value or "automatic").strip().lower()
-+        return normalized if normalized in {"automatic", "responsive", "balanced", "maximum"} else "automatic"
-+
-     @staticmethod
-     def _as_bool(value: Any, default: bool) -> bool:
-         if isinstance(value, bool):
-diff --git a/src/core/modrinth/modrinth_content_manager.py b/src/core/modrinth/modrinth_content_manager.py
-index 8b2c5ad..7168c9b 100644
---- a/src/core/modrinth/modrinth_content_manager.py
-+++ b/src/core/modrinth/modrinth_content_manager.py
-@@ -1,5 +1,7 @@
- from __future__ import annotations
- 
-+from concurrent.futures import ThreadPoolExecutor, as_completed
-+from os import cpu_count
+diff --git a/src/core/diagnostics/diagnostics_manager.py b/src/core/diagnostics/diagnostics_manager.py
+index 3195872..bb99006 100644
+--- a/src/core/diagnostics/diagnostics_manager.py
++++ b/src/core/diagnostics/diagnostics_manager.py
+@@ -6,6 +6,7 @@ import json
+ import os
  from pathlib import Path
+ import platform
++import shutil
+ import sys
+ from typing import Any
  import zipfile
+@@ -14,14 +15,18 @@ from src.core.fs.paths import Paths
+ from src.core.instance.instance_manager import InstanceManager
+ from src.core.instance.instance_health_manager import InstanceHealthManager
+ from src.core.instance.instance_run_lock import InstanceRunLock
++from src.core.hardware.gpu_preference_manager import GpuPreferenceManager
++from src.core.java.java_diagnostics_manager import JavaDiagnosticsManager
+ from src.core.network.download_recovery import download_recovery_manager
++from src.core.runtime.game_runtime_manager import GameRuntimeManager
+ from src.core.runtime.process_supervisor import ProcessSupervisor
++from src.core.system.memory import SystemMemory
+ from src.core.security.sensitive_data_redactor import SensitiveDataRedactor
  
-@@ -12,6 +14,7 @@ from src.core.modrinth.modrinth_pack_installer import ModrinthPackInstaller
- from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
- from src.core.modrinth.modrinth_registry import ModrinthRegistry
- from src.core.network.artifact_download_service import ArtifactDownloadError, is_local_artifact_storage_error
-+from src.core.network.download_manager import download_manager
- from src.core.network.download_pause import download_pause_controller, is_download_paused
- from src.core.progress.file_batch_progress import FileBatchProgress
- from src.core.progress.progress_reporter import ProgressReporter
-@@ -201,10 +204,18 @@ class ModrinthContentManager:
-     def _download_pack_round(missing: list[dict], reporter: ProgressReporter | None, round_number: int) -> dict[str, str]:
-         total = len(missing)
-         message = "Downloading modpack mods..."
--        batch_progress = FileBatchProgress(reporter=reporter, stage=ProgressStage.DOWNLOADING_MODS, message=message, total=total, min_emit_interval_seconds=ModrinthContentManager.PROGRESS_EMIT_INTERVAL_SECONDS)
-+        batch_progress = FileBatchProgress(
-+            reporter=reporter,
-+            stage=ProgressStage.DOWNLOADING_MODS,
-+            message=message,
-+            total=total,
-+            min_emit_interval_seconds=ModrinthContentManager.PROGRESS_EMIT_INTERVAL_SECONDS,
-+        )
-         batch_progress.start()
--        errors: dict[str, str] = {}
--        for item in missing:
-+        if not missing:
-+            return {}
+ 
+ class DiagnosticsManager:
+-    REPORT_SCHEMA_VERSION = 1
+-    BUNDLE_SCHEMA_VERSION = 1
++    REPORT_SCHEMA_VERSION = 2
++    BUNDLE_SCHEMA_VERSION = 2
+     MAX_LOG_FILES = 8
+     MAX_LOG_BYTES = 256 * 1024
+     MAX_TOTAL_LOG_BYTES = 2 * 1024 * 1024
+@@ -58,17 +63,17 @@ class DiagnosticsManager:
+             f"python: {platform.python_version()}",
+             f"platform: {platform.platform()}",
+             f"architecture: {platform.machine() or 'unknown'}",
+-            f"executable: {Path(sys.executable).resolve()}",
+-            f"working_directory: {Path.cwd().resolve()}",
+-            f"application_root: {Paths.root().resolve()}",
++            f"executable: {cls._safe_path(Path(sys.executable))}",
++            f"working_directory: {cls._safe_path(Path.cwd())}",
++            f"application_root: {cls._safe_path(Paths.root())}",
+             "",
+             "Data directories",
+             "----------------",
+-            f"config: {Paths.CONFIG_ROOT.resolve()}",
+-            f"instances: {Paths.INSTANCES_ROOT.resolve()}",
+-            f"cache: {Paths.CACHE_ROOT.resolve()}",
+-            f"accounts: {Paths.ACCOUNTS_ROOT.resolve()}",
+-            f"logs: {Paths.LOGS_ROOT.resolve()}",
++            f"config: {cls._safe_path(Paths.CONFIG_ROOT)}",
++            f"instances: {cls._safe_path(Paths.INSTANCES_ROOT)}",
++            f"cache: {cls._safe_path(Paths.CACHE_ROOT)}",
++            f"accounts: {cls._safe_path(Paths.ACCOUNTS_ROOT)}",
++            f"logs: {cls._safe_path(Paths.LOGS_ROOT)}",
+             "",
+             "Runtime state",
+             "-------------",
+@@ -117,7 +122,16 @@ class DiagnosticsManager:
+         return destination
+ 
+     @classmethod
+-    def write_bundle(cls, path: Path, launcher_version: str, settings: dict[str, Any] | None = None, activity_log: str = "") -> Path:
++    def write_bundle(
++        cls,
++        path: Path,
++        launcher_version: str,
++        settings: dict[str, Any] | None = None,
++        activity_log: str = "",
++        *,
++        task_timeline: tuple[dict[str, object], ...] | list[dict[str, object]] = (),
++        issue_context: dict[str, Any] | None = None,
++    ) -> Path:
+         destination = Path(path)
+         if destination.suffix.lower() != ".zip":
+             destination = destination.with_suffix(".zip")
+@@ -134,8 +148,13 @@ class DiagnosticsManager:
+             "instance-health.json": cls._instance_health_json(),
+             "process-sessions.json": cls._process_sessions_json(),
+             "operation-journals.json": cls._operation_journals_json(),
++            "system-info.json": cls._system_info_json(),
++            "java-runtimes.json": cls._java_runtimes_json(),
++            "task-timeline.json": cls._task_timeline_json(task_timeline),
++            "issue-context.json": cls._issue_context_json(issue_context or {}),
+         }
+         entries.update(cls._safe_log_entries())
++        entries.update(cls._safe_runtime_entries())
+         manifest_entries = [
+             {
+                 "path": name,
+@@ -175,6 +194,105 @@ class DiagnosticsManager:
+             temporary.unlink(missing_ok=True)
+         return destination
+ 
 +
-+        def download_one(item: dict) -> tuple[str, str | None, object | None]:
-             token = object()
-             child_reporter = batch_progress.reporter_for(token)
-             entry = item["entry"]
-@@ -229,16 +240,45 @@ class ModrinthContentManager:
-                     purpose="modpack-artifact",
-                 )
-                 entry.pop("downloadFailure", None)
-+                return path, None, None
-             except Exception as error:
-                 if is_download_paused(error) or is_local_artifact_storage_error(error):
-                     raise
--                errors[path] = str(error)
-                 if isinstance(error, ArtifactDownloadError):
-                     entry["downloadFailure"] = error.failure.to_dict()
-+                return path, str(error), error
-             finally:
-                 batch_progress.complete(token)
++    @classmethod
++    def _system_info_json(cls) -> bytes:
++        try:
++            usage = shutil.disk_usage(Paths.root())
++            gpu = GpuPreferenceManager.detect()
++            payload: dict[str, Any] = {
++                "schema_version": 1,
++                "platform": platform.platform(),
++                "system": platform.system(),
++                "release": platform.release(),
++                "machine": platform.machine(),
++                "python": platform.python_version(),
++                "cpu": platform.processor() or "unknown",
++                "cpu_logical_count": os.cpu_count() or 0,
++                "memory_total_mb": SystemMemory.total_physical_memory_mb(),
++                "disk": {
++                    "total_bytes": int(usage.total),
++                    "free_bytes": int(usage.free),
++                },
++                "gpu": {
++                    "supported": gpu.supported,
++                    "error": SensitiveDataRedactor.redact_text(gpu.error),
++                    "adapters": [
++                        {
++                            "name": item.name,
++                            "vendor": item.vendor,
++                            "adapter_ram": item.adapter_ram,
++                            "dedicated": item.dedicated,
++                        }
++                        for item in gpu.adapters
++                    ],
++                },
++            }
++        except Exception as error:
++            payload = {"schema_version": 1, "error": SensitiveDataRedactor.redact_text(error)}
++        return (json.dumps(SensitiveDataRedactor.redact_value(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
 +
-+        errors: dict[str, str] = {}
-+        workers = ModrinthContentManager._download_worker_count(total)
-+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="mcw-modrinth-pack") as executor:
-+            futures = [executor.submit(download_one, item) for item in missing]
++    @classmethod
++    def _java_runtimes_json(cls) -> bytes:
++        try:
++            rows = []
++            for item in JavaDiagnosticsManager.scan():
++                rows.append({
++                    "major_version": item.major_version,
++                    "version_string": item.version_string,
++                    "vendor": item.vendor,
++                    "architecture": item.architecture,
++                    "java_home": cls._safe_path(Path(item.java_home)) if item.java_home else "",
++                    "executable": cls._safe_path(Path(item.executable)),
++                    "source": str(getattr(item.source, "value", item.source)),
++                    "valid": item.valid,
++                })
++            payload: dict[str, Any] = {"schema_version": 1, "runtimes": rows}
++        except Exception as error:
++            payload = {"schema_version": 1, "error": SensitiveDataRedactor.redact_text(error), "runtimes": []}
++        return (json.dumps(SensitiveDataRedactor.redact_value(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
++
++    @classmethod
++    def _task_timeline_json(cls, timeline: object) -> bytes:
++        try:
++            rows = list(timeline) if isinstance(timeline, (list, tuple)) else []
++            payload: dict[str, Any] = {"schema_version": 1, "tasks": SensitiveDataRedactor.redact_value(rows[-100:])}
++        except Exception as error:
++            payload = {"schema_version": 1, "error": SensitiveDataRedactor.redact_text(error), "tasks": []}
++        return (json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
++
++    @classmethod
++    def _issue_context_json(cls, context: dict[str, Any]) -> bytes:
++        payload = {"schema_version": 1, "issue": SensitiveDataRedactor.redact_value(dict(context))}
++        return (json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
++
++    @classmethod
++    def _safe_runtime_entries(cls) -> dict[str, bytes]:
++        entries: dict[str, bytes] = {}
++        try:
++            instances = InstanceManager.list_instances()
++        except Exception:
++            return entries
++        candidates: list[tuple[float, str, Path]] = []
++        for instance in instances:
++            for kind, path in (("game", GameRuntimeManager.latest_game_log(instance)), ("crash", GameRuntimeManager.latest_crash_report(instance))):
++                if path is None or not path.is_file() or path.is_symlink():
++                    continue
++                try:
++                    modified = path.stat().st_mtime
++                except OSError:
++                    modified = 0.0
++                safe_instance = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in instance.name)[:48] or "instance"
++                candidates.append((modified, f"runtime/{safe_instance}-{kind}-{path.name}", path))
++        for _modified, name, path in sorted(candidates, reverse=True)[:6]:
 +            try:
-+                for future in as_completed(futures):
-+                    path, message_text, _error = future.result()
-+                    if message_text:
-+                        errors[path] = message_text
-+            except Exception:
-+                for future in futures:
-+                    future.cancel()
-+                raise
-         return errors
- 
-+    @staticmethod
-+    def _download_worker_count(total: int) -> int:
-+        count = max(0, int(total or 0))
-+        if count <= 1:
-+            return max(1, count)
-+        cores = max(1, int(cpu_count() or 1))
-+        if cores <= 4:
-+            adaptive = 2
-+        elif cores <= 8:
-+            adaptive = 4
-+        else:
-+            adaptive = 6
-+        return max(1, min(count, adaptive, ModrinthContentManager.MAX_DOWNLOAD_WORKERS, download_manager.max_concurrent_downloads))
-+
-     @staticmethod
-     def _download_mod_round(instance: Instance, missing: list[dict], reporter: ProgressReporter | None, round_number: int, launch_lock_token: str | None = None) -> dict[str, str]:
-         total = len(missing)
-diff --git a/src/core/network/download_journal.py b/src/core/network/download_journal.py
-index de64098..b865eda 100644
---- a/src/core/network/download_journal.py
-+++ b/src/core/network/download_journal.py
-@@ -15,38 +15,64 @@ from src.core.network.download_models import DownloadRequest, DownloadState
- class DownloadJournal:
-     SCHEMA_VERSION = 1
-     REPLACE_RETRY_DELAYS = (0.01, 0.03, 0.08, 0.16)
-+    PROGRESS_FLUSH_INTERVAL_SECONDS = 0.75
- 
-     def __init__(self, path: Path | None = None) -> None:
-         self.path = Path(path) if path is not None else Paths.download_journal_path()
-         self._lock = RLock()
-+        self._pending_progress: dict[str, dict] = {}
-+        self._last_progress_flush_at = 0.0
- 
-     def start(self, request: DownloadRequest, downloaded_bytes: int = 0) -> None:
--        self.update(request, DownloadState.DOWNLOADING, downloaded_bytes=downloaded_bytes, error="")
-+        self._update_entry(request, DownloadState.DOWNLOADING, downloaded_bytes=downloaded_bytes, error="", force=True)
- 
-     def update(self, request: DownloadRequest, state: DownloadState, downloaded_bytes: int = 0, error: str = "") -> None:
-+        self._update_entry(
-+            request,
-+            state,
-+            downloaded_bytes=downloaded_bytes,
-+            error=error,
-+            force=state is not DownloadState.DOWNLOADING,
-+        )
-+
-+    def _update_entry(self, request: DownloadRequest, state: DownloadState, downloaded_bytes: int, error: str, force: bool) -> None:
-+        first_url = request.urls[0] if request.urls else ""
-+        parsed = urlsplit(first_url)
-+        entry = {
-+            "request_id": request.request_id,
-+            "operation_id": request.operation_id,
-+            "source": request.source,
-+            "display_name": request.display_name,
-+            "destination": str(request.destination),
-+            "temporary_path": str(request.temporary_path),
-+            "host": parsed.hostname or "",
-+            "state": state.value,
-+            "downloaded_bytes": max(0, int(downloaded_bytes or 0)),
-+            "expected_size": request.expected_size,
-+            "error": self._compact_error(error),
-+            "updated_at": datetime.now(timezone.utc).isoformat(),
-+        }
-         with self._lock:
--            payload = self._read()
--            entries = payload.setdefault("entries", {})
--            first_url = request.urls[0] if request.urls else ""
--            parsed = urlsplit(first_url)
--            entries[request.request_id] = {
--                "request_id": request.request_id,
--                "operation_id": request.operation_id,
--                "source": request.source,
--                "display_name": request.display_name,
--                "destination": str(request.destination),
--                "temporary_path": str(request.temporary_path),
--                "host": parsed.hostname or "",
--                "state": state.value,
--                "downloaded_bytes": max(0, int(downloaded_bytes or 0)),
--                "expected_size": request.expected_size,
--                "error": self._compact_error(error),
--                "updated_at": datetime.now(timezone.utc).isoformat(),
--            }
--            self._write(payload)
-+            self._pending_progress[request.request_id] = entry
-+            now = time.monotonic()
-+            if not force and now - self._last_progress_flush_at < self.PROGRESS_FLUSH_INTERVAL_SECONDS:
-+                return
-+            self._flush_pending_locked(now)
-+
-+    def _flush_pending_locked(self, now: float | None = None) -> bool:
-+        if not self._pending_progress:
-+            return True
-+        payload = self._read()
-+        payload.setdefault("entries", {}).update(self._pending_progress)
-+        if not self._write(payload):
-+            return False
-+        self._pending_progress.clear()
-+        self._last_progress_flush_at = time.monotonic() if now is None else now
-+        return True
- 
-     def complete(self, request: DownloadRequest, size: int) -> None:
-         with self._lock:
-+            self._pending_progress.pop(request.request_id, None)
-             payload = self._read()
-             entries = payload.setdefault("entries", {})
-             if entries.pop(request.request_id, None) is None:
-@@ -55,9 +81,11 @@ class DownloadJournal:
- 
-     def remove(self, request_id: str) -> None:
-         with self._lock:
-+            normalized = str(request_id)
-+            pending_removed = self._pending_progress.pop(normalized, None) is not None
-             payload = self._read()
--            removed = payload.setdefault("entries", {}).pop(str(request_id), None)
--            if removed is not None:
-+            removed = payload.setdefault("entries", {}).pop(normalized, None)
-+            if removed is not None or pending_removed:
-                 self._write(payload)
- 
-     def remove_many(self, request_ids: object) -> int:
-@@ -67,14 +95,19 @@ class DownloadJournal:
-         with self._lock:
-             payload = self._read()
-             entries = payload.setdefault("entries", {})
--            removed = sum(1 for request_id in normalized if entries.pop(request_id, None) is not None)
-+            removed = 0
-+            for request_id in normalized:
-+                pending_removed = self._pending_progress.pop(request_id, None) is not None
-+                disk_removed = entries.pop(request_id, None) is not None
-+                removed += int(pending_removed or disk_removed)
-             if removed:
-                 self._write(payload)
-             return removed
- 
-     def snapshot(self) -> tuple[dict, ...]:
-         with self._lock:
--            entries = self._read().get("entries", {})
-+            entries = dict(self._read().get("entries", {}))
-+            entries.update(self._pending_progress)
-             return tuple(dict(entry) for entry in entries.values())
- 
-     def recoverable_entries(self) -> list[dict]:
-diff --git a/src/core/network/download_manager.py b/src/core/network/download_manager.py
-index aa6be20..8c73bf9 100644
---- a/src/core/network/download_manager.py
-+++ b/src/core/network/download_manager.py
-@@ -3,6 +3,7 @@ from __future__ import annotations
- from collections import defaultdict
- from contextlib import contextmanager
- from pathlib import Path
-+from os import cpu_count
- from threading import BoundedSemaphore, RLock
- from time import monotonic
- from urllib.parse import urlsplit
-@@ -36,6 +37,9 @@ class DownloadManager:
-         self._per_host_limit = min(DEFAULT_PER_HOST_LIMIT, self._global_limit)
-         self._global_semaphore = BoundedSemaphore(self._global_limit)
-         self._host_semaphores: dict[str, BoundedSemaphore] = defaultdict(lambda: BoundedSemaphore(self._per_host_limit))
-+        cores = max(1, int(cpu_count() or 1))
-+        self._hash_limit = 1 if cores <= 4 else 2
-+        self._hash_semaphore = BoundedSemaphore(self._hash_limit)
-         self._path_locks: dict[Path, RLock] = {}
- 
-     @property
-@@ -43,6 +47,36 @@ class DownloadManager:
-         with self._lock:
-             return self._global_limit
- 
-+    @staticmethod
-+    def recommended_concurrency(mode: object = "automatic", configured: object = 0, *, game_running: bool = False, cores: int | None = None) -> int:
-+        try:
-+            manual = int(configured or 0)
-+        except (TypeError, ValueError):
-+            manual = 0
-+        if manual > 0:
-+            return min(max(manual, 1), MAX_CONCURRENT_DOWNLOADS)
-+
-+        normalized = str(mode or "automatic").strip().lower()
-+        if normalized not in {"automatic", "responsive", "balanced", "maximum"}:
-+            normalized = "automatic"
-+        detected_cores = max(1, int(cores or cpu_count() or 1))
-+        if normalized == "responsive":
-+            value = 2
-+        elif normalized == "balanced":
-+            value = 4
-+        elif normalized == "maximum":
-+            value = min(12, max(6, detected_cores))
-+        elif detected_cores <= 4:
-+            value = 2
-+        elif detected_cores <= 8:
-+            value = 4
-+        else:
-+            value = 6
-+
-+        if normalized == "automatic" and game_running:
-+            value = min(value, 2)
-+        return min(max(value, 1), MAX_CONCURRENT_DOWNLOADS)
-+
-     @property
-     def per_host_limit(self) -> int:
-         with self._lock:
-@@ -292,24 +326,52 @@ class DownloadManager:
-             if actual_hashes.get(algorithm) != expected.lower():
-                 raise DownloadChecksumMismatchError(request.display_name, algorithm)
- 
--    @staticmethod
--    def calculate_hash(path: Path, algorithm: str, allow_while_paused: bool = False) -> str:
-+    def calculate_hash(self, path: Path, algorithm: str, allow_while_paused: bool = False) -> str:
-         normalized = str(algorithm).strip().lower()
--        if normalized == "sha1":
--            digest = hashlib.sha1(usedforsecurity=False)
--        else:
--            digest = hashlib.new(normalized)
--        with open_file(path, "rb") as file:
--            while chunk := file.read(1024 * 1024):
-+        return self.calculate_hashes(
-+            path,
-+            {normalized: ""},
-+            allow_while_paused=allow_while_paused,
-+        )[normalized]
-+
-+    def calculate_hashes(self, path: Path, expected: dict | object, allow_while_paused: bool = False) -> dict[str, str]:
-+        algorithms = tuple(dict.fromkeys(str(name).strip().lower() for name in dict(expected or {}) if str(name).strip()))
-+        if not algorithms:
-+            return {}
-+
-+        digests: dict[str, object] = {}
-+        for algorithm in algorithms:
-+            if algorithm == "sha1":
-+                digests[algorithm] = hashlib.sha1(usedforsecurity=False)
-+            else:
-+                digests[algorithm] = hashlib.new(algorithm)
-+
-+        with self._hash_slot(allow_while_paused=allow_while_paused):
-+            with open_file(path, "rb") as file:
-+                while chunk := file.read(CHUNK_SIZE):
-+                    if allow_while_paused:
-+                        download_pause_controller.raise_if_cancel_requested()
-+                    else:
-+                        download_pause_controller.raise_if_requested()
-+                    for digest in digests.values():
-+                        digest.update(chunk)
-+
-+        return {algorithm: digest.hexdigest().lower() for algorithm, digest in digests.items()}
-+
-+    @contextmanager
-+    def _hash_slot(self, *, allow_while_paused: bool = False):
-+        acquired = False
-+        try:
-+            while not acquired:
-                 if allow_while_paused:
-                     download_pause_controller.raise_if_cancel_requested()
-                 else:
-                     download_pause_controller.raise_if_requested()
--                digest.update(chunk)
--        return digest.hexdigest().lower()
--
--    def calculate_hashes(self, path: Path, expected: dict | object, allow_while_paused: bool = False) -> dict[str, str]:
--        return {algorithm: self.calculate_hash(path, algorithm, allow_while_paused=allow_while_paused) for algorithm in dict(expected or {})}
-+                acquired = self._hash_semaphore.acquire(timeout=0.25)
-+            yield
-+        finally:
-+            if acquired:
-+                self._hash_semaphore.release()
- 
-     @contextmanager
-     def _slot(self, host: str):
-diff --git a/src/gui/controllers/gui_settings_controller.py b/src/gui/controllers/gui_settings_controller.py
-index ca6e9ba..4a1de56 100644
---- a/src/gui/controllers/gui_settings_controller.py
-+++ b/src/gui/controllers/gui_settings_controller.py
-@@ -11,7 +11,6 @@ from mcw_core.api.instance.settings_manager import SettingsManager, default_inst
- from mcw_core.api.language.language_manager import tr
- from mcw_core.api.network.download_bandwidth_limiter import download_bandwidth_limiter
- from mcw_core.api.network.download_manager import download_manager
--from mcw_core.api.network.network_session import DEFAULT_MAX_CONCURRENT_DOWNLOADS
- from src.gui.controllers.base_controller import BaseController
- 
- 
-@@ -46,6 +45,7 @@ class GuiSettingsController(BaseController):
-         "curseforge_gateway_urls": (),
-         "download_limit_mbps": 0.0,
-         "download_concurrency": 0,
-+        "download_performance_mode": "automatic",
-         "notify_legacy_cache_cleanup": True,
-         "unused_version_retention_days": 14,
-         "instance_defaults": default_instance_settings(),
-@@ -55,6 +55,7 @@ class GuiSettingsController(BaseController):
-         super().__init__()
-         self._settings = LauncherSettingsManager()
-         self._current = copy.deepcopy(self.DEFAULTS)
-+        self._game_running = False
- 
-     @property
-     def current(self) -> dict:
-@@ -105,12 +106,13 @@ class GuiSettingsController(BaseController):
-             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
-             "download_limit_mbps": float(network.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]) or 0.0),
-             "download_concurrency": int(network.get("download_concurrency", self.DEFAULTS["download_concurrency"]) or 0),
-+            "download_performance_mode": self._normalize_download_performance_mode(network.get("download_performance_mode")),
-             "notify_legacy_cache_cleanup": bool(storage.get("notify_legacy_cache_cleanup", self.DEFAULTS["notify_legacy_cache_cleanup"])),
-             "unused_version_retention_days": int(storage.get("unused_version_retention_days", self.DEFAULTS["unused_version_retention_days"]) or self.DEFAULTS["unused_version_retention_days"]),
-             "instance_defaults": SettingsManager.normalize_dict(data.get("instance_defaults")),
-         }
-         download_bandwidth_limiter.configure_mbps(self._current["download_limit_mbps"])
--        download_manager.configure(self._current["download_concurrency"] or DEFAULT_MAX_CONCURRENT_DOWNLOADS)
-+        self._apply_download_policy()
-         self.settings_changed.emit(copy.deepcopy(self._current))
-         return copy.deepcopy(self._current)
- 
-@@ -127,7 +129,7 @@ class GuiSettingsController(BaseController):
-         except (TypeError, ValueError):
-             download_concurrency = 0
-         download_concurrency = 0 if download_concurrency <= 0 else min(download_concurrency, 16)
--        download_manager.configure(download_concurrency or DEFAULT_MAX_CONCURRENT_DOWNLOADS)
-+        download_performance_mode = self._normalize_download_performance_mode(data.get("download_performance_mode"))
-         tester_mode = bool(data.get("tester_mode", self.DEFAULTS["tester_mode"]))
-         update_channel = "beta" if tester_mode else "stable"
-         self._current = {
-@@ -161,10 +163,12 @@ class GuiSettingsController(BaseController):
-             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
-             "download_limit_mbps": download_limit_mbps,
-             "download_concurrency": download_concurrency,
-+            "download_performance_mode": download_performance_mode,
-             "notify_legacy_cache_cleanup": bool(data.get("notify_legacy_cache_cleanup", self.DEFAULTS["notify_legacy_cache_cleanup"])),
-             "unused_version_retention_days": max(1, min(int(data.get("unused_version_retention_days", self.DEFAULTS["unused_version_retention_days"]) or self.DEFAULTS["unused_version_retention_days"]), 365)),
-             "instance_defaults": SettingsManager.normalize_dict(data.get("instance_defaults")),
-         }
-+        self._apply_download_policy()
-         self._settings.save({
-             "gui": {
-                 "start_page": self._current["start_page"],
-@@ -191,6 +195,7 @@ class GuiSettingsController(BaseController):
-             "network": {
-                 "download_limit_mbps": self._current["download_limit_mbps"],
-                 "download_concurrency": self._current["download_concurrency"],
-+                "download_performance_mode": self._current["download_performance_mode"],
-             },
-             "storage": {
-                 "notify_legacy_cache_cleanup": self._current["notify_legacy_cache_cleanup"],
-@@ -203,6 +208,27 @@ class GuiSettingsController(BaseController):
-         self.log_created.emit(tr("GUI preferences saved"))
- 
- 
-+    def set_game_running(self, running: bool) -> None:
-+        normalized = bool(running)
-+        if normalized == self._game_running:
-+            return
-+        self._game_running = normalized
-+        self._apply_download_policy()
-+
-+    def _apply_download_policy(self) -> int:
-+        concurrency = download_manager.recommended_concurrency(
-+            self._current.get("download_performance_mode", "automatic"),
-+            self._current.get("download_concurrency", 0),
-+            game_running=self._game_running,
-+        )
-+        download_manager.configure(concurrency)
-+        return concurrency
-+
-+    @staticmethod
-+    def _normalize_download_performance_mode(value: object) -> str:
-+        normalized = str(value or "automatic").strip().lower()
-+        return normalized if normalized in {"automatic", "responsive", "balanced", "maximum"} else "automatic"
++                raw = path.read_bytes()[-cls.MAX_LOG_BYTES:]
++            except OSError:
++                continue
++            text = raw.decode("utf-8", errors="replace")
++            entries[name] = cls._truncate_utf8(SensitiveDataRedactor.redact_text(text).encode("utf-8"), cls.MAX_LOG_BYTES)
++        return entries
 +
      @classmethod
-     def _normalize_start_page(cls, value: object) -> str:
-         page = str(value or cls.DEFAULTS["start_page"]).strip()
-diff --git a/src/gui/controllers/update_controller.py b/src/gui/controllers/update_controller.py
-index 1b5f3fe..790cf5c 100644
---- a/src/gui/controllers/update_controller.py
-+++ b/src/gui/controllers/update_controller.py
-@@ -4,13 +4,14 @@ from datetime import datetime, timezone
- 
- from PySide6.QtCore import Signal, Slot
- 
-+from mcw_core import get_default_core
- from mcw_core.api.config.launcher_settings_manager import LauncherSettingsManager
- from mcw_core.api.language.language_manager import tr
- from mcw_core.api.progress.progress_reporter import ProgressReporter
- from mcw_core.api.update.update_manager import UpdateManager
- from src.gui.config import GITHUB_REPOSITORY, UPDATE_CHANNEL, VERSION_ID
- from src.gui.controllers.base_controller import BaseController
--from src.gui.task_runner import TaskRunner
-+from src.gui.task_runner import TaskConflictPolicy, TaskRunner
- from src.models.update.update_info import UpdateInfo
- 
- 
-@@ -31,8 +32,12 @@ class UpdateController(BaseController):
-         self._channel = self._normalize_channel(channel)
-         self._manager = UpdateManager(repository=GITHUB_REPOSITORY, current_version=VERSION_ID, channel=self._channel)
-         self._settings = LauncherSettingsManager()
-+        self._core = get_default_core()
-+        self._pending_update_info: UpdateInfo | None = None
-         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
-         self._task_runner.task_failed.connect(self._on_task_failed)
-+        self._task_runner.task_cancelled.connect(self._on_task_cancelled)
-+        self._task_runner.task_settled.connect(self._on_task_settled)
- 
-     @property
-     def channel(self) -> str:
-@@ -54,9 +59,43 @@ class UpdateController(BaseController):
-         task_id = self.MANUAL_CHECK_TASK_ID if manual else self.AUTO_CHECK_TASK_ID
-         self._task_runner.run(task_id, lambda: self._manager.check_for_update(force_refresh=manual), tr("update.status.checking"), blocking=False)
- 
--    def prepare(self, info: UpdateInfo) -> None:
-+    def prepare(self, info: UpdateInfo) -> bool:
-+        if self._pending_update_info is not None or self._task_runner.is_task_active(self.PREPARE_TASK_ID):
-+            return False
-+        self._pending_update_info = info
-+        cancelled = self._task_runner.begin_priority_mode("update.")
-+        core_cancelled = bool(self._core.operations.cancel())
-+        cancelled_count = len(cancelled)
-+        if cancelled_count or core_cancelled:
-+            self.status_changed.emit(tr("update.status.priority", count=cancelled_count))
-+            self.log_created.emit(tr("update.log.priority", count=cancelled_count))
-+        return self._start_pending_prepare()
+     def _download_recovery_json(cls) -> bytes:
+         try:
+diff --git a/src/core/diagnostics/issue_report_builder.py b/src/core/diagnostics/issue_report_builder.py
+new file mode 100644
+index 0000000..6fec991
+--- /dev/null
++++ b/src/core/diagnostics/issue_report_builder.py
+@@ -0,0 +1,62 @@
++from __future__ import annotations
 +
-+    def _start_pending_prepare(self) -> bool:
-+        info = self._pending_update_info
-+        if info is None:
-+            return False
-+        active_tasks = [task_id for task_id in self._task_runner.active_task_ids if not task_id.startswith("update.")]
-+        if active_tasks:
-+            self.status_changed.emit(tr("update.status.priority_waiting", count=len(active_tasks)))
-+            return True
++from pathlib import Path
++from typing import Any
++from urllib.parse import urlencode
 +
-+        self._pending_update_info = None
-         reporter = ProgressReporter(self.progress_received.emit)
--        self._task_runner.run(self.PREPARE_TASK_ID, lambda: self._manager.prepare_update(info, reporter), tr("update.status.downloading"), blocking=True)
-+        started = self._task_runner.run(
-+            self.PREPARE_TASK_ID,
-+            lambda: self._manager.prepare_update(info, reporter),
-+            tr("update.status.downloading"),
-+            blocking=True,
-+            conflict_policy=TaskConflictPolicy.PARALLEL,
++from src.core.security.sensitive_data_redactor import SensitiveDataRedactor
++
++
++class IssueReportBuilder:
++    """Build a privacy-filtered GitHub issue draft from user-provided context."""
++
++    @staticmethod
++    def normalize(details: dict[str, Any]) -> dict[str, str]:
++        fields = ("title", "what_happened", "steps", "expected", "actual", "context")
++        return {
++            field: SensitiveDataRedactor.redact_text(str(details.get(field) or "").strip())
++            for field in fields
++        }
++
++    @classmethod
++    def build_body(cls, details: dict[str, Any], *, launcher_version: str, diagnostics_path: Path | None = None) -> str:
++        safe = cls.normalize(details)
++        diagnostics_name = Path(diagnostics_path).name if diagnostics_path is not None else "MCW-Diagnostics-YYYYMMDD-HHMMSS.zip"
++        lines = [
++            "## What happened",
++            safe["what_happened"] or "(please describe the problem)",
++            "",
++            "## Steps to reproduce",
++            safe["steps"] or "1. ",
++            "",
++            "## Expected behavior",
++            safe["expected"] or "(what did you expect to happen?)",
++            "",
++            "## Actual behavior",
++            safe["actual"] or "(what happened instead?)",
++            "",
++            "## Launcher context",
++            f"- MCW Launcher: {launcher_version}",
++        ]
++        if safe["context"]:
++            lines.append(f"- Context: {safe['context']}")
++        lines.extend(
++            [
++                "",
++                "## Diagnostics",
++                f"Attach `{diagnostics_name}` to this issue by dragging the ZIP into the GitHub issue editor.",
++                "",
++                "> The diagnostic bundle is privacy-filtered, but you should still review the issue text and attachments before submitting.",
++            ]
 +        )
-+        if not started:
-+            self.release_priority()
-+        return started
++        return "\n".join(lines).rstrip() + "\n"
 +
-+    def release_priority(self) -> None:
-+        self._pending_update_info = None
-+        self._task_runner.end_priority_mode("update.")
- 
-     @Slot(str, object)
-     def _on_task_succeeded(self, task_id: str, result: object) -> None:
-@@ -86,6 +125,7 @@ class UpdateController(BaseController):
-     @Slot(str, object)
-     def _on_task_failed(self, task_id: str, error: Exception) -> None:
-         if task_id == self.PREPARE_TASK_ID:
-+            self.release_priority()
-             self._emit_error(tr("update.error.title"), error)
-             return
-         if task_id not in {self.AUTO_CHECK_TASK_ID, self.MANUAL_CHECK_TASK_ID}:
-@@ -94,3 +134,14 @@ class UpdateController(BaseController):
-         manual = task_id == self.MANUAL_CHECK_TASK_ID
-         self.log_created.emit(tr("update.log.check_failed", error=error))
-         self.update_check_failed.emit(error, manual)
++    @classmethod
++    def github_new_issue_url(cls, repository: str, details: dict[str, Any], *, launcher_version: str, diagnostics_path: Path | None = None) -> str:
++        repo = str(repository or "").strip().strip("/")
++        if not repo or "/" not in repo:
++            raise ValueError("A GitHub owner/repository name is required.")
++        safe = cls.normalize(details)
++        title = safe["title"] or f"Bug report - MCW Launcher {launcher_version}"
++        body = cls.build_body(details, launcher_version=launcher_version, diagnostics_path=diagnostics_path)
++        return f"https://github.com/{repo}/issues/new?{urlencode({'title': title, 'body': body})}"
+diff --git a/src/gui/dialogs/issue_report_dialog.py b/src/gui/dialogs/issue_report_dialog.py
+new file mode 100644
+index 0000000..003d577
+--- /dev/null
++++ b/src/gui/dialogs/issue_report_dialog.py
+@@ -0,0 +1,166 @@
++from __future__ import annotations
 +
-+    @Slot(str)
-+    def _on_task_cancelled(self, task_id: str) -> None:
-+        if task_id == self.PREPARE_TASK_ID:
-+            self.release_priority()
++from pathlib import Path
 +
-+    @Slot(str, bool, object)
-+    def _on_task_settled(self, task_id: str, _succeeded: bool, _payload: object) -> None:
-+        if self._pending_update_info is None or task_id.startswith("update."):
++from PySide6.QtCore import QUrl, Signal
++from PySide6.QtGui import QDesktopServices, QGuiApplication
++from PySide6.QtWidgets import (
++    QDialog,
++    QFormLayout,
++    QHBoxLayout,
++    QLabel,
++    QLineEdit,
++    QMessageBox,
++    QPushButton,
++    QStackedWidget,
++    QTextEdit,
++    QVBoxLayout,
++    QWidget,
++)
++
++from mcw_core.api.language.language_manager import tr
++
++
++class IssueReportDialog(QDialog):
++    information_submitted = Signal(object)
++
++    def __init__(self, context: str = "", parent=None) -> None:
++        super().__init__(parent)
++        self._context = str(context or "").strip()
++        self._issue_url = ""
++        self._bundle_path: Path | None = None
++        self.setWindowTitle(tr("issue_report.title"))
++        self.resize(720, 620)
++
++        root = QVBoxLayout(self)
++        self.stack = QStackedWidget()
++        root.addWidget(self.stack, 1)
++        self._build_information_page()
++        self._build_guidance_page()
++
++    def _build_information_page(self) -> None:
++        page = QWidget()
++        layout = QVBoxLayout(page)
++        heading = QLabel(tr("issue_report.details.heading"))
++        heading.setWordWrap(True)
++        layout.addWidget(heading)
++
++        form = QFormLayout()
++        self.title_edit = QLineEdit()
++        self.title_edit.setPlaceholderText(tr("issue_report.details.title_placeholder"))
++        self.what_happened_edit = QTextEdit()
++        self.what_happened_edit.setPlaceholderText(tr("issue_report.details.what_happened_placeholder"))
++        self.steps_edit = QTextEdit()
++        self.steps_edit.setPlaceholderText(tr("issue_report.details.steps_placeholder"))
++        self.expected_edit = QTextEdit()
++        self.actual_edit = QTextEdit()
++        for editor in (self.what_happened_edit, self.steps_edit, self.expected_edit, self.actual_edit):
++            editor.setMinimumHeight(76)
++        form.addRow(tr("issue_report.details.title"), self.title_edit)
++        form.addRow(tr("issue_report.details.what_happened"), self.what_happened_edit)
++        form.addRow(tr("issue_report.details.steps"), self.steps_edit)
++        form.addRow(tr("issue_report.details.expected"), self.expected_edit)
++        form.addRow(tr("issue_report.details.actual"), self.actual_edit)
++        layout.addLayout(form)
++
++        self.context_label = QLabel(tr("issue_report.details.context", context=self._context or tr("issue_report.details.context_none")))
++        self.context_label.setWordWrap(True)
++        layout.addWidget(self.context_label)
++
++        self.status_label = QLabel("")
++        self.status_label.setWordWrap(True)
++        layout.addWidget(self.status_label)
++
++        buttons = QHBoxLayout()
++        buttons.addStretch()
++        cancel = QPushButton(tr("common.cancel"))
++        self.continue_button = QPushButton(tr("issue_report.details.continue"))
++        cancel.clicked.connect(self.reject)
++        self.continue_button.clicked.connect(self._submit_information)
++        buttons.addWidget(cancel)
++        buttons.addWidget(self.continue_button)
++        layout.addLayout(buttons)
++        self.stack.addWidget(page)
++
++    def _build_guidance_page(self) -> None:
++        page = QWidget()
++        layout = QVBoxLayout(page)
++        heading = QLabel(tr("issue_report.guide.heading"))
++        heading.setWordWrap(True)
++        layout.addWidget(heading)
++
++        self.bundle_label = QLabel("")
++        self.bundle_label.setWordWrap(True)
++        self.bundle_label.setTextInteractionFlags(self.bundle_label.textInteractionFlags())
++        layout.addWidget(self.bundle_label)
++
++        instructions = QLabel(tr("issue_report.guide.instructions"))
++        instructions.setWordWrap(True)
++        layout.addWidget(instructions)
++
++        self.preview = QTextEdit()
++        self.preview.setReadOnly(True)
++        layout.addWidget(self.preview, 1)
++
++        buttons = QHBoxLayout()
++        copy_button = QPushButton(tr("issue_report.guide.copy"))
++        open_folder_button = QPushButton(tr("issue_report.guide.open_folder"))
++        open_github_button = QPushButton(tr("issue_report.guide.open_github"))
++        close_button = QPushButton(tr("common.close"))
++        copy_button.clicked.connect(lambda: QGuiApplication.clipboard().setText(self.preview.toPlainText()))
++        open_folder_button.clicked.connect(self._open_bundle_folder)
++        open_github_button.clicked.connect(self._open_github)
++        close_button.clicked.connect(self.accept)
++        buttons.addWidget(copy_button)
++        buttons.addWidget(open_folder_button)
++        buttons.addStretch()
++        buttons.addWidget(open_github_button)
++        buttons.addWidget(close_button)
++        layout.addLayout(buttons)
++        self.stack.addWidget(page)
++
++    def _submit_information(self) -> None:
++        title = self.title_edit.text().strip()
++        what_happened = self.what_happened_edit.toPlainText().strip()
++        if not title or not what_happened:
++            QMessageBox.information(self, tr("issue_report.title"), tr("issue_report.details.required"))
 +            return
-+        self._start_pending_prepare()
++        self.continue_button.setEnabled(False)
++        self.status_label.setText(tr("issue_report.details.collecting"))
++        self.information_submitted.emit(self.details())
++
++
++    def prefill(self, *, title: str = "", what_happened: str = "") -> None:
++        if title:
++            self.title_edit.setText(str(title))
++        if what_happened:
++            self.what_happened_edit.setPlainText(str(what_happened))
++
++    def details(self) -> dict[str, str]:
++        return {
++            "title": self.title_edit.text().strip(),
++            "what_happened": self.what_happened_edit.toPlainText().strip(),
++            "steps": self.steps_edit.toPlainText().strip(),
++            "expected": self.expected_edit.toPlainText().strip(),
++            "actual": self.actual_edit.toPlainText().strip(),
++            "context": self._context,
++        }
++
++    def set_collection_failed(self, message: str) -> None:
++        self.continue_button.setEnabled(True)
++        self.status_label.setText(tr("issue_report.details.collect_failed", error=message))
++
++    def show_guidance(self, bundle_path: Path, issue_body: str, issue_url: str) -> None:
++        self._bundle_path = Path(bundle_path)
++        self._issue_url = str(issue_url)
++        self.bundle_label.setText(tr("issue_report.guide.bundle", path=self._bundle_path))
++        self.preview.setPlainText(issue_body)
++        self.stack.setCurrentIndex(1)
++
++    def _open_bundle_folder(self) -> None:
++        if self._bundle_path is not None:
++            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._bundle_path.parent.resolve())))
++
++    def _open_github(self) -> None:
++        if self._issue_url:
++            QDesktopServices.openUrl(QUrl(self._issue_url))
 diff --git a/src/gui/main_window_2.py b/src/gui/main_window_2.py
-index e93f7a8..4d51cde 100644
+index 4d51cde..756ac95 100644
 --- a/src/gui/main_window_2.py
 +++ b/src/gui/main_window_2.py
-@@ -154,6 +154,7 @@ class MainWindow(QMainWindow):
-         self._content_tasks: set[str] = set()
-         self._suppress_loader_progress = False
-         self._prompted_update_versions: set[str] = set()
-+        self._pending_prepared_update: PreparedUpdate | None = None
-         self._selected_instance: object | None = None
-         self._restoring_instance_selection = False
-         self._pending_mod_install_after_create: dict[str, object] | None = None
-@@ -635,6 +636,7 @@ class MainWindow(QMainWindow):
-         self.lan_hosting_controller.prepared.connect(self._on_lan_hosting_prepared)
-         self.launch_controller.launch_finished.connect(self.launch_control.set_result)
-         self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
-+        self.launch_controller.launch_finished.connect(lambda _result: self.gui_settings_controller.set_game_running(True))
-         self.launch_controller.game_exited.connect(self._on_game_exited)
-         self.launch_controller.pause_requested.connect(self.launch_control.set_pause_pending)
-         self.launch_controller.launch_paused.connect(self._on_launch_paused)
-@@ -726,6 +728,7 @@ class MainWindow(QMainWindow):
-         self.account_controller.audit_security()
-         self.instance_controller.refresh()
-         self.instance_controller.refresh_running(force=True)
-+        self.gui_settings_controller.set_game_running(bool(InstanceRunLock.list_active()))
-         self.running_instances_timer.start()
-         self.version_controller.refresh()
-         self.java_controller.scan()
-@@ -1175,6 +1178,9 @@ class MainWindow(QMainWindow):
-         self.modrinth_controller.install_mod(instance_name, str(getattr(version, "version_id", "")), tuple(allowed_version_types))
- 
-     def _on_task_settled(self, task_id: str, succeeded: bool, result: object) -> None:
-+        if self._pending_prepared_update is not None and not task_id.startswith("update."):
-+            QTimer.singleShot(0, self._try_launch_pending_update)
-+
-         if task_id != self.instance_controller.CREATE_TASK_ID:
+@@ -15,6 +15,7 @@ from mcw_core.api.content.installed_content_library import InstalledContentLibra
+ from mcw_core.api.curseforge.curseforge_client import CurseForgeClient
+ from mcw_core.api.curseforge.curseforge_errors import CurseForgeManagedFilesRequired, CurseForgeModpackManualDownloadRequired
+ from mcw_core.api.diagnostics.diagnostics_manager import DiagnosticsManager
++from mcw_core.api.diagnostics.issue_report_builder import IssueReportBuilder
+ from mcw_core.api.fs.paths import Paths
+ from mcw_core.api.hardware.gpu_preference_manager import GraphicsDetectionResult
+ from mcw_core.api.instance.instance_manager import InstanceManager
+@@ -30,7 +31,7 @@ from mcw_core.api.update.windows_update_installer import AutomaticUpdateUnsuppor
+ from src.gui.application import create_application
+ from src.gui.animation.motion_runtime import MotionRuntime
+ from src.gui.app_restart import start_restarted_process
+-from src.gui.config import LAUNCHER_NAME, VERSION_ID
++from src.gui.config import GITHUB_REPOSITORY, LAUNCHER_NAME, VERSION_ID
+ from src.gui.controllers.account_controller import AccountController
+ from src.gui.controllers.curseforge_controller import CurseForgeController
+ from src.gui.controllers.content_pack_controller import ContentPackController
+@@ -64,6 +65,7 @@ from src.gui.dialogs.atlauncher_browser_dialog import ATLauncherBrowserDialog
+ from src.gui.dialogs.lan_agent_log_dialog import LanAgentLogDialog
+ from src.gui.dialogs.legacy_storage_cleanup_dialog import LegacyStorageCleanupDialog, format_bytes
+ from src.gui.dialogs.instance_import_settings_dialog import InstanceImportSettingsDialog
++from src.gui.dialogs.issue_report_dialog import IssueReportDialog
+ from src.gui.dialogs.modpack_export_dialog import ModpackExportDialog
+ from src.gui.dialogs.modpack_import_settings_dialog import ModpackImportSettingsDialog
+ from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
+@@ -165,6 +167,10 @@ class MainWindow(QMainWindow):
+         self._manual_launch_provider = ""
+         self._manual_launch_lock_token = ""
+         self._portable_manual_request: object | None = None
++        self._diagnostics_mode = ""
++        self._pending_issue_dialog: IssueReportDialog | None = None
++        self._pending_issue_details: dict[str, str] = {}
++        self._last_error_context = ""
+         self._page_history: list[str] = []
+         self._page_history_index = -1
+         self.running_instances_timer.setInterval(1000)
+@@ -429,6 +435,7 @@ class MainWindow(QMainWindow):
+         self.launcher_settings_page.install_java_requested.connect(self.java_controller.install)
+         self.launcher_settings_page.open_java_requested.connect(self._open_java_folder)
+         self.logs_page.export_diagnostics_requested.connect(self._export_diagnostics)
++        self.logs_page.report_issue_requested.connect(self._open_issue_report)
+         self.logs_page.open_logs_folder_requested.connect(self._open_logs_folder)
+         self.logs_page.open_latest_game_log_requested.connect(self._open_latest_game_log)
+         self.logs_page.open_latest_crash_report_requested.connect(self._open_latest_crash_report)
+@@ -671,6 +678,8 @@ class MainWindow(QMainWindow):
+         self.task_runner.task_failed.connect(self._on_task_failed)
+         self.task_runner.task_succeeded.connect(self._on_task_completed)
+         self.task_runner.task_succeeded.connect(self._on_task_succeeded)
++        self.task_runner.task_succeeded.connect(self._on_diagnostics_task_succeeded)
++        self.task_runner.task_failed.connect(self._on_diagnostics_task_failed)
+         self.task_runner.task_failed.connect(self._on_task_completed)
+         self.task_runner.task_settled.connect(self._on_task_settled)
+         self.task_runner.busy_changed.connect(self._set_busy)
+@@ -2671,13 +2680,90 @@ class MainWindow(QMainWindow):
+         selected, _ = QFileDialog.getSaveFileName(self, tr("diagnostics.export.title"), str(suggested), tr("diagnostics.file_filter"))
+         if not selected:
              return
- 
-@@ -2054,6 +2060,7 @@ class MainWindow(QMainWindow):
-             self.launch_control.set_exit_result(result)
-         self.instance_controller.refresh_running(force=True)
-         self.instance_controller.refresh(selected_name=result_name or selected_name)
-+        self.gui_settings_controller.set_game_running(bool(InstanceRunLock.list_active()))
-         crashed = bool(getattr(result, "crashed", False))
-         instance_name = str(getattr(result, "instance_name", "Minecraft"))
-         exit_code = int(getattr(result, "exit_code", -1))
-@@ -2098,7 +2105,7 @@ class MainWindow(QMainWindow):
-             if not WindowsUpdateInstaller.is_supported():
-                 QMessageBox.information(self, tr("update.error.title"), tr("update.error.packaged_only"))
-                 return
--            blocked_reason = self._update_install_block_reason()
-+            blocked_reason = self._update_install_block_reason(include_tasks=False)
-             if blocked_reason:
-                 QMessageBox.warning(self, tr("update.error.title"), blocked_reason)
-                 self.launcher_settings_page.set_update_status(tr("update.status.waiting"))
-@@ -2116,18 +2123,33 @@ class MainWindow(QMainWindow):
-             QMessageBox.warning(self, tr("update.error.title"), tr("update.error.check_failed", error=error))
- 
-     def _on_update_prepared(self, prepared: PreparedUpdate) -> None:
--        blocked_reason = self._update_install_block_reason()
-+        self._pending_prepared_update = prepared
-+        self._try_launch_pending_update()
+-        try:
+-            path = DiagnosticsManager.write_bundle(Path(selected), launcher_version=VERSION_ID, settings=self.gui_settings_controller.raw_settings(), activity_log=self.logs_page.activity_text())
+-        except Exception as error:
+-            self._show_error(tr("diagnostics.export.title"), str(error))
++        self._start_diagnostics_export(Path(selected), mode="export")
 +
-+    def _try_launch_pending_update(self) -> None:
-+        prepared = self._pending_prepared_update
-+        if prepared is None:
++    def _open_issue_report(self, *, initial_title: str = "", initial_what_happened: str = "") -> None:
++        instance = self._selected_instance
++        context_parts = [f"MCW {VERSION_ID}"]
++        if instance is not None:
++            name = str(getattr(instance, "name", "") or "").strip()
++            game_version = str(getattr(instance, "minecraft_version", "") or "").strip()
++            loader = str(getattr(instance, "mod_loader", "") or "").strip()
++            if name:
++                context_parts.append(f"instance={name}")
++            if game_version:
++                context_parts.append(f"minecraft={game_version}")
++            if loader:
++                context_parts.append(f"loader={loader}")
++        if self._last_error_context:
++            context_parts.append(f"last_error={self._last_error_context}")
++        dialog = IssueReportDialog("; ".join(context_parts), self)
++        dialog.prefill(title=initial_title, what_happened=initial_what_happened)
++        dialog.information_submitted.connect(lambda details, owner=dialog: self._collect_issue_report(owner, details))
++        self._pending_issue_dialog = dialog
++        dialog.exec()
++        if self._pending_issue_dialog is dialog:
++            self._pending_issue_dialog = None
++
++    def _collect_issue_report(self, dialog: IssueReportDialog, details: object) -> None:
++        if dialog is not self._pending_issue_dialog or not isinstance(details, dict):
 +            return
++        self._pending_issue_details = {str(key): str(value) for key, value in details.items()}
++        self._start_diagnostics_export(Paths.diagnostics_default_path(), mode="issue")
 +
-+        active_tasks = [task_id for task_id in self.task_runner.active_task_ids if not task_id.startswith("update.")]
-+        if active_tasks:
-+            self.launcher_settings_page.set_update_status(tr("update.status.priority_waiting", count=len(active_tasks)))
++    def _start_diagnostics_export(self, path: Path, *, mode: str) -> None:
++        if self.task_runner.is_task_active("diagnostics.export"):
++            if mode == "issue" and self._pending_issue_dialog is not None:
++                self._pending_issue_dialog.set_collection_failed(tr("diagnostics.busy"))
++            else:
++                QMessageBox.information(self, tr("diagnostics.export.title"), tr("diagnostics.busy"))
 +            return
++        self._diagnostics_mode = mode
++        settings = self.gui_settings_controller.raw_settings()
++        activity = self.logs_page.activity_text()
++        timeline = self.task_runner.diagnostics_snapshot()
++        issue_context = dict(self._pending_issue_details) if mode == "issue" else {}
 +
-+        blocked_reason = self._update_install_block_reason(include_tasks=False)
-         if blocked_reason:
-             self.launcher_settings_page.set_update_status(tr("update.status.waiting"))
--            QMessageBox.warning(self, tr("update.error.title"), blocked_reason)
++        def task() -> Path:
++            return DiagnosticsManager.write_bundle(
++                Path(path),
++                launcher_version=VERSION_ID,
++                settings=settings,
++                activity_log=activity,
++                task_timeline=timeline,
++                issue_context=issue_context,
++            )
++
++        started = self.task_runner.run("diagnostics.export", task, tr("diagnostics.collecting"), blocking=False)
++        if not started and mode == "issue" and self._pending_issue_dialog is not None:
++            self._pending_issue_dialog.set_collection_failed(tr("diagnostics.busy"))
++
++    def _on_diagnostics_task_succeeded(self, task_id: str, result: object) -> None:
++        if task_id != "diagnostics.export":
              return
++        path = Path(result)
++        mode = self._diagnostics_mode
++        self._diagnostics_mode = ""
+         self.logs_page.append(tr("diagnostics.export.success", path=path))
+-        QMessageBox.information(self, tr("diagnostics.export.title"), tr("diagnostics.export.success", path=path))
++        if mode != "issue":
++            QMessageBox.information(self, tr("diagnostics.export.title"), tr("diagnostics.export.success", path=path))
++            return
++        dialog = self._pending_issue_dialog
++        if dialog is None:
++            return
++        body = IssueReportBuilder.build_body(self._pending_issue_details, launcher_version=VERSION_ID, diagnostics_path=path)
++        url = IssueReportBuilder.github_new_issue_url(GITHUB_REPOSITORY, self._pending_issue_details, launcher_version=VERSION_ID, diagnostics_path=path)
++        dialog.show_guidance(path, body, url)
 +
-+        self._pending_prepared_update = None
-         self.launcher_settings_page.set_update_status(tr("update.status.installing"))
-         QTimer.singleShot(0, lambda: self._launch_prepared_update(prepared))
++    def _on_diagnostics_task_failed(self, task_id: str, error: object) -> None:
++        if task_id != "diagnostics.export":
++            return
++        mode = self._diagnostics_mode
++        self._diagnostics_mode = ""
++        if mode == "issue" and self._pending_issue_dialog is not None:
++            self._pending_issue_dialog.set_collection_failed(str(error))
++            return
++        self._show_error(tr("diagnostics.export.title"), str(error))
  
--    def _update_install_block_reason(self) -> str | None:
--        active_tasks = [task_id for task_id in self.task_runner.active_task_ids if not task_id.startswith("update.")]
--        if active_tasks:
--            return tr("update.error.tasks_running", count=len(active_tasks))
-+    def _update_install_block_reason(self, *, include_tasks: bool = True) -> str | None:
-+        if include_tasks:
-+            active_tasks = [task_id for task_id in self.task_runner.active_task_ids if not task_id.startswith("update.")]
-+            if active_tasks:
-+                return tr("update.error.tasks_running", count=len(active_tasks))
-         running_instances = InstanceRunLock.list_active()
-         if running_instances:
-             names = ", ".join(item.name for item in running_instances[:4])
-@@ -2140,6 +2162,7 @@ class MainWindow(QMainWindow):
+     def _open_forge_logs(self, name: str) -> None:
          try:
-             WindowsUpdateInstaller.launch(prepared)
-         except (AutomaticUpdateUnsupportedError, OSError, RuntimeError) as error:
-+            self.update_controller.release_priority()
-             self._show_error(tr("update.error.title"), str(error))
-             self.launcher_settings_page.set_update_status(tr("update.status.failed"))
-             return
-diff --git a/src/gui/pages/launcher_settings_page.py b/src/gui/pages/launcher_settings_page.py
-index 2791bb5..eb57a31 100644
---- a/src/gui/pages/launcher_settings_page.py
-+++ b/src/gui/pages/launcher_settings_page.py
-@@ -115,12 +115,17 @@ class LauncherSettingsPage(BasePage):
-         self.download_limit_mbps.setValue(10.0)
-         self.download_limit_mbps.setEnabled(False)
-         self.limit_download_speed.toggled.connect(self.download_limit_mbps.setEnabled)
-+        self.download_performance_label = QLabel(tr("network.performance.label"))
-+        self.download_performance_mode = QComboBox()
-+        self._reload_download_performance_modes()
-         self.download_concurrency = QComboBox()
-         self.download_concurrency.addItem(tr("network.concurrency.auto"), 0)
-         for value in (2, 4, 6, 8, 12, 16):
-             self.download_concurrency.addItem(tr("network.concurrency.value", count=value), value)
-         bandwidth_card.layout.addWidget(self.limit_download_speed)
-         bandwidth_card.layout.addWidget(self.download_limit_mbps)
-+        bandwidth_card.layout.addWidget(self.download_performance_label)
-+        bandwidth_card.layout.addWidget(self.download_performance_mode)
-         bandwidth_card.layout.addWidget(QLabel(tr("network.concurrency.label")))
-         bandwidth_card.layout.addWidget(self.download_concurrency)
-         downloads_section.add_card(bandwidth_card)
-@@ -499,6 +504,7 @@ class LauncherSettingsPage(BasePage):
-         self.prefer_dedicated_gpu.toggled.connect(self._refresh_dirty_state)
-         self.limit_download_speed.toggled.connect(self._refresh_dirty_state)
-         self.download_limit_mbps.valueChanged.connect(self._refresh_dirty_state)
-+        self.download_performance_mode.currentIndexChanged.connect(self._refresh_dirty_state)
-         self.download_concurrency.currentIndexChanged.connect(self._refresh_dirty_state)
-         self.language_combo.currentIndexChanged.connect(self._refresh_dirty_state)
-         self.show_content_descriptions.toggled.connect(self._refresh_dirty_state)
-@@ -895,6 +901,7 @@ class LauncherSettingsPage(BasePage):
-             "allow_launch_on_forge_preflight_failure": self.current_forge_preflight_policy() == ManagedContentPolicy.ALLOW,
-             "curseforge_gateway_urls": [field.text().strip() for field in self.curseforge_gateway_inputs],
-             "download_limit_mbps": self.download_limit_mbps.value() if self.limit_download_speed.isChecked() else 0.0,
-+            "download_performance_mode": str(self.download_performance_mode.currentData() or "automatic"),
-             "download_concurrency": int(self.download_concurrency.currentData() or 0),
-             "instance_defaults": copy.deepcopy(self._instance_defaults),
-         }
-@@ -932,6 +939,16 @@ class LauncherSettingsPage(BasePage):
-     def set_update_busy(self, busy: bool) -> None:
-         self.check_updates_button.setEnabled(not busy)
+@@ -2743,7 +2829,16 @@ class MainWindow(QMainWindow):
+         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.resolve())))
  
-+    def _reload_download_performance_modes(self) -> None:
-+        current = str(self.download_performance_mode.currentData() or "automatic") if self.download_performance_mode.count() else "automatic"
-+        self.download_performance_mode.blockSignals(True)
-+        self.download_performance_mode.clear()
-+        for mode in ("automatic", "responsive", "balanced", "maximum"):
-+            self.download_performance_mode.addItem(tr(f"network.performance.{mode}"), mode)
-+        index = self.download_performance_mode.findData(current)
-+        self.download_performance_mode.setCurrentIndex(max(0, index))
-+        self.download_performance_mode.blockSignals(False)
-+
-     def retranslate_dynamic(self) -> None:
-         self.title_label.setText(tr("launcher_settings.page.title"))
-         self.subtitle_label.setText(tr("launcher_settings.page.subtitle"))
-@@ -1035,6 +1052,8 @@ class LauncherSettingsPage(BasePage):
-         self.preview_primary_button.setText(tr("theme.authoring.preview.primary_button"))
-         self.preview_disabled_button.setText(tr("theme.authoring.preview.disabled_button"))
-         self.preview_dialog_button.setText(tr("theme.authoring.preview.dialog_button"))
-+        self.download_performance_label.setText(tr("network.performance.label"))
-+        self._reload_download_performance_modes()
-         self._reload_motion_modes()
-         self._update_instance_defaults_summary()
-         self._update_save_button_text()
-@@ -1057,6 +1076,7 @@ class LauncherSettingsPage(BasePage):
-             self.forge_preflight_policy_combo,
-             self.limit_download_speed,
-             self.download_limit_mbps,
-+            self.download_performance_mode,
-             self.download_concurrency,
-             self.join_tester_program,
-             self.language_combo,
-@@ -1097,6 +1117,9 @@ class LauncherSettingsPage(BasePage):
-         self.limit_download_speed.setChecked(download_limit > 0)
-         self.download_limit_mbps.setValue(download_limit if download_limit > 0 else 10.0)
-         self.download_limit_mbps.setEnabled(download_limit > 0)
-+        performance_mode = str(settings.get("download_performance_mode", "automatic") or "automatic").strip().lower()
-+        performance_index = self.download_performance_mode.findData(performance_mode)
-+        self.download_performance_mode.setCurrentIndex(max(0, performance_index))
-         concurrency = int(settings.get("download_concurrency", 0) or 0)
-         concurrency_index = self.download_concurrency.findData(concurrency)
-         self.download_concurrency.setCurrentIndex(max(0, concurrency_index))
+     def _show_error(self, title: str, message: str) -> None:
+-        QMessageBox.critical(self, title, message)
++        self._last_error_context = f"{title}: {message}"[:1200]
++        box = QMessageBox(self)
++        box.setIcon(QMessageBox.Icon.Critical)
++        box.setWindowTitle(title)
++        box.setText(message)
++        report_button = box.addButton(tr("issue_report.error.report"), QMessageBox.ButtonRole.ActionRole)
++        box.addButton(QMessageBox.StandardButton.Ok)
++        box.exec()
++        if box.clickedButton() is report_button:
++            self._open_issue_report(initial_title=title, initial_what_happened=message)
+ 
+     def _show_network_retry(self, controller: object, task_id: str, title: str, message: str) -> None:
+         box = QMessageBox(self)
+diff --git a/src/gui/pages/logs_page.py b/src/gui/pages/logs_page.py
+index 8a1f84e..b582bf7 100644
+--- a/src/gui/pages/logs_page.py
++++ b/src/gui/pages/logs_page.py
+@@ -7,6 +7,7 @@ from PySide6.QtGui import QGuiApplication
+ from PySide6.QtWidgets import QHBoxLayout, QPushButton, QTextEdit
+ 
+ from src.gui.pages.base_page import BasePage
++from mcw_core.api.language.language_manager import tr
+ from mcw_core.api.security.sensitive_data_redactor import SensitiveDataRedactor
+ from src.gui.widget.card_widget import CardWidget
+ from src.gui.theme.runtime import set_theme_icon
+@@ -17,6 +18,7 @@ class LogsPage(BasePage):
+     open_logs_folder_requested = Signal()
+     open_latest_game_log_requested = Signal()
+     open_latest_crash_report_requested = Signal()
++    report_issue_requested = Signal()
+ 
+     def __init__(self) -> None:
+         super().__init__("Logs", "Frontend activity and structured progress events appear here.", "logs")
+@@ -31,12 +33,14 @@ class LogsPage(BasePage):
+         copy_button = set_theme_icon(QPushButton("Copy all"), "icon.action.copy")
+         clear_button = set_theme_icon(QPushButton("Clear"), "icon.action.clear")
+         export_button = set_theme_icon(QPushButton("Export diagnostics"), "icon.action.export")
++        report_button = set_theme_icon(QPushButton(tr("issue_report.error.report")), "icon.state.error")
+         open_folder_button = set_theme_icon(QPushButton("Open logs folder"), "icon.action.folder")
+         open_game_log_button = set_theme_icon(QPushButton("Open latest game log"), "icon.action.folder")
+         open_crash_report_button = set_theme_icon(QPushButton("Open latest crash report"), "icon.state.error")
+         copy_button.clicked.connect(lambda: QGuiApplication.clipboard().setText(self.output.toPlainText()))
+         clear_button.clicked.connect(self.output.clear)
+         export_button.clicked.connect(self.export_diagnostics_requested.emit)
++        report_button.clicked.connect(self.report_issue_requested.emit)
+         open_folder_button.clicked.connect(self.open_logs_folder_requested.emit)
+         open_game_log_button.clicked.connect(self.open_latest_game_log_requested.emit)
+         open_crash_report_button.clicked.connect(self.open_latest_crash_report_requested.emit)
+@@ -47,6 +51,7 @@ class LogsPage(BasePage):
+         buttons.addWidget(open_crash_report_button)
+         buttons.addWidget(open_folder_button)
+         buttons.addWidget(export_button)
++        buttons.addWidget(report_button)
+         card.layout.addWidget(self.output, 1)
+         card.layout.addLayout(buttons)
+         self.root_layout.addWidget(card, 1)
 diff --git a/src/gui/task_runner.py b/src/gui/task_runner.py
-index 587beea..81650da 100644
+index 81650da..aa598c9 100644
 --- a/src/gui/task_runner.py
 +++ b/src/gui/task_runner.py
-@@ -95,6 +95,7 @@ class TaskRunner(QObject):
-         self._contexts: dict[str, TaskContext] = {}
+@@ -1,9 +1,11 @@
+ from __future__ import annotations
+ 
++from collections import deque
+ from collections.abc import Callable
+ from dataclasses import dataclass
+ from enum import StrEnum
+ from threading import Event, Thread
++from datetime import datetime, timezone
+ from time import monotonic
+ from typing import Any
+ from uuid import uuid4
+@@ -96,6 +98,8 @@ class TaskRunner(QObject):
          self._blocking_tasks = 0
          self._shutting_down = False
-+        self._priority_prefix: str | None = None
+         self._priority_prefix: str | None = None
++        self._timeline: deque[dict[str, object]] = deque(maxlen=100)
++        self._timeline_active: dict[str, dict[str, object]] = {}
          self._worker_settled.connect(self._finish_worker, Qt.ConnectionType.QueuedConnection)
  
      @property
-@@ -109,6 +110,14 @@ class TaskRunner(QObject):
-     def has_active_tasks(self) -> bool:
-         return bool(self._contexts)
- 
-+    @property
-+    def is_priority_mode(self) -> bool:
-+        return self._priority_prefix is not None
-+
-+    @property
-+    def priority_prefix(self) -> str | None:
-+        return self._priority_prefix
-+
-     @property
-     def active_task_ids(self) -> tuple[str, ...]:
+@@ -123,6 +127,21 @@ class TaskRunner(QObject):
          # Keep the public contract unique even while an obsolete generation drains.
-@@ -135,6 +144,9 @@ class TaskRunner(QObject):
-         if self._shutting_down:
-             self.task_rejected.emit(tr("task.shutting_down"))
-             return False
-+        if self._priority_prefix is not None and not normalized_id.startswith(self._priority_prefix):
-+            self.task_rejected.emit(tr("task.priority_mode"))
-+            return False
+         return tuple(dict.fromkeys(context.task_id for context in self._contexts.values()))
  
-         normalized_group = str(group or normalized_id).strip() or normalized_id
-         policy = TaskConflictPolicy(conflict_policy)
-@@ -238,19 +250,53 @@ class TaskRunner(QObject):
-             self._request_cancel_context(context)
-         return len(contexts)
- 
--    def cancel_all(self) -> tuple[str, ...]:
-+    def cancel_all(self, *, exclude_prefix: str | None = None) -> tuple[str, ...]:
-+        normalized_exclude = str(exclude_prefix or "").strip()
-         cancelled: list[str] = []
-         for context in tuple(self._contexts.values()):
-             if context.state is not TaskState.RUNNING:
-                 continue
-+            if normalized_exclude and context.task_id.startswith(normalized_exclude):
-+                continue
-             self._request_cancel_context(context)
-             cancelled.append(context.task_id)
-         return tuple(dict.fromkeys(cancelled))
- 
-+    def begin_priority_mode(self, allowed_prefix: str = "update.") -> tuple[str, ...]:
-+        """Cancel competing work and reserve the runner for one task family.
++    def diagnostics_snapshot(self) -> tuple[dict[str, object], ...]:
++        """Return a bounded, serialization-safe task timeline for diagnostics."""
 +
-+        Priority mode is intentionally softer than shutdown: the application remains
-+        alive, but new tasks outside ``allowed_prefix`` are rejected until the mode is
-+        released. Existing tasks receive cooperative cancellation requests. A worker
-+        that is already inside a non-interruptible/legacy section may drain in the
-+        background; callers must still wait for those contexts to settle before an
-+        exclusive commit such as applying a launcher update.
-+        """
++        rows = [dict(item) for item in self._timeline]
++        for context_id, item in self._timeline_active.items():
++            row = dict(item)
++            context = self._contexts.get(context_id)
++            if context is not None:
++                row["state"] = context.state.value
++                row["cancel_requested"] = context.token.cancelled
++                row["superseded"] = context.superseded
++                row["duration_seconds"] = round(max(0.0, monotonic() - context.started_at), 3)
++            rows.append(row)
++        return tuple(rows[-100:])
 +
-+        if self._shutting_down:
-+            return ()
-+        normalized = str(allowed_prefix or "").strip()
-+        if not normalized:
-+            raise ValueError("A priority task prefix is required.")
-+        if self._priority_prefix not in {None, normalized}:
-+            raise RuntimeError(f"Task priority mode is already reserved for '{self._priority_prefix}'.")
-+        self._priority_prefix = normalized
-+        return self.cancel_all(exclude_prefix=normalized)
+     def is_task_active(self, task_id: str) -> bool:
+         normalized = str(task_id).strip()
+         return any(context.task_id == normalized for context in self._contexts.values())
+@@ -213,6 +232,16 @@ class TaskRunner(QObject):
+             started_at=monotonic(),
+         )
+         self._contexts[context_id] = context
++        self._timeline_active[context_id] = {
++            "task_id": normalized_id,
++            "group": normalized_group,
++            "blocking": bool(blocking),
++            "cooperative": bool(cooperative),
++            "state": TaskState.RUNNING.value,
++            "started_at": datetime.now(timezone.utc).isoformat(),
++            "cancel_requested": False,
++            "superseded": False,
++        }
+ 
+         if blocking:
+             self._blocking_tasks += 1
+@@ -310,6 +339,11 @@ class TaskRunner(QObject):
+             return
+         context.state = TaskState.CANCEL_REQUESTED
+         context.superseded = bool(superseded)
++        timeline = self._timeline_active.get(context.context_id)
++        if timeline is not None:
++            timeline["state"] = TaskState.CANCEL_REQUESTED.value
++            timeline["cancel_requested"] = True
++            timeline["superseded"] = bool(superseded)
+         context.token.cancel()
+         self.task_cancel_requested.emit(context.task_id)
+ 
+@@ -320,6 +354,16 @@ class TaskRunner(QObject):
+             return
+         self._release_blocking(context)
+ 
++        timeline = self._timeline_active.pop(context_id, None) or {
++            "task_id": context.task_id,
++            "group": context.group,
++            "started_at": "",
++        }
++        timeline["ended_at"] = datetime.now(timezone.utc).isoformat()
++        timeline["duration_seconds"] = round(max(0.0, monotonic() - context.started_at), 3)
++        timeline["cancel_requested"] = context.token.cancelled
++        timeline["superseded"] = context.superseded
 +
-+    def end_priority_mode(self, allowed_prefix: str | None = None) -> bool:
-+        if self._priority_prefix is None:
-+            return False
-+        normalized = str(allowed_prefix or "").strip()
-+        if normalized and normalized != self._priority_prefix:
-+            return False
-+        self._priority_prefix = None
-+        return True
-+
-     def begin_shutdown(self) -> tuple[str, ...]:
-         if self._shutting_down:
-             return ()
-         self._shutting_down = True
-+        self._priority_prefix = None
-         self.shutdown_started.emit()
-         return self.cancel_all()
+         cancelled = (
+             context.token.cancelled
+             or context.superseded
+@@ -327,6 +371,9 @@ class TaskRunner(QObject):
+         )
+         if cancelled:
+             context.state = TaskState.CANCELLED
++            timeline["state"] = TaskState.CANCELLED.value
++            timeline["result"] = "cancelled"
++            self._timeline.append(timeline)
+             self.task_cancelled.emit(context.task_id)
+             self.task_settled.emit(
+                 context.task_id,
+@@ -337,12 +384,19 @@ class TaskRunner(QObject):
  
-diff --git a/test/core/config/test_launcher_settings_manager.py b/test/core/config/test_launcher_settings_manager.py
-index 542bf96..3a84f83 100644
---- a/test/core/config/test_launcher_settings_manager.py
-+++ b/test/core/config/test_launcher_settings_manager.py
-@@ -168,7 +168,11 @@ def test_motion_mode_is_normalized_to_supported_values(tmp_path: Path) -> None:
- def test_download_limit_is_unlimited_by_default_and_normalized(tmp_path: Path) -> None:
-     manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
+         if succeeded:
+             context.state = TaskState.SUCCEEDED
++            timeline["state"] = TaskState.SUCCEEDED.value
++            timeline["result"] = "success"
++            self._timeline.append(timeline)
+             self.task_succeeded.emit(context.task_id, payload)
+             self.task_settled.emit(context.task_id, True, payload)
+             return
  
--    assert manager.load()["network"] == {"download_limit_mbps": 0.0, "download_concurrency": 0}
-+    assert manager.load()["network"] == {
-+        "download_limit_mbps": 0.0,
-+        "download_concurrency": 0,
-+        "download_performance_mode": "automatic",
-+    }
+         context.state = TaskState.FAILED
+         error = payload if isinstance(payload, Exception) else RuntimeError(str(payload))
++        timeline["state"] = TaskState.FAILED.value
++        timeline["result"] = "failed"
++        timeline["error_type"] = type(error).__name__
++        self._timeline.append(timeline)
+         self.task_failed.emit(context.task_id, error)
+         self.task_settled.emit(context.task_id, False, error)
  
-     manager.update_section("network", {"download_limit_mbps": "12.5"})
-     assert manager.load()["network"]["download_limit_mbps"] == 12.5
-@@ -188,6 +192,12 @@ def test_download_limit_is_unlimited_by_default_and_normalized(tmp_path: Path) -
-     manager.update_section("network", {"download_concurrency": 99})
-     assert manager.load()["network"]["download_concurrency"] == 16
- 
-+    manager.update_section("network", {"download_performance_mode": "responsive"})
-+    assert manager.load()["network"]["download_performance_mode"] == "responsive"
-+
-+    manager.update_section("network", {"download_performance_mode": "unknown"})
-+    assert manager.load()["network"]["download_performance_mode"] == "automatic"
-+
- 
- def test_rc_tester_channel_is_forced_to_stable_for_first_stable_release(tmp_path: Path) -> None:
-     path = tmp_path / "launcher_settings.json"
 diff --git a/test/core/config/test_version_metadata.py b/test/core/config/test_version_metadata.py
-index 372a209..7dcd7b4 100644
+index 7dcd7b4..173169c 100644
 --- a/test/core/config/test_version_metadata.py
 +++ b/test/core/config/test_version_metadata.py
 @@ -6,9 +6,9 @@ from src.gui.config import VERSION_ID as GUI_VERSION_ID
  
  
  def test_launcher_version_metadata_has_one_source_of_truth() -> None:
--    assert VERSION == "v1.4.0-beta.1"
--    assert VERSION_ID == "1.4.0-beta.1"
--    assert VERSION_TAG == "v1.4.0-beta.1"
-+    assert VERSION == "v1.4.0-beta.2"
-+    assert VERSION_ID == "1.4.0-beta.2"
-+    assert VERSION_TAG == "v1.4.0-beta.2"
+-    assert VERSION == "v1.4.0-beta.2"
+-    assert VERSION_ID == "1.4.0-beta.2"
+-    assert VERSION_TAG == "v1.4.0-beta.2"
++    assert VERSION == "v1.4.0-beta.3"
++    assert VERSION_ID == "1.4.0-beta.3"
++    assert VERSION_TAG == "v1.4.0-beta.3"
      assert UPDATE_CHANNEL == "beta"
      assert GUI_VERSION == VERSION
      assert GUI_VERSION_ID == VERSION_ID
-diff --git a/test/core/modrinth/test_modrinth_content_manager.py b/test/core/modrinth/test_modrinth_content_manager.py
-index 9ab7a2a..2f6bacb 100644
---- a/test/core/modrinth/test_modrinth_content_manager.py
-+++ b/test/core/modrinth/test_modrinth_content_manager.py
-@@ -266,7 +266,7 @@ def test_pause_is_not_swallowed_as_a_modrinth_download_failure(tmp_path, monkeyp
-         ModrinthContentManager.ensure(instance)
+diff --git a/test/core/diagnostics/test_diagnostics_manager.py b/test/core/diagnostics/test_diagnostics_manager.py
+index b71f6e5..dcb4ee7 100644
+--- a/test/core/diagnostics/test_diagnostics_manager.py
++++ b/test/core/diagnostics/test_diagnostics_manager.py
+@@ -205,3 +205,30 @@ def test_instance_health_bundle_uses_safe_relative_paths(tmp_path, monkeypatch):
  
- 
--def test_missing_pack_files_download_sequentially_for_strict_cancellation(tmp_path, monkeypatch):
-+def test_missing_pack_files_download_with_adaptive_parallelism(tmp_path, monkeypatch):
-     from threading import Lock
-     import time
- 
-@@ -304,12 +304,20 @@ def test_missing_pack_files_download_sequentially_for_strict_cancellation(tmp_pa
-                 active -= 1
- 
-     monkeypatch.setattr(ModrinthDownloader, "download_urls", fake_download_urls)
-+    monkeypatch.setattr(ModrinthContentManager, "_download_worker_count", staticmethod(lambda _total: 3))
- 
-     assert ModrinthContentManager.ensure(instance) == ()
--    assert max_active == 1
-+    assert max_active == 3
-     assert max_active <= ModrinthContentManager.MAX_DOWNLOAD_WORKERS
- 
- 
-+def test_download_worker_count_is_conservative_on_low_core_systems(monkeypatch):
-+    monkeypatch.setattr("src.core.modrinth.modrinth_content_manager.cpu_count", lambda: 4)
-+    monkeypatch.setattr("src.core.modrinth.modrinth_content_manager.download_manager._global_limit", 8)
-+
-+    assert ModrinthContentManager._download_worker_count(20) == 2
+     assert payload["instances"][0]["issues"][0]["path"] == "instances/Example/mods/missing.jar"
+     assert str(tmp_path) not in json.dumps(payload)
 +
 +
- def test_missing_pack_artifact_without_url_exposes_no_download_url_manual_fallback(tmp_path, monkeypatch):
-     instance = make_instance(tmp_path)
-     content = b"manual zip"
-diff --git a/test/core/network/test_download_journal.py b/test/core/network/test_download_journal.py
-index b7170ea..166388f 100644
---- a/test/core/network/test_download_journal.py
-+++ b/test/core/network/test_download_journal.py
-@@ -57,3 +57,32 @@ def test_locked_journal_replace_is_best_effort(monkeypatch, tmp_path: Path) -> N
- 
-     assert journal_path.exists() is False
-     assert tuple(tmp_path.glob("*.tmp")) == ()
++def test_v2_bundle_contains_system_task_and_issue_context(tmp_path: Path, monkeypatch) -> None:
++    monkeypatch.setattr(diagnostics_manager.DiagnosticsManager, "_safe_log_entries", classmethod(lambda cls: {}))
++    monkeypatch.setattr(diagnostics_manager.DiagnosticsManager, "_safe_runtime_entries", classmethod(lambda cls: {}))
++    monkeypatch.setattr(diagnostics_manager.DiagnosticsManager, "_system_info_json", classmethod(lambda cls: b'{"schema_version": 1}\n'))
++    monkeypatch.setattr(diagnostics_manager.DiagnosticsManager, "_java_runtimes_json", classmethod(lambda cls: b'{"schema_version": 1, "runtimes": []}\n'))
 +
++    result = DiagnosticsManager.write_bundle(
++        tmp_path / "v2.zip",
++        "1.4.0-beta.3",
++        task_timeline=({"task_id": "java.scan", "state": "cancelled"},),
++        issue_context={"title": "Example", "what_happened": "Failure"},
++    )
 +
-+def test_downloading_progress_is_batched_until_critical_state(tmp_path: Path, monkeypatch) -> None:
-+    journal_path = tmp_path / "download-journal.json"
-+    journal = DownloadJournal(journal_path)
-+    request = _request(tmp_path)
-+    journal.start(request, downloaded_bytes=1)
-+
-+    writes = 0
-+    real_write = journal._write
-+
-+    def counted_write(payload):
-+        nonlocal writes
-+        writes += 1
-+        return real_write(payload)
-+
-+    monkeypatch.setattr(journal, "_write", counted_write)
-+    journal._last_progress_flush_at = __import__("time").monotonic()
-+
-+    journal.update(request, DownloadState.DOWNLOADING, downloaded_bytes=5)
-+    journal.update(request, DownloadState.DOWNLOADING, downloaded_bytes=6)
-+
-+    assert writes == 0
-+    assert journal.snapshot()[0]["downloaded_bytes"] == 6
-+
-+    journal.update(request, DownloadState.CANCELLED, downloaded_bytes=6)
-+
-+    assert writes == 1
-+    assert json.loads(journal_path.read_text(encoding="utf-8"))["entries"]["request-1"]["state"] == DownloadState.CANCELLED.value
-diff --git a/test/core/network/test_unified_download_manager.py b/test/core/network/test_unified_download_manager.py
-index c9ae454..e88094f 100644
---- a/test/core/network/test_unified_download_manager.py
-+++ b/test/core/network/test_unified_download_manager.py
-@@ -132,3 +132,54 @@ def test_all_permanent_sources_fail_without_repeated_attempts(manager: DownloadM
-     assert destination.with_name("file.jar.part").exists() is False
-     entries = DownloadJournal(tmp_path / "journal.json").recoverable_entries()
-     assert entries[0]["state"] == DownloadState.FAILED.value
-+
-+
-+def test_calculate_hashes_reads_file_once_for_multiple_algorithms(manager: DownloadManager, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-+    content = (b"mcw-beta2-hash" * 100000) + b"tail"
-+    path = tmp_path / "artifact.bin"
-+    path.write_bytes(content)
-+    real_open_file = download_manager_module.open_file
-+    read_calls = 0
-+
-+    class CountingFile:
-+        def __init__(self, handle):
-+            self._handle = handle
-+
-+        def __enter__(self):
-+            self._handle.__enter__()
-+            return self
-+
-+        def __exit__(self, exc_type, exc, tb):
-+            return self._handle.__exit__(exc_type, exc, tb)
-+
-+        def read(self, size=-1):
-+            nonlocal read_calls
-+            read_calls += 1
-+            return self._handle.read(size)
-+
-+    def counting_open_file(target, mode):
-+        return CountingFile(real_open_file(target, mode))
-+
-+    monkeypatch.setattr(download_manager_module, "open_file", counting_open_file)
-+
-+    hashes = manager.calculate_hashes(path, {"sha1": "x", "sha512": "y", "sha256": "z"})
-+
-+    assert hashes == {
-+        "sha1": hashlib.sha1(content).hexdigest(),
-+        "sha512": hashlib.sha512(content).hexdigest(),
-+        "sha256": hashlib.sha256(content).hexdigest(),
-+    }
-+    expected_chunks = (len(content) + download_manager_module.CHUNK_SIZE - 1) // download_manager_module.CHUNK_SIZE
-+    assert read_calls == expected_chunks + 1
-+
-+
-+def test_recommended_concurrency_profiles_are_bounded_and_game_aware() -> None:
-+    assert DownloadManager.recommended_concurrency("automatic", cores=4) == 2
-+    assert DownloadManager.recommended_concurrency("automatic", cores=8) == 4
-+    assert DownloadManager.recommended_concurrency("automatic", cores=16) == 6
-+    assert DownloadManager.recommended_concurrency("automatic", cores=16, game_running=True) == 2
-+    assert DownloadManager.recommended_concurrency("responsive", cores=16) == 2
-+    assert DownloadManager.recommended_concurrency("balanced", cores=16) == 4
-+    assert DownloadManager.recommended_concurrency("maximum", cores=16) == 12
-+    assert DownloadManager.recommended_concurrency("maximum", configured=8, cores=16, game_running=True) == 8
-+    assert DownloadManager.recommended_concurrency("unknown", cores=4) == 2
-diff --git a/test/gui/controllers/test_update_controller_priority.py b/test/gui/controllers/test_update_controller_priority.py
++    with zipfile.ZipFile(result, "r") as archive:
++        names = set(archive.namelist())
++        assert "system-info.json" in names
++        assert "java-runtimes.json" in names
++        assert "task-timeline.json" in names
++        assert "issue-context.json" in names
++        timeline = json.loads(archive.read("task-timeline.json"))
++        issue = json.loads(archive.read("issue-context.json"))
++        manifest = json.loads(archive.read("manifest.json"))
++    assert timeline["tasks"][0]["task_id"] == "java.scan"
++    assert issue["issue"]["title"] == "Example"
++    assert manifest["schema_version"] == 2
+diff --git a/test/core/diagnostics/test_issue_report_builder.py b/test/core/diagnostics/test_issue_report_builder.py
 new file mode 100644
-index 0000000..212ea58
+index 0000000..6f67515
 --- /dev/null
-+++ b/test/gui/controllers/test_update_controller_priority.py
-@@ -0,0 +1,73 @@
-+from __future__ import annotations
-+
++++ b/test/core/diagnostics/test_issue_report_builder.py
+@@ -0,0 +1,40 @@
 +from pathlib import Path
-+from threading import Thread
-+from types import SimpleNamespace
++from urllib.parse import parse_qs, urlparse
++
++from src.core.diagnostics.issue_report_builder import IssueReportBuilder
++
++
++def test_issue_report_builder_redacts_and_includes_diagnostics_filename() -> None:
++    details = {
++        "title": "Launch failed",
++        "what_happened": "Authorization: Bearer secret-token",
++        "steps": "1. Launch instance",
++        "expected": "Game opens",
++        "actual": "Launcher reports an error",
++        "context": "instance=RLCraft",
++    }
++    body = IssueReportBuilder.build_body(
++        details,
++        launcher_version="1.4.0-beta.3",
++        diagnostics_path=Path("MCW-Diagnostics-20260812-190000.zip"),
++    )
++
++    assert "MCW-Diagnostics-20260812-190000.zip" in body
++    assert "1.4.0-beta.3" in body
++    assert "secret-token" not in body
++    assert "<redacted>" in body
++
++
++def test_github_new_issue_url_prefills_title_and_body() -> None:
++    url = IssueReportBuilder.github_new_issue_url(
++        "mahiru7229/mcw-launcher",
++        {"title": "Forge profile issue", "what_happened": "Forge failed"},
++        launcher_version="1.4.0-beta.3",
++    )
++    parsed = urlparse(url)
++    query = parse_qs(parsed.query)
++
++    assert parsed.netloc == "github.com"
++    assert parsed.path == "/mahiru7229/mcw-launcher/issues/new"
++    assert query["title"] == ["Forge profile issue"]
++    assert "Forge failed" in query["body"][0]
+diff --git a/test/gui/dialogs/test_issue_report_dialog.py b/test/gui/dialogs/test_issue_report_dialog.py
+new file mode 100644
+index 0000000..961c252
+--- /dev/null
++++ b/test/gui/dialogs/test_issue_report_dialog.py
+@@ -0,0 +1,29 @@
++from __future__ import annotations
 +
 +import pytest
 +
 +pytest.importorskip("PySide6")
 +
-+from src.gui.controllers.update_controller import UpdateController
-+from src.gui.task_runner import TaskCancellationToken, TaskContext, TaskRunner
-+from src.models.update.update_info import ReleaseAsset, UpdateInfo
++from src.gui.dialogs.issue_report_dialog import IssueReportDialog
 +
 +
-+def _info() -> UpdateInfo:
-+    return UpdateInfo(
-+        current_version="1.4.0-beta.2",
-+        version="1.4.0-beta.2",
-+        tag_name="v1.4.0-beta.2",
-+        title="Beta 2",
-+        release_notes="",
-+        release_url="https://example.invalid/release",
-+        published_at="2026-08-12T00:00:00Z",
-+        prerelease=True,
-+        asset=ReleaseAsset(
-+            name="MCW-Launcher-v1.4.0-beta.2-windows-x64.zip",
-+            download_url="https://example.invalid/update.zip",
-+            size=123,
-+            sha256="a" * 64,
-+        ),
++def test_issue_report_collects_information_before_guidance(gui_app) -> None:
++    dialog = IssueReportDialog("MCW 1.4.0-beta.3; instance=RLCraft")
++    submitted = []
++    dialog.information_submitted.connect(submitted.append)
++
++    assert dialog.stack.currentIndex() == 0
++    dialog.prefill(title="Forge failed", what_happened="Runtime missing")
++    dialog.steps_edit.setPlainText("1. Launch")
++    dialog._submit_information()
++
++    assert submitted[0]["title"] == "Forge failed"
++    assert dialog.stack.currentIndex() == 0
++
++    dialog.show_guidance(
++        __import__("pathlib").Path("MCW-Diagnostics.zip"),
++        "issue body",
++        "https://github.com/mahiru7229/mcw-launcher/issues/new",
 +    )
-+
-+
-+def test_prepare_enters_priority_mode_and_waits_for_cancelled_work_to_settle(gui_app, monkeypatch: pytest.MonkeyPatch) -> None:
-+    runner = TaskRunner()
-+    controller = UpdateController(runner, channel="beta")
-+    token = TaskCancellationToken()
-+    context = TaskContext(
-+        context_id="legacy-task",
-+        task_id="java.install.21",
-+        group="java.install.21",
-+        thread=Thread(target=lambda: None, daemon=True),
-+        token=token,
-+        blocking=True,
-+        cooperative=False,
-+    )
-+    runner._contexts[context.context_id] = context
-+    runner._blocking_tasks = 1
-+
-+    cancelled_core = []
-+    controller._core = SimpleNamespace(operations=SimpleNamespace(cancel=lambda: cancelled_core.append(True) or True))
-+    started = []
-+
-+    def fake_run(task_id, task, message, blocking=True, **kwargs):
-+        started.append((task_id, blocking, kwargs))
-+        return True
-+
-+    monkeypatch.setattr(runner, "run", fake_run)
-+
-+    assert controller.prepare(_info()) is True
-+    assert token.cancelled is True
-+    assert cancelled_core == [True]
-+    assert runner.is_priority_mode is True
-+    assert started == []
-+
-+    runner._contexts.pop(context.context_id)
-+    runner._blocking_tasks = 0
-+    controller._on_task_settled("java.install.21", False, RuntimeError("cancelled"))
-+
-+    assert started[0][0] == controller.PREPARE_TASK_ID
-+    assert started[0][1] is True
-+    assert controller._pending_update_info is None
++    assert dialog.stack.currentIndex() == 1
++    assert dialog.preview.toPlainText() == "issue body"
 diff --git a/test/gui/test_task_runner.py b/test/gui/test_task_runner.py
-index b3f125b..3345848 100644
+index 3345848..9cdce59 100644
 --- a/test/gui/test_task_runner.py
 +++ b/test/gui/test_task_runner.py
-@@ -90,3 +90,30 @@ def test_shutdown_requests_cancellation_and_rejects_new_work(gui_app) -> None:
-     assert runner.is_shutting_down is True
-     assert token.cancelled is True
-     assert runner.run("later", lambda: None, "later", blocking=False) is False
+@@ -117,3 +117,31 @@ def test_priority_mode_cancels_competing_tasks_and_rejects_new_non_priority_work
+ 
+     assert runner.end_priority_mode("update.") is True
+     assert runner.is_priority_mode is False
 +
 +
-+def test_priority_mode_cancels_competing_tasks_and_rejects_new_non_priority_work(gui_app) -> None:
++def test_diagnostics_snapshot_reports_active_cancellation_state(gui_app) -> None:
 +    runner = TaskRunner()
 +    token = TaskCancellationToken()
 +    context = TaskContext(
-+        context_id="context-1",
++        context_id="diagnostic-context",
 +        task_id="java.scan",
 +        group="java.scan",
 +        thread=Thread(target=lambda: None, daemon=True),
 +        token=token,
 +        blocking=False,
 +        cooperative=True,
++        started_at=1.0,
 +    )
 +    runner._contexts[context.context_id] = context
-+    rejected = []
-+    runner.task_rejected.connect(rejected.append)
++    runner._timeline_active[context.context_id] = {
++        "task_id": context.task_id,
++        "group": context.group,
++        "state": TaskState.RUNNING.value,
++    }
 +
-+    assert runner.begin_priority_mode("update.") == ("java.scan",)
-+    assert runner.is_priority_mode is True
-+    assert runner.priority_prefix == "update."
-+    assert token.cancelled is True
-+    assert runner.run("modrinth.search", lambda: None, "search", blocking=False) is False
-+    assert rejected
++    runner.cancel("java.scan")
++    snapshot = runner.diagnostics_snapshot()
 +
-+    assert runner.end_priority_mode("update.") is True
-+    assert runner.is_priority_mode is False
++    assert snapshot[-1]["task_id"] == "java.scan"
++    assert snapshot[-1]["state"] == TaskState.CANCEL_REQUESTED.value
++    assert snapshot[-1]["cancel_requested"] is True
 diff --git a/test/test_public_api.py b/test/test_public_api.py
-index 53e5239..b86eb1e 100644
+index b86eb1e..ff4d381 100644
 --- a/test/test_public_api.py
 +++ b/test/test_public_api.py
 @@ -8,7 +8,7 @@ from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, derive_custo
  
  
  def test_bundled_core_runtime_version_follows_launcher_release() -> None:
--    assert mcw_core.__version__ == "1.4.0-beta.1"
-+    assert mcw_core.__version__ == "1.4.0-beta.2"
+-    assert mcw_core.__version__ == "1.4.0-beta.2"
++    assert mcw_core.__version__ == "1.4.0-beta.3"
  
  
  def test_distribution_version_when_installed() -> None:
@@ -1444,8 +1323,8 @@ index 53e5239..b86eb1e 100644
          installed = version("mcw-core")
      except PackageNotFoundError:
          return
--    assert installed == "1.4.0b1"
-+    assert installed == "1.4.0b2"
+-    assert installed == "1.4.0b2"
++    assert installed == "1.4.0b3"
  
  
  def test_optifine_public_api_is_import_only() -> None:

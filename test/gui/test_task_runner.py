@@ -117,3 +117,31 @@ def test_priority_mode_cancels_competing_tasks_and_rejects_new_non_priority_work
 
     assert runner.end_priority_mode("update.") is True
     assert runner.is_priority_mode is False
+
+
+def test_diagnostics_snapshot_reports_active_cancellation_state(gui_app) -> None:
+    runner = TaskRunner()
+    token = TaskCancellationToken()
+    context = TaskContext(
+        context_id="diagnostic-context",
+        task_id="java.scan",
+        group="java.scan",
+        thread=Thread(target=lambda: None, daemon=True),
+        token=token,
+        blocking=False,
+        cooperative=True,
+        started_at=1.0,
+    )
+    runner._contexts[context.context_id] = context
+    runner._timeline_active[context.context_id] = {
+        "task_id": context.task_id,
+        "group": context.group,
+        "state": TaskState.RUNNING.value,
+    }
+
+    runner.cancel("java.scan")
+    snapshot = runner.diagnostics_snapshot()
+
+    assert snapshot[-1]["task_id"] == "java.scan"
+    assert snapshot[-1]["state"] == TaskState.CANCEL_REQUESTED.value
+    assert snapshot[-1]["cancel_requested"] is True

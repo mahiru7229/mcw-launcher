@@ -1,31 +1,30 @@
-MCW Launcher v1.4.0-beta.2
+MCW Launcher v1.4.0-beta.3
 
 Validation date: 2026-08-12
 Environment: Linux headless build/test environment (PySide6 not installed)
 
 Full pytest regression:
-  1555 passed, 91 skipped, 2 warnings, 0 failed
+  1558 passed, 92 skipped, 2 warnings, 0 failed
 
 Warnings:
   2 intentional duplicate-ZIP-member warnings from package security fixtures.
 
 Additional validation:
-  python -m compileall -q src mcw_core tools launcher.py: PASS
-  Translation/static GUI coverage after beta.2 additions: PASS
-  Update Priority + adaptive download/hash/journal targeted regression: PASS
+  python -m compileall -q src mcw_core tools test: PASS
+  Translation/static GUI coverage after beta.3 additions: PASS
+  Diagnostics v2 + issue draft privacy tests: PASS
 
-Beta.2 scope validated:
-  - Update Priority Mode cancels competing launcher tasks and rejects new non-update work.
-  - Update prepare waits for cancelled workers to settle before exclusive update handoff.
-  - Adaptive Modrinth .mrpack artifact concurrency remains bounded by configured download limits.
-  - SHA-1/SHA-512/SHA-256 can be calculated in one file pass with bounded hash I/O concurrency.
-  - Download journal progress updates are batched while terminal/critical states flush immediately.
-  - Automatic/Responsive/Balanced/Maximum download performance modes normalize correctly.
-  - Automatic mode downshifts download concurrency while Minecraft is running.
+Beta.3 scope validated:
+  - Diagnostics schema v2 includes system info, Java runtimes, task timeline, issue context and bounded runtime/crash logs.
+  - Diagnostics export is dispatched through TaskRunner instead of blocking the GUI thread.
+  - Report Issue workflow collects user context before diagnostics and guidance.
+  - GitHub issue title/body generation is privacy-filtered and references the generated ZIP by filename only.
+  - TaskRunner diagnostics snapshot is bounded and records lifecycle/cancellation/supersede metadata.
+  - Existing beta.1/beta.2 task lifecycle, Forge, update-priority and download-performance regressions remain green.
 
 Platform note:
-  91 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
-  Windows smoke testing is still required for the GUI update handoff and live performance-profile behavior.
+  92 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
+  Windows GUI smoke testing is still required for the two-step Report Issue dialog and browser handoff.
 
 Release policy:
-  This beta delivery contains Launcher source only. No standalone MCW Core ZIP/WHL is built or published for beta.2.
+  Beta/RC delivery is a Launcher changed-files ZIP only. No standalone MCW Core artifact is built for beta.3.

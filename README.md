@@ -9,7 +9,7 @@
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.2">
     <img src="https://img.shields.io/badge/Stable-v1.3.2-brightgreen" alt="Stable version">
   </a>
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.2">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.3">
     <img src="https://img.shields.io/badge/Beta-v1.4.0--beta.2-orange" alt="Beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
@@ -51,20 +51,13 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.2 hỗ trợ nâng cấp
 
 ---
 
-## Có gì mới trong v1.4.0-beta.2
+## Có gì mới trong v1.4.0-beta.3
 
-**v1.4.0-beta.2** tập trung vào hiệu năng tải modpack và ưu tiên cập nhật launcher. Khi người dùng chọn cập nhật, launcher chuyển sang **Update Priority Mode**, hủy/drop các task khác theo cùng nguyên tắc shutdown, chặn task mới chen vào và chỉ bước sang apply sau khi các worker cũ đã dừng ở safe point.
+**v1.4.0-beta.3** tập trung vào Diagnostics v2 và quy trình báo lỗi. Nút **Báo cáo lỗi** mở màn hình nhập thông tin trước, sau đó launcher thu thập diagnostics ở background và mới hiện hướng dẫn tạo GitHub issue/đính kèm ZIP. Bundle mới bổ sung system info, Java runtime, task timeline, runtime/crash logs gần nhất và issue context đã lọc thông tin nhạy cảm.
 
-- Modrinth pack artifacts tải song song thích ứng theo CPU và giới hạn download đã cấu hình.
-- SHA-1/SHA-512/SHA-256 được tính trong một lượt đọc file; hashing có I/O budget riêng để giảm giật trên máy yếu/HDD.
-- Download journal batch progress writes để giảm `fsync` cạnh tranh khi nhiều file đang tải.
-- Thêm profile **Automatic / Responsive / Balanced / Maximum**; Automatic tự giảm concurrency khi Minecraft đang chạy.
-- Update Priority Mode cancel task khác, khóa scheduler cho `update.*`, nhưng vẫn đợi mutation cũ drain an toàn trước bước apply.
-- Các mutation nặng trên cùng instance vẫn giữ tuần tự trong beta.2 để tránh đổi hiệu năng lấy rủi ro dữ liệu.
+Beta.3 giữ toàn bộ TaskRunner/Kill Instance/Forge hardening từ beta.1 và adaptive download/Update Priority từ beta.2.
 
-Beta.3 sẽ tập trung Diagnostics v2, Create Issue Report, privacy/task timeline và benchmark/Windows soak.
-
-Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.2.md`](docs/RELEASE-v1.4.0-beta.2.md).
+Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.3.md`](docs/RELEASE-v1.4.0-beta.3.md).
 
 ## Có gì mới trong v1.4.0-beta.1
 

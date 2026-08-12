@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from threading import Event, Thread
+from datetime import datetime, timezone
 from time import monotonic
 from typing import Any
 from uuid import uuid4
@@ -96,6 +98,8 @@ class TaskRunner(QObject):
         self._blocking_tasks = 0
         self._shutting_down = False
         self._priority_prefix: str | None = None
+        self._timeline: deque[dict[str, object]] = deque(maxlen=100)
+        self._timeline_active: dict[str, dict[str, object]] = {}
         self._worker_settled.connect(self._finish_worker, Qt.ConnectionType.QueuedConnection)
 
     @property
@@ -122,6 +126,21 @@ class TaskRunner(QObject):
     def active_task_ids(self) -> tuple[str, ...]:
         # Keep the public contract unique even while an obsolete generation drains.
         return tuple(dict.fromkeys(context.task_id for context in self._contexts.values()))
+
+    def diagnostics_snapshot(self) -> tuple[dict[str, object], ...]:
+        """Return a bounded, serialization-safe task timeline for diagnostics."""
+
+        rows = [dict(item) for item in self._timeline]
+        for context_id, item in self._timeline_active.items():
+            row = dict(item)
+            context = self._contexts.get(context_id)
+            if context is not None:
+                row["state"] = context.state.value
+                row["cancel_requested"] = context.token.cancelled
+                row["superseded"] = context.superseded
+                row["duration_seconds"] = round(max(0.0, monotonic() - context.started_at), 3)
+            rows.append(row)
+        return tuple(rows[-100:])
 
     def is_task_active(self, task_id: str) -> bool:
         normalized = str(task_id).strip()
@@ -213,6 +232,16 @@ class TaskRunner(QObject):
             started_at=monotonic(),
         )
         self._contexts[context_id] = context
+        self._timeline_active[context_id] = {
+            "task_id": normalized_id,
+            "group": normalized_group,
+            "blocking": bool(blocking),
+            "cooperative": bool(cooperative),
+            "state": TaskState.RUNNING.value,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "cancel_requested": False,
+            "superseded": False,
+        }
 
         if blocking:
             self._blocking_tasks += 1
@@ -310,6 +339,11 @@ class TaskRunner(QObject):
             return
         context.state = TaskState.CANCEL_REQUESTED
         context.superseded = bool(superseded)
+        timeline = self._timeline_active.get(context.context_id)
+        if timeline is not None:
+            timeline["state"] = TaskState.CANCEL_REQUESTED.value
+            timeline["cancel_requested"] = True
+            timeline["superseded"] = bool(superseded)
         context.token.cancel()
         self.task_cancel_requested.emit(context.task_id)
 
@@ -320,6 +354,16 @@ class TaskRunner(QObject):
             return
         self._release_blocking(context)
 
+        timeline = self._timeline_active.pop(context_id, None) or {
+            "task_id": context.task_id,
+            "group": context.group,
+            "started_at": "",
+        }
+        timeline["ended_at"] = datetime.now(timezone.utc).isoformat()
+        timeline["duration_seconds"] = round(max(0.0, monotonic() - context.started_at), 3)
+        timeline["cancel_requested"] = context.token.cancelled
+        timeline["superseded"] = context.superseded
+
         cancelled = (
             context.token.cancelled
             or context.superseded
@@ -327,6 +371,9 @@ class TaskRunner(QObject):
         )
         if cancelled:
             context.state = TaskState.CANCELLED
+            timeline["state"] = TaskState.CANCELLED.value
+            timeline["result"] = "cancelled"
+            self._timeline.append(timeline)
             self.task_cancelled.emit(context.task_id)
             self.task_settled.emit(
                 context.task_id,
@@ -337,12 +384,19 @@ class TaskRunner(QObject):
 
         if succeeded:
             context.state = TaskState.SUCCEEDED
+            timeline["state"] = TaskState.SUCCEEDED.value
+            timeline["result"] = "success"
+            self._timeline.append(timeline)
             self.task_succeeded.emit(context.task_id, payload)
             self.task_settled.emit(context.task_id, True, payload)
             return
 
         context.state = TaskState.FAILED
         error = payload if isinstance(payload, Exception) else RuntimeError(str(payload))
+        timeline["state"] = TaskState.FAILED.value
+        timeline["result"] = "failed"
+        timeline["error_type"] = type(error).__name__
+        self._timeline.append(timeline)
         self.task_failed.emit(context.task_id, error)
         self.task_settled.emit(context.task_id, False, error)
 
