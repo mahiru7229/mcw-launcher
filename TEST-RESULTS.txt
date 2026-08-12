@@ -1,31 +1,31 @@
-MCW Launcher / MCW Core v1.4.0 stable release validation
-Date: 2026-08-12
+MCW Launcher v1.4.1-beta.1
 
-Source regression
-- Command: PYTHONPATH=. pytest -q
-- Result: 1560 passed, 93 skipped, 2 warnings, 0 failed
-- Warnings: two intentional duplicate-member ZIP security fixtures in test/core/package/test_package_manager_security.py
-- Skips: GUI/platform tests requiring PySide6 and/or Windows-specific runtime support unavailable in this Linux build environment
+Validation date: 2026-08-12
+Environment: Linux headless build/test environment (PySide6 not installed)
 
-Static/runtime validation
-- python -m compileall launcher.py src mcw_core tools test: PASS
-- python -m tools.release_preflight: PASS (after release evidence generation)
-- Language parity: 2131 / 2131 translation keys
-- Unresolved merge markers: 0
+Full pytest regression:
+  1579 passed, 93 skipped, 2 warnings, 0 failed
 
-MCW Core wheel
-- Built with: python -m pip wheel . --no-deps --no-build-isolation
-- Artifact: mcw_core-1.4.0-py3-none-any.whl
-- Installed into isolated target: PASS
-- mcw_core.__version__: 1.4.0
-- importlib.metadata version("mcw-core"): 1.4.0
-- public InstanceService.kill(): available
-- src.gui entries in wheel: 0
+Warnings:
+  2 intentional duplicate-ZIP-member warnings from package security fixtures.
 
-Release notes
-- Launcher runtime: v1.4.0
-- Update channel: stable
-- Python distribution: mcw-core 1.4.0
+Additional validation:
+  python -m compileall -q launcher.py src mcw_core tools test: PASS
+  Diagnostics v2.1 privacy/path sanitization regressions: PASS
+  Java 8 managed provisioning/recovery regressions: PASS
+  Forge/NeoForge installer diagnostics regressions: PASS
 
-Platform note
-- This environment cannot build or smoke-test the Windows PyInstaller EXE. Windows CI/smoke testing remains required before publishing the final Windows binary/update package.
+v1.4.1-beta.1 scope validated:
+  - Automatic Java 8 no longer allows an old external PATH runtime to block managed Temurin provisioning.
+  - Explicit compatible Java selections remain honored.
+  - Recovery prefers managed Java, records selection/provision/download stages, and falls back externally only when appropriate.
+  - Diagnostics v2.1 removes direct drive/UNC roots, sanitizes runtime/player/UUID context, and isolates collector failures.
+  - Runtime attachments report original/included size and truncation state.
+  - Core/user cancellation exceptions are classified as cancelled by TaskRunner diagnostics.
+
+Platform note:
+  93 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
+  Windows smoke testing is still required for actual managed Java download/install and GUI task-timeline cancellation signals.
+
+Release policy:
+  Beta/RC delivery is a Launcher changed-files ZIP only. No standalone MCW Core artifact is built for v1.4.1-beta.1.

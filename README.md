@@ -9,6 +9,9 @@
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0">
     <img src="https://img.shields.io/badge/Stable-v1.4.0-brightgreen" alt="Stable version">
   </a>
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.1-beta.1">
+    <img src="https://img.shields.io/badge/Beta-v1.4.1--beta.1-orange" alt="Beta version">
+  </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
   </a>
@@ -47,6 +50,19 @@ Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh b
 Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.4.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.4.1-beta.1
+
+**v1.4.1-beta.1** là beta duy nhất của nhánh bảo trì 1.4.1. Bản này sửa automatic Java recovery/provisioning sau khi xác nhận Java 8 quá cũ có thể làm Forge legacy cài profile thất bại, đồng thời nâng Diagnostics lên **v2.1** với privacy filtering mạnh hơn và evidence đầy đủ hơn.
+
+- Automatic Java 8 ưu tiên MCW-managed Temurin; Java 8 cũ trên `PATH` không còn chặn managed download/recovery.
+- Java được user chọn explicit vẫn được tôn trọng nếu đúng major; recovery ưu tiên runtime managed rồi mới fallback external.
+- Java download báo rõ stage metadata / download+SHA-256 / extract+install và lưu timeline quyết định recovery.
+- Diagnostics v2.1 dùng path alias `root/...`, `temp/...`, `user/...`, `external/...`; không export drive letter hoặc UNC share name trực tiếp.
+- Runtime/crash logs được sanitize thêm player/UUID, có metadata truncation; Forge/NeoForge installer logs và Java recovery timeline được đưa vào bundle.
+- Collector diagnostics lỗi độc lập không làm hỏng cả ZIP; task cancellation từ Core được ghi `cancelled` thay vì `failed`.
+
+Xem chi tiết tại [`docs/RELEASE-v1.4.1-beta.1.md`](docs/RELEASE-v1.4.1-beta.1.md).
 
 ## Có gì mới trong v1.4.0
 

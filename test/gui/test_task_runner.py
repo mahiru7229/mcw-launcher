@@ -145,3 +145,34 @@ def test_diagnostics_snapshot_reports_active_cancellation_state(gui_app) -> None
     assert snapshot[-1]["task_id"] == "java.scan"
     assert snapshot[-1]["state"] == TaskState.CANCEL_REQUESTED.value
     assert snapshot[-1]["cancel_requested"] is True
+
+
+def test_core_cancel_exception_is_recorded_as_cancelled(gui_app) -> None:
+    class DownloadCancelledError(RuntimeError):
+        pass
+
+    runner = TaskRunner()
+    context = TaskContext(
+        context_id="context-cancelled-core",
+        task_id="minecraft.launch",
+        group="minecraft.launch",
+        thread=Thread(target=lambda: None, daemon=True),
+        token=TaskCancellationToken(),
+        blocking=True,
+        cooperative=False,
+        started_at=1.0,
+    )
+    runner._contexts[context.context_id] = context
+    runner._blocking_tasks = 1
+    runner._timeline_active[context.context_id] = {
+        "task_id": context.task_id,
+        "group": context.group,
+        "state": TaskState.RUNNING.value,
+    }
+
+    runner._finish_worker(context.context_id, False, DownloadCancelledError("cancelled by user"))
+    snapshot = runner.diagnostics_snapshot()
+
+    assert snapshot[-1]["state"] == TaskState.CANCELLED.value
+    assert snapshot[-1]["result"] == "cancelled"
+    assert snapshot[-1]["cancellation_type"] == "DownloadCancelledError"

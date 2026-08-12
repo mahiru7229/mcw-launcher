@@ -623,9 +623,8 @@ def test_run_defaults_to_java_8_when_major_version_is_missing(
         version=version,
     )
     monkeypatch.setattr(
-        JavaSelector,
-        "select_java",
-        lambda major: (
+        "src.core.java.java_resolver.JavaProvisioner.install_managed",
+        lambda major, reporter=None, force=False: (
             selected.append(major)
             or Path("java8/javaw.exe")
         ),
