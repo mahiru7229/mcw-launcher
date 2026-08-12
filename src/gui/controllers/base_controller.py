@@ -10,7 +10,7 @@ from PySide6.QtCore import QObject, Signal
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.security.sensitive_data_redactor import SensitiveDataRedactor
 from src.gui.network_retry import NetworkRetryPolicy, is_retryable_network_error, run_with_network_retries
-from src.gui.task_runner import TaskRunner
+from src.gui.task_runner import TaskCancellationToken, TaskConflictPolicy, TaskRunner
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +62,8 @@ class BaseController(QObject):
             self._network_task(normalized_id, task),
             str(message),
             blocking=blocking,
+            conflict_policy=TaskConflictPolicy.REPLACE,
+            cooperative=True,
         )
 
     def retry_network_task(self, task_id: str) -> bool:
@@ -81,9 +83,11 @@ class BaseController(QObject):
             self._network_task(normalized_id, registration.task),
             registration.message,
             blocking=registration.blocking,
+            conflict_policy=TaskConflictPolicy.REPLACE,
+            cooperative=True,
         )
 
-    def _network_task(self, task_id: str, task: Callable[[], Any]) -> Callable[[], Any]:
+    def _network_task(self, task_id: str, task: Callable[[], Any]) -> Callable[[TaskCancellationToken], Any]:
         def on_retry(next_attempt: int, max_attempts: int, error: Exception, delay: float) -> None:
             message = tr("network.retry.auto", attempt=next_attempt, max_attempts=max_attempts)
             self.status_changed.emit(message)
@@ -99,11 +103,17 @@ class BaseController(QObject):
                 )
             )
 
-        return lambda: run_with_network_retries(
-            task,
-            policy=self.NETWORK_RETRY_POLICY,
-            on_retry=on_retry,
-        )
+        def run(token: TaskCancellationToken) -> Any:
+            token.checkpoint()
+            return run_with_network_retries(
+                task,
+                policy=self.NETWORK_RETRY_POLICY,
+                on_retry=on_retry,
+                sleep=token.wait,
+                checkpoint=token.checkpoint,
+            )
+
+        return run
 
     def _offer_network_retry(self, task_id: str, title: str, error: Exception) -> bool:
         normalized_id = str(task_id).strip()

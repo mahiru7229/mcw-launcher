@@ -2088,7 +2088,15 @@
     "storage.legacy.scan.completed_detail": "Cleanup candidates were analyzed using the current storage retention settings.",
     "storage.legacy.scan.failed": "Storage analysis failed",
     "storage.legacy.clean.task": "Cleaning selected legacy storage...",
-    "storage.legacy.dialog.reclaimable": "Reclaimable"
+    "storage.legacy.dialog.reclaimable": "Reclaimable",
+    "workspace.action.kill": "Kill Instance",
+    "workspace.kill.title": "Kill Instance",
+    "workspace.kill.warning": "Force-kill '{name}' now? Minecraft will be terminated immediately and unsaved world data may be lost.",
+    "workspace.kill.not_running": "'{name}' is no longer running.",
+    "status.instance.killing": "Killing '{name}'...",
+    "status.instance.killed": "Killed '{name}'",
+    "task.shutting_down": "The launcher is shutting down.",
+    "task.group_running": "Task group '{group}' is already running."
   },
   "aliases": {
     "MCW Launcher": "app.name",

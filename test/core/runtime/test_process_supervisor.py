@@ -130,3 +130,19 @@ def test_stop_instance_terminates_verified_root_and_registered_children(monkeypa
     assert ProcessSupervisor.stop_instance(instance, graceful_timeout=0.01) is True
     assert {pid for pid, _force in terminated} == {5000, 5001}
     assert not (Paths.process_sessions_root() / f"{session.session_id}.json").exists()
+
+
+def test_kill_instance_force_kills_registered_process_and_marks_session() -> None:
+    instance = _instance()
+    process = FakeProcess()
+    session = ProcessSupervisor.begin(instance)
+    ProcessSupervisor.attach(session.session_id, process)
+
+    assert ProcessSupervisor.kill_instance(instance, timeout=0.01) is True
+    assert process.killed is True
+    assert process.terminated is False
+    current = ProcessSupervisor.active_for(instance)
+    assert current is not None
+    assert current.state is ProcessSessionState.KILLING
+    assert current.detail == "killed_by_user"
+    assert ProcessSupervisor.kill_requested(session.session_id) is True

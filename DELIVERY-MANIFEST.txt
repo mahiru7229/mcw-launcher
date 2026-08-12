@@ -1,32 +1,35 @@
-MCW Launcher / MCW Core v1.3.2 release candidate
+MCW Launcher / MCW Core v1.4.0-beta.1 beta delivery
 
 Release metadata
-- Launcher runtime: v1.3.2
-- Update channel: stable
-- MCW Core distribution: 1.3.2
+- Launcher runtime: v1.4.0-beta.1
+- Update channel: beta
+- MCW Core runtime: 1.4.0-beta.1
+- MCW Core distribution: 1.4.0b1
 
-Primary fixes
-- Windows WinError 32 fixed-temp race for Mojang manifest and instance registry/metadata
-- Canonical short-workspace recursive-delete guard
-- Verified-only launcher auto-update with GitHub digest/.sha256 fallback
-- Managed release-file inventory and rollback-aware stale file cleanup for v1.3.2+ updater
-- Unified Windows-safe modpack archive paths
-- Transactional theme overwrite publish
-- Release evidence and GUI/core boundary preflight checks
+Beta 1 scope
+- TaskRunner v2 foundation with cooperative cancellation and replaceable background/network work
+- Shutdown cancellation boundary: launcher work no longer blocks window close
+- Kill Instance action with confirmation and supervised force-kill semantics
+- User-killed Minecraft sessions are not classified as crashes
+- Forge issue #20 strict profile selection, validate-before-cache and poisoned-cache invalidation
+- v1.3.2 issue #19/atomic-write/update-integrity hardening retained
 
-Generated deliverables
-- MCW-Launcher-v1.3.2-source.zip
-- MCW-Launcher-v1.3.2-changed-files.zip
-- README-launcher-v1.3.2.md
-- RELEASE-v1.3.2.md
-- mcw-core-v1.3.2-source.zip
-- mcw_core-1.3.2-py3-none-any.whl
-- README-core-v1.3.2.md
-- RELEASE-core-v1.3.2.md
-- SHA256SUMS.txt
+Three-beta roadmap
+- beta.1: task lifecycle/shutdown + Kill Instance + Forge #20
+- beta.2: adaptive modpack downloader + one-pass hashing/I/O/progress/journal optimization
+- beta.3: Diagnostics v2 + Create Issue Report + privacy/task timeline + benchmark/Windows soak
 
-Not generated in this Linux environment
+Validation in this environment
+- Full pytest: 1551 passed, 90 skipped, 0 failed, 2 intentional ZIP-fixture warnings
+- compileall: PASS
+- release_preflight: PASS
+- language parity: 2092 / 2092
+- Core wheel isolated install/import: PASS
+
+Not generated/tested in this Linux environment
 - MCW Launcher.exe
-- MCW-Launcher-v1.3.2-windows-x64.zip
+- Windows x64 update ZIP
+- Real PySide6 close/shutdown soak test
+- Real Minecraft Windows process-tree Kill smoke test
 
-The Windows executable/update ZIP still requires the existing Windows PyInstaller build workflow. The source, tests, release preflight, and pure-Python Core wheel are validated here.
+These Windows-specific checks remain required before promotion to beta.2/stable.

@@ -7,7 +7,7 @@ from PySide6.QtCore import Signal, Slot
 from mcw_core.api.language.language_manager import tr
 from mcw_core import get_default_core, is_download_cancelled
 from src.gui.controllers.base_controller import BaseController
-from src.gui.task_runner import TaskRunner
+from src.gui.task_runner import TaskConflictPolicy, TaskRunner
 
 
 class JavaController(BaseController):
@@ -31,11 +31,11 @@ class JavaController(BaseController):
         self._task_runner.task_failed.connect(self._on_task_failed)
 
     def scan(self) -> None:
-        self._task_runner.run(self.SCAN_TASK_ID, lambda: self._core.java.scan(self.progress_received.emit), tr("Scanning Java installations..."), blocking=False)
+        self._task_runner.run(self.SCAN_TASK_ID, lambda: self._core.java.scan(self.progress_received.emit), tr("Scanning Java installations..."), blocking=False, conflict_policy=TaskConflictPolicy.REPLACE)
         self.refresh_latest_release()
 
     def refresh_latest_release(self) -> None:
-        self._task_runner.run(self.LATEST_RELEASE_TASK_ID, self._core.java.latest_feature_release, tr("launcher_settings.java.latest_checking"), blocking=False)
+        self._task_runner.run(self.LATEST_RELEASE_TASK_ID, self._core.java.latest_feature_release, tr("launcher_settings.java.latest_checking"), blocking=False, conflict_policy=TaskConflictPolicy.REPLACE)
 
     def install(self, major: int) -> None:
         managed_major = self._core.java.normalize_feature_major(major)

@@ -2088,7 +2088,15 @@
     "storage.legacy.scan.completed_detail": "Các mục có thể dọn đã được phân tích theo thiết lập thời gian lưu trữ hiện tại.",
     "storage.legacy.scan.failed": "Phân tích lưu trữ thất bại",
     "storage.legacy.clean.task": "Đang dọn dữ liệu lưu trữ đã chọn...",
-    "storage.legacy.dialog.reclaimable": "Có thể giải phóng"
+    "storage.legacy.dialog.reclaimable": "Có thể giải phóng",
+    "workspace.action.kill": "Kill Instance",
+    "workspace.kill.title": "Kill Instance",
+    "workspace.kill.warning": "Buộc dừng '{name}' ngay bây giờ? Minecraft sẽ bị kết thúc ngay lập tức và dữ liệu thế giới chưa lưu có thể bị mất.",
+    "workspace.kill.not_running": "'{name}' không còn chạy.",
+    "status.instance.killing": "Đang buộc dừng '{name}'...",
+    "status.instance.killed": "Đã buộc dừng '{name}'",
+    "task.shutting_down": "Launcher đang tắt.",
+    "task.group_running": "Nhóm tác vụ '{group}' đang chạy."
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

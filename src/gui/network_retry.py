@@ -29,6 +29,7 @@ class NetworkRetryPolicy:
 
 
 RetryCallback = Callable[[int, int, Exception, float], None]
+CheckpointCallback = Callable[[], None]
 
 _RETRYABLE_ERRNOS = {
     errno.ECONNABORTED,
@@ -97,11 +98,14 @@ def run_with_network_retries(
     policy: NetworkRetryPolicy | None = None,
     on_retry: RetryCallback | None = None,
     sleep: Callable[[float], Any] = time.sleep,
+    checkpoint: CheckpointCallback | None = None,
 ) -> T:
     active_policy = policy or NetworkRetryPolicy()
     max_attempts = max(1, int(active_policy.max_attempts))
 
     for attempt in range(1, max_attempts + 1):
+        if checkpoint is not None:
+            checkpoint()
         try:
             return task()
         except Exception as error:
@@ -113,6 +117,8 @@ def run_with_network_retries(
                 on_retry(next_attempt, max_attempts, error, delay)
             if delay > 0:
                 sleep(delay)
+            if checkpoint is not None:
+                checkpoint()
 
     raise RuntimeError("Network retry loop ended unexpectedly.")
 

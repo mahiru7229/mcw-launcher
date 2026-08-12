@@ -109,6 +109,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(self._display_profile.minimum_width, self._display_profile.minimum_height)
 
         self.task_runner = TaskRunner(self)
+        self._closing = False
         self.version_controller = VersionController(self.task_runner)
         self.account_controller = AccountController(self.task_runner)
         self.backup_controller = BackupController(self.task_runner)
@@ -332,6 +333,7 @@ class MainWindow(QMainWindow):
 
         self.instances_page.refresh_requested.connect(self.instance_controller.refresh)
         self.instances_page.launch_requested.connect(self._request_launch)
+        self.instances_page.kill_instance_requested.connect(self._request_kill_instance)
         self.instances_page.instance_settings_requested.connect(self._open_instance_settings_workspace)
         self.instances_page.manage_accounts_requested.connect(lambda: self.show_page("accounts"))
         self.instances_page.selected_instance_changed.connect(self.instance_controller.select)
@@ -906,6 +908,21 @@ class MainWindow(QMainWindow):
     def _request_launch(self) -> None:
         if self._confirm_all_unsaved_settings():
             self.launch_controller.launch()
+
+    def _request_kill_instance(self, instance_name: str) -> None:
+        name = str(instance_name or "").strip()
+        if not name:
+            return
+        answer = QMessageBox.warning(
+            self,
+            tr("workspace.kill.title"),
+            tr("workspace.kill.warning", name=name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.instance_controller.kill_instance(name)
 
     def _open_instance_settings_workspace(self, instance_name: str) -> None:
         name = str(instance_name or "").strip()
@@ -2334,9 +2351,6 @@ class MainWindow(QMainWindow):
         self.toast_manager.show(tr("language.restart.saved_for_later"), "warning", tr("language.restart.title"))
 
     def _restart_for_language_change(self) -> None:
-        if self.task_runner.has_active_tasks:
-            QMessageBox.information(self, tr("language.restart.title"), tr("language.restart.active_task"))
-            return
         if not self._confirm_all_unsaved_settings():
             return
         if self.gui_settings_controller.current.get("remember_window_size", True):
@@ -2344,7 +2358,8 @@ class MainWindow(QMainWindow):
         if not start_restarted_process():
             QMessageBox.critical(self, tr("language.restart.title"), tr("language.restart.failed"))
             return
-        self.task_runner.close()
+        self.launch_controller.cancel()
+        self.task_runner.begin_shutdown()
         application = QGuiApplication.instance()
         if application is not None:
             application.quit()
@@ -2598,6 +2613,8 @@ class MainWindow(QMainWindow):
         self.theme_runtime.reapply_assets(self.launch_control)
 
     def _on_progress(self, event: object) -> None:
+        if self._closing or self.task_runner.is_shutting_down:
+            return
         stage = getattr(event, "stage", None)
         stage_value = str(getattr(stage, "value", stage or ""))
         if self._suppress_loader_progress and stage_value in {"downloading_mod_loader", "installing_mod_loader"}:
@@ -2860,15 +2877,6 @@ class MainWindow(QMainWindow):
         )
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        if self.task_runner.has_active_tasks:
-            QMessageBox.information(
-                self,
-                tr("MCW Launcher"),
-                tr("A launcher task is still running.\nClose the window after it finishes."),
-            )
-            event.ignore()
-            return
-
         if not self._confirm_all_unsaved_settings():
             event.ignore()
             return
@@ -2876,7 +2884,13 @@ class MainWindow(QMainWindow):
         if self.gui_settings_controller.current.get("remember_window_size", True):
             self.gui_settings_controller.save_geometry(self.saveGeometry())
 
-        self.task_runner.close()
+        self._closing = True
+        self.running_instances_timer.stop()
+        # Closing the launcher is now a shutdown boundary. Launcher work is cancelled
+        # and late progress/results are discarded; running Minecraft processes are
+        # intentionally left alive unless the user explicitly chooses Kill Instance.
+        self.launch_controller.cancel()
+        self.task_runner.begin_shutdown()
         super().closeEvent(event)
 
 

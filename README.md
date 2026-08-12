@@ -9,6 +9,9 @@
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.3.2">
     <img src="https://img.shields.io/badge/Stable-v1.3.2-brightgreen" alt="Stable version">
   </a>
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0-beta.1">
+    <img src="https://img.shields.io/badge/Beta-v1.4.0--beta.1-orange" alt="Beta version">
+  </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
   </a>
@@ -47,6 +50,21 @@ Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh b
 Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.3.2 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.4.0-beta.1
+
+**v1.4.0-beta.1** mở nhánh v1.4 với nền tảng task lifecycle/shutdown mới, **Kill Instance** cho Minecraft đang chạy và fix Forge profile/cache cho issue #20. Background/network task có thể bị cancel hoặc supersede thay vì luôn chặn task mới; khi đóng launcher, launcher ưu tiên hủy work của chính nó và thoát mà không tự kill game đang chạy.
+
+- Cooperative cancellation token + `REPLACE` policy cho request nền/network.
+- Shutdown không còn bị task metadata/scan chậm giữ cửa sổ lại.
+- Instance Workspace đổi **Launch → Kill Instance** khi game đang chạy, có cảnh báo trước force-kill.
+- User-killed session không bị báo nhầm thành crash.
+- Forge installer/profile cache không còn fallback sang vanilla profile; poisoned cache tự invalidated.
+- Regression riêng cho Forge 1.12.2 / 14.23.5.2860.
+
+Ba beta v1.4 được chia theo dependency: beta.1 = lifecycle/runtime stability; beta.2 = modpack download/I/O performance; beta.3 = Diagnostics v2 + Create Issue Report + polish/benchmark.
+
+Xem chi tiết tại [`docs/RELEASE-v1.4.0-beta.1.md`](docs/RELEASE-v1.4.0-beta.1.md).
 
 ## Có gì mới trong v1.3.2
 

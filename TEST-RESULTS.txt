@@ -1,39 +1,28 @@
-MCW Launcher / MCW Core v1.3.2
+MCW Launcher / MCW Core v1.4.0-beta.1
+Test run date: 2026-08-12
+Environment: Linux / Python 3.13 (release-build workspace)
 
-Release validation
+Full regression suite:
+  python -m pytest -q
+  1551 passed, 90 skipped, 2 warnings, 0 failed
 
-- Update channel: stable
-- Language parity: 2084 keys in en-US and vi-VN
-- Python compileall: PASS for launcher.py, src, mcw_core, and tools
-- Full regression: 1544 passed, 90 skipped, 2 warnings
-- Focused v1.3.2 regression: 105 passed
-- MCW Core wheel build: PASS using local setuptools/wheel with build isolation disabled
-- Wheel install into isolated target: PASS
-- Installed distribution metadata: mcw-core 1.3.2
-- Installed runtime metadata: mcw_core.__version__ == 1.3.2
-- Wheel GUI exclusion: PASS (no src/gui package)
-- Release preflight: PASS
-- Unresolved merge markers: 0
+Focused integration regression after v1.4 changes:
+  66 passed
+  - runtime translation/static text coverage
+  - version metadata
+  - Forge profile/cache regression including issue #20 (1.12.2 / 14.23.5.2860)
+  - ProcessSupervisor/GameRuntimeManager force-kill semantics
+  - cancellation-aware network retry
 
-Warnings
+MCW Core wheel:
+  mcw_core-1.4.0b1-py3-none-any.whl
+  isolated target install: PASS
+  runtime version: 1.4.0-beta.1
+  distribution version: 1.4.0b1
+  src.gui bundled: no
+  public InstanceService.kill: available
 
-The two warnings are intentional duplicate-entry ZIP fixtures from package security tests:
-- test_extract_deduplicates_identical_archive_members
-- test_extract_rejects_conflicting_duplicate_archive_members
-
-v1.3.2 regression coverage added
-
-- Concurrent Minecraft manifest refresh uses independent temporary files.
-- Existing manifest cache survives an atomic publish sharing violation.
-- Atomic replace retries PermissionError and cleanup remains best-effort.
-- Short-workspace cleanup rejects canonical parent escape and root deletion.
-- Automatic update uses .sha256 sidecar when GitHub digest is absent.
-- Automatic update rejects an archive with no trusted SHA-256 source.
-- Update manifest is mandatory and managed-file lifecycle is rollback-safe.
-- Modpack package paths reject absolute/traversal/Windows-invalid names.
-- Theme overwrite restores the previous theme if final publish fails.
-- Release preflight rejects stale evidence and direct GUI -> src.core imports.
-
-Platform note
-
-Validation was executed in a Linux headless environment with Python 3.13.5. Windows-only GUI/Win32 behavior remains covered by the repository's Windows CI and should receive the normal packaged EXE smoke test before publishing the GitHub release.
+Notes:
+- 90 tests are skipped in this environment where PySide6/Windows GUI runtime is unavailable.
+- The 2 warnings are intentional duplicate ZIP-member fixtures in package security tests.
+- Windows GUI shutdown, Qt signal delivery, and real Minecraft process-tree kill require Windows smoke/soak validation before stable.

@@ -1,37 +1,44 @@
 from __future__ import annotations
 
+from threading import Thread
 from typing import Any
 
 import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtCore import QThread
-
-from src.gui.task_runner import TaskContext, TaskRunner
+from src.gui.task_runner import (
+    TaskCancellationToken,
+    TaskContext,
+    TaskRunner,
+    TaskState,
+)
 
 
 @pytest.mark.parametrize(
-    ("finish_method", "signal_name", "payload"),
+    ("succeeded", "signal_name", "payload"),
     (
-        ("_finish_success", "task_succeeded", object()),
-        ("_finish_failure", "task_failed", RuntimeError("failed")),
+        (True, "task_succeeded", object()),
+        (False, "task_failed", RuntimeError("failed")),
     ),
 )
 def test_completion_callbacks_observe_released_blocking_state(
     gui_app,
-    finish_method: str,
+    succeeded: bool,
     signal_name: str,
     payload: Any,
 ):
     runner = TaskRunner()
-    thread = QThread()
-    runner._contexts["modpack.update.preview"] = TaskContext(
+    context = TaskContext(
+        context_id="context-1",
         task_id="modpack.update.preview",
-        thread=thread,
-        worker=object(),
+        group="modpack.update.preview",
+        thread=Thread(target=lambda: None, daemon=True),
+        token=TaskCancellationToken(),
         blocking=True,
+        cooperative=False,
     )
+    runner._contexts[context.context_id] = context
     runner._blocking_tasks = 1
     observed_states = []
 
@@ -41,6 +48,45 @@ def test_completion_callbacks_observe_released_blocking_state(
         )
     )
 
-    getattr(runner, finish_method)("modpack.update.preview", payload)
+    runner._finish_worker(context.context_id, succeeded, payload)
 
     assert observed_states == [(False, False)]
+
+
+def test_cancel_marks_task_and_token_without_killing_thread(gui_app) -> None:
+    runner = TaskRunner()
+    token = TaskCancellationToken()
+    context = TaskContext(
+        context_id="context-1",
+        task_id="versions.load",
+        group="versions",
+        thread=Thread(target=lambda: None, daemon=True),
+        token=token,
+        blocking=False,
+        cooperative=True,
+    )
+    runner._contexts[context.context_id] = context
+
+    assert runner.cancel("versions.load") is True
+    assert token.cancelled is True
+    assert context.state is TaskState.CANCEL_REQUESTED
+
+
+def test_shutdown_requests_cancellation_and_rejects_new_work(gui_app) -> None:
+    runner = TaskRunner()
+    token = TaskCancellationToken()
+    context = TaskContext(
+        context_id="context-1",
+        task_id="java.scan",
+        group="java.scan",
+        thread=Thread(target=lambda: None, daemon=True),
+        token=token,
+        blocking=False,
+        cooperative=False,
+    )
+    runner._contexts[context.context_id] = context
+
+    assert runner.begin_shutdown() == ("java.scan",)
+    assert runner.is_shutting_down is True
+    assert token.cancelled is True
+    assert runner.run("later", lambda: None, "later", blocking=False) is False
