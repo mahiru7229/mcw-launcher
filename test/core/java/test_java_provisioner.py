@@ -104,8 +104,68 @@ def test_install_release_extracts_in_short_jvm_workspace(monkeypatch: pytest.Mon
 
     executable = JavaProvisioner._install_release(release, archive)
 
-    assert captured["staging"].parent == short_root / "jvm"
+    assert captured["staging"].parent.parent == short_root / "jvm"
+    assert captured["staging"].name == "extract"
     assert len(str(captured["staging"])) < len(str(runtime_root / ".java-8.installing-" / ("x" * 32)))
     assert executable == target / "bin" / "javaw.exe"
     assert executable.is_file()
-    assert not captured["staging"].exists()
+    assert not captured["staging"].parent.exists()
+
+
+def test_install_release_passes_nonexistent_extract_directory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    from src.core.fs.paths import Paths
+
+    runtime_root = tmp_path / "runtimes"
+    target = runtime_root / "java-8"
+    short_root = tmp_path / "short"
+    archive = tmp_path / "java.zip"
+    archive.write_bytes(b"archive")
+    release = JavaRelease(major=8, url="https://example.test/java.zip", sha256="0" * 64, size=7, filename="java.zip", release_name="test")
+
+    monkeypatch.setattr(Paths, "SHORT_WORKSPACE_ROOT", short_root)
+    monkeypatch.setattr(ManagedJavaRepository, "root", lambda: runtime_root)
+    monkeypatch.setattr(ManagedJavaRepository, "runtime_dir", lambda major: target)
+
+    def extract(_archive, destination):
+        assert not destination.exists()
+        java_home = destination / "jdk8u502-b07"
+        executable = java_home / "bin" / "javaw.exe"
+        executable.parent.mkdir(parents=True)
+        executable.write_bytes(b"java")
+        return java_home
+
+    monkeypatch.setattr("src.core.java.java_provisioner.JavaArchiveExtractor.extract", extract)
+
+    assert JavaProvisioner._install_release(release, archive) == target / "bin" / "javaw.exe"
+
+
+def test_managed_install_reports_metadata_stage_failure(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(ManagedJavaRepository, "executable", lambda major: Path("missing/javaw.exe"))
+    monkeypatch.setattr(
+        "src.core.java.java_provisioner.AdoptiumClient.get_latest_windows_x64_jdk",
+        lambda major: (_ for _ in ()).throw(RuntimeError("metadata offline")),
+    )
+
+    with pytest.raises(RuntimeError, match="download metadata.*metadata offline"):
+        JavaProvisioner.install_managed(8)
+
+
+def test_managed_install_reports_download_or_checksum_stage_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    release = JavaRelease(
+        major=8,
+        url="https://example.test/java8.zip",
+        sha256="0" * 64,
+        size=100,
+        filename="java8.zip",
+        release_name="test",
+    )
+    monkeypatch.setattr(ManagedJavaRepository, "executable", lambda major: Path("missing/javaw.exe"))
+    monkeypatch.setattr(ManagedJavaRepository, "archive_path", lambda major: tmp_path / "java8.zip")
+    monkeypatch.setattr("src.core.java.java_provisioner.AdoptiumClient.get_latest_windows_x64_jdk", lambda major: release)
+    monkeypatch.setattr(
+        "src.core.java.java_provisioner.JavaArchiveDownloader.download",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("checksum mismatch")),
+    )
+
+    with pytest.raises(RuntimeError, match="download or SHA-256 verification failed.*checksum mismatch"):
+        JavaProvisioner.install_managed(8)

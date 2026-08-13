@@ -38,3 +38,13 @@ def test_github_new_issue_url_prefills_title_and_body() -> None:
     assert parsed.path == "/mahiru7229/mcw-launcher/issues/new"
     assert query["title"] == ["Forge profile issue"]
     assert "Forge failed" in query["body"][0]
+
+
+def test_issue_report_builder_hides_drive_letters() -> None:
+    body = IssueReportBuilder.build_body(
+        {"title": "Path error", "what_happened": r"Failed at D:\\Games\\MCW\\instances\\Pack\\file.jar"},
+        launcher_version="1.4.1-beta.1",
+    )
+
+    assert "D:" not in body
+    assert "root/Games/MCW/instances/Pack/file.jar" in body

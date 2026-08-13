@@ -1,1 +1,1 @@
-release: mcw-launcher v1.4.0 stable lifecycle, performance, diagnostics and progress hardening
+fix: mcw-launcher v1.4.1 stable Java recovery and diagnostics v2.1

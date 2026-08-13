@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0">
-    <img src="https://img.shields.io/badge/Stable-v1.4.0-brightgreen" alt="Stable version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.1">
+    <img src="https://img.shields.io/badge/Stable-v1.4.1-brightgreen" alt="Stable version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -44,9 +44,27 @@ Mỗi instance có riêng:
 
 Mục tiêu của dự án là tạo ra một launcher dễ kiểm soát, minh bạch khi tải file, an toàn khi sửa chữa và đủ linh hoạt cho cả người chơi Vanilla lẫn người dùng modpack.
 ---
-Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.4.0 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
+Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.4.1 hỗ trợ nâng cấp trực tiếp từ v0.5.1 và tất cả các phiên bản phát hành sau đó.
 
 ---
+
+## Có gì mới trong v1.4.1
+
+**v1.4.1** là bản maintenance stable cho nhánh 1.4, tập trung vào Java recovery/download và Diagnostics v2.1. Bản stable hợp nhất beta.1-beta.2: Java 8 managed được ưu tiên khi automatic recovery, Java runtime cũ trên PATH không còn chặn provisioning, Java scan/Diagnostics không còn bật JVM popup từ candidate bị gỡ dở, và managed Java extraction không còn tự va chạm short-workspace trên Windows.
+
+- Java scan/version probe ưu tiên `java.exe` console khi candidate là `javaw.exe`, tránh JVM GUI dialog từ runtime bị gỡ dở/hỏng.
+- Diagnostics Java scan dùng cùng probe an toàn, nên export bundle không còn bật popup JVM cho candidate lỗi kiểu này.
+- Managed Java extraction dùng thư mục con chưa tồn tại trong short workspace, sửa `WinError 183` do extractor nhận chính workspace đã được tạo sẵn.
+- Diagnostics alias riêng short workspace thành `temp/...`, tránh lộ user path trong lỗi Java extraction.
+
+- Automatic Java 8 ưu tiên MCW-managed Temurin; Java 8 cũ trên `PATH` không còn chặn managed download/recovery.
+- Java được user chọn explicit vẫn được tôn trọng nếu đúng major; recovery ưu tiên runtime managed rồi mới fallback external.
+- Java download báo rõ stage metadata / download+SHA-256 / extract+install và lưu timeline quyết định recovery.
+- Diagnostics v2.1 dùng path alias `root/...`, `temp/...`, `user/...`, `external/...`; không export drive letter hoặc UNC share name trực tiếp.
+- Runtime/crash logs được sanitize thêm player/UUID, có metadata truncation; Forge/NeoForge installer logs và Java recovery timeline được đưa vào bundle.
+- Collector diagnostics lỗi độc lập không làm hỏng cả ZIP; task cancellation từ Core được ghi `cancelled` thay vì `failed`.
+
+Xem chi tiết tại [`docs/RELEASE-v1.4.1.md`](docs/RELEASE-v1.4.1.md).
 
 ## Có gì mới trong v1.4.0
 

@@ -1,16 +1,16 @@
-MCW Launcher / MCW Core v1.4.0 stable delivery
+MCW Launcher / MCW Core v1.4.1 stable delivery
 
 Launcher artifacts
-- MCW-Launcher-v1.4.0-changed-files.zip
-- MCW-Launcher-v1.4.0-source.zip
-- README-launcher-v1.4.0.md
-- RELEASE-v1.4.0.md
+- MCW-Launcher-v1.4.1-changed-files.zip
+- MCW-Launcher-v1.4.1-source.zip
+- README-launcher-v1.4.1.md
+- RELEASE-v1.4.1.md
 
 Core artifacts
-- mcw-core-v1.4.0-source.zip
-- mcw_core-1.4.0-py3-none-any.whl
-- README-core-v1.4.0.md
-- RELEASE-core-v1.4.0.md
+- mcw-core-v1.4.1-source.zip
+- mcw_core-1.4.1-py3-none-any.whl
+- README-core-v1.4.1.md
+- RELEASE-core-v1.4.1.md
 
 Verification
 - SHA256SUMS.txt
@@ -18,9 +18,9 @@ Verification
 - CHANGES.diff
 - CHANGED-FILES.txt
 
-Launcher runtime: v1.4.0
+Launcher runtime: v1.4.1
 Update channel: stable
-MCW Core distribution: 1.4.0
+MCW Core distribution: 1.4.1
 
 Windows executable note
 - No MCW Launcher.exe / windows-x64 updater package is built in this Linux environment.

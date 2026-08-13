@@ -347,6 +347,13 @@ class TaskRunner(QObject):
         context.token.cancel()
         self.task_cancel_requested.emit(context.task_id)
 
+    @staticmethod
+    def _is_cancellation_payload(payload: object) -> bool:
+        if isinstance(payload, TaskCancelledError):
+            return True
+        name = type(payload).__name__.casefold()
+        return name.endswith("cancellederror") or name.endswith("cancelederror")
+
     @Slot(str, bool, object)
     def _finish_worker(self, context_id: str, succeeded: bool, payload: object) -> None:
         context = self._contexts.pop(context_id, None)
@@ -367,12 +374,14 @@ class TaskRunner(QObject):
         cancelled = (
             context.token.cancelled
             or context.superseded
-            or isinstance(payload, TaskCancelledError)
+            or self._is_cancellation_payload(payload)
         )
         if cancelled:
             context.state = TaskState.CANCELLED
             timeline["state"] = TaskState.CANCELLED.value
             timeline["result"] = "cancelled"
+            if isinstance(payload, Exception):
+                timeline["cancellation_type"] = type(payload).__name__
             self._timeline.append(timeline)
             self.task_cancelled.emit(context.task_id)
             self.task_settled.emit(

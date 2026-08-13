@@ -1,31 +1,34 @@
-MCW Launcher / MCW Core v1.4.0 stable release validation
-Date: 2026-08-12
+MCW Launcher / MCW Core v1.4.1 stable release validation
+Date: 2026-08-13
 
 Source regression
 - Command: PYTHONPATH=. pytest -q
-- Result: 1560 passed, 93 skipped, 2 warnings, 0 failed
+- Result: 1582 passed, 93 skipped, 2 warnings, 0 failed
 - Warnings: two intentional duplicate-member ZIP security fixtures in test/core/package/test_package_manager_security.py
 - Skips: GUI/platform tests requiring PySide6 and/or Windows-specific runtime support unavailable in this Linux build environment
 
+Targeted stable metadata
+- test/core/config/test_version_metadata.py + test/test_public_api.py: 6 passed
+
 Static/runtime validation
-- python -m compileall launcher.py src mcw_core tools test: PASS
-- python -m tools.release_preflight: PASS (after release evidence generation)
+- python -m compileall -q launcher.py src mcw_core tools test: PASS
+- python -m tools.release_preflight: PASS
 - Language parity: 2131 / 2131 translation keys
 - Unresolved merge markers: 0
 
 MCW Core wheel
-- Built with: python -m pip wheel . --no-deps --no-build-isolation
-- Artifact: mcw_core-1.4.0-py3-none-any.whl
+- Built with: python -m pip wheel <core-source> --no-deps --no-build-isolation
+- Artifact: mcw_core-1.4.1-py3-none-any.whl
 - Installed into isolated target: PASS
-- mcw_core.__version__: 1.4.0
-- importlib.metadata version("mcw-core"): 1.4.0
+- mcw_core.__version__: 1.4.1
+- importlib.metadata version("mcw-core"): 1.4.1
 - public InstanceService.kill(): available
 - src.gui entries in wheel: 0
 
-Release notes
-- Launcher runtime: v1.4.0
+Release metadata
+- Launcher runtime: v1.4.1
 - Update channel: stable
-- Python distribution: mcw-core 1.4.0
+- Python distribution: mcw-core 1.4.1
 
 Platform note
-- This environment cannot build or smoke-test the Windows PyInstaller EXE. Windows CI/smoke testing remains required before publishing the final Windows binary/update package.
+- This Linux environment does not build or smoke-test the Windows PyInstaller EXE. Windows CI/smoke testing remains required before publishing the Windows binary/update package.
