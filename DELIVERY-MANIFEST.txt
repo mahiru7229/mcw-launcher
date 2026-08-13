@@ -1,6 +1,6 @@
-MCW Launcher v1.4.1-beta.1 delivery
+MCW Launcher v1.4.1-beta.2 delivery
 
 Beta delivery policy: Launcher changed-files ZIP only.
 No standalone MCW Core source ZIP or wheel is produced for beta/RC builds.
 
-Apply the patch over MCW Launcher v1.4.0 stable with the previously supplied Windows test-suite hotfixes applied.
+Apply this patch over MCW Launcher v1.4.1-beta.1.

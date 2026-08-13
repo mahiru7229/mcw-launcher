@@ -112,7 +112,7 @@ class JavaProvisioner:
         new_runtime_installed = False
 
         try:
-            extracted_java_home = JavaArchiveExtractor.extract(archive_path, staging_dir)
+            extracted_java_home = JavaArchiveExtractor.extract(archive_path, staging_dir / "extract")
             if target_dir.exists():
                 target_dir.replace(backup_dir)
                 old_runtime_moved = True

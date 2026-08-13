@@ -618,6 +618,27 @@ def test_get_major_version_executes_requested_path(
     }
 
 
+def test_get_major_version_prefers_console_java_to_avoid_javaw_dialogs(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    javaw_path = tmp_path / "broken-jre" / "bin" / "javaw.exe"
+    java_path = javaw_path.with_name("java.exe")
+    java_path.parent.mkdir(parents=True)
+    javaw_path.write_bytes(b"")
+    java_path.write_bytes(b"")
+    received = {}
+
+    def fake_run(command, **kwargs):
+        received["command"] = command
+        return SimpleNamespace(stderr='java version "1.8.0_502"\n')
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    assert JavaManager._get_major_version(javaw_path) == 8
+    assert received["command"] == [str(java_path), "-version"]
+
+
 @pytest.mark.parametrize(
     "version_output",
     [

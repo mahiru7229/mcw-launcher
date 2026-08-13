@@ -1,31 +1,31 @@
-MCW Launcher v1.4.1-beta.1
+MCW Launcher v1.4.1-beta.2
 
-Validation date: 2026-08-12
+Validation date: 2026-08-13
 Environment: Linux headless build/test environment (PySide6 not installed)
 
 Full pytest regression:
-  1579 passed, 93 skipped, 2 warnings, 0 failed
+  1582 passed, 93 skipped, 2 warnings, 0 failed
 
 Warnings:
   2 intentional duplicate-ZIP-member warnings from package security fixtures.
 
 Additional validation:
-  python -m compileall -q launcher.py src mcw_core tools test: PASS
-  Diagnostics v2.1 privacy/path sanitization regressions: PASS
-  Java 8 managed provisioning/recovery regressions: PASS
-  Forge/NeoForge installer diagnostics regressions: PASS
+  python -m compileall -q src mcw_core test: PASS
+  Java scan/version-probe regression: PASS
+  Diagnostics Java probe regression: PASS
+  Managed Java short-workspace extraction regression: PASS
+  Diagnostics short-workspace path sanitization regression: PASS
 
-v1.4.1-beta.1 scope validated:
-  - Automatic Java 8 no longer allows an old external PATH runtime to block managed Temurin provisioning.
-  - Explicit compatible Java selections remain honored.
-  - Recovery prefers managed Java, records selection/provision/download stages, and falls back externally only when appropriate.
-  - Diagnostics v2.1 removes direct drive/UNC roots, sanitizes runtime/player/UUID context, and isolates collector failures.
-  - Runtime attachments report original/included size and truncation state.
-  - Core/user cancellation exceptions are classified as cancelled by TaskRunner diagnostics.
+v1.4.1-beta.2 scope validated:
+  - Java discovery probes sibling java.exe instead of javaw.exe when available, avoiding JVM GUI error dialogs from partially removed/broken runtimes during background scan.
+  - Diagnostics Java collection uses the same safe console probe path.
+  - Managed Java extraction receives a fresh child directory inside the already-created short workspace, fixing WinError 183 collisions.
+  - MCW short-workspace paths are exported as temp/... in Diagnostics rather than exposing the local user path.
+  - All Java recovery and Diagnostics v2.1 behavior from beta.1 remains covered by the full regression suite.
 
 Platform note:
   93 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
-  Windows smoke testing is still required for actual managed Java download/install and GUI task-timeline cancellation signals.
+  The reported Windows failure modes are covered by contract/regression tests, but final GUI smoke testing should still be performed on Windows.
 
 Release policy:
-  Beta/RC delivery is a Launcher changed-files ZIP only. No standalone MCW Core artifact is built for v1.4.1-beta.1.
+  Beta/RC delivery is a Launcher changed-files ZIP only. No standalone MCW Core artifact is built for v1.4.1-beta.2.

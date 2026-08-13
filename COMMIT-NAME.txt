@@ -1,1 +1,1 @@
-fix(beta): mcw-launcher v1.4.1-beta.1 Java recovery and diagnostics v2.1
+fix(beta): mcw-launcher v1.4.1-beta.2 harden Java scan and managed extraction

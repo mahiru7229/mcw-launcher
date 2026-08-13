@@ -9,8 +9,8 @@
   <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.0">
     <img src="https://img.shields.io/badge/Stable-v1.4.0-brightgreen" alt="Stable version">
   </a>
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.1-beta.1">
-    <img src="https://img.shields.io/badge/Beta-v1.4.1--beta.1-orange" alt="Beta version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.1-beta.2">
+    <img src="https://img.shields.io/badge/Beta-v1.4.1--beta.2-orange" alt="Beta version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions">
     <img src="https://img.shields.io/badge/Tests-passing-success" alt="Tests">
@@ -51,9 +51,14 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.4.0 hỗ trợ nâng cấp
 
 ---
 
-## Có gì mới trong v1.4.1-beta.1
+## Có gì mới trong v1.4.1-beta.2
 
-**v1.4.1-beta.1** là beta duy nhất của nhánh bảo trì 1.4.1. Bản này sửa automatic Java recovery/provisioning sau khi xác nhận Java 8 quá cũ có thể làm Forge legacy cài profile thất bại, đồng thời nâng Diagnostics lên **v2.1** với privacy filtering mạnh hơn và evidence đầy đủ hơn.
+**v1.4.1-beta.2** sửa hai regression Windows phát hiện khi test beta.1: Java scan/Diagnostics có thể kích hoạt popup từ một Java `javaw.exe` bị hỏng, và managed Java extraction có thể tự va chạm với short-workspace vừa tạo. Bản này giữ nguyên toàn bộ Java recovery + Diagnostics v2.1 của beta.1.
+
+- Java scan/version probe ưu tiên `java.exe` console khi candidate là `javaw.exe`, tránh JVM GUI dialog từ runtime bị gỡ dở/hỏng.
+- Diagnostics Java scan dùng cùng probe an toàn, nên export bundle không còn bật popup JVM cho candidate lỗi kiểu này.
+- Managed Java extraction dùng thư mục con chưa tồn tại trong short workspace, sửa `WinError 183` do extractor nhận chính workspace đã được tạo sẵn.
+- Diagnostics alias riêng short workspace thành `temp/...`, tránh lộ user path trong lỗi Java extraction.
 
 - Automatic Java 8 ưu tiên MCW-managed Temurin; Java 8 cũ trên `PATH` không còn chặn managed download/recovery.
 - Java được user chọn explicit vẫn được tôn trọng nếu đúng major; recovery ưu tiên runtime managed rồi mới fallback external.
@@ -62,7 +67,7 @@ Hỗ trợ nâng cấp trực tiếp: MCW Launcher v1.4.0 hỗ trợ nâng cấp
 - Runtime/crash logs được sanitize thêm player/UUID, có metadata truncation; Forge/NeoForge installer logs và Java recovery timeline được đưa vào bundle.
 - Collector diagnostics lỗi độc lập không làm hỏng cả ZIP; task cancellation từ Core được ghi `cancelled` thay vì `failed`.
 
-Xem chi tiết tại [`docs/RELEASE-v1.4.1-beta.1.md`](docs/RELEASE-v1.4.1-beta.1.md).
+Xem chi tiết tại [`docs/RELEASE-v1.4.1-beta.2.md`](docs/RELEASE-v1.4.1-beta.2.md).
 
 ## Có gì mới trong v1.4.0
 

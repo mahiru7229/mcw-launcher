@@ -49,3 +49,19 @@ def test_sanitize_path_uses_root_alias_without_drive_letter(monkeypatch) -> None
     monkeypatch.setattr(DiagnosticsSanitizer, "_known_roots", classmethod(lambda cls: ((Path("C:/mcw_launcher"), "root"),)))
 
     assert DiagnosticsSanitizer.sanitize_path(r"C:\mcw_launcher\instances\RLCraft\logs\latest.log") == "root/instances/RLCraft/logs/latest.log"
+
+
+def test_sanitize_text_uses_short_workspace_alias_before_generic_drive(monkeypatch) -> None:
+    monkeypatch.setattr(
+        DiagnosticsSanitizer,
+        "_known_roots",
+        classmethod(lambda cls: ((Path(r"C:\Users\Mahiru\AppData\Local\MCW\t"), "temp"),)),
+    )
+
+    text = DiagnosticsSanitizer.sanitize_text(
+        r"[WinError 183] path exists: 'C:\Users\Mahiru\AppData\Local\MCW\t\jvm\deadbeef'"
+    )
+
+    assert "C:" not in text
+    assert "Mahiru" not in text
+    assert "temp/jvm/deadbeef" in text

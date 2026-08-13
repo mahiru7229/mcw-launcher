@@ -93,6 +93,10 @@ class DiagnosticsSanitizer:
     def _known_roots(cls) -> tuple[tuple[Path, str], ...]:
         roots: list[tuple[Path, str]] = []
         try:
+            roots.append((Path(Paths.SHORT_WORKSPACE_ROOT), "temp"))
+        except Exception:
+            pass
+        try:
             roots.append((Path(Paths.root()), "root"))
         except Exception:
             pass
