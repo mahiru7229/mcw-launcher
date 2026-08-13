@@ -1,31 +1,34 @@
-MCW Launcher v1.4.1-beta.2
+MCW Launcher / MCW Core v1.4.1 stable release validation
+Date: 2026-08-13
 
-Validation date: 2026-08-13
-Environment: Linux headless build/test environment (PySide6 not installed)
+Source regression
+- Command: PYTHONPATH=. pytest -q
+- Result: 1582 passed, 93 skipped, 2 warnings, 0 failed
+- Warnings: two intentional duplicate-member ZIP security fixtures in test/core/package/test_package_manager_security.py
+- Skips: GUI/platform tests requiring PySide6 and/or Windows-specific runtime support unavailable in this Linux build environment
 
-Full pytest regression:
-  1582 passed, 93 skipped, 2 warnings, 0 failed
+Targeted stable metadata
+- test/core/config/test_version_metadata.py + test/test_public_api.py: 6 passed
 
-Warnings:
-  2 intentional duplicate-ZIP-member warnings from package security fixtures.
+Static/runtime validation
+- python -m compileall -q launcher.py src mcw_core tools test: PASS
+- python -m tools.release_preflight: PASS
+- Language parity: 2131 / 2131 translation keys
+- Unresolved merge markers: 0
 
-Additional validation:
-  python -m compileall -q src mcw_core test: PASS
-  Java scan/version-probe regression: PASS
-  Diagnostics Java probe regression: PASS
-  Managed Java short-workspace extraction regression: PASS
-  Diagnostics short-workspace path sanitization regression: PASS
+MCW Core wheel
+- Built with: python -m pip wheel <core-source> --no-deps --no-build-isolation
+- Artifact: mcw_core-1.4.1-py3-none-any.whl
+- Installed into isolated target: PASS
+- mcw_core.__version__: 1.4.1
+- importlib.metadata version("mcw-core"): 1.4.1
+- public InstanceService.kill(): available
+- src.gui entries in wheel: 0
 
-v1.4.1-beta.2 scope validated:
-  - Java discovery probes sibling java.exe instead of javaw.exe when available, avoiding JVM GUI error dialogs from partially removed/broken runtimes during background scan.
-  - Diagnostics Java collection uses the same safe console probe path.
-  - Managed Java extraction receives a fresh child directory inside the already-created short workspace, fixing WinError 183 collisions.
-  - MCW short-workspace paths are exported as temp/... in Diagnostics rather than exposing the local user path.
-  - All Java recovery and Diagnostics v2.1 behavior from beta.1 remains covered by the full regression suite.
+Release metadata
+- Launcher runtime: v1.4.1
+- Update channel: stable
+- Python distribution: mcw-core 1.4.1
 
-Platform note:
-  93 tests were skipped because this environment does not provide PySide6/Windows-only runtime dependencies.
-  The reported Windows failure modes are covered by contract/regression tests, but final GUI smoke testing should still be performed on Windows.
-
-Release policy:
-  Beta/RC delivery is a Launcher changed-files ZIP only. No standalone MCW Core artifact is built for v1.4.1-beta.2.
+Platform note
+- This Linux environment does not build or smoke-test the Windows PyInstaller EXE. Windows CI/smoke testing remains required before publishing the Windows binary/update package.
