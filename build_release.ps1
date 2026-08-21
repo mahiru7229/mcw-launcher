@@ -78,7 +78,7 @@ Invoke-Checked "Release package build" { python -m tools.build_release_zip --exe
 $ZipName = "MCW-Launcher-v$Version-windows-x64.zip"
 $ZipPath = Join-Path ".\release" $ZipName
 $ShaPath = "$ZipPath.sha256"
-$ReleaseNotes = ".\docs\RELEASE-$VersionTag.md"
+$ReleaseNotes = ".\docs\releases\$VersionTag.md"
 
 if (-not (Test-Path $ZipPath)) {
     throw "Expected release ZIP was not created: $ZipPath"

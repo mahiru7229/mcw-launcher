@@ -785,9 +785,12 @@ class Paths:
 
     @staticmethod
     def asset_object(asset: DownloadAsset):
-        directory = Paths.CACHE_ROOT / "assets" / "objects" / asset.sha1[:2] 
+        from src.core.minecraft.metadata_validation import MinecraftMetadataValidation
+
+        digest = MinecraftMetadataValidation.sha1(asset.sha1, "asset SHA-1")
+        directory = Paths.CACHE_ROOT / "assets" / "objects" / digest[:2]
         directory.mkdir(parents=True, exist_ok=True)
-        return directory / asset.sha1
+        return directory / digest
     
     @staticmethod
     def assets_dir():

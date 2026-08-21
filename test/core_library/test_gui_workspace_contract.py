@@ -19,7 +19,7 @@ def _imports(path: Path) -> set[str]:
 
 
 def test_main_window_uses_instance_workspace_as_primary_instance_frontend() -> None:
-    path = PROJECT_ROOT / "src" / "gui" / "main_window_2.py"
+    path = PROJECT_ROOT / "src" / "gui" / "main_window.py"
     source = path.read_text(encoding="utf-8")
     imports = _imports(path)
 

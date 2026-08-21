@@ -390,7 +390,7 @@ def audit_version_metadata(project_root: Path) -> list[str]:
     if UPDATE_CHANNEL != expected_channel:
         errors.append(f"{VERSION_ID} must use update channel {expected_channel}, got {UPDATE_CHANNEL}")
 
-    release_notes = project_root / "docs" / f"RELEASE-{VERSION_TAG}.md"
+    release_notes = project_root / "docs" / "releases" / f"{VERSION_TAG}.md"
     if not release_notes.is_file():
         errors.append(f"Missing release notes: {release_notes.relative_to(project_root)}")
     for required in ("README.md", "LICENSE", "mcw_launcher.spec", "tools/build_release_zip.py"):

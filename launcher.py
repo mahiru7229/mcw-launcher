@@ -88,7 +88,8 @@ def _validate_startup_dependencies(project_root: Path | None = None) -> None:
         joined = "\n- ".join(missing)
         raise RuntimeError(
             "MCW Launcher installation is incomplete. Reapply the complete "
-            "v0.9.0-beta.2 patch before starting the launcher. Missing files:\n- "
+            "source package or reinstall the current release before starting "
+            "the launcher. Missing files:\n- "
             f"{joined}"
         )
 
@@ -167,7 +168,7 @@ def main() -> None:
 
         # Import and construct Qt widgets only on the GUI thread. Persistent I/O
         # above is isolated so a locked database cannot freeze the splash forever.
-        from src.gui.main_window_2 import MainWindow
+        from src.gui.main_window import MainWindow
 
         window = MainWindow(gpu_detection)
         startup_stage_key = "startup.finalizing"

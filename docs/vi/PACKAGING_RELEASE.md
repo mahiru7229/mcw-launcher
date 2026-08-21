@@ -1,60 +1,17 @@
-# Đóng gói và phát hành MCW Core 1.0.1
+# Đóng gói MCW Core
 
-## Kết quả audit từ file được cung cấp
+MCW Launcher `v1.5.0-alpha.1` có bundle implementation Core nhưng chủ động **không** phát hành source archive hoặc wheel Core độc lập.
 
-1. Wheel metadata khai báo version `1.0.0`.
-2. Wheel được upload có `src/config.py` báo `1.0.0-rc.1`, nên `mcw_core.__version__` có thể trả RC1 dù package metadata là stable.
-3. Repo core rút gọn chỉ include `mcw_core*`, nhưng `mcw_core` hiện import nhiều lớp từ `src`.
-4. Launcher source đầy đủ có pyproject include `mcw_core*`, `src`, `src.core*`, `src.models*`, `src.database*` và exclude GUI.
+Chỉ thực hiện đợt release Core riêng sau khi đã chốt version và phạm vi. Trước khi publish:
 
-Trước khi publish chính thức, phải đồng bộ version runtime và metadata.
+1. Đồng bộ version runtime, distribution và Git tag.
+2. Đóng gói `mcw_core*` cùng toàn bộ implementation/resource mà public API phụ thuộc; không đưa GUI, test hoặc dữ liệu người dùng vào wheel.
+3. Cài wheel trong môi trường Python 3.12 sạch trên Windows và Linux.
+4. Kiểm tra import `mcw_core` không cần PySide6, CLI, LAN Agent, examples và public API tests.
+5. Audit wheel để loại account database, private config, log, cache và credential.
 
-## Public package 1.0.0 nên chứa
+Mức ổn định:
 
-```toml
-[tool.setuptools.packages.find]
-include = ["mcw_core*", "src", "src.core*", "src.models*", "src.database*"]
-exclude = ["src.gui*", "test*"]
-```
-
-Đây là giải pháp compatibility cho 1.0.0. Mục tiêu dài hạn nên chuyển implementation thật vào namespace private của `mcw_core`, sau đó bỏ `src` khỏi wheel ở major release phù hợp.
-
-## Build
-
-```powershell
-python -m pip install build wheel
-python -m build
-```
-
-Kiểm tra wheel trong môi trường sạch:
-
-```powershell
-py -3.12 -m venv .venv-test
-.\.venv-test\Scripts\Activate.ps1
-python -m pip install dist\mcw_core-1.0.1-py3-none-any.whl
-python -c "import mcw_core; print(mcw_core.__version__)"
-python -c "import importlib.util; assert importlib.util.find_spec('PySide6') is None"
-```
-
-## Release validation
-
-- `mcw_core.__version__ == "1.0.0"`;
-- package metadata version 1.0.0;
-- import không cần PySide6;
-- LAN Agent resource tồn tại và checksum đúng;
-- CLI `mcw-core-launch --help` chạy;
-- examples compile;
-- public API tests xanh;
-- GUI không import `src.core`;
-- wheel không chứa account database, config, logs hoặc test data.
-
-## API stability
-
-- top-level `mcw_core`: stable;
-- `mcw_core.api.*`: public granular boundary;
-- `src.*`: implementation compatibility, không stable;
-- deprecation cần ít nhất một minor release trước khi xóa public symbol.
-
-## Distribution warning
-
-Wheel chỉ là code MIT của project. Mod/modpack tải bởi người dùng vẫn tuân theo license và provider policy riêng.
+- `mcw_core`: facade ổn định nên ưu tiên;
+- `mcw_core.api.*`: public boundary chi tiết;
+- `src.*`: implementation tương thích nội bộ, không phải contract cho consumer.

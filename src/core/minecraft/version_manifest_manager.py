@@ -7,6 +7,7 @@ import requests
 
 from src.core.fs.atomic_file import atomic_write_text
 from src.core.fs.paths import Paths
+from src.core.minecraft.metadata_validation import MinecraftMetadataValidation
 from src.models.minecraft.version_manifest import VersionManifest
 
 
@@ -74,7 +75,16 @@ class VersionManifestManager:
             for version in versions:
                 if not isinstance(version, dict):
                     return []
-                parsed.append(VersionManifest(id=str(version["id"]), type=str(version["type"]), url=str(version["url"]), release_time=datetime.fromisoformat(str(version["releaseTime"]))))
-        except (KeyError, TypeError, ValueError):
+                parsed.append(
+                    VersionManifest(
+                        id=MinecraftMetadataValidation.identifier(version["id"], "Minecraft version id"),
+                        type=str(version["type"]),
+                        url=str(version["url"]),
+                        release_time=datetime.fromisoformat(str(version["releaseTime"])),
+                        sha1=MinecraftMetadataValidation.sha1(version.get("sha1"), "version metadata SHA-1"),
+                        size=max(0, int(version.get("size", 0) or 0)),
+                    )
+                )
+        except (KeyError, TypeError, ValueError, RuntimeError):
             return []
         return parsed

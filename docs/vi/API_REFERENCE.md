@@ -1,4 +1,6 @@
-# Tham chiếu API MCW Core 1.0.1
+# Tham chiếu API MCW Core (snapshot legacy)
+
+> Snapshot từ thời 1.0.1 được giữ lại cho mục đích migration. Alpha 1 chưa phát hành Core độc lập; consumer hiện tại cần đối chiếu export trong `mcw_core` và `mcw_core.api`.
 
 Tài liệu này liệt kê public re-export modules và signature được đọc trực tiếp từ source/wheel. Kiểu trả về `Any` nghĩa là source không khai báo annotation rõ ràng.
 

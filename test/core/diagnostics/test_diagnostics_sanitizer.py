@@ -7,12 +7,12 @@ def test_sanitize_text_removes_windows_drive_letters_and_normalizes_paths(monkey
     monkeypatch.setattr(DiagnosticsSanitizer, "_known_roots", classmethod(lambda cls: ((Path("C:/mcw_launcher"), "root"),)))
 
     text = DiagnosticsSanitizer.sanitize_text(
-        'File "C:\\mcw_launcher\\src\\gui\\main_window_2.py" and D:\\Private\\logs\\latest.log'
+        'File "C:\\mcw_launcher\\src\\gui\\main_window.py" and D:\\Private\\logs\\latest.log'
     )
 
     assert "C:" not in text
     assert "D:" not in text
-    assert "root/src/gui/main_window_2.py" in text
+    assert "root/src/gui/main_window.py" in text
     assert "root/Private/logs/latest.log" in text
 
 

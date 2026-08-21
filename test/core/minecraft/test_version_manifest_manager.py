@@ -25,12 +25,16 @@ def make_manifest_data() -> dict:
                 "id": "1.21.8",
                 "type": "release",
                 "url": "https://example.com/1.21.8.json",
+                "sha1": "a" * 40,
+                "size": 1200,
                 "releaseTime": "2026-07-01T10:30:00+00:00",
             },
             {
                 "id": "26w28a",
                 "type": "snapshot",
                 "url": "https://example.com/26w28a.json",
+                "sha1": "b" * 40,
+                "size": 1400,
                 "releaseTime": "2026-07-08T12:00:00+00:00",
             },
         ],
@@ -225,12 +229,16 @@ def test_parse_manifest_returns_version_models():
     assert release.url == (
         "https://example.com/1.21.8.json"
     )
+    assert release.sha1 == "a" * 40
+    assert release.size == 1200
 
     assert snapshot.id == "26w28a"
     assert snapshot.type == "snapshot"
     assert snapshot.url == (
         "https://example.com/26w28a.json"
     )
+    assert snapshot.sha1 == "b" * 40
+    assert snapshot.size == 1400
 
 
 def test_parse_manifest_converts_release_time_to_datetime():
