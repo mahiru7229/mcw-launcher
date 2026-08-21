@@ -281,6 +281,29 @@ def test_parse_manifest_preserves_version_order():
     ]
 
 
+def test_parse_manifest_accepts_official_legacy_ids_with_spaces():
+    data = make_manifest_data()
+    data["versions"][0]["id"] = "1.14.2 Pre-Release 4"
+    data["versions"][1]["id"] = "3D Shareware v1.34"
+
+    result = VersionManifestManager._parse_manifest(data)
+
+    assert [version.id for version in result] == [
+        "1.14.2 Pre-Release 4",
+        "3D Shareware v1.34",
+    ]
+
+
+def test_parse_manifest_skips_one_unsafe_entry_without_discarding_valid_entries():
+    data = make_manifest_data()
+    unsafe = dict(data["versions"][0], id="../escape")
+    data["versions"].insert(0, unsafe)
+
+    result = VersionManifestManager._parse_manifest(data)
+
+    assert [version.id for version in result] == ["1.21.8", "26w28a"]
+
+
 @pytest.mark.parametrize(
     "invalid_manifest",
     [

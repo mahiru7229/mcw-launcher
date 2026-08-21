@@ -12,6 +12,7 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 - Chọn native library theo hệ điều hành thay vì hard-code Windows.
 - Nhận diện riêng Linux ARM64 thay vì ánh xạ nhầm sang x64.
 - Validate identifier, artifact path và digest từ metadata trước khi tạo đường dẫn local.
+- Chấp nhận các Minecraft version ID legacy chính thức có dấu cách; một entry lỗi không còn làm rỗng toàn bộ manifest.
 - Sắp xếp lại tài liệu, release notes và quy trình preflight.
 
 ### Removed

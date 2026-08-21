@@ -71,13 +71,13 @@ class VersionManifestManager:
             return []
 
         parsed: list[VersionManifest] = []
-        try:
-            for version in versions:
-                if not isinstance(version, dict):
-                    return []
+        for version in versions:
+            if not isinstance(version, dict):
+                continue
+            try:
                 parsed.append(
                     VersionManifest(
-                        id=MinecraftMetadataValidation.identifier(version["id"], "Minecraft version id"),
+                        id=MinecraftMetadataValidation.version_id(version["id"]),
                         type=str(version["type"]),
                         url=str(version["url"]),
                         release_time=datetime.fromisoformat(str(version["releaseTime"])),
@@ -85,6 +85,8 @@ class VersionManifestManager:
                         size=max(0, int(version.get("size", 0) or 0)),
                     )
                 )
-        except (KeyError, TypeError, ValueError, RuntimeError):
-            return []
+            except (KeyError, TypeError, ValueError, RuntimeError):
+                # One malformed or provider-specific historical entry must not
+                # make every valid Minecraft version disappear from the UI.
+                continue
         return parsed
