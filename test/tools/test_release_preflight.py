@@ -30,6 +30,15 @@ def test_find_merge_markers_reports_release_text_files(tmp_path: Path) -> None:
     assert errors == ["README.md:2: unresolved merge marker"]
 
 
+def test_find_merge_markers_ignores_local_test_and_environment_artifacts(tmp_path: Path) -> None:
+    for directory in (".alpha2-venv", ".venv", "pytest-of-root"):
+        path = tmp_path / directory / "fixture.py"
+        path.parent.mkdir(parents=True)
+        path.write_text("<<<<<<< fixture\n", encoding="utf-8")
+
+    assert find_merge_markers(tmp_path) == []
+
+
 def test_language_audit_accepts_matching_keys_and_placeholders(tmp_path: Path) -> None:
     translations = {"hello": "Hello", "welcome": "Welcome {name}"}
     write_pack(tmp_path / "lang" / "en-US.json", "en-US", translations)
@@ -47,7 +56,7 @@ def test_language_audit_reports_missing_keys_and_placeholder_mismatch(tmp_path: 
 
 def test_current_release_notes_exist() -> None:
     project_root = Path(__file__).resolve().parents[2]
-    assert (project_root / "docs" / f"RELEASE-{VERSION_TAG}.md").is_file()
+    assert (project_root / "docs" / "releases" / f"{VERSION_TAG}.md").is_file()
 
 
 def test_private_gateway_audit_rejects_unexpected_or_secret_configuration(tmp_path: Path) -> None:

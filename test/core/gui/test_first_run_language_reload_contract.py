@@ -6,7 +6,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 def test_first_run_setup_can_be_reopened_from_launcher_settings() -> None:
     page_source = (_REPO_ROOT / "src/gui/pages/launcher_settings_page.py").read_text(encoding="utf-8")
-    window_source = (_REPO_ROOT / "src/gui/main_window_2.py").read_text(encoding="utf-8")
+    window_source = (_REPO_ROOT / "src/gui/main_window.py").read_text(encoding="utf-8")
 
     assert "first_run_setup_requested = Signal()" in page_source
     assert "launcher_settings.first_run.button" in page_source
@@ -15,7 +15,7 @@ def test_first_run_setup_can_be_reopened_from_launcher_settings() -> None:
 
 
 def test_language_change_is_applied_only_after_a_clean_restart() -> None:
-    window_source = (_REPO_ROOT / "src/gui/main_window_2.py").read_text(encoding="utf-8")
+    window_source = (_REPO_ROOT / "src/gui/main_window.py").read_text(encoding="utf-8")
     apply_method = window_source.split("    def _apply_gui_settings(self, settings: dict) -> None:\n", 1)[1].split("\n    def _preview_theme", 1)[0]
 
     assert "language_manager.set_language(self._session_locale, notify=False)" in apply_method

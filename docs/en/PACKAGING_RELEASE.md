@@ -1,29 +1,17 @@
-# Packaging and Releasing MCW Core 1.0.1
+# Packaging MCW Core
 
-## Audit findings from the supplied artifacts
+MCW Launcher `v1.5.0-alpha.2` includes the Core implementation but deliberately does **not** publish a standalone Core source archive or wheel.
 
-1. Wheel metadata declares 1.0.0.
-2. The uploaded wheel contains `src/config.py` reporting `1.0.0-rc.1`, so `mcw_core.__version__` can disagree with package metadata.
-3. The reduced core repository packages only `mcw_core*`, while the facade currently imports implementation classes from `src`.
-4. The complete launcher source uses a compatibility wheel configuration that includes core/model/database implementation packages and excludes the GUI.
+The dedicated Core release must be performed only after its version and scope are chosen. Before publishing:
 
-Synchronize runtime and distribution versions before publishing.
+1. Synchronize runtime, distribution and Git tag versions.
+2. Package `mcw_core*` plus every implementation/resource dependency it imports; do not include GUI, tests or user data.
+3. Install the wheel in a clean Python 3.12 environment on Windows and Linux.
+4. Verify importing `mcw_core` without PySide6, the CLI, bundled LAN Agent, examples and public API tests.
+5. Audit the wheel for account databases, private config, logs, cache and credentials.
 
-## Compatibility package configuration
+Stability levels:
 
-For the first stable release, include `mcw_core*`, `src`, `src.core*`, `src.models*` and `src.database*`, while excluding `src.gui*` and tests. A future internal refactor should move implementation under a private `mcw_core` namespace before removing `src` from the wheel.
-
-## Build and verify
-
-```powershell
-python -m pip install build wheel
-python -m build
-```
-
-Install the wheel in a clean Python 3.12 environment, verify `mcw_core.__version__ == "1.0.0"`, verify import without PySide6, test the CLI, bundled LAN agent, public API tests and all examples.
-
-## Stability levels
-
-- `mcw_core`: stable facade;
-- `mcw_core.api.*`: public granular boundary;
-- `src.*`: compatibility implementation, not a consumer contract.
+- `mcw_core`: preferred stable facade;
+- `mcw_core.api.*`: granular public boundary;
+- `src.*`: private compatibility implementation, not a consumer contract.

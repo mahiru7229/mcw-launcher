@@ -9,8 +9,8 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
-import src.gui.main_window_2 as main_window_module
-from src.gui.main_window_2 import MainWindow
+import src.gui.main_window as main_window_module
+from src.gui.main_window import MainWindow
 
 
 class _Button:

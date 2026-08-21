@@ -18,7 +18,18 @@ from src.core.lan.lan_agent_manager import LanAgentManager
 from src.core.theme.theme_contract import ASSET_CATALOG_FILENAME, CONTRACT_FILENAME, SCHEMA_FILENAME, THEME_SCHEMA_VERSION, build_theme_asset_catalog_v1, build_theme_runtime_contract_v1, build_theme_schema_v6
 
 TEXT_SUFFIXES = {".json", ".md", ".ps1", ".py", ".txt", ".yml", ".yaml"}
-IGNORED_DIRECTORIES = {".git", ".pytest_cache", ".venv", "__pycache__", "build", "cache", "dist", "release"}
+IGNORED_DIRECTORIES = {
+    ".alpha2-venv",
+    ".git",
+    ".pytest_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "cache",
+    "dist",
+    "pytest-of-root",
+    "release",
+}
 CONFLICT_MARKERS = ("<<<<<<<", "=======", ">>>>>>>")
 PLACEHOLDER_PATTERN = re.compile(r"(?<!\{)\{([A-Za-z_][A-Za-z0-9_]*)[^{}]*\}(?!\})")
 
@@ -390,7 +401,7 @@ def audit_version_metadata(project_root: Path) -> list[str]:
     if UPDATE_CHANNEL != expected_channel:
         errors.append(f"{VERSION_ID} must use update channel {expected_channel}, got {UPDATE_CHANNEL}")
 
-    release_notes = project_root / "docs" / f"RELEASE-{VERSION_TAG}.md"
+    release_notes = project_root / "docs" / "releases" / f"{VERSION_TAG}.md"
     if not release_notes.is_file():
         errors.append(f"Missing release notes: {release_notes.relative_to(project_root)}")
     for required in ("README.md", "LICENSE", "mcw_launcher.spec", "tools/build_release_zip.py"):

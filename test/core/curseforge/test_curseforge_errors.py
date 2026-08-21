@@ -65,7 +65,7 @@ def test_modpack_manual_download_exception_has_stable_module_and_legacy_reexport
     assert error.expected_loader == ""
 
 def test_gui_imports_curseforge_recovery_errors_from_stable_module() -> None:
-    main_window = Path("src/gui/main_window_2.py").read_text(encoding="utf-8")
+    main_window = Path("src/gui/main_window.py").read_text(encoding="utf-8")
     controller = Path("src/gui/controllers/curseforge_controller.py").read_text(encoding="utf-8")
 
     assert "from mcw_core.api.curseforge.curseforge_errors import" in main_window

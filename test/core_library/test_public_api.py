@@ -155,14 +155,14 @@ def test_gui_uses_mcw_core_boundary_instead_of_src_core() -> None:
     assert not violations, "Launcher bypasses the MCW Core public boundary:\n" + "\n".join(violations)
 
 
-def test_headless_distribution_excludes_gui_and_pyside_dependency() -> None:
+def test_launcher_distribution_includes_gui_and_bundled_core() -> None:
     data = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     dependencies = tuple(data["project"]["dependencies"])
     package_find = data["tool"]["setuptools"]["packages"]["find"]
 
-    assert all("pyside" not in item.casefold() for item in dependencies)
-    assert "src.gui*" in package_find["exclude"]
+    assert any("pyside" in item.casefold() for item in dependencies)
     assert "mcw_core*" in package_find["include"]
+    assert "src*" in package_find["include"]
 
 
 def test_packaged_lan_agent_is_available_outside_project_root(tmp_path: Path) -> None:

@@ -14,7 +14,7 @@ def test_atlauncher_browser_reuses_rich_detail_panel() -> None:
 
 
 def test_atlauncher_is_wired_through_instance_creation_and_main_window() -> None:
-    main = read("src/gui/main_window_2.py")
+    main = read("src/gui/main_window.py")
     workspace = read("src/gui/pages/instance_workspace_page.py")
     create_dialog = read("src/gui/dialogs/create_instance_dialog.py")
 

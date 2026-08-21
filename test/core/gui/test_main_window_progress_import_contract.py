@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-MAIN_WINDOW = PROJECT_ROOT / "src" / "gui" / "main_window_2.py"
+MAIN_WINDOW = PROJECT_ROOT / "src" / "gui" / "main_window.py"
 PROGRESS_SYMBOLS = {"ProgressEvent", "ProgressState", "ProgressStage"}
 
 
@@ -25,4 +25,4 @@ def test_main_window_imports_every_progress_symbol_it_uses() -> None:
             continue
         imported.update(alias.asname or alias.name for alias in node.names)
 
-    assert used <= imported, f"Missing progress imports in main_window_2.py: {sorted(used - imported)}"
+    assert used <= imported, f"Missing progress imports in main_window.py: {sorted(used - imported)}"

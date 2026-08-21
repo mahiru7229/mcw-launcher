@@ -72,3 +72,19 @@ def test_scan_requests_java_diagnostics_and_latest_release(gui_app, monkeypatch:
     controller.scan()
 
     assert task_ids == [("java.scan", False), ("java.latest_release", False)]
+
+
+def test_startup_scan_can_skip_latest_release(gui_app, monkeypatch: pytest.MonkeyPatch):
+    runner = TaskRunner()
+    controller = JavaController(runner)
+    task_ids = []
+
+    def run(task_id, task, message, blocking=True, **_kwargs):
+        task_ids.append((task_id, blocking))
+        return True
+
+    monkeypatch.setattr(runner, "run", run)
+
+    controller.scan(check_latest_release=False)
+
+    assert task_ids == [("java.scan", False)]

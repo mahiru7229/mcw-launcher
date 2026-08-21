@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QApplication
 from src.gui.dark_theme import apply_forced_dark_theme, configure_forced_dark_attributes
 from src.gui.dialogs.message_box_compat import install_message_box_compatibility
 from src.gui.input_guard import install_combo_box_wheel_guard
+from src.gui.widget.adaptive_combo_box import install_adaptive_combo_boxes
 
 
 def _application_icon_path() -> Path:
@@ -40,4 +41,5 @@ def create_application(arguments: Sequence[str] | None = None) -> QApplication:
         app._combo_box_wheel_guard = install_combo_box_wheel_guard(app)
     if not hasattr(app, "_message_box_compatibility_filter"):
         app._message_box_compatibility_filter = install_message_box_compatibility(app)
+    install_adaptive_combo_boxes(app)
     return app
