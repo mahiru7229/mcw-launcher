@@ -52,7 +52,13 @@ class AdaptiveComboBoxManager(QObject):
 
         text = combo.currentText() or combo.placeholderText() or " "
         text_width = combo.fontMetrics().horizontalAdvance(text)
-        icon_width = combo.iconSize().width() + 8 if not combo.currentIcon().isNull() else 0
+        current_index = combo.currentIndex()
+        current_icon = combo.itemIcon(current_index) if current_index >= 0 else None
+        icon_width = (
+            combo.iconSize().width() + 8
+            if current_icon is not None and not current_icon.isNull()
+            else 0
+        )
         unbounded = text_width + icon_width + self.TEXT_CHROME_WIDTH
         desired = max(minimum, min(maximum, unbounded))
 

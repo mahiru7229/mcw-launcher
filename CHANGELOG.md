@@ -17,6 +17,10 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 - HTTP client hỗ trợ SOCKS proxy từ environment.
 - Linux x64 được nâng từ nền tảng ban đầu thành source-test target.
 
+### Fixed
+
+- Adaptive combobox lấy icon của mục đang chọn qua API `itemIcon()` tương thích PySide6.
+
 ### Known limitations
 
 - Chưa có AppImage/DEB và automatic updater cho Linux.

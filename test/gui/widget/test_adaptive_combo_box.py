@@ -8,6 +8,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
+from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import QApplication, QComboBox, QWidget
 
 from src.gui.widget.adaptive_combo_box import AdaptiveComboBoxManager
@@ -46,3 +47,22 @@ def test_combo_caps_long_text_and_sets_tooltip() -> None:
 
     assert combo.width() == 160
     assert combo.toolTip() == combo.currentText()
+
+
+def test_combo_resizes_selected_item_with_icon() -> None:
+    app = _application()
+    combo = QComboBox()
+    icon_pixmap = QPixmap(16, 16)
+    icon_pixmap.fill()
+    combo.addItem(QIcon(icon_pixmap), "Minecraft 1.21")
+    manager = AdaptiveComboBoxManager(app)
+
+    manager.refresh(combo)
+
+    expected_minimum = (
+        combo.fontMetrics().horizontalAdvance(combo.currentText())
+        + combo.iconSize().width()
+        + 8
+        + manager.TEXT_CHROME_WIDTH
+    )
+    assert combo.width() >= expected_minimum
