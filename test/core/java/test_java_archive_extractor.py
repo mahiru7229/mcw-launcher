@@ -1,5 +1,7 @@
 from pathlib import Path
 from io import BytesIO
+import os
+import stat
 import tarfile
 from zipfile import ZipFile
 
@@ -45,4 +47,6 @@ def test_extracts_linux_tar_and_preserves_java_executable(tmp_path: Path) -> Non
 
     java = java_home / "bin" / "java"
     assert java.is_file()
-    assert java.stat().st_mode & 0o100
+    assert java.read_bytes() == payload
+    if os.name != "nt":
+        assert java.stat().st_mode & stat.S_IXUSR

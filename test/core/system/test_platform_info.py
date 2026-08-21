@@ -40,3 +40,15 @@ def test_linux_x64_supports_managed_java(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr("src.core.system.platform_info.platform.machine", lambda: "x86_64")
 
     assert PlatformInfo.supports_managed_java() is True
+
+
+def test_empty_system_name_uses_normalized_sys_platform(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("src.core.system.platform_info.platform.system", lambda: "")
+    monkeypatch.setattr("src.core.system.platform_info.platform.machine", lambda: "AMD64")
+    monkeypatch.setattr("src.core.system.platform_info.sys.platform", "win32")
+
+    profile = PlatformInfo.current()
+
+    assert profile.os_name == "windows"
+    assert profile.java_executable == "javaw.exe"
+    assert profile.archive_suffix == ".zip"

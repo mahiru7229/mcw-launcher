@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
 import platform
 import sys
 
@@ -38,12 +37,23 @@ class PlatformInfo:
     def current(cls) -> PlatformProfile:
         system = platform.system().strip().casefold()
         machine = platform.machine().strip().casefold()
-        os_name = cls._OS_NAMES.get(system, system or sys.platform.casefold())
+        fallback = sys.platform.strip().casefold()
+        if fallback.startswith("win"):
+            fallback = "windows"
+        elif fallback.startswith("linux"):
+            fallback = "linux"
+        elif fallback == "darwin":
+            fallback = "mac"
+        os_name = cls._OS_NAMES.get(system, system or fallback)
         architecture, adoptium_architecture = cls._ARCHITECTURES.get(
             machine,
             (machine or "unknown", machine or "unknown"),
         )
-        is_windows = os_name == "windows" or os.name == "nt"
+        # Keep every platform-specific value derived from the same detected
+        # profile. Mixing in os.name makes cross-platform tests (and any
+        # caller-supplied platform probe) produce a Linux profile containing
+        # Windows Java/archive names when the host process is Windows.
+        is_windows = os_name == "windows"
         return PlatformProfile(
             os_name=os_name,
             architecture=architecture,
