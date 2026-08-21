@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcw-launcher"
-version = "1.5.0a1"
+version = "1.5.0a2"
 description = "Instance-first Minecraft launcher for Windows and Linux"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -12,7 +12,8 @@ license = {text = "MIT"}
 authors = [{name = "mahiru7229"}]
 dependencies = [
     "PySide6>=6.8,<7",
-    "httpx>=0.28,<1",
+    "cryptography>=46,<47",
+    "httpx[socks]>=0.28,<1",
     "requests>=2.32,<3",
     "pywin32>=311; sys_platform == 'win32'",
 ]

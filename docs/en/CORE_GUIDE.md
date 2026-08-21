@@ -1,6 +1,6 @@
 # MCW Core Guide (legacy API reference)
 
-> This guide originated with MCW Core 1.0.1. Alpha 1 bundles Core with the launcher and does not publish a standalone wheel. Verify signatures against the current `mcw_core` public surface until the dedicated Core release is prepared.
+> This guide originated with MCW Core 1.0.1. Alpha 2 bundles Core with the launcher and does not publish a standalone wheel. Verify signatures against the current `mcw_core` public surface until the dedicated Core release is prepared.
 
 ## 1. Purpose
 
@@ -8,7 +8,7 @@ This guide explains how to use MCW Core as the backend of an independent Minecra
 
 ## 2. Installation
 
-For Alpha 1, use Core from the launcher source tree:
+For Alpha 2, use Core from the launcher source tree:
 
 ```powershell
 py -3.12 -m venv .venv

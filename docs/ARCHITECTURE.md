@@ -1,6 +1,6 @@
 # Kiến trúc MCW Launcher
 
-Tài liệu này mô tả ranh giới kiến trúc áp dụng từ `v1.5.0-alpha.1`. Mục tiêu là giảm phụ thuộc chéo, giữ startup không bị network I/O ngầm và chuẩn bị implementation đa nền tảng.
+Tài liệu này mô tả ranh giới kiến trúc áp dụng từ `v1.5.0-alpha.2`. Mục tiêu là giảm phụ thuộc chéo, giữ startup không bị network I/O ngầm và chuẩn bị implementation đa nền tảng.
 
 ## Các lớp chính
 
@@ -44,7 +44,7 @@ Các thư mục runtime chính do `Paths` quản lý:
 
 Rule của Minecraft dùng tên chuẩn `windows`, `linux`, `osx` và kiến trúc `x86`, `x64`, `arm64`. Code nghiệp vụ không được giả định `windows`, `javaw.exe`, dấu `;` của classpath hoặc archive ZIP nếu chưa đi qua abstraction theo nền tảng.
 
-Trong Alpha 1, native library selection và architecture detection đã theo nền tảng. Các phần Java provisioning, executable packaging, OS integration và LAN cần tiếp tục được tách trước khi Linux được đánh dấu supported.
+Trong Alpha 2, native selection, Java discovery/provisioning, archive extraction và credential protection đã có nhánh Linux. Executable packaging, Forge-family smoke test và một số OS integration vẫn cần hoàn thiện trước khi Linux được đánh dấu stable.
 
 ## Nguyên tắc refactor
 

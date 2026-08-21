@@ -2,6 +2,26 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.0-alpha.2] - 2026-08-21
+
+### Added
+
+- Linux platform profile, Adoptium metadata selection và managed Java TAR.GZ extraction.
+- Linux credential encryption backend và Linux preflight tool.
+- Adaptive sizing cho toàn bộ combobox trong GUI.
+- Ubuntu Qt dependencies trong CI.
+
+### Changed
+
+- Java discovery dùng executable/path theo nền tảng.
+- HTTP client hỗ trợ SOCKS proxy từ environment.
+- Linux x64 được nâng từ nền tảng ban đầu thành source-test target.
+
+### Known limitations
+
+- Chưa có AppImage/DEB và automatic updater cho Linux.
+- Forge/NeoForge, Microsoft login và Linux ARM64 chưa nằm trong release gate.
+
 ## [1.5.0-alpha.1] - 2026-08-21
 
 ### Changed
@@ -32,4 +52,5 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 Maintenance release của nhánh 1.4, tập trung Java recovery/download và Diagnostics v2.1. Xem tag `v1.4.1` trong GitHub Releases để đọc release notes đầy đủ.
 
 [1.5.0-alpha.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.1
+[1.5.0-alpha.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.2
 [1.4.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.1

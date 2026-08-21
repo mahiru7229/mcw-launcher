@@ -18,7 +18,18 @@ from src.core.lan.lan_agent_manager import LanAgentManager
 from src.core.theme.theme_contract import ASSET_CATALOG_FILENAME, CONTRACT_FILENAME, SCHEMA_FILENAME, THEME_SCHEMA_VERSION, build_theme_asset_catalog_v1, build_theme_runtime_contract_v1, build_theme_schema_v6
 
 TEXT_SUFFIXES = {".json", ".md", ".ps1", ".py", ".txt", ".yml", ".yaml"}
-IGNORED_DIRECTORIES = {".git", ".pytest_cache", ".venv", "__pycache__", "build", "cache", "dist", "release"}
+IGNORED_DIRECTORIES = {
+    ".alpha2-venv",
+    ".git",
+    ".pytest_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "cache",
+    "dist",
+    "pytest-of-root",
+    "release",
+}
 CONFLICT_MARKERS = ("<<<<<<<", "=======", ">>>>>>>")
 PLACEHOLDER_PATTERN = re.compile(r"(?<!\{)\{([A-Za-z_][A-Za-z0-9_]*)[^{}]*\}(?!\})")
 

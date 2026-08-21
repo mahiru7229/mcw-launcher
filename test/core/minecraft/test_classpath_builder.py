@@ -436,7 +436,7 @@ def test_build_accepts_windows_style_artifact_path(
     )
 
     assert result.split(os.pathsep)[0] == str(
-        libraries_dir / Path(artifact_path)
+        libraries_dir / Path("com/example/library.jar")
     )
 
 

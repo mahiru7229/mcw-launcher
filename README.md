@@ -12,12 +12,12 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.5.0--alpha.1-orange" alt="v1.5.0-alpha.1">
+  <img src="https://img.shields.io/badge/version-v1.5.0--alpha.2-orange" alt="v1.5.0-alpha.2">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!WARNING]
-> `v1.5.0-alpha.1` là bản phát triển để tái cấu trúc code và đặt nền móng cho Linux. Hãy sao lưu thư mục instance trước khi thử nghiệm. Bản Windows vẫn là nền tảng chính; Linux chưa được xem là hoàn thiện ở Alpha 1.
+> `v1.5.0-alpha.2` là bản thử nghiệm chạy source trên Lubuntu. Hãy sao lưu thư mục instance trước khi thử nghiệm. Windows vẫn là nền tảng release chính; Linux chưa có binary và chưa được xem là stable.
 
 ## Tổng quan
 
@@ -35,11 +35,11 @@ Các nhóm tính năng chính:
 
 ## Trạng thái nền tảng
 
-| Nền tảng | Trạng thái Alpha 1 | Ghi chú |
+| Nền tảng | Trạng thái Alpha 2 | Ghi chú |
 | --- | --- | --- |
 | Windows 10/11 x64 | Đang hỗ trợ | Luồng chính và bản đóng gói PyInstaller hiện tại. |
-| Linux x64 | Đang thử nghiệm | Đã có nhận diện rule/native và CI; Java provisioning, packaging và một số tích hợp hệ thống còn cần hoàn thiện. |
-| Linux ARM64 | Nền tảng ban đầu | Nhận diện đúng kiến trúc; chưa có cam kết tương thích runtime/game. |
+| Linux x64 | Alpha 2 source test | Native rules, Java discovery/provisioning, `tar.gz`, credential storage và CI đã có; cần smoke test game trên Lubuntu. |
+| Linux ARM64 | Nền tảng ban đầu | Nhận diện và metadata Java đúng; chưa có cam kết launch game. |
 | macOS | Chưa hỗ trợ | Chưa nằm trong phạm vi v1.5. |
 
 ## Yêu cầu
@@ -93,13 +93,19 @@ Chạy kiểm tra trước release:
 python -m tools.release_preflight
 ```
 
+Trên Lubuntu, chạy preflight riêng trước khi mở GUI:
+
+```bash
+python tools/linux_preflight.py
+```
+
 Build Windows hiện tại:
 
 ```powershell
 .\build_release.ps1
 ```
 
-Build Linux chưa phải deliverable của Alpha 1. Không nên dùng script Windows hoặc đổi đuôi artifact để giả lập một bản Linux release.
+Alpha 2 cung cấp source để test Linux, chưa cung cấp AppImage hoặc `.deb`. Không nên dùng script Windows hoặc đổi đuôi artifact để giả lập Linux release.
 
 ## Kiến trúc repository
 
@@ -122,12 +128,13 @@ GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, khô
 ## Tài liệu
 
 - [Quickstart](docs/QUICKSTART.md)
+- [Kiểm thử trên Lubuntu](docs/LINUX_TESTING.md)
 - [Kiến trúc](docs/ARCHITECTURE.md)
 - [Instance system](docs/INSTANCE_SYSTEM.md)
 - [MCW Core API](docs/MCW_CORE_LIBRARY.md)
 - [Language packs](docs/LANGUAGE_PACKS.md)
 - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
-- [Release notes v1.5.0-alpha.1](docs/releases/v1.5.0-alpha.1.md)
+- [Release notes v1.5.0-alpha.2](docs/releases/v1.5.0-alpha.2.md)
 - [Changelog](CHANGELOG.md)
 
 ## Đóng góp và bảo mật

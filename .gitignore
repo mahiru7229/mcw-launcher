@@ -12,6 +12,7 @@ dist/
 config/*
 !config/curseforge.example.json
 config/private/
+config/private/credential.key
 instances/
 logs/
 cache/

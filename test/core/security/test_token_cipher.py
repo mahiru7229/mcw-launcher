@@ -5,6 +5,7 @@ import base64
 import pytest
 
 from src.core.security.token_cipher import TokenCipher
+from src.core.fs.paths import Paths
 
 
 class FakeDPAPI:
@@ -42,3 +43,19 @@ def test_cipher_reads_legacy_dpapi_payload(monkeypatch: pytest.MonkeyPatch) -> N
 
     assert TokenCipher.needs_upgrade(legacy_value)
     assert TokenCipher.decrypt(legacy_value, "ignored-purpose") == "legacy-token"
+
+
+def test_portable_cipher_round_trip_is_bound_to_purpose(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(TokenCipher, "_backend", None)
+    monkeypatch.setattr(Paths, "CONFIG_ROOT", tmp_path / "config")
+
+    protected = TokenCipher.encrypt("refresh-secret", "account:one:refresh")
+
+    assert protected.startswith(TokenCipher.PORTABLE_PREFIX)
+    assert TokenCipher.decrypt(protected, "account:one:refresh") == "refresh-secret"
+    assert (Paths.CONFIG_ROOT / "private" / "credential.key").is_file()
+    with pytest.raises(RuntimeError, match="could not be unlocked"):
+        TokenCipher.decrypt(protected, "account:two:refresh")

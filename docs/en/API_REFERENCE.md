@@ -1,6 +1,6 @@
 # MCW Core API Reference (legacy snapshot)
 
-> This 1.0.1-era snapshot is retained for migration context. Alpha 1 does not ship a standalone Core artifact; current consumers should verify exports from `mcw_core` and `mcw_core.api`.
+> This 1.0.1-era snapshot is retained for migration context. Alpha 2 does not ship a standalone Core artifact; current consumers should verify exports from `mcw_core` and `mcw_core.api`.
 
 This reference lists public re-export modules and signatures read directly from the supplied source/wheel. `Any` means the source does not provide an explicit return annotation.
 

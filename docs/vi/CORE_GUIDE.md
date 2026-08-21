@@ -1,6 +1,6 @@
 # Hướng dẫn MCW Core (tham chiếu API legacy)
 
-> Tài liệu này bắt nguồn từ MCW Core 1.0.1. Alpha 1 chỉ bundle Core cùng launcher và chưa phát hành wheel/source Core độc lập. Hãy đối chiếu signature với public surface `mcw_core` hiện tại cho tới đợt release Core riêng.
+> Tài liệu này bắt nguồn từ MCW Core 1.0.1. Alpha 2 chỉ bundle Core cùng launcher và chưa phát hành wheel/source Core độc lập. Hãy đối chiếu signature với public surface `mcw_core` hiện tại cho tới đợt release Core riêng.
 
 ## 1. Mục tiêu của tài liệu
 
@@ -24,7 +24,7 @@ Tài liệu này giải thích cách sử dụng MCW Core để xây một launc
 
 ## 2. Cài đặt
 
-### Dùng Core bundle trong source Alpha 1
+### Dùng Core bundle trong source Alpha 2
 
 ```powershell
 py -3.12 -m venv .venv
