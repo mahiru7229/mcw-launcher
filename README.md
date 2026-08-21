@@ -17,7 +17,7 @@
 </p>
 
 > [!WARNING]
-> `v1.5.0-alpha.2` là bản thử nghiệm chạy source trên Lubuntu. Hãy sao lưu thư mục instance trước khi thử nghiệm. Windows vẫn là nền tảng release chính; Linux chưa có binary và chưa được xem là stable.
+> `v1.5.0-alpha.2` là bản thử nghiệm chạy source trên Lubuntu. Vanilla Minecraft đã được smoke-test thành công, nhưng hãy sao lưu thư mục instance trước khi thử nghiệm. Windows vẫn là nền tảng release chính; Linux chưa có binary và chưa được xem là stable.
 
 ## Tổng quan
 
@@ -38,14 +38,14 @@ Các nhóm tính năng chính:
 | Nền tảng | Trạng thái Alpha 2 | Ghi chú |
 | --- | --- | --- |
 | Windows 10/11 x64 | Đang hỗ trợ | Luồng chính và bản đóng gói PyInstaller hiện tại. |
-| Linux x64 | Alpha 2 source test | Native rules, Java discovery/provisioning, `tar.gz`, credential storage và CI đã có; cần smoke test game trên Lubuntu. |
+| Linux x64 | Alpha 2 đã smoke-test | Native rules, Java discovery/provisioning, `tar.gz`, credential storage và Vanilla 1.21.1 đã được xác nhận trên Lubuntu 24.04/VirtualBox. |
 | Linux ARM64 | Nền tảng ban đầu | Nhận diện và metadata Java đúng; chưa có cam kết launch game. |
 | macOS | Chưa hỗ trợ | Chưa nằm trong phạm vi v1.5. |
 
 ## Yêu cầu
 
 - Python 3.12 trở lên.
-- Git và kết nối Internet để tải metadata/game content.
+- Git và kết nối Internet cho lần tải metadata/game content đầu tiên; instance đã cache đầy đủ vẫn có thể launch offline.
 - Windows 10/11 hoặc một bản phân phối Linux x64 để thử nghiệm.
 - Java không bắt buộc cài sẵn cho mọi trường hợp; launcher có cơ chế quản lý runtime, nhưng luồng Linux vẫn đang được hoàn thiện.
 

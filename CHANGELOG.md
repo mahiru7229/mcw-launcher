@@ -10,16 +10,21 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 - Linux credential encryption backend và Linux preflight tool.
 - Adaptive sizing cho toàn bộ combobox trong GUI.
 - Ubuntu Qt dependencies trong CI.
+- Cảnh báo offline không chặn launch và thông báo khi kết nối Internet được khôi phục.
 
 ### Changed
 
 - Java discovery dùng executable/path theo nền tảng.
 - HTTP client hỗ trợ SOCKS proxy từ environment.
 - Linux x64 được nâng từ nền tảng ban đầu thành source-test target.
+- Manifest, Minecraft version metadata và Java startup dùng chiến lược cache-first để tránh chờ network timeout khi offline.
+- Kiểm tra cập nhật và JDK online được hoãn hoặc bỏ qua khi chưa có kết nối.
 
 ### Fixed
 
 - Adaptive combobox lấy icon của mục đang chọn qua API `itemIcon()` tương thích PySide6.
+- Bổ sung lại các module cấu hình Core bị thiếu khỏi source package.
+- Vanilla Minecraft 1.21.1 đã được smoke-test thành công trên Lubuntu 24.04 trong VirtualBox, gồm cả cached offline launch.
 
 ### Known limitations
 
