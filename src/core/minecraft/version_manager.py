@@ -45,6 +45,8 @@ class VersionManager:
     def _download_version(version: VersionManifest) -> Path | None:
         version_path = Paths.version_json(version)
         version_path.parent.mkdir(parents=True, exist_ok=True)
+        if VersionManager._cached_metadata_is_valid(version_path, version):
+            return version_path
         try:
             return HttpDownloader.download(
                 download_info=version,

@@ -30,9 +30,10 @@ class JavaController(BaseController):
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
 
-    def scan(self) -> None:
+    def scan(self, *, check_latest_release: bool = True) -> None:
         self._task_runner.run(self.SCAN_TASK_ID, lambda: self._core.java.scan(self.progress_received.emit), tr("Scanning Java installations..."), blocking=False, conflict_policy=TaskConflictPolicy.REPLACE)
-        self.refresh_latest_release()
+        if check_latest_release:
+            self.refresh_latest_release()
 
     def refresh_latest_release(self) -> None:
         self._task_runner.run(self.LATEST_RELEASE_TASK_ID, self._core.java.latest_feature_release, tr("launcher_settings.java.latest_checking"), blocking=False, conflict_policy=TaskConflictPolicy.REPLACE)

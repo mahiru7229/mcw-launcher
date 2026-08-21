@@ -16,7 +16,15 @@ MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 
 class VersionManifestManager:
     @staticmethod
-    def get() -> list[VersionManifest]:
+    def get(*, force_refresh: bool = False) -> list[VersionManifest]:
+        manifest_path = Paths.version_manifest()
+        if not force_refresh:
+            cached = VersionManifestManager._parse_manifest(
+                VersionManifestManager._load_manifest(manifest_path)
+            )
+            if cached:
+                return cached
+
         manifest_path = VersionManifestManager._download_manifest()
         manifest_data = VersionManifestManager._load_manifest(manifest_path)
         return VersionManifestManager._parse_manifest(manifest_data)
@@ -52,9 +60,12 @@ class VersionManifestManager:
         return data if isinstance(data, dict) else {}
 
     @staticmethod
-    def latest_version(is_snapshot: bool = False) -> str:
-        manifest_path = VersionManifestManager._download_manifest()
+    def latest_version(is_snapshot: bool = False, *, force_refresh: bool = False) -> str:
+        manifest_path = Paths.version_manifest()
         manifest_data = VersionManifestManager._load_manifest(manifest_path)
+        if force_refresh or not isinstance(manifest_data.get("latest"), dict):
+            manifest_path = VersionManifestManager._download_manifest()
+            manifest_data = VersionManifestManager._load_manifest(manifest_path)
         latest = manifest_data.get("latest")
         if not isinstance(latest, dict):
             return ""

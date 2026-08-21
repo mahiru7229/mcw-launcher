@@ -21,12 +21,22 @@ class VersionController(BaseController):
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
 
-    def refresh(self) -> None:
-        self._run_network_task(self._task_runner, self.TASK_ID, self._load_versions, tr("Loading Minecraft version manifest..."), blocking=False)
+    def refresh(self, *, force_refresh: bool = False) -> None:
+        self._run_network_task(
+            self._task_runner,
+            self.TASK_ID,
+            lambda: self._load_versions(force_refresh=force_refresh),
+            tr("Loading Minecraft version manifest..."),
+            blocking=False,
+        )
 
     @staticmethod
-    def _load_versions() -> list[Any]:
-        versions = VersionManifestManager.get()
+    def _load_versions(*, force_refresh: bool = False) -> list[Any]:
+        versions = (
+            VersionManifestManager.get(force_refresh=True)
+            if force_refresh
+            else VersionManifestManager.get()
+        )
         if not versions:
             raise RuntimeError(tr("Minecraft version manifest is unavailable."))
         return versions

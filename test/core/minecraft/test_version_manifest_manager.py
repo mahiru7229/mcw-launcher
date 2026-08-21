@@ -380,7 +380,7 @@ def test_get_orchestrates_download_load_and_parse(
         fake_parse,
     )
 
-    result = VersionManifestManager.get()
+    result = VersionManifestManager.get(force_refresh=True)
 
     assert result is parsed_result
     assert calls == [
@@ -388,6 +388,24 @@ def test_get_orchestrates_download_load_and_parse(
         ("load", manifest_path),
         ("parse", manifest_data),
     ]
+
+
+def test_get_uses_valid_cache_without_network(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(make_manifest_data()), encoding="utf-8")
+    monkeypatch.setattr(Paths, "version_manifest", lambda: manifest_path)
+    monkeypatch.setattr(
+        VersionManifestManager,
+        "_download_manifest",
+        lambda: (_ for _ in ()).throw(AssertionError("unexpected network refresh")),
+    )
+
+    result = VersionManifestManager.get()
+
+    assert [version.id for version in result] == ["1.21.8", "26w28a"]
 
 
 def test_latest_version_returns_latest_release(
@@ -468,7 +486,9 @@ def test_latest_version_returns_empty_string_for_invalid_manifest(
 
 def test_latest_version_returns_empty_string_after_download_failure(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ):
+    monkeypatch.setattr(Paths, "version_manifest", lambda: tmp_path / "missing.json")
     monkeypatch.setattr(
         VersionManifestManager,
         "_download_manifest",

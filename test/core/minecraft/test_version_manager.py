@@ -282,8 +282,33 @@ def test_download_version_uses_verified_cache_when_network_fails(
     manifest.size = version_path.stat().st_size
 
     monkeypatch.setattr(Paths, "version_json", lambda _version: version_path)
+    checks = iter((False, True))
     monkeypatch.setattr(HttpDownloader, "download", lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("offline")))
-    monkeypatch.setattr(HttpDownloader, "verify_sha1", lambda path, sha1: path == version_path and sha1 == manifest.sha1)
+    monkeypatch.setattr(HttpDownloader, "verify_sha1", lambda path, sha1: next(checks))
+
+    assert VersionManager._download_version(manifest) == version_path
+
+
+def test_download_version_uses_verified_cache_without_network(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    manifest = make_manifest("1.20.1")
+    version_path = tmp_path / "version.json"
+    version_path.write_text(json.dumps(make_version_data()), encoding="utf-8")
+    manifest.size = version_path.stat().st_size
+
+    monkeypatch.setattr(Paths, "version_json", lambda _version: version_path)
+    monkeypatch.setattr(
+        HttpDownloader,
+        "download",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected network download")),
+    )
+    monkeypatch.setattr(
+        HttpDownloader,
+        "verify_sha1",
+        lambda path, sha1: path == version_path and sha1 == manifest.sha1,
+    )
 
     assert VersionManager._download_version(manifest) == version_path
 

@@ -38,6 +38,7 @@ from src.gui.controllers.account_controller import AccountController
 from src.gui.controllers.curseforge_controller import CurseForgeController
 from src.gui.controllers.content_pack_controller import ContentPackController
 from src.gui.controllers.content_library_controller import ContentLibraryController
+from src.gui.controllers.connectivity_controller import ConnectivityController
 from src.gui.controllers.ftb_controller import FTBController
 from src.gui.controllers.atlauncher_controller import ATLauncherController
 from src.gui.controllers.backup_controller import BackupController
@@ -116,6 +117,7 @@ class MainWindow(QMainWindow):
         self.task_runner = TaskRunner(self)
         self._closing = False
         self.version_controller = VersionController(self.task_runner)
+        self.connectivity_controller = ConnectivityController(self.task_runner)
         self.account_controller = AccountController(self.task_runner)
         self.backup_controller = BackupController(self.task_runner)
         self.java_controller = JavaController(self.task_runner)
@@ -142,6 +144,7 @@ class MainWindow(QMainWindow):
         self._legacy_storage_notice_shown = False
         self._legacy_storage_notice = None
         self._legacy_cleanup_dialog = None
+        self._last_connectivity_online: bool | None = None
         self.theme_runtime = ThemeRuntime()
         self.motion_runtime = MotionRuntime(parent=self)
         language_manager.reload()
@@ -452,6 +455,7 @@ class MainWindow(QMainWindow):
 
         self.version_controller.versions_changed.connect(self.instances_page.set_versions)
         self.version_controller.versions_changed.connect(lambda versions: self.home_page.set_manifest_count(len(versions)))
+        self.connectivity_controller.connectivity_changed.connect(self._on_connectivity_changed)
         self.mod_loader_controller.fabric_versions_changed.connect(self.instances_page.set_fabric_versions)
         self.mod_loader_controller.quilt_versions_changed.connect(self.instances_page.set_quilt_versions)
         self.mod_loader_controller.forge_versions_changed.connect(self.instances_page.set_forge_versions)
@@ -693,6 +697,7 @@ class MainWindow(QMainWindow):
         self.task_runner.task_rejected.connect(lambda message: QMessageBox.information(self, tr("MCW Launcher"), tr(message)))
 
         controllers = (
+            self.connectivity_controller,
             self.version_controller,
             self.account_controller,
             self.backup_controller,
@@ -746,13 +751,49 @@ class MainWindow(QMainWindow):
         self.gui_settings_controller.set_game_running(bool(InstanceRunLock.list_active()))
         self.running_instances_timer.start()
         self.version_controller.refresh()
-        self.java_controller.scan()
+        self.java_controller.scan(check_latest_release=False)
+        self.connectivity_controller.probe(force=True)
         self.logs_page.append(tr("Started {launcher_name}", launcher_name=LAUNCHER_NAME))
         if settings.get("auto_check_updates", True):
-            QTimer.singleShot(1500, lambda: self.update_controller.check(manual=False))
+            QTimer.singleShot(2000, self._check_startup_update)
         if settings.get("notify_legacy_cache_cleanup", True):
             retention_days = int(settings.get("unused_version_retention_days", 14) or 14)
             QTimer.singleShot(2500, lambda days=retention_days: self.storage_controller.probe(days))
+
+    def _on_connectivity_changed(self, online: bool, _detail: str) -> None:
+        previous = self._last_connectivity_online
+        self._last_connectivity_online = bool(online)
+
+        if online:
+            if previous is True:
+                return
+            if previous is False:
+                self.toast_manager.show(
+                    tr("network.online.restored.message"),
+                    "success",
+                    tr("network.online.restored.title"),
+                )
+                self.logs_page.append(tr("network.online.restored.log"))
+                if self.gui_settings_controller.current.get("auto_check_updates", True):
+                    self.update_controller.check(manual=False)
+            self.version_controller.refresh(force_refresh=True)
+            self.java_controller.refresh_latest_release()
+            return
+
+        if previous is False:
+            return
+        self.toast_manager.show(
+            tr("network.offline.message"),
+            "warning",
+            tr("network.offline.title"),
+        )
+        self._set_status(tr("network.offline.status"))
+
+    def _check_startup_update(self) -> None:
+        if self._last_connectivity_online is False:
+            self.logs_page.append(tr("network.offline.update_check_skipped_log"))
+            return
+        self.update_controller.check(manual=False)
 
     def _review_legacy_storage(self) -> None:
         self.storage_controller.scan(self._unused_version_retention_days())
@@ -818,7 +859,8 @@ class MainWindow(QMainWindow):
         self.account_controller.refresh()
         self.instance_controller.refresh()
         self.instance_controller.refresh_running(force=True)
-        self.version_controller.refresh()
+        self.version_controller.refresh(force_refresh=self._last_connectivity_online is True)
+        self.connectivity_controller.probe(force=True)
         self._set_status("Refreshing launcher data...")
 
     def show_page(self, page_id: str, *, record_history: bool = True) -> bool:
@@ -925,6 +967,7 @@ class MainWindow(QMainWindow):
 
     def _request_launch(self) -> None:
         if self._confirm_all_unsaved_settings():
+            self.connectivity_controller.probe(force=True)
             self.launch_controller.launch()
 
     def _request_kill_instance(self, instance_name: str) -> None:
