@@ -146,3 +146,33 @@ def test_kill_instance_force_kills_registered_process_and_marks_session() -> Non
     assert current.state is ProcessSessionState.KILLING
     assert current.detail == "killed_by_user"
     assert ProcessSupervisor.kill_requested(session.session_id) is True
+
+
+def test_posix_termination_targets_dedicated_process_group(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[int, int]] = []
+    monkeypatch.setattr("src.core.runtime.process_supervisor.os.name", "posix")
+    monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpid", lambda: 100)
+    monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpgid", lambda pid: pid)
+    monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpgrp", lambda: 100)
+    monkeypatch.setattr("src.core.runtime.process_supervisor.os.killpg", lambda pid, sig: calls.append((pid, sig)))
+    monkeypatch.setattr(
+        "src.core.runtime.process_supervisor.os.kill",
+        lambda _pid, _sig: (_ for _ in ()).throw(AssertionError("group signal expected")),
+    )
+
+    ProcessSupervisor._terminate_pid_tree(4321, force=False)
+
+    assert calls == [(4321, 15)]
+
+
+def test_posix_termination_falls_back_to_root_pid_without_owned_group(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[int, int]] = []
+    monkeypatch.setattr("src.core.runtime.process_supervisor.os.name", "posix")
+    monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpid", lambda: 100)
+    monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpgid", lambda _pid: 200)
+    monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpgrp", lambda: 200)
+    monkeypatch.setattr("src.core.runtime.process_supervisor.os.kill", lambda pid, sig: calls.append((pid, sig)))
+
+    ProcessSupervisor._terminate_pid_tree(4321, force=True)
+
+    assert calls == [(4321, 9)]

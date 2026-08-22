@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QCloseEvent, QDesktopServices, QGuiApplication, QScreen
-from PySide6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QPushButton, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QStackedWidget, QVBoxLayout, QWidget
 
 from mcw_core import CompatibilityConfirmationRequired
 from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
@@ -263,6 +263,10 @@ class MainWindow(QMainWindow):
         navigation_layout.addWidget(self.page_back_button)
         navigation_layout.addWidget(self.page_forward_button)
         navigation_layout.addStretch(1)
+        self.connectivity_indicator = QLabel()
+        self.connectivity_indicator.setObjectName("ConnectivityBadge")
+        self._update_connectivity_indicator(None)
+        navigation_layout.addWidget(self.connectivity_indicator)
         self._update_page_navigation()
 
         self.content_stack = QStackedWidget()
@@ -763,6 +767,7 @@ class MainWindow(QMainWindow):
     def _on_connectivity_changed(self, online: bool, _detail: str) -> None:
         previous = self._last_connectivity_online
         self._last_connectivity_online = bool(online)
+        self._update_connectivity_indicator(bool(online))
 
         if online:
             if previous is True:
@@ -788,6 +793,25 @@ class MainWindow(QMainWindow):
             tr("network.offline.title"),
         )
         self._set_status(tr("network.offline.status"))
+
+    def _update_connectivity_indicator(self, online: bool | None) -> None:
+        if online is None:
+            state = "checking"
+            text = tr("network.status.checking")
+            tooltip = tr("network.status.checking.tooltip")
+        elif online:
+            state = "online"
+            text = tr("network.status.online")
+            tooltip = tr("network.status.online.tooltip")
+        else:
+            state = "offline"
+            text = tr("network.status.offline")
+            tooltip = tr("network.status.offline.tooltip")
+        self.connectivity_indicator.setProperty("connectivityState", state)
+        self.connectivity_indicator.setText(text)
+        self.connectivity_indicator.setToolTip(tooltip)
+        self.connectivity_indicator.style().unpolish(self.connectivity_indicator)
+        self.connectivity_indicator.style().polish(self.connectivity_indicator)
 
     def _check_startup_update(self) -> None:
         if self._last_connectivity_online is False:
@@ -2450,6 +2474,7 @@ class MainWindow(QMainWindow):
         retranslate_widget_tree(self)
         self.setWindowTitle(tr(LAUNCHER_NAME))
         self._update_page_navigation()
+        self._update_connectivity_indicator(self._last_connectivity_online)
 
         for widget in (
             self.sidebar,

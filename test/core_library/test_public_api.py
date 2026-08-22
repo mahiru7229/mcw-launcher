@@ -100,6 +100,13 @@ def test_optifine_service_is_available_from_public_facade(tmp_path: Path) -> Non
     assert core.optifine.OFFICIAL_DOWNLOADS_URL == "https://optifine.net/downloads"
 
 
+def test_platform_storage_migration_is_available_from_public_api() -> None:
+    from mcw_core.api.storage import PlatformStorageMigration, PlatformStorageMigrationReport
+
+    assert PlatformStorageMigration.MARKER_NAME == ".platform-storage-migration-v1.json"
+    assert PlatformStorageMigrationReport().completed is True
+
+
 def test_instance_state_types_are_public() -> None:
     assert InstanceState.RUNNING.value == "running"
     status = InstanceStatus(instance_id="id", name="Example", state=InstanceState.READY)
