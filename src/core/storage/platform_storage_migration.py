@@ -69,7 +69,21 @@ class PlatformStorageMigration:
 
             for candidate in candidates:
                 if candidate.is_symlink():
-                    errors.append(f"{candidate}: symbolic links are not migrated")
+                    try:
+                        relative = candidate.relative_to(source)
+                        target = destination / relative
+                        link_target = cls._validated_link_target(candidate, source)
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        if target.exists() or target.is_symlink():
+                            if target.is_symlink() and os.readlink(target) == link_target:
+                                skipped_files += 1
+                            else:
+                                conflicts.append(target.as_posix())
+                            continue
+                        cls._copy_symlink_atomic(link_target, target)
+                        copied_files += 1
+                    except (OSError, ValueError) as error:
+                        errors.append(f"{candidate}: {error}")
                     continue
                 if not candidate.is_file():
                     continue
@@ -107,6 +121,26 @@ class PlatformStorageMigration:
             shutil.copy2(source, temporary, follow_symlinks=False)
             with temporary.open("rb+") as stream:
                 os.fsync(stream.fileno())
+            os.replace(temporary, destination)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    @staticmethod
+    def _validated_link_target(link: Path, source_root: Path) -> str:
+        raw_target = os.readlink(link)
+        if not raw_target or os.path.isabs(raw_target):
+            raise ValueError("absolute or empty symbolic link target is not migrated")
+        source_boundary = source_root.resolve(strict=False)
+        resolved_target = (link.parent / raw_target).resolve(strict=False)
+        if not resolved_target.is_relative_to(source_boundary):
+            raise ValueError("symbolic link target escapes the migration source")
+        return raw_target
+
+    @staticmethod
+    def _copy_symlink_atomic(link_target: str, destination: Path) -> None:
+        temporary = destination.with_name(f".{destination.name}.{os.getpid()}.{uuid4().hex}.tmp")
+        try:
+            temporary.symlink_to(link_target)
             os.replace(temporary, destination)
         finally:
             temporary.unlink(missing_ok=True)
