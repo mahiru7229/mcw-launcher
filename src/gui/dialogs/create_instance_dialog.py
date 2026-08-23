@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -10,10 +10,13 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QLabel,
     QLineEdit,
+    QLayout,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -78,8 +81,15 @@ class CreateInstanceDialog(QDialog):
         root.addWidget(self.buttons)
 
     def _minecraft_tab(self) -> QWidget:
+        scroll = QScrollArea()
+        scroll.setObjectName("CreateInstanceScrollArea")
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+
         tab = QWidget()
         layout = QVBoxLayout(tab)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         layout.setContentsMargins(12, 14, 12, 12)
         layout.setSpacing(12)
 
@@ -141,7 +151,10 @@ class CreateInstanceDialog(QDialog):
         self.optifine_status.setWordWrap(True)
         layout.addWidget(self.optifine_status)
         layout.addStretch(1)
-        return tab
+        scroll.setWidget(tab)
+        self.minecraft_scroll = scroll
+        self.minecraft_tab_content = tab
+        return scroll
 
     def _modpack_tab(self) -> QWidget:
         tab = QWidget()

@@ -17,6 +17,11 @@ try:
 except ImportError:  # pragma: no cover - Windows runtime dependency
     _win32crypt = None
 
+try:
+    import keyring as _keyring
+except ImportError:  # pragma: no cover - optional Linux desktop dependency
+    _keyring = None
+
 
 class TokenCipher:
     DPAPI_PREFIX = "mcw-dpapi:v2:"
@@ -26,6 +31,10 @@ class TokenCipher:
     DESCRIPTION = "MCW Launcher Protected Token"
     VERSION = 2
     _backend: Any = _win32crypt
+    _keyring: Any = _keyring
+    _portable_backend_name = "encrypted-file"
+    KEYRING_SERVICE = f"{LAUNCHER_SLUG}.credentials"
+    KEYRING_USERNAME = "fernet-key-v1"
 
     @classmethod
     def encrypt(cls, value: str, purpose: str = "generic") -> str:
@@ -114,14 +123,42 @@ class TokenCipher:
     def _portable_cipher(cls) -> Fernet:
         key_path = cls._portable_key_path()
         key_path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            key = key_path.read_bytes().strip()
-        except FileNotFoundError:
+        file_key = cls._read_portable_key(key_path)
+
+        if cls._keyring is not None:
+            try:
+                stored = cls._keyring.get_password(cls.KEYRING_SERVICE, cls.KEYRING_USERNAME)
+                keyring_key = stored.encode("ascii") if isinstance(stored, str) else b""
+                if file_key is not None:
+                    # Alpha 2 stored this key beside the portable config. Seed
+                    # the exact key into Secret Service so existing encrypted
+                    # tokens remain readable, then remove the disk copy.
+                    if keyring_key != file_key:
+                        cls._keyring.set_password(cls.KEYRING_SERVICE, cls.KEYRING_USERNAME, file_key.decode("ascii"))
+                    key_path.unlink(missing_ok=True)
+                    cls._portable_backend_name = "secret-service"
+                    return Fernet(file_key)
+                if cls._valid_fernet_key(keyring_key):
+                    cls._portable_backend_name = "secret-service"
+                    return Fernet(keyring_key)
+
+                selected = Fernet.generate_key()
+                cls._keyring.set_password(cls.KEYRING_SERVICE, cls.KEYRING_USERNAME, selected.decode("ascii"))
+                cls._portable_backend_name = "secret-service"
+                return Fernet(selected)
+            except Exception:
+                # Secret Service may be unavailable or locked in a minimal
+                # desktop session. Keep the encrypted-file fallback usable.
+                pass
+
+        cls._portable_backend_name = "encrypted-file"
+        key = file_key
+        if key is None:
             key = Fernet.generate_key()
             try:
                 descriptor = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             except FileExistsError:
-                key = key_path.read_bytes().strip()
+                key = cls._read_portable_key(key_path) or b""
             else:
                 with os.fdopen(descriptor, "wb") as stream:
                     stream.write(key)
@@ -133,6 +170,34 @@ class TokenCipher:
             return Fernet(key)
         except (ValueError, TypeError) as error:
             raise RuntimeError("The local credential key is invalid.") from error
+
+    @staticmethod
+    def _read_portable_key(path: Path) -> bytes | None:
+        try:
+            key = path.read_bytes().strip()
+        except (FileNotFoundError, OSError):
+            return None
+        return key if TokenCipher._valid_fernet_key(key) else None
+
+    @staticmethod
+    def _valid_fernet_key(key: bytes) -> bool:
+        if not key:
+            return False
+        try:
+            Fernet(key)
+        except (ValueError, TypeError):
+            return False
+        return True
+
+    @classmethod
+    def protection_backend(cls) -> tuple[str, bool]:
+        if cls._backend is not None:
+            return "windows-dpapi", True
+        # Resolve the optional desktop keyring before reporting status. This
+        # keeps Account Security accurate even before the first Microsoft
+        # token is stored in the current session.
+        cls._portable_cipher()
+        return cls._portable_backend_name, cls._portable_backend_name == "secret-service"
 
     @staticmethod
     def _portable_key_path() -> Path:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from weakref import WeakKeyDictionary
+from weakref import WeakKeyDictionary, WeakSet
 
 from PySide6.QtCore import QEvent, QObject, QTimer
 from PySide6.QtWidgets import QApplication, QComboBox
@@ -17,6 +17,7 @@ class AdaptiveComboBoxManager(QObject):
     def __init__(self, application: QApplication) -> None:
         super().__init__(application)
         self._configured: WeakKeyDictionary[QComboBox, bool] = WeakKeyDictionary()
+        self._pending_refreshes: WeakSet[QComboBox] = WeakSet()
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if isinstance(watched, QComboBox) and event.type() in {
@@ -28,19 +29,40 @@ class AdaptiveComboBoxManager(QObject):
             QEvent.Type.LayoutRequest,
         }:
             self.configure(watched)
-            QTimer.singleShot(0, lambda combo=watched: self.refresh(combo))
+            self.schedule_refresh(watched)
         return False
 
     def configure(self, combo: QComboBox) -> None:
         if combo in self._configured:
             return
         self._configured[combo] = True
-        combo.currentTextChanged.connect(lambda _text, target=combo: self.refresh(target))
+        combo.currentTextChanged.connect(lambda _text, target=combo: self.schedule_refresh(target))
         model = combo.model()
-        model.rowsInserted.connect(lambda *_args, target=combo: self.refresh(target))
-        model.rowsRemoved.connect(lambda *_args, target=combo: self.refresh(target))
-        model.modelReset.connect(lambda target=combo: self.refresh(target))
-        model.dataChanged.connect(lambda *_args, target=combo: self.refresh(target))
+        model.rowsInserted.connect(lambda *_args, target=combo: self.schedule_refresh(target))
+        model.rowsRemoved.connect(lambda *_args, target=combo: self.schedule_refresh(target))
+        model.modelReset.connect(lambda target=combo: self.schedule_refresh(target))
+        model.dataChanged.connect(lambda *_args, target=combo: self.schedule_refresh(target))
+
+    def schedule_refresh(self, combo: QComboBox) -> None:
+        """Refresh after the current model mutation batch has completed.
+
+        QComboBox updates its current index after emitting some model signals.
+        Coalescing refreshes into the next event-loop turn ensures the width is
+        measured from the final selected item after clear/remove/repopulate.
+        """
+
+        if combo in self._pending_refreshes:
+            return
+        self._pending_refreshes.add(combo)
+        QTimer.singleShot(0, lambda target=combo: self._run_scheduled_refresh(target))
+
+    def _run_scheduled_refresh(self, combo: QComboBox) -> None:
+        self._pending_refreshes.discard(combo)
+        try:
+            self.refresh(combo)
+        except RuntimeError:
+            # The owning dialog may have been destroyed before the timer ran.
+            return
 
     def refresh(self, combo: QComboBox) -> None:
         if combo is None:

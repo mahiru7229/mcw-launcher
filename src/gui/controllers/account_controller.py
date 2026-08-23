@@ -134,6 +134,7 @@ class AccountController(BaseController):
         self.status_changed.emit(tr("Account removed"))
         self.log_created.emit(tr("Account removed: {account_id}", account_id=account_id))
         self.refresh()
+        self.audit_security()
 
     def _sync_selected_profile_if_needed(self, account: object | None) -> None:
         if account is None:
@@ -183,6 +184,7 @@ class AccountController(BaseController):
         self.status_changed.emit(tr("account.microsoft.added", username=username))
         self.log_created.emit(tr("account.microsoft.added", username=username))
         self.refresh()
+        self.audit_security()
 
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:

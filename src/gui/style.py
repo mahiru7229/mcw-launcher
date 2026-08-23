@@ -225,6 +225,22 @@ QLabel#WarningBadge {
     font-weight: 800;
 }
 
+QLabel#ConnectivityBadge {
+    background: #30352d;
+    color: #ffffff;
+    border: 1px solid #171a15;
+    padding: 4px 9px;
+    font-weight: 700;
+}
+
+QLabel#ConnectivityBadge[connectivityState="online"] {
+    background: #344329;
+}
+
+QLabel#ConnectivityBadge[connectivityState="offline"] {
+    background: #4a3824;
+}
+
 QPushButton {
     background: #454940;
     color: #ffffff;

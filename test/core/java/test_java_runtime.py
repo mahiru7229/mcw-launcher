@@ -413,6 +413,7 @@ def test_run_uses_zero_creation_flags_outside_windows(
     )
 
     assert received["creationflags"] == 0
+    assert received["start_new_session"] is True
 
 
 def test_run_closes_log_file_when_popen_fails(
@@ -525,6 +526,7 @@ def test_run_passes_all_expected_popen_options(
         "stdout",
         "stderr",
         "creationflags",
+        "start_new_session",
     }
     assert received["kwargs"]["cwd"] == instance_dir
     assert (
@@ -536,6 +538,7 @@ def test_run_passes_all_expected_popen_options(
         is java_runtime.subprocess.STDOUT
     )
     assert received["kwargs"]["creationflags"] == 0
+    assert received["kwargs"]["start_new_session"] is True
 
 def test_run_retries_winerror_206_with_compacted_classpath(monkeypatch: pytest.MonkeyPatch, instance, instance_dir: Path):
     received_commands = []

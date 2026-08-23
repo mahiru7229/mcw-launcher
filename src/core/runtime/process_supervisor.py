@@ -555,9 +555,17 @@ class ProcessSupervisor:
                 pass
             return
         try:
-            os.kill(pid, signal.SIGKILL if force else signal.SIGTERM)
+            target_signal = signal.SIGKILL if force else signal.SIGTERM
+            group_id = os.getpgid(pid)
+            if group_id == pid and group_id != os.getpgrp():
+                os.killpg(group_id, target_signal)
+                return
+            os.kill(pid, target_signal)
         except OSError:
-            pass
+            try:
+                os.kill(pid, signal.SIGKILL if force else signal.SIGTERM)
+            except OSError:
+                pass
 
     @classmethod
     def _wait_for_exit(cls, pid: int, timeout: float) -> None:

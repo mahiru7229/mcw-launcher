@@ -150,6 +150,7 @@ class AccountPage(BasePage):
 
     def set_security_report(self, report: object) -> None:
         healthy = bool(getattr(report, "is_healthy", False))
+        backend = str(getattr(report, "credential_backend", "platform") or "platform")
         self.security_status.setObjectName("StatusBadge" if healthy else "WarningBadge")
         self.security_status.setText(
             tr(
@@ -159,6 +160,8 @@ class AccountPage(BasePage):
                 legacy=getattr(report, "legacy_account_count", 0),
                 invalid=getattr(report, "invalid_account_count", 0),
             )
+            + "\n"
+            + tr("account.security.backend", backend=tr(f"account.security.backend.{backend}"))
         )
         self.security_status.style().unpolish(self.security_status)
         self.security_status.style().polish(self.security_status)

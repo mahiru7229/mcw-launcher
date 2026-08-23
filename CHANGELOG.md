@@ -2,6 +2,33 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.0-alpha.3] - 2026-08-22
+
+### Added
+
+- XDG storage layout cho config, data, cache và state trên Linux.
+- Migration một lần, copy-only từ layout portable Alpha 2; dữ liệu cũ không bị xóa hay ghi đè khi có xung đột.
+- Linux Secret Service/keyring cho khóa bảo vệ refresh token Microsoft, kèm fallback local có cảnh báo.
+- OAuth browser fallback qua `xdg-open` và callback server chỉ bind loopback IPv4.
+- Trạng thái Online/Offline thường trực trên thanh điều hướng.
+- Process group riêng cho mỗi phiên Minecraft trên POSIX để Stop/Kill xử lý đúng cây tiến trình.
+
+### Changed
+
+- Fabric và Quilt được đưa vào Linux release gate cùng với Vanilla và Microsoft login.
+- Theme, account, instance, managed Java, backup và log dùng đúng XDG root sau bootstrap.
+- Credential audit hiển thị backend bảo vệ đang dùng.
+
+### Fixed
+
+- Tiến trình con của loader/Java trên Linux không còn dễ bị bỏ lại khi dừng game từ launcher.
+- Microsoft sign-in có thể mở trình duyệt trên các desktop Linux nơi module `webbrowser` không tìm được handler.
+
+### Known limitations
+
+- Chưa có AppImage/DEB và automatic updater cho Linux.
+- Forge/NeoForge và Linux ARM64 chưa nằm trong release gate Alpha 3.
+
 ## [1.5.0-alpha.2] - 2026-08-21
 
 ### Added
@@ -62,4 +89,5 @@ Maintenance release của nhánh 1.4, tập trung Java recovery/download và Dia
 
 [1.5.0-alpha.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.1
 [1.5.0-alpha.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.2
+[1.5.0-alpha.3]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.3
 [1.4.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.1

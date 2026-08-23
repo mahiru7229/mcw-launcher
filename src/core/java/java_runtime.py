@@ -94,14 +94,19 @@ class JavaRuntime:
 
     @staticmethod
     def _popen(java: Path, command: list[str], instance_dir: Path, log_file: TextIO, creation_flags: int) -> subprocess.Popen:
-        return subprocess.Popen(
-            [str(java), *command],
-            cwd=instance_dir,
-            stdin=subprocess.DEVNULL,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            creationflags=creation_flags,
-        )
+        options = {
+            "cwd": instance_dir,
+            "stdin": subprocess.DEVNULL,
+            "stdout": log_file,
+            "stderr": subprocess.STDOUT,
+            "creationflags": creation_flags,
+        }
+        if os.name != "nt":
+            # Give each Minecraft launch its own process group so the
+            # supervisor can stop loader/Java descendants without touching
+            # the launcher or unrelated Java processes.
+            options["start_new_session"] = True
+        return subprocess.Popen([str(java), *command], **options)
 
     @staticmethod
     def _is_windows_length_error(error: OSError) -> bool:
