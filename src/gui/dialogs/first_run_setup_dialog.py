@@ -21,6 +21,7 @@ from mcw_core.api.language.language_manager import language_manager, tr
 from mcw_core.api.system.memory import MemoryAllocationPolicy
 from src.gui.localization import retranslate_widget_tree
 from src.gui.window_sizing import resize_dialog_to_screen
+from src.gui.widget.scrollable_page import scrollable_page
 
 
 class FirstRunSetupDialog(QDialog):
@@ -111,11 +112,11 @@ class FirstRunSetupDialog(QDialog):
         root.addLayout(button_row)
 
     def _base_page(self) -> tuple[QWidget, QVBoxLayout]:
-        page = QWidget()
-        layout = QVBoxLayout(page)
+        content = QWidget()
+        layout = QVBoxLayout(content)
         layout.setContentsMargins(0, 4, 0, 4)
         layout.setSpacing(12)
-        return page, layout
+        return scrollable_page(content, object_name="FirstRunPageScrollArea"), layout
 
     def _build_welcome_page(self) -> QWidget:
         page, layout = self._base_page()

@@ -327,7 +327,10 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.SELECTING_JAVA, message="Selecting Java runtime...")
-            required_java_major = int(version.java_version.get("majorVersion") or 8)
+            required_java_major = JavaMajorPolicy.required_for_minecraft(
+                instance.version_id,
+                version.java_version.get("majorVersion"),
+            )
             java_major = JavaMajorPolicy.resolve(required_java_major)
             preferred_java = str(getattr(settings, "java_path", "") or "").strip()
             download_pause_controller.raise_if_requested()

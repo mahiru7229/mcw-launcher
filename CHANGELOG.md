@@ -2,6 +2,30 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.0-alpha.4] - 2026-08-23
+
+### Added
+
+- Forge và NeoForge được đưa vào Linux release gate.
+- Fallback xác định Java 8/16/17/21 theo Minecraft release khi profile cũ hoặc custom bị thiếu `javaVersion`.
+- Scrollable page dùng chung giữ minimum size tự nhiên của widget và chỉ hiện thanh cuộn dọc khi thiếu không gian.
+
+### Changed
+
+- Metadata `javaVersion` của Mojang luôn được ưu tiên; fallback release mapping chỉ dùng khi metadata không tồn tại.
+- Add Instance, First Run Setup và các tab Runtime/Policy của Instance Settings dùng cùng một quy tắc responsive.
+- Forge/NeoForge installer chạy trong process group riêng trên POSIX.
+
+### Fixed
+
+- Modern Forge/NeoForge không còn mặc định nhầm Java 8 khi version profile thiếu Java metadata.
+- Loader installer bị timeout trên Linux dọn cả process group thay vì có thể để lại Java child process.
+
+### Known limitations
+
+- Forge/NeoForge vẫn cần smoke test launch thực tế trên Lubuntu trước khi chốt Alpha 4.
+- Chưa có AppImage/DEB, Linux updater hoặc cam kết Linux ARM64.
+
 ## [1.5.0-alpha.3] - 2026-08-22
 
 ### Added
@@ -90,4 +114,5 @@ Maintenance release của nhánh 1.4, tập trung Java recovery/download và Dia
 [1.5.0-alpha.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.1
 [1.5.0-alpha.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.2
 [1.5.0-alpha.3]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.3
+[1.5.0-alpha.4]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.4
 [1.4.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.1
