@@ -27,6 +27,7 @@ from mcw_core.api.instance.settings_manager import SettingsManager
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.system.memory import MemoryAllocationPolicy, SystemMemory
 from src.gui.window_sizing import resize_dialog_to_screen
+from src.gui.widget.scrollable_page import scrollable_page
 from src.models.instance.settings import InstanceSettings
 
 
@@ -173,7 +174,7 @@ class InstanceSettingsEditorDialog(QDialog):
         window_form.addRow("", self.fullscreen)
         layout.addWidget(window_group)
         layout.addStretch(1)
-        return tab
+        return scrollable_page(tab, object_name="InstanceRuntimeSettingsScrollArea")
 
     def _policies_tab(self) -> QWidget:
         tab = QWidget()
@@ -203,7 +204,7 @@ class InstanceSettingsEditorDialog(QDialog):
         managed_form.addRow(tr("instance_defaults.policy.forge"), self.forge_preflight_failure_policy)
         layout.addWidget(managed_group)
         layout.addStretch(1)
-        return tab
+        return scrollable_page(tab, object_name="InstancePolicySettingsScrollArea")
 
     def _arguments_tab(self) -> QWidget:
         tab = QWidget()

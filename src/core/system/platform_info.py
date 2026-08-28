@@ -72,6 +72,10 @@ class PlatformInfo:
             "aarch64",
         }
 
+    @staticmethod
+    def is_windows() -> bool:
+        return PlatformInfo.current().os_name == "windows"
+
     @classmethod
     def java_home_executables(cls) -> tuple[str, ...]:
         profile = cls.current()

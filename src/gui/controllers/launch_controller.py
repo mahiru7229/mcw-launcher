@@ -41,6 +41,9 @@ class LaunchController(BaseController):
         self._state_lock = Lock()
         self._manual_content_waiting = False
         self._manual_content_error: Exception | None = None
+        self._compatibility_waiting = False
+        self._compatibility_error: CompatibilityConfirmationRequired | None = None
+        self._compatibility_allowed = False
 
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
@@ -56,6 +59,13 @@ class LaunchController(BaseController):
 
     def launch(self, allow_compatibility_issues_once: bool = False) -> None:
         if self._task_runner.is_task_active(self.TASK_ID):
+            if self.waiting_for_compatibility_confirmation:
+                with self._state_lock:
+                    error = self._compatibility_error
+                if error is not None:
+                    self.compatibility_confirmation_required.emit(error)
+                self.status_changed.emit(tr("compatibility.confirmation.required"))
+                return
             if self.waiting_for_manual_content:
                 with self._state_lock:
                     error = self._manual_content_error
@@ -92,6 +102,7 @@ class LaunchController(BaseController):
                         on_progress=self._on_progress,
                         on_exit=self._on_game_exit,
                         on_manual_content_required=self._on_manual_content_required,
+                        on_compatibility_confirmation=self._on_compatibility_confirmation,
                         allow_compatibility_issues_once=allow_compatibility_issues_once,
                     )
                 )
@@ -156,6 +167,48 @@ class LaunchController(BaseController):
         self.status_changed.emit(tr("artifact.manual.launch_paused_short"))
         self.log_created.emit(f"{type(error).__name__}: launch paused for manual content import")
 
+    @property
+    def waiting_for_compatibility_confirmation(self) -> bool:
+        with self._state_lock:
+            return self._compatibility_waiting
+
+    def resolve_compatibility_confirmation(self, allow: bool) -> bool:
+        allowed = bool(allow)
+        with self._state_lock:
+            if not self._compatibility_waiting:
+                return False
+            self._compatibility_allowed = allowed
+            self._compatibility_waiting = False
+        resumed = self._core.operations.resume()
+        if resumed and allowed:
+            self.launch_resumed.emit()
+            self.status_changed.emit(tr("launch.resumed"))
+            self.log_created.emit(tr("launch.resumed_log"))
+        return resumed
+
+    def _on_compatibility_confirmation(self, error: CompatibilityConfirmationRequired) -> bool:
+        with self._state_lock:
+            self._compatibility_waiting = True
+            self._compatibility_error = error
+            self._compatibility_allowed = False
+        if not self._core.operations.pause():
+            with self._state_lock:
+                self._compatibility_waiting = False
+                self._compatibility_error = None
+            return False
+        self.launch_paused.emit()
+        self.compatibility_confirmation_required.emit(error)
+        self.status_changed.emit(tr("compatibility.confirmation.required"))
+        self.log_created.emit(f"CompatibilityConfirmationRequired: {len(error.issues)} issue(s); launch paused")
+        try:
+            self._core.operations.checkpoint()
+            with self._state_lock:
+                return self._compatibility_allowed
+        finally:
+            with self._state_lock:
+                self._compatibility_waiting = False
+                self._compatibility_error = None
+
     def _on_progress(self, event: ProgressEvent) -> None:
         self.progress_received.emit(event)
         key = self._progress_log_key(event)
@@ -195,6 +248,8 @@ class LaunchController(BaseController):
         with self._state_lock:
             self._manual_content_waiting = False
             self._manual_content_error = None
+            self._compatibility_waiting = False
+            self._compatibility_error = None
 
         self.launch_finished.emit(result)
 
@@ -218,6 +273,8 @@ class LaunchController(BaseController):
         with self._state_lock:
             self._manual_content_waiting = False
             self._manual_content_error = None
+            self._compatibility_waiting = False
+            self._compatibility_error = None
 
         if is_download_cancelled(error):
             self.launch_cancelled.emit()
