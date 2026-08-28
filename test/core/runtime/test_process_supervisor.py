@@ -153,6 +153,10 @@ def test_posix_termination_targets_dedicated_process_group(monkeypatch: pytest.M
     calls: list[tuple[int, int]] = []
     monkeypatch.setattr("src.core.runtime.process_supervisor.PlatformInfo.is_windows", lambda: False)
     monkeypatch.setattr(
+        "src.core.runtime.process_supervisor.signal",
+        SimpleNamespace(SIGTERM=15, SIGKILL=9),
+    )
+    monkeypatch.setattr(
         "src.core.runtime.process_supervisor.os",
         SimpleNamespace(
             getpid=lambda: 100,
@@ -171,6 +175,10 @@ def test_posix_termination_targets_dedicated_process_group(monkeypatch: pytest.M
 def test_posix_termination_falls_back_to_root_pid_without_owned_group(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[int, int]] = []
     monkeypatch.setattr("src.core.runtime.process_supervisor.PlatformInfo.is_windows", lambda: False)
+    monkeypatch.setattr(
+        "src.core.runtime.process_supervisor.signal",
+        SimpleNamespace(SIGTERM=15, SIGKILL=9),
+    )
     monkeypatch.setattr(
         "src.core.runtime.process_supervisor.os",
         SimpleNamespace(
