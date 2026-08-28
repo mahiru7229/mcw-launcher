@@ -59,7 +59,7 @@ def test_build_linux_release_zip_writes_platform_and_executable_mode(tmp_path: P
     (project / "LICENSE").write_text("license", encoding="utf-8")
     executable = project / "mcw-launcher"
     executable.write_bytes(b"linux-binary")
-    executable.chmod(0o755)
+    executable.chmod(0o644)
     output = project / "release" / f"MCW-Launcher-v{VERSION_ID}-linux-x64.zip"
 
     build_release_zip(project, executable, VERSION_ID, output, "linux-x64")
@@ -70,7 +70,8 @@ def test_build_linux_release_zip_writes_platform_and_executable_mode(tmp_path: P
         executable_info = archive.getinfo(f"{root}/mcw-launcher")
         assert manifest["platform"] == "linux-x64"
         assert manifest["executable"] == "mcw-launcher"
-        assert executable_info.external_attr >> 16 & 0o111
+        assert executable_info.create_system == 3
+        assert executable_info.external_attr >> 16 & 0o777 == 0o755
 
 
 def test_release_script_runs_directly_from_any_working_directory(tmp_path: Path) -> None:

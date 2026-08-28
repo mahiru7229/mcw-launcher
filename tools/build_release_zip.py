@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import stat
 import sys
 import tempfile
 import zipfile
@@ -89,7 +90,17 @@ def build_release_zip(project_root: Path, executable: Path, version: str, output
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
             for path in sorted(payload_root.rglob("*")):
                 if path.is_file():
-                    archive.write(path, path.relative_to(payload_root.parent).as_posix())
+                    archive_name = path.relative_to(payload_root.parent).as_posix()
+                    info = zipfile.ZipInfo.from_file(path, archive_name)
+                    info.compress_type = zipfile.ZIP_DEFLATED
+                    if platform_id == "linux-x64" and path == payload_root / executable.name:
+                        # A Windows filesystem cannot represent POSIX execute
+                        # bits. Encode the Linux launcher contract explicitly
+                        # so cross-builds still extract an executable binary.
+                        info.create_system = 3
+                        info.external_attr = (stat.S_IFREG | 0o755) << 16
+                    with path.open("rb") as source, archive.open(info, "w", force_zip64=True) as target:
+                        shutil.copyfileobj(source, target, length=1024 * 1024)
 
     checksum_path = output.with_name(f"{output.name}.sha256")
     checksum_path.write_text(f"{sha256_file(output)}  {output.name}\n", encoding="utf-8")
