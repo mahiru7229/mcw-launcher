@@ -610,7 +610,7 @@ def test_run_uses_required_java_major_version(
     )
 
 
-def test_run_defaults_to_java_8_when_major_version_is_missing(
+def test_run_infers_java_17_for_minecraft_1_20_1_when_metadata_is_missing(
     monkeypatch: pytest.MonkeyPatch,
 ):
     version = make_version(
@@ -623,10 +623,11 @@ def test_run_defaults_to_java_8_when_major_version_is_missing(
         version=version,
     )
     monkeypatch.setattr(
-        "src.core.java.java_resolver.JavaProvisioner.install_managed",
-        lambda major, reporter=None, force=False: (
+        JavaSelector,
+        "select_java",
+        lambda major: (
             selected.append(major)
-            or Path("java8/javaw.exe")
+            or Path("java17/javaw.exe")
         ),
     )
 
@@ -636,10 +637,10 @@ def test_run_defaults_to_java_8_when_major_version_is_missing(
         account=object(),
     )
 
-    assert selected == [8]
+    assert selected == [17]
     assert (
         result["minecraftJavaMajorVersion"]
-        == 8
+        == 17
     )
 
 
