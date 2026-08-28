@@ -1,14 +1,20 @@
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+import tomllib
 
 import mcw_core
 from mcw_core import InstanceRuntimeProfile, LaunchRequest, get_default_core
 from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
 from mcw_core.api.hardware.first_run_recommendation_service import FirstRunRecommendationService
 from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, derive_custom_text, is_readable_text
+from src.config import VERSION_ID
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_bundled_core_runtime_version_follows_launcher_release() -> None:
-    assert mcw_core.__version__ == "1.5.0-alpha.5"
+    assert mcw_core.__version__ == VERSION_ID
 
 
 def test_launcher_distribution_version_when_installed() -> None:
@@ -16,7 +22,8 @@ def test_launcher_distribution_version_when_installed() -> None:
         installed = version("mcw-launcher")
     except PackageNotFoundError:
         return
-    assert installed == "1.5.0a5"
+    project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    assert installed == project["version"]
 
 
 def test_optifine_public_api_is_import_only() -> None:

@@ -14,6 +14,7 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 - Không còn chạy lại toàn bộ dependency resolving, managed-file checking và loader preflight sau cảnh báo tương thích có thể bỏ qua.
 - Các nút dài trong dialog tương thích không còn bị ép nhỏ làm cắt chữ.
 - Trạng thái OptiFine trong Add Instance nằm trên một hàng tự nhiên, không còn căn lệch/chồng hàng khi bị vô hiệu hóa.
+- Cross-platform test không còn thay đổi `os.name` toàn cục làm pytest dùng sai `PosixPath`/`WindowsPath`; version contract cũng không còn ghim số Alpha cũ.
 
 ### Release status
 

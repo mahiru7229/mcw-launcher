@@ -354,8 +354,8 @@ def test_run_uses_create_no_window_on_windows(
         FixedDateTime,
     )
     monkeypatch.setattr(
-        "src.core.java.java_runtime.os.name",
-        "nt",
+        "src.core.java.java_runtime.PlatformInfo.is_windows",
+        lambda: True,
     )
     monkeypatch.setattr(
         "src.core.java.java_runtime.subprocess.CREATE_NO_WINDOW",
@@ -393,8 +393,8 @@ def test_run_uses_zero_creation_flags_outside_windows(
         FixedDateTime,
     )
     monkeypatch.setattr(
-        "src.core.java.java_runtime.os.name",
-        "posix",
+        "src.core.java.java_runtime.PlatformInfo.is_windows",
+        lambda: False,
     )
 
     def fake_popen(command, **kwargs):
@@ -494,8 +494,8 @@ def test_run_passes_all_expected_popen_options(
         FixedDateTime,
     )
     monkeypatch.setattr(
-        "src.core.java.java_runtime.os.name",
-        "posix",
+        "src.core.java.java_runtime.PlatformInfo.is_windows",
+        lambda: False,
     )
 
     def fake_popen(command, **kwargs):
@@ -545,7 +545,7 @@ def test_run_retries_winerror_206_with_compacted_classpath(monkeypatch: pytest.M
     expected_process = object()
 
     monkeypatch.setattr("src.core.java.java_runtime.datetime", FixedDateTime)
-    monkeypatch.setattr("src.core.java.java_runtime.os.name", "nt")
+    monkeypatch.setattr("src.core.java.java_runtime.PlatformInfo.is_windows", lambda: True)
     monkeypatch.setattr("src.core.java.java_runtime.subprocess.CREATE_NO_WINDOW", 0x08000000, raising=False)
 
     def fake_popen(command, **kwargs):
@@ -575,7 +575,7 @@ def test_run_retries_winerror_206_with_compacted_classpath(monkeypatch: pytest.M
 
 def test_run_reports_actionable_error_when_winerror_206_cannot_be_compacted(monkeypatch: pytest.MonkeyPatch, instance, instance_dir: Path):
     monkeypatch.setattr("src.core.java.java_runtime.datetime", FixedDateTime)
-    monkeypatch.setattr("src.core.java.java_runtime.os.name", "nt")
+    monkeypatch.setattr("src.core.java.java_runtime.PlatformInfo.is_windows", lambda: True)
     monkeypatch.setattr("src.core.java.java_runtime.subprocess.CREATE_NO_WINDOW", 0x08000000, raising=False)
 
     def failing_popen(command, **kwargs):

@@ -150,7 +150,7 @@ def test_kill_instance_force_kills_registered_process_and_marks_session() -> Non
 
 def test_posix_termination_targets_dedicated_process_group(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[int, int]] = []
-    monkeypatch.setattr("src.core.runtime.process_supervisor.os.name", "posix")
+    monkeypatch.setattr("src.core.runtime.process_supervisor.PlatformInfo.is_windows", lambda: False)
     monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpid", lambda: 100)
     monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpgid", lambda pid: pid)
     monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpgrp", lambda: 100)
@@ -167,7 +167,7 @@ def test_posix_termination_targets_dedicated_process_group(monkeypatch: pytest.M
 
 def test_posix_termination_falls_back_to_root_pid_without_owned_group(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[int, int]] = []
-    monkeypatch.setattr("src.core.runtime.process_supervisor.os.name", "posix")
+    monkeypatch.setattr("src.core.runtime.process_supervisor.PlatformInfo.is_windows", lambda: False)
     monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpid", lambda: 100)
     monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpgid", lambda _pid: 200)
     monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpgrp", lambda: 200)
