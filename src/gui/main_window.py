@@ -3158,6 +3158,7 @@ class MainWindow(QMainWindow):
         clicked = box.clickedButton()
         if clicked is cancel or clicked is None:
             self.launch_control.set_failed(tr("compatibility.confirmation.cancelled"), tr("compatibility.confirmation.settings_hint"))
+            self.launch_controller.resolve_compatibility_confirmation(False)
             return
         instance = self._selected_instance
         if clicked is always_allow and instance is not None:
@@ -3166,7 +3167,7 @@ class MainWindow(QMainWindow):
             SettingsManager.save(instance, settings)
             self.instance_settings_page.set_settings(instance.name, settings)
         if clicked in {launch_once, always_allow}:
-            QTimer.singleShot(0, lambda: self.launch_controller.launch(True))
+            self.launch_controller.resolve_compatibility_confirmation(True)
 
     def _portable_manual_download_required(self, request: object) -> None:
         requirements = tuple(getattr(request, "requirements", ()) or ())

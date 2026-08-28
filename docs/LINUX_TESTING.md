@@ -1,6 +1,6 @@
 # Kiểm thử MCW Launcher trên Lubuntu
 
-Tài liệu này áp dụng cho `v1.5.0-alpha.4`. Alpha 4 chạy từ source; chưa có AppImage hoặc `.deb`.
+Tài liệu này áp dụng cho `v1.5.0-alpha.5`. Alpha 5 chạy từ source; chưa có AppImage hoặc `.deb`.
 
 ## 1. Chuẩn bị hệ thống
 
@@ -16,7 +16,7 @@ Không chạy launcher bằng `sudo` vì tài khoản, config và runtime sẽ b
 ## 2. Cài môi trường source
 
 ```bash
-cd mcw-launcher-v1.5.0-alpha.4
+cd mcw-launcher-v1.5.0-alpha.5
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip

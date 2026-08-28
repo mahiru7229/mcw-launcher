@@ -25,6 +25,7 @@ from src.core.curseforge.curseforge_content_manager import CurseForgeContentMana
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.mod.modpack_dependency_resolver import ModpackDependencyResolver
 from src.core.network.artifact_download_service import ArtifactDownloadError
+from src.core.network.download_pause import DownloadCancelledError
 from src.models.mod.dependency_resolution import DependencyResolutionResult
 from src.core.runtime.process_supervisor import ProcessSupervisor
 from src.core.minecraft.version_manager import VersionManager
@@ -1215,6 +1216,59 @@ def test_run_can_bypass_compatibility_errors_once_without_changing_policy(monkey
 
     assert result["minecraftVersion"] == pipeline["version"].id
     assert "A dependency version may be incompatible." in result["warnings"]
+
+
+def test_run_resumes_same_pipeline_after_compatibility_confirmation(monkeypatch: pytest.MonkeyPatch):
+    pipeline = patch_pipeline(monkeypatch)
+    settings = SimpleNamespace(
+        forge_preflight_failure_policy="ask",
+        modrinth_failure_policy="inherit",
+        curseforge_failure_policy="inherit",
+    )
+    issue = SimpleNamespace(severity="error", code="duplicate-mod-id", message="Duplicate enabled mod ID.")
+    report = SimpleNamespace(errors=(issue,), warnings=(), warning_count=0, loader="forge")
+    scans = []
+    confirmations = []
+    monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
+    monkeypatch.setattr(
+        ForgePreflightManager,
+        "scan",
+        lambda instance, version, verify_files=False: scans.append((instance, version)) or report,
+    )
+    monkeypatch.setattr(ForgePreflightManager, "validate_runtime_files", lambda instance, version: ())
+
+    result = MinecraftExecutor.run(
+        instance=make_instance(),
+        authentication=object(),
+        account=object(),
+        on_compatibility_confirmation=lambda request: confirmations.append(request) or True,
+    )
+
+    assert result["minecraftVersion"] == pipeline["version"].id
+    assert len(confirmations) == 1
+    assert len(scans) == 1
+    assert "Duplicate enabled mod ID." in result["warnings"]
+
+
+def test_run_cancels_same_pipeline_when_compatibility_is_declined(monkeypatch: pytest.MonkeyPatch):
+    patch_pipeline(monkeypatch)
+    settings = SimpleNamespace(
+        forge_preflight_failure_policy="ask",
+        modrinth_failure_policy="inherit",
+        curseforge_failure_policy="inherit",
+    )
+    issue = SimpleNamespace(severity="error", code="duplicate-mod-id", message="Duplicate enabled mod ID.")
+    report = SimpleNamespace(errors=(issue,), warnings=(), warning_count=0, loader="forge")
+    monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
+    monkeypatch.setattr(ForgePreflightManager, "scan", lambda instance, version, verify_files=False: report)
+
+    with pytest.raises(DownloadCancelledError, match="compatibility warning"):
+        MinecraftExecutor.run(
+            instance=make_instance(),
+            authentication=object(),
+            account=object(),
+            on_compatibility_confirmation=lambda request: False,
+        )
 
 
 def test_hard_loader_installation_errors_cannot_be_bypassed(monkeypatch: pytest.MonkeyPatch):

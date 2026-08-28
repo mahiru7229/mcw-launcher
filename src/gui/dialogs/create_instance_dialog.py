@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -86,6 +87,7 @@ class CreateInstanceDialog(QDialog):
 
         form = QFormLayout()
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self.name_input = QLineEdit()
         self.version_combo = QComboBox()
         self.version_combo.setEditable(False)
@@ -128,9 +130,12 @@ class CreateInstanceDialog(QDialog):
         layout.addWidget(self.optifine_checkbox)
         optifine_form = QFormLayout()
         optifine_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        optifine_form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self.optifine_detected_label = QLabel()
         self.optifine_detected_value = QLabel()
-        self.optifine_detected_value.setWordWrap(True)
+        self.optifine_detected_value.setWordWrap(False)
+        self.optifine_detected_value.setMinimumWidth(260)
+        self.optifine_detected_value.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.optifine_file_label = QLabel()
         self.optifine_file_button = QPushButton()
         self.optifine_file_button.clicked.connect(self._choose_optifine_file)

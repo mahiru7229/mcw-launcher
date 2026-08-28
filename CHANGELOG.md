@@ -2,6 +2,23 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.0-alpha.5] - 2026-08-28
+
+### Changed
+
+- Compatibility confirmation tạm dừng launch attempt hiện tại và tiếp tục tại chỗ sau khi người dùng cho phép.
+- Dialog giữ kích thước tự nhiên của action button; nội dung Add Instance tiếp tục dùng cuộn dọc khi thiếu chiều cao.
+
+### Fixed
+
+- Không còn chạy lại toàn bộ dependency resolving, managed-file checking và loader preflight sau cảnh báo tương thích có thể bỏ qua.
+- Các nút dài trong dialog tương thích không còn bị ép nhỏ làm cắt chữ.
+- Trạng thái OptiFine trong Add Instance nằm trên một hàng tự nhiên, không còn căn lệch/chồng hàng khi bị vô hiệu hóa.
+
+### Release status
+
+- Alpha 5 là Alpha cuối của nhánh `1.5.0`; bước tiếp theo là Beta release gate trên Windows và Linux.
+
 ## [1.5.0-alpha.4] - 2026-08-23
 
 ### Added
@@ -115,4 +132,5 @@ Maintenance release của nhánh 1.4, tập trung Java recovery/download và Dia
 [1.5.0-alpha.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.2
 [1.5.0-alpha.3]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.3
 [1.5.0-alpha.4]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.4
+[1.5.0-alpha.5]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.5
 [1.4.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.1

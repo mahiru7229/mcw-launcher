@@ -8,7 +8,7 @@ from mcw_core.api.theme.theme_palette import DEFAULT_THEME_PALETTE, derive_custo
 
 
 def test_bundled_core_runtime_version_follows_launcher_release() -> None:
-    assert mcw_core.__version__ == "1.5.0-alpha.3"
+    assert mcw_core.__version__ == "1.5.0-alpha.5"
 
 
 def test_launcher_distribution_version_when_installed() -> None:
@@ -16,7 +16,7 @@ def test_launcher_distribution_version_when_installed() -> None:
         installed = version("mcw-launcher")
     except PackageNotFoundError:
         return
-    assert installed == "1.5.0a3"
+    assert installed == "1.5.0a5"
 
 
 def test_optifine_public_api_is_import_only() -> None:
@@ -29,6 +29,7 @@ def test_new_public_api_defaults() -> None:
     assert InstanceRuntimeProfile.__dataclass_fields__["required_java_major"].type in {int, "int"}
     assert ManagedContentPolicy.ASK == "ask"
     assert LaunchRequest.__dataclass_fields__["allow_compatibility_issues_once"].default is False
+    assert LaunchRequest.__dataclass_fields__["on_compatibility_confirmation"].default is None
     recommendation = FirstRunRecommendationService.fallback()
     assert recommendation.recommended_max_memory_mb >= recommendation.recommended_min_memory_mb
 
