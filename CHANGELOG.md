@@ -2,6 +2,29 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.0-beta.1] - 2026-08-28
+
+### Added
+
+- Automatic updater thử nghiệm cho packaged Linux x64 release.
+- Platform-aware GitHub asset selection cho ZIP Windows/Linux riêng biệt.
+- Linux updater helper chạy tách session, kiểm tra quyền ghi, giữ executable mode và tự restart.
+- Integration test giả lập toàn bộ Beta 1 → Beta 2 mà không thay đổi dữ liệu XDG.
+
+### Changed
+
+- Release manifest bắt buộc khớp schema, version, platform, executable và managed-file set.
+- Update applier thay từng file atomically và dùng chung backup/rollback cho Windows/Linux.
+
+### Security
+
+- Từ chối path traversal, symlink, duplicate archive path, file ngoài manifest và sai platform.
+- Updater Linux không gọi `sudo`; thư mục cài đặt chỉ đọc phải update thủ công.
+
+### Release status
+
+- Beta 2 sẽ là live update gate đầu tiên cho luồng Beta 1 → Beta 2 trên Lubuntu.
+
 ## [1.5.0-alpha.5] - 2026-08-28
 
 ### Changed
@@ -125,13 +148,9 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 - Linux packaging và managed Java provisioning chưa hoàn chỉnh.
 - Windows vẫn là nền tảng release chính của Alpha 1.
 
+[1.5.0-beta.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.1
 ## [1.4.1]
 
 Maintenance release của nhánh 1.4, tập trung Java recovery/download và Diagnostics v2.1. Xem tag `v1.4.1` trong GitHub Releases để đọc release notes đầy đủ.
 
-[1.5.0-alpha.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.1
-[1.5.0-alpha.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.2
-[1.5.0-alpha.3]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.3
-[1.5.0-alpha.4]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.4
-[1.5.0-alpha.5]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.5
 [1.4.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.1

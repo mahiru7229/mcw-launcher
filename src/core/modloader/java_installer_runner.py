@@ -10,6 +10,7 @@ from src.core.java.java_resolver import JavaRecoveryError, JavaResolver
 from src.core.java.java_recovery_diagnostics import JavaRecoveryDiagnostics
 from src.core.java.java_runtime import JavaRuntime
 from src.core.progress.progress_reporter import ProgressReporter
+from src.core.system.platform_info import PlatformInfo
 from src.models.progress.progress_stage import ProgressStage
 
 
@@ -106,7 +107,8 @@ class ModLoaderJavaRunner:
 
     @staticmethod
     def _invoke(java: Path, arguments: list[str], cwd: Path, timeout: float) -> subprocess.CompletedProcess[str] | OSError | subprocess.TimeoutExpired:
-        creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        is_windows = PlatformInfo.is_windows()
+        creation_flags = subprocess.CREATE_NO_WINDOW if is_windows else 0
         options: dict[str, object] = {
             "cwd": cwd,
             "stdout": subprocess.PIPE,
@@ -114,7 +116,7 @@ class ModLoaderJavaRunner:
             "text": True,
             "creationflags": creation_flags,
         }
-        if os.name != "nt":
+        if not is_windows:
             options["start_new_session"] = True
         try:
             process = subprocess.Popen(
@@ -141,7 +143,7 @@ class ModLoaderJavaRunner:
 
     @staticmethod
     def _terminate_installer(process: subprocess.Popen[str]) -> None:
-        if os.name != "nt":
+        if not PlatformInfo.is_windows():
             try:
                 os.killpg(os.getpgid(process.pid), signal.SIGKILL)
                 return

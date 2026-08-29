@@ -1,6 +1,6 @@
 # Kiểm thử MCW Launcher trên Lubuntu
 
-Tài liệu này áp dụng cho `v1.5.0-alpha.5`. Alpha 5 chạy từ source; chưa có AppImage hoặc `.deb`.
+Tài liệu này áp dụng cho `v1.5.0-beta.1`. Có thể chạy từ source để regression, nhưng automatic updater chỉ bật trong ZIP Linux x64 native do GitHub Release build.
 
 ## 1. Chuẩn bị hệ thống
 
@@ -16,7 +16,7 @@ Không chạy launcher bằng `sudo` vì tài khoản, config và runtime sẽ b
 ## 2. Cài môi trường source
 
 ```bash
-cd mcw-launcher-v1.5.0-alpha.5
+cd mcw-launcher-v1.5.0-beta.1
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -54,7 +54,7 @@ MCW_LEGACY_ROOT="$HOME/mcw-launcher-v1.5.0-alpha.2" python launcher.py
 
 Để chủ động giữ layout portable, dùng `MCW_PORTABLE=1`. Không xóa thư mục Alpha 2 trước khi xác nhận instance và account xuất hiện đúng trong Alpha 3.
 
-## 6. Checklist Alpha 4
+## 6. Checklist Beta 1
 
 1. Launcher mở được và không báo lỗi startup/account security.
 2. Danh sách version Minecraft xuất hiện.
@@ -74,9 +74,20 @@ MCW_LEGACY_ROOT="$HOME/mcw-launcher-v1.5.0-alpha.2" python launcher.py
 16. Mở Add Instance, First Run và Instance Settings ở kích thước màn hình nhỏ; widget không bị ép co hoặc chồng chữ, thanh cuộn dọc xuất hiện khi cần.
 17. Khởi động lại launcher rồi launch lại Forge/NeoForge để xác nhận profile, libraries và managed Java cache được dùng lại.
 
-## Giới hạn Alpha 4
+## 7. Test updater giả lập trong Beta 1
 
-- Automatic updater chỉ hỗ trợ Windows packaged build.
+Beta 1 chưa thể tự cập nhật tới Beta 2 trước khi Beta 2 được phát hành. Regression tự động dùng gói local giả lập để xác nhận download cache, SHA-256, manifest Linux, staging, atomic replacement, mode `0755`, restart và rollback.
+
+Khi kiểm tra GUI Beta 1, xác nhận:
+
+1. Bản chạy từ source báo updater chỉ dành cho packaged release.
+2. Gói `linux-x64.zip` chạy được và nhận đúng kênh Beta.
+3. Gói cài đặt nằm trong Home, không dùng `sudo` và không đặt trong thư mục chỉ đọc.
+4. Account, instance, world và setting XDG không thay đổi khi chạy test updater Core.
+
+## 8. Giới hạn Beta 1
+
+- Cập nhật thật trên Linux được dành cho gate Beta 1 → Beta 2; Beta 1 mới chứng minh bằng integration package local.
+- Updater không gọi `sudo`. Thư mục cài đặt không ghi được sẽ yêu cầu update thủ công.
 - GPU preference integration chỉ hỗ trợ Windows; Linux trả trạng thái unsupported và không chặn launch.
-- Forge/NeoForge đã vào release gate nhưng vẫn cần smoke test thực tế trên máy Lubuntu.
 - Linux ARM64 có nhận diện/metadata đúng nhưng chưa được xác nhận bằng launch thực tế.

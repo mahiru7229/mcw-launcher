@@ -386,7 +386,7 @@
     "update.latest.title": "Không có bản cập nhật",
     "update.latest.message": "Đang sử dụng phiên bản MCW Launcher mới nhất.",
     "update.error.title": "Cập nhật launcher",
-    "update.error.packaged_only": "Cài đặt tự động chỉ hoạt động với bản EXE Windows đã đóng gói. Hãy build hoặc chạy gói release để kiểm tra tính năng cập nhật tự động.",
+    "update.error.packaged_only": "Cài đặt tự động chỉ hoạt động với bản release Windows x64 hoặc Linux x64 đã đóng gói. Hãy chạy ZIP release native để kiểm tra cập nhật tự động.",
     "update.error.check_failed": "MCW Launcher không thể kiểm tra cập nhật.\n\n{error}",
     "launcher_settings.update.channel": "Kênh cập nhật",
     "update.channel.beta": "Beta",

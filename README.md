@@ -12,12 +12,12 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.5.0--alpha.5-orange" alt="v1.5.0-alpha.5">
+  <img src="https://img.shields.io/badge/version-v1.5.0--beta.1-blue" alt="v1.5.0-beta.1">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!WARNING]
-> `v1.5.0-alpha.5` là Alpha cuối của nhánh 1.5.0. Luồng Windows/Linux, Forge/NeoForge, nhiều managed Java runtime và responsive UI đã nằm trong release gate; bước tiếp theo là Beta.
+> `v1.5.0-beta.1` bổ sung automatic updater thử nghiệm cho gói Linux x64. Beta 2 sẽ là release đầu tiên dùng để kiểm tra cập nhật trực tiếp Beta 1 → Beta 2 trên Lubuntu.
 
 ## Tổng quan
 
@@ -35,10 +35,10 @@ Các nhóm tính năng chính:
 
 ## Trạng thái nền tảng
 
-| Nền tảng | Trạng thái Alpha 5 | Ghi chú |
+| Nền tảng | Trạng thái Beta 1 | Ghi chú |
 | --- | --- | --- |
 | Windows 10/11 x64 | Đang hỗ trợ | Luồng chính và bản đóng gói PyInstaller hiện tại. |
-| Linux x64 | Alpha 5 test target | Vanilla, Microsoft, Fabric, Quilt, Forge/NeoForge và multi-Java nằm trong release gate trên Lubuntu 24.04/VirtualBox. |
+| Linux x64 | Beta test target | Luồng game đã đạt Alpha gate; automatic updater ZIP mới cần được xác nhận trực tiếp bằng Beta 1 → Beta 2. |
 | Linux ARM64 | Nền tảng ban đầu | Nhận diện và metadata Java đúng; chưa có cam kết launch game. |
 | macOS | Chưa hỗ trợ | Chưa nằm trong phạm vi v1.5. |
 
@@ -105,7 +105,7 @@ Build Windows hiện tại:
 .\build_release.ps1
 ```
 
-Alpha 5 cung cấp source để test Linux, chưa cung cấp AppImage hoặc `.deb`. GitHub Release Actions chuẩn bị ZIP native riêng cho Windows và Linux từ Beta.
+GitHub Release Actions chỉ build ZIP native Windows/Linux sau khi test cả hai nền tảng đạt. Beta 1 chưa cung cấp AppImage hoặc `.deb`; updater Linux hoạt động với ZIP `linux-x64` đặt trong thư mục người dùng có quyền ghi.
 
 ## Kiến trúc repository
 
@@ -134,7 +134,7 @@ GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, khô
 - [MCW Core API](docs/MCW_CORE_LIBRARY.md)
 - [Language packs](docs/LANGUAGE_PACKS.md)
 - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
-- [Release notes v1.5.0-alpha.5](docs/releases/v1.5.0-alpha.5.md)
+- [Release notes v1.5.0-beta.1](docs/releases/v1.5.0-beta.1.md)
 - [Changelog](CHANGELOG.md)
 
 ## Đóng góp và bảo mật

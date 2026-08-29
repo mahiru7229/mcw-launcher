@@ -29,7 +29,7 @@ from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from mcw_core.api.modrinth.modrinth_errors import ModrinthManagedFilesRequired, ModrinthModpackManualDownloadRequired
 from mcw_core.api.network.download_pause import is_download_cancelled, is_download_paused
 from mcw_core.api.runtime.game_runtime_manager import GameRuntimeManager
-from mcw_core.api.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
+from mcw_core.api.update.automatic_update_installer import AutomaticUpdateInstaller, AutomaticUpdateUnsupportedError
 from src.gui.application import create_application
 from src.gui.animation.motion_runtime import MotionRuntime
 from src.gui.app_restart import start_restarted_process
@@ -2185,7 +2185,7 @@ class MainWindow(QMainWindow):
             self.launcher_settings_page.set_update_status(tr("update.status.auto_disabled"))
             return
         if decision == UpdateDialog.UPDATE_NOW:
-            if not WindowsUpdateInstaller.is_supported():
+            if not AutomaticUpdateInstaller.is_supported():
                 QMessageBox.information(self, tr("update.error.title"), tr("update.error.packaged_only"))
                 return
             blocked_reason = self._update_install_block_reason(include_tasks=False)
@@ -2243,7 +2243,7 @@ class MainWindow(QMainWindow):
 
     def _launch_prepared_update(self, prepared: PreparedUpdate) -> None:
         try:
-            WindowsUpdateInstaller.launch(prepared)
+            AutomaticUpdateInstaller.launch(prepared)
         except (AutomaticUpdateUnsupportedError, OSError, RuntimeError) as error:
             self.update_controller.release_priority()
             self._show_error(tr("update.error.title"), str(error))

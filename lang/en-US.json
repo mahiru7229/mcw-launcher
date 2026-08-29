@@ -386,7 +386,7 @@
     "update.latest.title": "No updates available",
     "update.latest.message": "You are using the latest available MCW Launcher version.",
     "update.error.title": "Launcher update",
-    "update.error.packaged_only": "Automatic installation is only available in the packaged Windows EXE. Build or run the release package to test automatic updates.",
+    "update.error.packaged_only": "Automatic installation is only available in packaged Windows x64 or Linux x64 release builds. Run a native release ZIP to test automatic updates.",
     "update.error.check_failed": "MCW Launcher could not check for updates.\n\n{error}",
     "launcher_settings.update.channel": "Update channel",
     "update.channel.beta": "Beta",
