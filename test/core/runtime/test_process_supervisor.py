@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -150,14 +151,20 @@ def test_kill_instance_force_kills_registered_process_and_marks_session() -> Non
 
 def test_posix_termination_targets_dedicated_process_group(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[int, int]] = []
-    monkeypatch.setattr("src.core.runtime.process_supervisor.os.name", "posix")
-    monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpid", lambda: 100)
-    monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpgid", lambda pid: pid)
-    monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpgrp", lambda: 100)
-    monkeypatch.setattr("src.core.runtime.process_supervisor.os.killpg", lambda pid, sig: calls.append((pid, sig)))
+    monkeypatch.setattr("src.core.runtime.process_supervisor.PlatformInfo.is_windows", lambda: False)
     monkeypatch.setattr(
-        "src.core.runtime.process_supervisor.os.kill",
-        lambda _pid, _sig: (_ for _ in ()).throw(AssertionError("group signal expected")),
+        "src.core.runtime.process_supervisor.signal",
+        SimpleNamespace(SIGTERM=15, SIGKILL=9),
+    )
+    monkeypatch.setattr(
+        "src.core.runtime.process_supervisor.os",
+        SimpleNamespace(
+            getpid=lambda: 100,
+            getpgid=lambda pid: pid,
+            getpgrp=lambda: 100,
+            killpg=lambda pid, sig: calls.append((pid, sig)),
+            kill=lambda _pid, _sig: (_ for _ in ()).throw(AssertionError("group signal expected")),
+        ),
     )
 
     ProcessSupervisor._terminate_pid_tree(4321, force=False)
@@ -167,11 +174,20 @@ def test_posix_termination_targets_dedicated_process_group(monkeypatch: pytest.M
 
 def test_posix_termination_falls_back_to_root_pid_without_owned_group(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[int, int]] = []
-    monkeypatch.setattr("src.core.runtime.process_supervisor.os.name", "posix")
-    monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpid", lambda: 100)
-    monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpgid", lambda _pid: 200)
-    monkeypatch.setattr("src.core.runtime.process_supervisor.os.getpgrp", lambda: 200)
-    monkeypatch.setattr("src.core.runtime.process_supervisor.os.kill", lambda pid, sig: calls.append((pid, sig)))
+    monkeypatch.setattr("src.core.runtime.process_supervisor.PlatformInfo.is_windows", lambda: False)
+    monkeypatch.setattr(
+        "src.core.runtime.process_supervisor.signal",
+        SimpleNamespace(SIGTERM=15, SIGKILL=9),
+    )
+    monkeypatch.setattr(
+        "src.core.runtime.process_supervisor.os",
+        SimpleNamespace(
+            getpid=lambda: 100,
+            getpgid=lambda _pid: 200,
+            getpgrp=lambda: 200,
+            kill=lambda pid, sig: calls.append((pid, sig)),
+        ),
+    )
 
     ProcessSupervisor._terminate_pid_tree(4321, force=True)
 

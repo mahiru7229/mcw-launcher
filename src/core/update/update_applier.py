@@ -196,7 +196,7 @@ class UpdateApplier:
             "stderr": subprocess.DEVNULL,
             "close_fds": True,
         }
-        if PlatformInfo.is_windows():
+        if PlatformInfo.current().os_name == "windows":
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         else:
             kwargs["start_new_session"] = True
@@ -237,7 +237,7 @@ class UpdateApplier:
 
     @staticmethod
     def _wait_for_process_exit(pid: int, timeout_seconds: float = 120.0) -> None:
-        if PlatformInfo.is_windows():
+        if PlatformInfo.current().os_name == "windows":
             synchronize = 0x00100000
             wait_timeout = 0x00000102
             kernel32 = ctypes.windll.kernel32
