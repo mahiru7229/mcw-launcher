@@ -22,3 +22,12 @@ def test_message_box_is_forced_dark_with_white_text(gui_app):
     assert box.palette().color(QPalette.ColorRole.Text) == QColor(DIALOG_TEXT)
     assert DIALOG_BACKGROUND in box.styleSheet()
     assert DIALOG_TEXT in box.styleSheet()
+
+
+def test_custom_message_box_buttons_preserve_translated_text_width(gui_app):
+    box = QMessageBox()
+    button = box.addButton("Always allow for this instance", QMessageBox.ButtonRole.ActionRole)
+
+    apply_message_box_compatibility(box)
+
+    assert button.minimumWidth() >= button.fontMetrics().horizontalAdvance(button.text()) + 36

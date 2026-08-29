@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -10,13 +10,11 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
-    QFrame,
     QLabel,
     QLineEdit,
-    QLayout,
     QMessageBox,
     QPushButton,
-    QScrollArea,
+    QSizePolicy,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -26,6 +24,7 @@ from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManage
 from mcw_core.api.language.language_manager import tr
 from src.gui.loader_version_options import loader_title, loader_version_entries
 from src.gui.theme.runtime import set_theme_icon
+from src.gui.widget.scrollable_page import scrollable_page
 from src.gui.window_sizing import resize_dialog_to_screen
 from src.models.optifine.optifine_models import OptiFineVersion
 
@@ -81,20 +80,14 @@ class CreateInstanceDialog(QDialog):
         root.addWidget(self.buttons)
 
     def _minecraft_tab(self) -> QWidget:
-        scroll = QScrollArea()
-        scroll.setObjectName("CreateInstanceScrollArea")
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-
         tab = QWidget()
         layout = QVBoxLayout(tab)
-        layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         layout.setContentsMargins(12, 14, 12, 12)
         layout.setSpacing(12)
 
         form = QFormLayout()
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self.name_input = QLineEdit()
         self.version_combo = QComboBox()
         self.version_combo.setEditable(False)
@@ -137,9 +130,12 @@ class CreateInstanceDialog(QDialog):
         layout.addWidget(self.optifine_checkbox)
         optifine_form = QFormLayout()
         optifine_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        optifine_form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self.optifine_detected_label = QLabel()
         self.optifine_detected_value = QLabel()
-        self.optifine_detected_value.setWordWrap(True)
+        self.optifine_detected_value.setWordWrap(False)
+        self.optifine_detected_value.setMinimumWidth(260)
+        self.optifine_detected_value.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.optifine_file_label = QLabel()
         self.optifine_file_button = QPushButton()
         self.optifine_file_button.clicked.connect(self._choose_optifine_file)
@@ -151,7 +147,7 @@ class CreateInstanceDialog(QDialog):
         self.optifine_status.setWordWrap(True)
         layout.addWidget(self.optifine_status)
         layout.addStretch(1)
-        scroll.setWidget(tab)
+        scroll = scrollable_page(tab, object_name="CreateInstanceScrollArea")
         self.minecraft_scroll = scroll
         self.minecraft_tab_content = tab
         return scroll

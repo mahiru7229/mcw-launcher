@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import QAbstractButton, QApplication, QLabel, QMessageBox, QPlainTextEdit, QTextEdit
+from PySide6.QtWidgets import QAbstractButton, QApplication, QLabel, QMessageBox, QPlainTextEdit, QSizePolicy, QTextEdit
 
 from src.gui.dark_theme import create_forced_dark_palette
 from src.gui.dark_theme_constants import (
@@ -108,6 +108,25 @@ def apply_message_box_compatibility(message_box: QMessageBox) -> None:
             f"background: {DIALOG_BUTTON}; color: {DIALOG_TEXT}; "
             f"border: 2px solid {DIALOG_BORDER}; padding: 7px 12px; font-weight: 700;"
         )
+        # QMessageBox may compress custom action buttons to its historical
+        # 88 px default. Preserve the translated text width so confirmation
+        # choices never become unreadable.
+        text_width = button.fontMetrics().horizontalAdvance(button.text())
+        button.setMinimumWidth(max(88, text_width + 36, button.sizeHint().width()))
+        button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+
+    buttons = message_box.findChildren(QAbstractButton)
+    if buttons:
+        required_width = sum(button.minimumWidth() for button in buttons) + 48 + 12 * (len(buttons) - 1)
+        screen = message_box.screen()
+        available_width = screen.availableGeometry().width() - 32 if screen is not None else required_width
+        if required_width <= available_width:
+            message_box.setMinimumWidth(max(message_box.minimumWidth(), required_width))
+        layout = message_box.layout()
+        if layout is not None:
+            layout.invalidate()
+            layout.activate()
+        message_box.adjustSize()
 
 
 class MessageBoxCompatibilityFilter(QObject):

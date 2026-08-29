@@ -84,11 +84,19 @@ def test_headless_facade_launches_an_offline_instance(monkeypatch: pytest.Monkey
 
     monkeypatch.setattr(facade.MinecraftExecutor, "run", fake_run)
     core = MCWCore(CorePaths.from_root(tmp_path))
-    result = core.launch(LaunchRequest(instance="Headless Test", offline_username="LibraryPlayer"))
+    confirmation_callback = lambda request: True
+    result = core.launch(
+        LaunchRequest(
+            instance="Headless Test",
+            offline_username="LibraryPlayer",
+            on_compatibility_confirmation=confirmation_callback,
+        )
+    )
 
     assert captured["instance"] is instance
     assert captured["account"].username == "LibraryPlayer"
     assert captured["authentication"].player_name == "LibraryPlayer"
+    assert captured["on_compatibility_confirmation"] is confirmation_callback
     assert result.minecraft_java_major_version == 17
     assert result.minecraft_version == "quilt-loader-0.30.1-1.20.1"
     assert result["warnings"] == ("headless smoke warning",)

@@ -6,7 +6,9 @@ import re
 import sys
 
 from PyInstaller.utils.hooks import collect_data_files
-from PyInstaller.utils.win32.versioninfo import FixedFileInfo, StringFileInfo, StringStruct, StringTable, VarFileInfo, VarStruct, VSVersionInfo
+
+if sys.platform == "win32":
+    from PyInstaller.utils.win32.versioninfo import FixedFileInfo, StringFileInfo, StringStruct, StringTable, VarFileInfo, VarStruct, VSVersionInfo
 
 
 PROJECT_ROOT = Path(SPECPATH).resolve()
@@ -41,6 +43,8 @@ if not APP_ICON_PNG_PATH.is_file():
 
 NUMERIC_VERSION = _numeric_version(VERSION_ID)
 IS_PRERELEASE = any(marker in VERSION_ID.casefold() for marker in ("alpha", "beta", "rc"))
+IS_WINDOWS = sys.platform == "win32"
+EXECUTABLE_NAME = "MCW Launcher" if IS_WINDOWS else "mcw-launcher"
 
 # Keep the default language packs inside the one-file executable so the GUI can
 # still start when the external release payload is incomplete. External packs
@@ -55,7 +59,7 @@ DATAS += collect_data_files("certifi")
 # win32crypt is imported through a guarded import because source-mode tests also
 # run outside Windows. Keep it explicit so Microsoft token DPAPI is always
 # available in the Windows executable.
-HIDDEN_IMPORTS = ["win32crypt", "pywintypes"]
+HIDDEN_IMPORTS = ["win32crypt", "pywintypes"] if IS_WINDOWS else ["keyring.backends.SecretService", "secretstorage"]
 
 # Only QtCore, QtGui and QtWidgets are used by the launcher. Excluding unrelated
 # bindings and optional Qt modules prevents accidental size growth when the
@@ -114,38 +118,40 @@ EXCLUDES = [
     "tkinter",
 ]
 
-VERSION_RESOURCE = VSVersionInfo(
-    ffi=FixedFileInfo(
-        filevers=NUMERIC_VERSION,
-        prodvers=NUMERIC_VERSION,
-        mask=0x3F,
-        flags=0x2 if IS_PRERELEASE else 0x0,
-        OS=0x40004,
-        fileType=0x1,
-        subtype=0x0,
-        date=(0, 0),
-    ),
-    kids=[
-        StringFileInfo(
-            [
-                StringTable(
-                    "040904B0",
-                    [
-                        StringStruct("CompanyName", DEVELOPER_NAME),
-                        StringStruct("FileDescription", LAUNCHER_NAME),
-                        StringStruct("FileVersion", VERSION_ID),
-                        StringStruct("InternalName", "MCW Launcher"),
-                        StringStruct("LegalCopyright", f"Copyright © 2026 {DEVELOPER_NAME}"),
-                        StringStruct("OriginalFilename", "MCW Launcher.exe"),
-                        StringStruct("ProductName", "MCW Launcher"),
-                        StringStruct("ProductVersion", VERSION_ID),
-                    ],
-                )
-            ]
+VERSION_RESOURCE = None
+if IS_WINDOWS:
+    VERSION_RESOURCE = VSVersionInfo(
+        ffi=FixedFileInfo(
+            filevers=NUMERIC_VERSION,
+            prodvers=NUMERIC_VERSION,
+            mask=0x3F,
+            flags=0x2 if IS_PRERELEASE else 0x0,
+            OS=0x40004,
+            fileType=0x1,
+            subtype=0x0,
+            date=(0, 0),
         ),
-        VarFileInfo([VarStruct("Translation", [1033, 1200])]),
-    ],
-)
+        kids=[
+            StringFileInfo(
+                [
+                    StringTable(
+                        "040904B0",
+                        [
+                            StringStruct("CompanyName", DEVELOPER_NAME),
+                            StringStruct("FileDescription", LAUNCHER_NAME),
+                            StringStruct("FileVersion", VERSION_ID),
+                            StringStruct("InternalName", "MCW Launcher"),
+                            StringStruct("LegalCopyright", f"Copyright © 2026 {DEVELOPER_NAME}"),
+                            StringStruct("OriginalFilename", "MCW Launcher.exe"),
+                            StringStruct("ProductName", "MCW Launcher"),
+                            StringStruct("ProductVersion", VERSION_ID),
+                        ],
+                    )
+                ]
+            ),
+            VarFileInfo([VarStruct("Translation", [1033, 1200])]),
+        ],
+    )
 
 # PerMonitorV2 avoids Windows bitmap-scaling the Qt window, which keeps QScreen
 # geometry reliable for the 1600x900 and 1280x720 display profiles. Long path
@@ -203,7 +209,7 @@ exe = EXE(
     analysis.binaries,
     analysis.datas,
     [],
-    name="MCW Launcher",
+    name=EXECUTABLE_NAME,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -211,8 +217,8 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     version=VERSION_RESOURCE,
-    icon=str(APP_ICON_PATH),
-    manifest=WINDOWS_MANIFEST,
+    icon=str(APP_ICON_PATH) if IS_WINDOWS else None,
+    manifest=WINDOWS_MANIFEST if IS_WINDOWS else None,
     uac_admin=False,
     uac_uiaccess=False,
 )

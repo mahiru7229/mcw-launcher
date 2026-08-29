@@ -33,6 +33,7 @@ def test_current_platform_profile(
     assert profile.adoptium_architecture == adoptium
     assert profile.java_executable == java
     assert profile.archive_suffix == suffix
+    assert PlatformInfo.is_windows() is (os_name == "windows")
 
 
 def test_linux_x64_supports_managed_java(monkeypatch: pytest.MonkeyPatch) -> None:
