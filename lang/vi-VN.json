@@ -6,6 +6,7 @@
   },
   "translations": {
     "app.name": "MCW Launcher",
+    "platform.open.failed": "Không thể mở file hoặc thư mục bằng trình xử lý của desktop.",
     "navigation.home": "Trang chủ",
     "navigation.accounts": "Tài khoản",
     "navigation.instances": "Instance",

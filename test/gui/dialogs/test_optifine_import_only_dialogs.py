@@ -59,6 +59,14 @@ def test_manage_dialog_has_no_online_version_controls(app) -> None:
     assert not hasattr(dialog, "versions_requested")
 
 
+def test_manage_dialog_scrolls_content_but_keeps_actions_fixed(app) -> None:
+    dialog = OptiFineDialog()
+
+    assert dialog.content_scroll.widgetResizable() is True
+    assert dialog.content_scroll.parentWidget() is dialog
+    assert dialog.install_button.parentWidget() is dialog
+
+
 def test_create_dialog_keeps_optifine_status_on_one_natural_row(app) -> None:
     dialog = CreateInstanceDialog()
 

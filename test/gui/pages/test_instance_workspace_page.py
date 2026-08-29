@@ -35,6 +35,14 @@ def test_workspace_builds_instance_library_and_keeps_selected_instance(gui_app):
     assert page.manage_mods_button.isEnabled() is True
 
 
+def test_workspace_action_panel_scrolls_when_height_is_limited(gui_app):
+    page = InstanceWorkspacePage()
+
+    assert page.action_scroll.widget() is page.action_panel
+    assert page.action_scroll.widgetResizable() is True
+    assert page.action_scroll.minimumWidth() >= 300
+
+
 def test_workspace_search_filters_by_loader_and_version(gui_app):
     page = InstanceWorkspacePage()
     page.set_instances(

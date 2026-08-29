@@ -39,6 +39,7 @@ from src.gui.pages.instances_page import InstancesPage
 from src.gui.theme.accent_runtime import theme_accent_runtime
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
+from src.gui.widget.scrollable_page import scrollable_page
 
 
 class InstanceWorkspacePage(BasePage):
@@ -283,7 +284,9 @@ class InstanceWorkspacePage(BasePage):
         self.action_panel.layout.addWidget(self.clone_button)
         self.action_panel.layout.addWidget(self.export_button)
         self.action_panel.layout.addWidget(self.delete_button)
-        self.splitter.addWidget(self.action_panel)
+        self.action_scroll = scrollable_page(self.action_panel, object_name="InstanceActionScrollArea")
+        self.action_scroll.setMinimumWidth(300)
+        self.splitter.addWidget(self.action_scroll)
         self.splitter.setStretchFactor(0, 1)
         self.splitter.setStretchFactor(1, 0)
         self.splitter.setSizes([820, 330])

@@ -3,8 +3,8 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 
-from PySide6.QtCore import QSignalBlocker, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QDesktopServices, QPalette
+from PySide6.QtCore import QSignalBlocker, QTimer, Signal
+from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy, QSpinBox
 
 from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
@@ -20,6 +20,7 @@ from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEdit
 from src.gui.dialogs.protected_value_reveal_dialog import confirm_reveal_protected_values
 from src.gui.dialogs.theme_issues_dialog import ThemeIssuesDialog
 from src.gui.pages.base_page import BasePage
+from src.gui.platform_open import open_local_path
 from src.gui.theme.live_reload import ThemeLiveReload
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
@@ -1238,7 +1239,7 @@ class LauncherSettingsPage(BasePage):
         if theme is None or theme.root is None:
             QMessageBox.information(self, tr("theme.authoring.title"), tr("theme.authoring.no_folder"))
             return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(theme.root)))
+        open_local_path(theme.root)
 
     def _duplicate_theme(self) -> None:
         theme = self._selected_theme()

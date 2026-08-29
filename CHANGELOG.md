@@ -2,6 +2,22 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.0-beta.2] - 2026-08-29
+
+### Changed
+
+- OptiFine và Instance Info giữ kích thước tự nhiên; khi thiếu chiều cao, nội dung cuộn dọc còn action/footer vẫn truy cập được.
+- Các thao tác mở file/thư mục trên Linux ưu tiên `xdg-open`, sau đó `gio open`, rồi mới dùng Qt desktop services.
+
+### Fixed
+
+- Sửa dialog OptiFine và panel Instance Info bị cắt/chồng nội dung trên Linux ở cửa sổ nhỏ.
+- Sửa các nút Open Folder không phản hồi trên một số desktop Lubuntu.
+
+### Release status
+
+- Beta 2 là live update gate để xác nhận updater Beta 1 → Beta 2 giữ nguyên dữ liệu XDG và khởi động lại đúng phiên bản.
+
 ## [1.5.0-beta.1] - 2026-08-28
 
 ### Added
@@ -149,6 +165,7 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 - Windows vẫn là nền tảng release chính của Alpha 1.
 
 [1.5.0-beta.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.1
+[1.5.0-beta.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.2
 ## [1.4.1]
 
 Maintenance release của nhánh 1.4, tập trung Java recovery/download và Diagnostics v2.1. Xem tag `v1.4.1` trong GitHub Releases để đọc release notes đầy đủ.

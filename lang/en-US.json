@@ -6,6 +6,7 @@
   },
   "translations": {
     "app.name": "MCW Launcher",
+    "platform.open.failed": "The file or folder could not be opened with the desktop handler.",
     "navigation.home": "Home",
     "navigation.accounts": "Accounts",
     "navigation.instances": "Instance",

@@ -5,8 +5,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, QUrl
-from PySide6.QtGui import QCloseEvent, QDesktopServices, QGuiApplication, QScreen
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QCloseEvent, QGuiApplication, QScreen
 from PySide6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QStackedWidget, QVBoxLayout, QWidget
 
 from mcw_core import CompatibilityConfirmationRequired
@@ -88,6 +88,7 @@ from src.gui.pages.instance_workspace_page import InstanceWorkspacePage
 from src.gui.pages.launcher_settings_page import LauncherSettingsPage
 from src.gui.pages.logs_page import LogsPage
 from src.gui.pages.mods_page import ModsPage
+from src.gui.platform_open import open_local_path
 from src.gui.presenters.launch_error_presenter import LaunchErrorPresenter
 from src.gui.style import APP_STYLE
 from src.gui.task_progress import task_progress_profile
@@ -1075,7 +1076,7 @@ class MainWindow(QMainWindow):
         except Exception as error:
             self._show_error(tr("content.library.title"), str(error))
             return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+        open_local_path(path)
 
     def _open_content_library_manager(self, content_type: str) -> None:
         instance = self.content_library_controller.current_instance
@@ -1151,7 +1152,7 @@ class MainWindow(QMainWindow):
         except Exception as error:
             self._show_error(tr("content.manager.title"), str(error))
             return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+        open_local_path(path)
 
     def _install_curseforge_content_pack(self, instance_name: str, content_type: str, project_name: str, file: object) -> None:
         kind = ContentPackManager.normalize_type(content_type)
@@ -2017,7 +2018,7 @@ class MainWindow(QMainWindow):
         if not directory.exists():
             self._show_error(tr("Java installations"), tr("The selected Java directory no longer exists."))
             return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory.resolve())))
+        open_local_path(directory)
 
     def _open_optifine(self, name: str) -> None:
         normalized = str(name or "").strip()
@@ -2042,7 +2043,7 @@ class MainWindow(QMainWindow):
         except Exception as error:
             self._show_error(tr("Instances"), str(error))
             return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory.resolve())))
+        open_local_path(directory)
 
     def _open_backups_folder(self, instance_name: str) -> None:
         name = str(instance_name).strip()
@@ -2053,7 +2054,7 @@ class MainWindow(QMainWindow):
         except Exception as error:
             self._show_error(tr("Instance backups"), str(error))
             return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory.resolve())))
+        open_local_path(directory)
 
     def _on_backup_created(self, result: object) -> None:
         backup = getattr(result, "backup", None)
@@ -2984,7 +2985,7 @@ class MainWindow(QMainWindow):
         global_logs = (Paths.neoforge_root() if loader_name == ModLoaderManager.NEOFORGE else Paths.forge_root()) / "logs"
         target = instance_logs if instance_logs.exists() and any(instance_logs.iterdir()) else global_logs
         target.mkdir(parents=True, exist_ok=True)
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(target.resolve())))
+        open_local_path(target)
 
     def _export_forge_diagnostics(self, name: str) -> None:
         try:
@@ -3011,7 +3012,7 @@ class MainWindow(QMainWindow):
         )
 
     def _open_logs_folder(self) -> None:
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(Paths.logs_root().resolve())))
+        open_local_path(Paths.logs_root())
 
 
     def _open_latest_game_log(self) -> None:
@@ -3023,7 +3024,7 @@ class MainWindow(QMainWindow):
         if path is None:
             QMessageBox.information(self, tr("Game log"), tr("No Minecraft log was found for this instance."))
             return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.resolve())))
+        open_local_path(path)
 
     def _open_latest_crash_report(self) -> None:
         instance = self._selected_instance
@@ -3034,7 +3035,7 @@ class MainWindow(QMainWindow):
         if path is None:
             QMessageBox.information(self, tr("Crash report"), tr("No crash report was found for this instance."))
             return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.resolve())))
+        open_local_path(path)
 
     def _show_error(self, title: str, message: str) -> None:
         self._last_error_context = f"{title}: {message}"[:1200]

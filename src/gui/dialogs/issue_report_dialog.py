@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from mcw_core.api.language.language_manager import tr
+from src.gui.platform_open import open_local_path
 
 
 class IssueReportDialog(QDialog):
@@ -191,7 +192,7 @@ class IssueReportDialog(QDialog):
 
     def _open_bundle_folder(self) -> None:
         if self._bundle_path is not None:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._bundle_path.parent.resolve())))
+            open_local_path(self._bundle_path.parent)
 
     def _open_github(self) -> None:
         if self._issue_url:

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices, QGuiApplication
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QMessageBox, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget
 
 from mcw_core.api.language.language_manager import tr
+from src.gui.platform_open import open_local_path
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.window_sizing import resize_dialog_to_screen
 
@@ -73,8 +74,8 @@ class LanAgentLogDialog(QDialog):
         if not self.log_path.is_file():
             QMessageBox.information(self, tr("lan.agent.log.title"), tr("lan.agent.log.not_found"))
             return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.log_path.resolve())))
+        open_local_path(self.log_path)
 
     def _open_folder(self) -> None:
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.log_path.parent.resolve())))
+        open_local_path(self.log_path.parent)

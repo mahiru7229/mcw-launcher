@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import QAbstractItemView, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
 from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
@@ -11,6 +11,7 @@ from mcw_core.api.curseforge.curseforge_registry import CurseForgeRegistry
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from src.gui.theme.runtime import set_theme_icon
+from src.gui.platform_open import open_local_path
 from src.gui.window_sizing import resize_dialog_to_screen
 from src.models.instance.instance import Instance
 from src.models.mod.mod_info import ModInfo
@@ -495,7 +496,7 @@ class ModManagerDialog(QDialog):
         if self._instance is not None:
             folder = self._instance.instance_dir / "mods"
             folder.mkdir(parents=True, exist_ok=True)
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder.resolve())))
+            open_local_path(folder)
 
     def _set_actions_enabled(self, enabled: bool) -> None:
         for button in (self.refresh_button, self.analyze_button, self.open_folder_button, self.add_button, self.enable_button, self.disable_button, self.remove_button):

@@ -13,10 +13,12 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from mcw_core.api.language.language_manager import tr
 from src.gui.window_sizing import resize_dialog_to_screen
+from src.gui.widget.scrollable_page import scrollable_page
 from src.models.optifine.optifine_models import OptiFineVersion
 
 
@@ -43,10 +45,15 @@ class OptiFineDialog(QDialog):
         root.setContentsMargins(18, 18, 18, 18)
         root.setSpacing(12)
 
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(12)
+
         self.description_label = QLabel()
         self.description_label.setObjectName("MutedLabel")
         self.description_label.setWordWrap(True)
-        root.addWidget(self.description_label)
+        content_layout.addWidget(self.description_label)
 
         form = QFormLayout()
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
@@ -64,7 +71,7 @@ class OptiFineDialog(QDialog):
         form.addRow(self.mode_label, self.mode_value)
         form.addRow(self.version_label, self.version_value)
         form.addRow(self.source_label, self.source_value)
-        root.addLayout(form)
+        content_layout.addLayout(form)
 
         source_row = QHBoxLayout()
         self.open_official_button = QPushButton()
@@ -74,13 +81,15 @@ class OptiFineDialog(QDialog):
         source_row.addWidget(self.open_official_button)
         source_row.addWidget(self.choose_file_button)
         source_row.addStretch(1)
-        root.addLayout(source_row)
+        content_layout.addLayout(source_row)
 
         self.status_label = QLabel()
         self.status_label.setObjectName("MutedLabel")
         self.status_label.setWordWrap(True)
-        root.addWidget(self.status_label)
-        root.addStretch(1)
+        content_layout.addWidget(self.status_label)
+        content_layout.addStretch(1)
+        self.content_scroll = scrollable_page(content, object_name="OptiFineScrollArea")
+        root.addWidget(self.content_scroll, 1)
 
         actions = QHBoxLayout()
         self.install_button = QPushButton()
