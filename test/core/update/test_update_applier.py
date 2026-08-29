@@ -1,4 +1,7 @@
 from pathlib import Path
+import os
+
+import pytest
 
 from src.core.update.update_applier import UpdateApplier, UpdateApplyRequest
 
@@ -176,3 +179,37 @@ def test_update_applier_restores_removed_managed_file_on_rollback(tmp_path, monk
 
     assert applier.run() == 1
     assert stale.read_text(encoding="utf-8") == "obsolete"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX executable modes are validated by the Linux CI job")
+def test_update_applier_atomically_installs_executable_linux_mode(tmp_path, monkeypatch) -> None:
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    updater = tmp_path / "updater"
+    staging = tmp_path / "staging"
+    for directory in (source, destination, updater, staging):
+        directory.mkdir()
+    source_executable = source / "mcw-launcher"
+    destination_executable = destination / "mcw-launcher"
+    source_executable.write_bytes(b"new-linux")
+    source_executable.chmod(0o755)
+    destination_executable.write_bytes(b"old-linux")
+    destination_executable.chmod(0o755)
+    request = UpdateApplyRequest(
+        parent_pid=123,
+        source_directory=source,
+        destination_directory=destination,
+        executable_name="mcw-launcher",
+        updater_directory=updater,
+        staging_directory=staging,
+        persistent_log_path=tmp_path / "updater.log",
+        target_version="1.5.0-beta.2",
+    )
+    applier = UpdateApplier(request)
+    monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
+    monkeypatch.setattr(applier, "_start_launcher", lambda: None)
+
+    assert applier.run() == 0
+    assert destination_executable.read_bytes() == b"new-linux"
+    assert destination_executable.stat().st_mode & 0o777 == 0o755
+    assert not list(destination.glob(".*.mcw-update-*.tmp"))

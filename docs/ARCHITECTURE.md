@@ -1,6 +1,6 @@
 # Kiến trúc MCW Launcher
 
-Tài liệu này mô tả ranh giới kiến trúc áp dụng từ `v1.5.0-alpha.3`. Mục tiêu là giảm phụ thuộc chéo, giữ startup không bị network I/O ngầm và chuẩn bị implementation đa nền tảng.
+Tài liệu này mô tả ranh giới kiến trúc áp dụng từ `v1.5.0-beta.1`. Mục tiêu là giảm phụ thuộc chéo, giữ startup không bị network I/O ngầm và chuẩn bị implementation đa nền tảng.
 
 ## Các lớp chính
 
