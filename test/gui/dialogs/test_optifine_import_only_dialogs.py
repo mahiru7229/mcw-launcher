@@ -57,3 +57,10 @@ def test_manage_dialog_has_no_online_version_controls(app) -> None:
     assert not hasattr(dialog, "preview_checkbox")
     assert not hasattr(dialog, "refresh_button")
     assert not hasattr(dialog, "versions_requested")
+
+
+def test_create_dialog_keeps_optifine_status_on_one_natural_row(app) -> None:
+    dialog = CreateInstanceDialog()
+
+    assert dialog.optifine_detected_value.wordWrap() is False
+    assert dialog.optifine_detected_value.minimumWidth() >= 260

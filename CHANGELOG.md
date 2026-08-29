@@ -148,14 +148,9 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 - Linux packaging và managed Java provisioning chưa hoàn chỉnh.
 - Windows vẫn là nền tảng release chính của Alpha 1.
 
+[1.5.0-beta.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.1
 ## [1.4.1]
 
 Maintenance release của nhánh 1.4, tập trung Java recovery/download và Diagnostics v2.1. Xem tag `v1.4.1` trong GitHub Releases để đọc release notes đầy đủ.
 
-[1.5.0-alpha.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.1
-[1.5.0-alpha.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.2
-[1.5.0-alpha.3]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.3
-[1.5.0-alpha.4]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.4
-[1.5.0-alpha.5]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-alpha.5
-[1.5.0-beta.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.1
 [1.4.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.4.1
