@@ -142,6 +142,10 @@ def test_invoke_kills_posix_installer_group_on_timeout(monkeypatch, tmp_path: Pa
     monkeypatch.setattr("src.core.modloader.java_installer_runner.PlatformInfo.is_windows", lambda: False)
     monkeypatch.setattr("src.core.modloader.java_installer_runner.subprocess.Popen", lambda *args, **kwargs: Process())
     monkeypatch.setattr("src.core.modloader.java_installer_runner.os", fake_os)
+    monkeypatch.setattr(
+        "src.core.modloader.java_installer_runner.signal",
+        SimpleNamespace(SIGKILL=9),
+    )
 
     result = ModLoaderJavaRunner._invoke(Path("java"), ["-jar", "installer.jar"], tmp_path, 1)
 
