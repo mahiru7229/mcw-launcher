@@ -103,7 +103,10 @@ def build_release_zip(project_root: Path, executable: Path, version: str, output
                         shutil.copyfileobj(source, target, length=1024 * 1024)
 
     checksum_path = output.with_name(f"{output.name}.sha256")
-    checksum_path.write_text(f"{sha256_file(output)}  {output.name}\n", encoding="utf-8")
+    # Write bytes so Windows cannot translate the LF terminator to CRLF.
+    # The checksum files are later verified together by GNU sha256sum on the
+    # Linux publish runner, where a trailing CR becomes part of the filename.
+    checksum_path.write_bytes(f"{sha256_file(output)}  {output.name}\n".encode("utf-8"))
     return output
 
 

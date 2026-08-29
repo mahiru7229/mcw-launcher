@@ -52,6 +52,31 @@ def test_build_release_zip_writes_update_manifest(tmp_path: Path) -> None:
     assert output.with_name(f"{output.name}.sha256").is_file()
 
 
+def test_build_release_zip_writes_portable_lf_checksum(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "README.md").write_text("readme", encoding="utf-8")
+    (project / "LICENSE").write_text("license", encoding="utf-8")
+    executable = project / "MCW Launcher.exe"
+    executable.write_bytes(b"windows-binary")
+    output = project / "release" / f"MCW-Launcher-v{VERSION_ID}-windows-x64.zip"
+    original_write_text = Path.write_text
+
+    def reject_text_mode_checksum(path: Path, *args, **kwargs):
+        if path.name.endswith(".sha256"):
+            raise AssertionError("Checksum must be written as bytes so Windows cannot emit CRLF")
+        return original_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", reject_text_mode_checksum)
+
+    build_release_zip(project, executable, VERSION_ID, output)
+
+    checksum = output.with_name(f"{output.name}.sha256").read_bytes()
+    assert checksum.endswith(b"\n")
+    assert b"\r" not in checksum
+    assert checksum.decode("utf-8").endswith(f"  {output.name}\n")
+
+
 def test_build_linux_release_zip_writes_platform_and_executable_mode(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
