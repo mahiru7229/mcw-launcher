@@ -32,4 +32,5 @@ def test_path_opener_uses_qt_when_no_linux_handler_exists(monkeypatch, tmp_path:
     monkeypatch.setattr(platform_open.QDesktopServices, "openUrl", lambda url: opened.append(url.toLocalFile()) or True)
 
     assert platform_open.open_local_path(tmp_path) is True
-    assert opened == [str(tmp_path.resolve())]
+    assert len(opened) == 1
+    assert Path(opened[0]) == tmp_path.resolve()

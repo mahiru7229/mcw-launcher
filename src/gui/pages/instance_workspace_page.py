@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLayout,
     QLineEdit,
     QListView,
     QListWidget,
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSplitter,
     QStyle,
@@ -39,7 +41,6 @@ from src.gui.pages.instances_page import InstancesPage
 from src.gui.theme.accent_runtime import theme_accent_runtime
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
-from src.gui.widget.scrollable_page import scrollable_page
 
 
 class InstanceWorkspacePage(BasePage):
@@ -284,7 +285,14 @@ class InstanceWorkspacePage(BasePage):
         self.action_panel.layout.addWidget(self.clone_button)
         self.action_panel.layout.addWidget(self.export_button)
         self.action_panel.layout.addWidget(self.delete_button)
-        self.action_scroll = scrollable_page(self.action_panel, object_name="InstanceActionScrollArea")
+        self.action_panel.layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        self.action_scroll = QScrollArea()
+        self.action_scroll.setObjectName("InstanceActionScrollArea")
+        self.action_scroll.setWidgetResizable(True)
+        self.action_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.action_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.action_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.action_scroll.setWidget(self.action_panel)
         self.action_scroll.setMinimumWidth(300)
         self.splitter.addWidget(self.action_scroll)
         self.splitter.setStretchFactor(0, 1)
