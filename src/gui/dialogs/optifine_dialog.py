@@ -2,16 +2,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QUrl, Signal
+from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
-    QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -55,22 +56,32 @@ class OptiFineDialog(QDialog):
         self.description_label.setWordWrap(True)
         content_layout.addWidget(self.description_label)
 
-        form = QFormLayout()
-        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        form = QGridLayout()
+        form.setHorizontalSpacing(18)
+        form.setVerticalSpacing(8)
+        form.setColumnStretch(1, 1)
         self.instance_value = QLabel()
         self.mode_value = QLabel()
         self.version_value = QLabel()
-        self.version_value.setWordWrap(True)
+        self.version_value.setWordWrap(False)
+        self.version_value.setMinimumWidth(280)
+        self.version_value.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.source_value = QLabel()
         self.source_value.setWordWrap(True)
+        self.source_value.setMinimumWidth(280)
+        self.source_value.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         self.instance_label = QLabel()
         self.mode_label = QLabel()
         self.version_label = QLabel()
         self.source_label = QLabel()
-        form.addRow(self.instance_label, self.instance_value)
-        form.addRow(self.mode_label, self.mode_value)
-        form.addRow(self.version_label, self.version_value)
-        form.addRow(self.source_label, self.source_value)
+        form.addWidget(self.instance_label, 0, 0)
+        form.addWidget(self.instance_value, 0, 1)
+        form.addWidget(self.mode_label, 1, 0)
+        form.addWidget(self.mode_value, 1, 1)
+        form.addWidget(self.version_label, 2, 0)
+        form.addWidget(self.version_value, 2, 1)
+        form.addWidget(self.source_label, 3, 0, Qt.AlignmentFlag.AlignTop)
+        form.addWidget(self.source_value, 3, 1)
         content_layout.addLayout(form)
 
         source_row = QHBoxLayout()

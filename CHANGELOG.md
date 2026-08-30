@@ -2,6 +2,22 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.0-beta.3] - 2026-08-30
+
+### Changed
+
+- Dialog OptiFine mở từ panel chức năng của instance dùng lưới hai cột ổn định thay cho form có thể nén sai chiều cao trên Linux.
+- Giá trị Detected version giữ một dòng với chiều rộng tự nhiên; đường dẫn JAR dài vẫn được xuống dòng.
+- Nội dung OptiFine cuộn dọc khi thiếu chiều cao, trong khi hàng nút Install/Repair/Uninstall/Close luôn cố định.
+
+### Fixed
+
+- Không còn cắt hoặc chồng dòng Detected version trong dialog OptiFine trên Lubuntu.
+
+### Release status
+
+- Automatic update Beta 1 → Beta 2 trên Linux x64 đã được xác nhận hoạt động thành công; Beta 3 tập trung chốt UI regression trước RC.
+
 ## [1.5.0-beta.2] - 2026-08-29
 
 ### Changed
@@ -166,6 +182,7 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 
 [1.5.0-beta.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.1
 [1.5.0-beta.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.2
+[1.5.0-beta.3]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.3
 ## [1.4.1]
 
 Maintenance release của nhánh 1.4, tập trung Java recovery/download và Diagnostics v2.1. Xem tag `v1.4.1` trong GitHub Releases để đọc release notes đầy đủ.

@@ -65,6 +65,8 @@ def test_manage_dialog_scrolls_content_but_keeps_actions_fixed(app) -> None:
     assert dialog.content_scroll.widgetResizable() is True
     assert dialog.content_scroll.parentWidget() is dialog
     assert dialog.install_button.parentWidget() is dialog
+    assert dialog.version_value.wordWrap() is False
+    assert dialog.version_value.minimumWidth() >= 280
 
 
 def test_create_dialog_keeps_optifine_status_on_one_natural_row(app) -> None:

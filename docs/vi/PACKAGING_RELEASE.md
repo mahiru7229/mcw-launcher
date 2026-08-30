@@ -1,6 +1,6 @@
 # Đóng gói MCW Core
 
-MCW Launcher `v1.5.0-beta.2` có bundle implementation Core nhưng chủ động **không** phát hành source archive hoặc wheel Core độc lập.
+MCW Launcher `v1.5.0-beta.3` có bundle implementation Core nhưng chủ động **không** phát hành source archive hoặc wheel Core độc lập.
 
 Chỉ thực hiện đợt release Core riêng sau khi đã chốt version và phạm vi. Trước khi publish:
 

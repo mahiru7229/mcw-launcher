@@ -1,6 +1,6 @@
 # Kiểm thử MCW Launcher trên Lubuntu
 
-Tài liệu này áp dụng cho `v1.5.0-beta.2`. Có thể chạy từ source để regression, nhưng automatic updater chỉ bật trong ZIP Linux x64 native do GitHub Release build.
+Tài liệu này áp dụng cho `v1.5.0-beta.3`. Có thể chạy từ source để regression, nhưng automatic updater chỉ bật trong ZIP Linux x64 native do GitHub Release build.
 
 ## 1. Chuẩn bị hệ thống
 
@@ -16,7 +16,7 @@ Không chạy launcher bằng `sudo` vì tài khoản, config và runtime sẽ b
 ## 2. Cài môi trường source
 
 ```bash
-cd mcw-launcher-v1.5.0-beta.2
+cd mcw-launcher-v1.5.0-beta.3
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -54,7 +54,7 @@ MCW_LEGACY_ROOT="$HOME/mcw-launcher-v1.5.0-alpha.2" python launcher.py
 
 Để chủ động giữ layout portable, dùng `MCW_PORTABLE=1`. Không xóa thư mục Alpha 2 trước khi xác nhận instance và account xuất hiện đúng trong Alpha 3.
 
-## 6. Checklist Beta 2
+## 6. Checklist Beta 3
 
 1. Launcher mở được và không báo lỗi startup/account security.
 2. Danh sách version Minecraft xuất hiện.
@@ -76,18 +76,18 @@ MCW_LEGACY_ROOT="$HOME/mcw-launcher-v1.5.0-alpha.2" python launcher.py
 18. Thu nhỏ OptiFine và Instance Info; nội dung phải cuộn dọc, không cắt chữ hoặc đẩy action button ra ngoài màn hình.
 19. Thử Open Folder từ instance, mod manager, logs, diagnostics và theme; file manager của Lubuntu phải mở đúng đường dẫn.
 
-## 7. Test cập nhật thật Beta 1 → Beta 2
+## 7. Kết quả cập nhật Beta 1 → Beta 2
 
-Chạy gói Beta 1 Linux x64 đã phát hành, chọn cập nhật Beta 2 và xác nhận download cache, SHA-256, manifest Linux, staging, atomic replacement, mode `0755`, restart và rollback.
+Luồng thật trên Lubuntu đã đạt: Beta 1 tải đúng asset Beta 2 Linux x64, xác minh gói, thay launcher và khởi động lại thành công mà không làm mất dữ liệu XDG.
 
-Khi kiểm tra GUI Beta 2, xác nhận:
+Khi kiểm tra GUI Beta 3, xác nhận:
 
 1. Bản chạy từ source báo updater chỉ dành cho packaged release.
 2. Gói `linux-x64.zip` chạy được và nhận đúng kênh Beta.
 3. Gói cài đặt nằm trong Home, không dùng `sudo` và không đặt trong thư mục chỉ đọc.
 4. Account, instance, world và setting XDG không thay đổi khi chạy test updater Core.
 
-## 8. Giới hạn Beta 2
+## 8. Giới hạn Beta 3
 
 - Beta 1 → Beta 2 là gate cập nhật thật đầu tiên trên Linux; vẫn giữ bản Beta 1 ZIP để rollback thủ công nếu môi trường desktop có lỗi ngoài dự kiến.
 - Updater không gọi `sudo`. Thư mục cài đặt không ghi được sẽ yêu cầu update thủ công.
