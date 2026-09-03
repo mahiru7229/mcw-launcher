@@ -1,6 +1,6 @@
 # Kiến trúc MCW Launcher
 
-Tài liệu này mô tả ranh giới kiến trúc áp dụng từ `v1.5.0-beta.4`. Mục tiêu là giảm phụ thuộc chéo, giữ startup không bị network I/O ngầm và chuẩn bị implementation đa nền tảng.
+Tài liệu này mô tả ranh giới kiến trúc áp dụng từ `v1.5.0`. Mục tiêu là giảm phụ thuộc chéo, giữ startup không bị network I/O ngầm và duy trì implementation đa nền tảng.
 
 ## Các lớp chính
 
@@ -44,7 +44,7 @@ Các thư mục runtime chính do `Paths` quản lý:
 
 Rule của Minecraft dùng tên chuẩn `windows`, `linux`, `osx` và kiến trúc `x86`, `x64`, `arm64`. Code nghiệp vụ không được giả định `windows`, `javaw.exe`, dấu `;` của classpath hoặc archive ZIP nếu chưa đi qua abstraction theo nền tảng.
 
-Trong Alpha 2, native selection, Java discovery/provisioning, archive extraction và credential protection đã có nhánh Linux. Executable packaging, Forge-family smoke test và một số OS integration vẫn cần hoàn thiện trước khi Linux được đánh dấu stable.
+Từ v1.5.0, native selection, Java discovery/provisioning, archive extraction, credential protection, executable packaging và Forge-family launch đều nằm trong release gate Linux x64.
 
 Từ Beta 2, thao tác mở file/thư mục đi qua `src.gui.platform_open`: Linux ưu tiên freedesktop handler (`xdg-open`, rồi `gio open`) và Qt là fallback đa nền tảng.
 
@@ -58,7 +58,7 @@ Từ Beta 2, thao tác mở file/thư mục đi qua `src.gui.platform_open`: Lin
 
 ## Release gate
 
-Một release candidate cần vượt qua:
+Một bản phát hành cần vượt qua:
 
 - `python -m pytest test -v` trên Windows và Linux CI.
 - `python -m tools.release_preflight`.

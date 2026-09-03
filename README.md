@@ -12,12 +12,12 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.5.0--beta.4-blue" alt="v1.5.0-beta.4">
+  <img src="https://img.shields.io/badge/version-v1.5.0-blue" alt="v1.5.0">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
-> [!WARNING]
-> `v1.5.0-beta.4` sửa thao tác mở file/thư mục từ bản PyInstaller trên Linux và giữ các hoàn thiện responsive của Beta 3. Live update Beta 1 → Beta 2 trên Linux x64 đã được xác nhận hoạt động thành công.
+> [!NOTE]
+> `v1.5.0` là bản Stable đầu tiên hỗ trợ đầy đủ Windows x64 và Linux x64. Luồng cập nhật Linux, responsive UI và thao tác mở thư mục trong bản PyInstaller đã được kiểm thử trực tiếp qua chuỗi Beta.
 
 ## Tổng quan
 
@@ -35,10 +35,10 @@ Các nhóm tính năng chính:
 
 ## Trạng thái nền tảng
 
-| Nền tảng | Trạng thái Beta 4 | Ghi chú |
+| Nền tảng | Trạng thái v1.5.0 | Ghi chú |
 | --- | --- | --- |
 | Windows 10/11 x64 | Đang hỗ trợ | Luồng chính và bản đóng gói PyInstaller hiện tại. |
-| Linux x64 | Beta test target | Automatic update Beta 1 → Beta 2 đã đạt; Beta 4 sửa desktop opener trong bản PyInstaller và giữ responsive UI của OptiFine. |
+| Linux x64 | Đang hỗ trợ | Automatic update và desktop opener trong bản PyInstaller đã được kiểm thử trực tiếp trên Lubuntu. |
 | Linux ARM64 | Nền tảng ban đầu | Nhận diện và metadata Java đúng; chưa có cam kết launch game. |
 | macOS | Chưa hỗ trợ | Chưa nằm trong phạm vi v1.5. |
 
@@ -105,7 +105,7 @@ Build Windows hiện tại:
 .\build_release.ps1
 ```
 
-GitHub Release Actions chỉ build ZIP native Windows/Linux sau khi test cả hai nền tảng đạt. Beta 4 chưa cung cấp AppImage hoặc `.deb`; updater Linux hoạt động với ZIP `linux-x64` đặt trong thư mục người dùng có quyền ghi.
+GitHub Release Actions chỉ build ZIP native Windows/Linux sau khi test cả hai nền tảng đạt. v1.5.0 chưa cung cấp AppImage hoặc `.deb`; updater Linux hoạt động với ZIP `linux-x64` đặt trong thư mục người dùng có quyền ghi.
 
 ## Kiến trúc repository
 
@@ -134,7 +134,7 @@ GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, khô
 - [MCW Core API](docs/MCW_CORE_LIBRARY.md)
 - [Language packs](docs/LANGUAGE_PACKS.md)
 - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
-- [Release notes v1.5.0-beta.4](docs/releases/v1.5.0-beta.4.md)
+- [Release notes v1.5.0](docs/releases/v1.5.0.md)
 - [Changelog](CHANGELOG.md)
 
 ## Đóng góp và bảo mật

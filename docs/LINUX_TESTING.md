@@ -1,6 +1,6 @@
 # Kiểm thử MCW Launcher trên Lubuntu
 
-Tài liệu này áp dụng cho `v1.5.0-beta.4`. Có thể chạy từ source để regression, nhưng automatic updater chỉ bật trong ZIP Linux x64 native do GitHub Release build.
+Tài liệu này áp dụng cho `v1.5.0`. Có thể chạy từ source để regression, nhưng automatic updater chỉ bật trong ZIP Linux x64 native do GitHub Release build.
 
 ## 1. Chuẩn bị hệ thống
 
@@ -16,7 +16,7 @@ Không chạy launcher bằng `sudo` vì tài khoản, config và runtime sẽ b
 ## 2. Cài môi trường source
 
 ```bash
-cd mcw-launcher-v1.5.0-beta.4
+cd mcw-launcher-v1.5.0
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -54,7 +54,7 @@ MCW_LEGACY_ROOT="$HOME/mcw-launcher-v1.5.0-alpha.2" python launcher.py
 
 Để chủ động giữ layout portable, dùng `MCW_PORTABLE=1`. Không xóa thư mục Alpha 2 trước khi xác nhận instance và account xuất hiện đúng trong Alpha 3.
 
-## 6. Checklist Beta 3
+## 6. Checklist Stable v1.5.0
 
 1. Launcher mở được và không báo lỗi startup/account security.
 2. Danh sách version Minecraft xuất hiện.
@@ -80,14 +80,14 @@ MCW_LEGACY_ROOT="$HOME/mcw-launcher-v1.5.0-alpha.2" python launcher.py
 
 Luồng thật trên Lubuntu đã đạt: Beta 1 tải đúng asset Beta 2 Linux x64, xác minh gói, thay launcher và khởi động lại thành công mà không làm mất dữ liệu XDG.
 
-Khi kiểm tra GUI Beta 3, xác nhận:
+Khi kiểm tra GUI Stable, xác nhận:
 
 1. Bản chạy từ source báo updater chỉ dành cho packaged release.
-2. Gói `linux-x64.zip` chạy được và nhận đúng kênh Beta.
+2. Gói `linux-x64.zip` chạy được và nhận đúng kênh Stable.
 3. Gói cài đặt nằm trong Home, không dùng `sudo` và không đặt trong thư mục chỉ đọc.
 4. Account, instance, world và setting XDG không thay đổi khi chạy test updater Core.
 
-## 8. Giới hạn Beta 3
+## 8. Giới hạn v1.5.0
 
 - Beta 1 → Beta 2 là gate cập nhật thật đầu tiên trên Linux; vẫn giữ bản Beta 1 ZIP để rollback thủ công nếu môi trường desktop có lỗi ngoài dự kiến.
 - Updater không gọi `sudo`. Thư mục cài đặt không ghi được sẽ yêu cầu update thủ công.

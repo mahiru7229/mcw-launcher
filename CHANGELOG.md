@@ -2,6 +2,32 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.0] - 2026-09-03
+
+### Added
+
+- Phát hành chính thức bản đóng gói Windows x64 và Linux x64 từ cùng một release gate.
+- Hỗ trợ automatic update an toàn trên Linux, gồm kiểm tra manifest/checksum, backup, rollback, giữ executable mode và tự khởi động lại.
+- Hỗ trợ Linux XDG storage, Secret Service, managed Java, Microsoft OAuth, trạng thái mạng và process-group supervision.
+- Hỗ trợ Vanilla, Fabric, Quilt, Forge, NeoForge cùng quy trình cài modpack và quản lý nội dung theo instance.
+
+### Changed
+
+- Giao diện giữ kích thước tự nhiên của widget và dùng vùng cuộn khi không gian hiển thị bị giới hạn.
+- Launch pipeline chỉ resolve/check một lần khi người dùng xác nhận bỏ qua cảnh báo tương thích.
+- Trình mở file/thư mục trên Linux tách khỏi môi trường Qt/PyInstaller và có chuỗi fallback desktop phù hợp.
+
+### Fixed
+
+- Sửa responsive của Add Instance, Instance Info và OptiFine trên Linux.
+- Sửa Open Folder không phản hồi trong bản Linux x64 đóng gói bằng PyInstaller.
+- Sửa vòng đời tiến trình game/installer, lựa chọn Java theo phiên bản và nhiều lỗi regression chéo Windows/Linux.
+
+### Release status
+
+- Toàn bộ release gate Windows/Ubuntu và smoke-test trực tiếp Beta 4 trên Lubuntu đã đạt.
+- Stable giữ nguyên runtime đã được xác nhận ở Beta 4; thay đổi phát hành chỉ gồm metadata và tài liệu.
+
 ## [1.5.0-beta.4] - 2026-09-02
 
 ### Changed
@@ -201,6 +227,8 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 [1.5.0-beta.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.2
 [1.5.0-beta.3]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.3
 [1.5.0-beta.4]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.4
+[1.5.0]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0
+
 ## [1.4.1]
 
 Maintenance release của nhánh 1.4, tập trung Java recovery/download và Diagnostics v2.1. Xem tag `v1.4.1` trong GitHub Releases để đọc release notes đầy đủ.
