@@ -1,6 +1,6 @@
 # Packaging MCW Core
 
-MCW Launcher `v1.5.0-beta.3` includes the Core implementation but deliberately does **not** publish a standalone Core source archive or wheel.
+MCW Launcher `v1.5.0-beta.4` includes the Core implementation but deliberately does **not** publish a standalone Core source archive or wheel.
 
 The dedicated Core release must be performed only after its version and scope are chosen. Before publishing:
 

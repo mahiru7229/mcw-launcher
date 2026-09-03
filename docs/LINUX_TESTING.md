@@ -1,6 +1,6 @@
 # Kiểm thử MCW Launcher trên Lubuntu
 
-Tài liệu này áp dụng cho `v1.5.0-beta.3`. Có thể chạy từ source để regression, nhưng automatic updater chỉ bật trong ZIP Linux x64 native do GitHub Release build.
+Tài liệu này áp dụng cho `v1.5.0-beta.4`. Có thể chạy từ source để regression, nhưng automatic updater chỉ bật trong ZIP Linux x64 native do GitHub Release build.
 
 ## 1. Chuẩn bị hệ thống
 
@@ -16,7 +16,7 @@ Không chạy launcher bằng `sudo` vì tài khoản, config và runtime sẽ b
 ## 2. Cài môi trường source
 
 ```bash
-cd mcw-launcher-v1.5.0-beta.3
+cd mcw-launcher-v1.5.0-beta.4
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip

@@ -2018,7 +2018,8 @@ class MainWindow(QMainWindow):
         if not directory.exists():
             self._show_error(tr("Java installations"), tr("The selected Java directory no longer exists."))
             return
-        open_local_path(directory)
+        if not open_local_path(directory):
+            self._show_error(tr("Java installations"), f"{tr('platform.open.failed')}\n{directory}")
 
     def _open_optifine(self, name: str) -> None:
         normalized = str(name or "").strip()
@@ -2043,7 +2044,8 @@ class MainWindow(QMainWindow):
         except Exception as error:
             self._show_error(tr("Instances"), str(error))
             return
-        open_local_path(directory)
+        if not open_local_path(directory):
+            self._show_error(tr("Instances"), f"{tr('platform.open.failed')}\n{directory}")
 
     def _open_backups_folder(self, instance_name: str) -> None:
         name = str(instance_name).strip()

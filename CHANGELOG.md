@@ -2,6 +2,23 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.0-beta.4] - 2026-09-02
+
+### Changed
+
+- Trình mở file/thư mục trên Linux loại bỏ đường dẫn thư viện và Qt plugin do PyInstaller chèn trước khi gọi ứng dụng desktop của hệ thống.
+- `xdg-open` được kiểm tra lỗi sớm; launcher tự thử `gio open`, sau đó `pcmanfm-qt` cho thư mục trên Lubuntu.
+
+### Fixed
+
+- Sửa nút Open Folder của instance không phản hồi trong bản Linux x64 dù cùng đường dẫn vẫn mở được từ Terminal.
+- Không còn coi process desktop handler vừa spawn là thành công khi process thoát lỗi ngay lập tức.
+- Đường dẫn không tồn tại bị từ chối rõ ràng; lỗi mở thư mục instance hiện hiển thị cả đường dẫn cho người dùng.
+
+### Release status
+
+- Beta 4 là regression fix của Beta 3 trước khi chuyển sang RC; cần smoke-test trực tiếp trên ZIP Linux x64 đóng gói bằng PyInstaller.
+
 ## [1.5.0-beta.3] - 2026-08-30
 
 ### Changed
@@ -183,6 +200,7 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 [1.5.0-beta.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.1
 [1.5.0-beta.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.2
 [1.5.0-beta.3]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.3
+[1.5.0-beta.4]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.4
 ## [1.4.1]
 
 Maintenance release của nhánh 1.4, tập trung Java recovery/download và Diagnostics v2.1. Xem tag `v1.4.1` trong GitHub Releases để đọc release notes đầy đủ.
