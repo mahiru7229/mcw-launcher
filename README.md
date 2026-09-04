@@ -16,6 +16,9 @@
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
+> Looking for MCW Launcher Core ? Try this [launcher core](https://github.com/mahiru7229/mcw-launcher-core) to build your own launcher !
+> Try to create a Vercel CurseForge API for this launcher ? Try this [repository](https://github.com/mahiru7229/mcw-curseforge-gateway) to build your own !
+
 > [!NOTE]
 > `v1.5.0` là bản Stable đầu tiên hỗ trợ đầy đủ Windows x64 và Linux x64. Luồng cập nhật Linux, responsive UI và thao tác mở thư mục trong bản PyInstaller đã được kiểm thử trực tiếp qua chuỗi Beta.
 
