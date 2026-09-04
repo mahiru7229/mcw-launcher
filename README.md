@@ -17,6 +17,7 @@
 </p>
 
 > Looking for MCW Launcher Core ? Try this [launcher core](https://github.com/mahiru7229/mcw-launcher-core) to build your own launcher !
+
 > Try to create a Vercel CurseForge API for this launcher ? Try this [repository](https://github.com/mahiru7229/mcw-curseforge-gateway) to build your own !
 
 > [!NOTE]
