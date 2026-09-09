@@ -1,0 +1,490 @@
+diff -ruN '--exclude=CHANGES.diff' /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/CHANGED-FILES.txt /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/CHANGED-FILES.txt
+--- /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/CHANGED-FILES.txt	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/CHANGED-FILES.txt	2026-09-09 11:37:04.036417328 +0000
+@@ -0,0 +1,11 @@
++CHANGELOG.md
++CHANGED-FILES.txt
++CHANGES.diff
++COMMIT-NAME.txt
++DELIVERY-MANIFEST.txt
++README.md
++docs/UPDATE_PACKAGES.md
++docs/releases/v1.5.1-beta.2.md
++src/config.py
++src/core/update/update_applier.py
++test/core/update/test_update_applier.py
+diff -ruN '--exclude=CHANGES.diff' /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/CHANGELOG.md /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/CHANGELOG.md
+--- /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/CHANGELOG.md	2026-09-09 11:36:45.935721894 +0000
++++ /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/CHANGELOG.md	2026-09-09 11:35:52.030135187 +0000
+@@ -2,6 +2,28 @@
+ 
+ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
+ 
++## [1.5.1-beta.2] - 2026-09-09
++
++### Changed
++
++- Windows updater thay `MCW Launcher.exe` trước các file còn lại để lỗi file-lock không tạo installation trộn nhiều phiên bản.
++- File tạm của executable chỉ được copy một lần; updater retry riêng thao tác atomic replace tối đa khoảng 30 giây thay vì copy lại toàn bộ EXE ở mỗi lượt.
++- Rollback bỏ qua file vẫn giống hệt backup, tránh cố ghi đè lại executable cũ khi update chưa từng thay được file đó.
++
++### Fixed
++
++- Sửa `WinError 5: Access is denied` có thể xảy ra khi PyInstaller/Windows/antivirus còn giữ `MCW Launcher.exe` trong thời gian ngắn sau khi process launcher đóng.
++- Không còn tự restart launcher nếu rollback cũng thất bại; updater giữ log và yêu cầu khôi phục/reinstall thay vì chạy một installation có thể không nhất quán.
++
++### Tests
++
++- Thêm regression tests cho executable-first update, transient file-lock retry, rollback bỏ qua executable không đổi và fail-safe restart policy.
++- Nhóm test updater đạt `53 passed, 1 skipped` trong môi trường build hiện tại.
++
++### Release status
++
++- Beta 2 cần smoke-test trực tiếp trên Windows packaged ZIP bằng luồng update từ `v1.5.1-beta.1` lên `v1.5.1-beta.2`.
++
+ ## [1.5.1-beta.1] - 2026-09-09
+ 
+ ### Added
+@@ -246,6 +268,7 @@
+ - Windows vẫn là nền tảng release chính của Alpha 1.
+ 
+ [1.5.0-beta.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.1
++[1.5.1-beta.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.1-beta.2
+ [1.5.1-beta.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.1-beta.1
+ [1.5.0-beta.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.2
+ [1.5.0-beta.3]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.3
+diff -ruN '--exclude=CHANGES.diff' /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/COMMIT-NAME.txt /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/COMMIT-NAME.txt
+--- /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/COMMIT-NAME.txt	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/COMMIT-NAME.txt	2026-09-09 11:37:04.036355104 +0000
+@@ -0,0 +1 @@
++fix(updater): harden Windows self-update file replacement
+diff -ruN '--exclude=CHANGES.diff' /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/DELIVERY-MANIFEST.txt /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/DELIVERY-MANIFEST.txt
+--- /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/DELIVERY-MANIFEST.txt	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/DELIVERY-MANIFEST.txt	2026-09-09 11:37:04.036600995 +0000
+@@ -0,0 +1,24 @@
++MCW Launcher v1.5.1-beta.2
++
++Purpose
++- Harden Windows self-update after observed WinError 5 while replacing MCW Launcher.exe.
++
++Behavior changes
++- Replace launcher executable before remaining update files.
++- Copy executable temp file once and retry atomic replace for up to ~30 seconds.
++- Skip rollback writes when destination is already identical to backup.
++- Do not restart launcher when rollback fails.
++- Add explicit updater log messages for executable lock/retry and unsafe rollback failure.
++
++Validation
++- python -m pytest test/core/config/test_version_metadata.py test/core/update test/gui/controllers/test_update_controller_priority.py -q
++- Result: 54 passed, 1 skipped.
++- Full suite collection in this container is blocked by missing PySide6; updater tests themselves pass.
++
++Recommended commit
++fix(updater): harden Windows self-update file replacement
++
++Release smoke test
++- Build Windows x64 ZIP through GitHub Actions/tag v1.5.1-beta.2.
++- Update a packaged v1.5.1-beta.1 installation to v1.5.1-beta.2.
++- Verify updater.log and final launcher version.
+diff -ruN '--exclude=CHANGES.diff' /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/README.md /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/README.md
+--- /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/README.md	2026-09-09 11:36:45.935981446 +0000
++++ /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/README.md	2026-09-09 11:35:52.029819781 +0000
+@@ -12,12 +12,12 @@
+ <p align="center">
+   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
+-  <img src="https://img.shields.io/badge/version-v1.5.1--beta.1-blue" alt="v1.5.1-beta.1">
++  <img src="https://img.shields.io/badge/version-v1.5.1--beta.2-blue" alt="v1.5.1-beta.2">
+   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
+ </p>
+ 
+ > [!WARNING]
+-> `v1.5.1-beta.1` thử nghiệm cơ chế tự phục hồi dependency bị modpack khai báo thiếu. Candidate chỉ được cài sau khi file đã qua xác minh hash và JAR cung cấp đúng mod ID/version yêu cầu.
++> `v1.5.1-beta.2` harden cơ chế self-update trên Windows: launcher executable được thay trước, retry file-lock lâu hơn và chỉ restart sau lỗi khi rollback hoàn tất an toàn.
+ 
+ ## Tổng quan
+ 
+@@ -35,7 +35,7 @@
+ 
+ ## Trạng thái nền tảng
+ 
+-| Nền tảng | Trạng thái v1.5.1 Beta 1 | Ghi chú |
++| Nền tảng | Trạng thái v1.5.1 Beta 2 | Ghi chú |
+ | --- | --- | --- |
+ | Windows 10/11 x64 | Đang hỗ trợ | Luồng chính và bản đóng gói PyInstaller hiện tại. |
+ | Linux x64 | Đang hỗ trợ | Automatic update và desktop opener trong bản PyInstaller đã được kiểm thử trực tiếp trên Lubuntu. |
+@@ -134,6 +134,7 @@
+ - [MCW Core API](docs/MCW_CORE_LIBRARY.md)
+ - [Language packs](docs/LANGUAGE_PACKS.md)
+ - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
++- [Release notes v1.5.1-beta.2](docs/releases/v1.5.1-beta.2.md)
+ - [Release notes v1.5.1-beta.1](docs/releases/v1.5.1-beta.1.md)
+ - [Changelog](CHANGELOG.md)
+ 
+diff -ruN '--exclude=CHANGES.diff' /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/docs/UPDATE_PACKAGES.md /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/docs/UPDATE_PACKAGES.md
+--- /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/docs/UPDATE_PACKAGES.md	2026-09-09 11:36:45.874689324 +0000
++++ /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/docs/UPDATE_PACKAGES.md	2026-09-09 11:36:33.675164858 +0000
+@@ -32,6 +32,20 @@
+ 
+ `mcw-update.json` lets the updater verify that the downloaded package matches the selected GitHub release before replacing files.
+ 
++## Windows executable replacement safety
++
++The packaged Windows launcher updates itself through the detached updater copy. After the parent launcher PID exits, Windows can still hold `MCW Launcher.exe` briefly (for example while the PyInstaller bootloader or security software releases the image).
++
++From `v1.5.1-beta.2`:
++
++- `MCW Launcher.exe` is replaced before any other release file.
++- The new EXE is copied to an adjacent temporary file once, then only the atomic `os.replace()` operation is retried.
++- Executable replacement gets a longer retry window (about 30 seconds).
++- Rollback skips files that are still byte-identical to their backup.
++- The launcher is restarted after a failed update only when rollback completed successfully.
++
++This ordering prevents a transient EXE lock from leaving an installation where libraries/resources come from the new release but the launcher executable is still from the old release.
++
+ ## Test an updater transition
+ 
+ 1. Build and publish the newer ZIP as an asset of a GitHub release with a higher semantic version.
+diff -ruN '--exclude=CHANGES.diff' /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/docs/releases/v1.5.1-beta.2.md /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/docs/releases/v1.5.1-beta.2.md
+--- /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/docs/releases/v1.5.1-beta.2.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/docs/releases/v1.5.1-beta.2.md	2026-09-09 11:35:52.030415120 +0000
+@@ -0,0 +1,38 @@
++# MCW Launcher v1.5.1-beta.2
++
++Beta 2 tập trung sửa độ tin cậy của automatic self-update trên Windows sau lỗi thực tế `WinError 5: Access is denied` khi thay `MCW Launcher.exe`.
++
++## Vấn đề được sửa
++
++Trong Beta 1, updater đã chạy bên ngoài launcher và chờ PID đóng, nhưng executable vẫn có thể bị Windows, PyInstaller bootloader hoặc phần mềm bảo mật giữ thêm một khoảng ngắn. Updater retry khoảng 7,5 giây nhưng mỗi lượt lại copy toàn bộ EXE sang temp trước khi `os.replace()`. Khi hết retry, rollback tiếp tục cố thay lại cùng executable dù file cũ thực tế chưa thay đổi; nếu rollback cũng lỗi, launcher cũ vẫn được restart.
++
++## Cơ chế Beta 2
++
++1. Chờ process launcher đóng như trước.
++2. Tạo rollback backup trước khi thay file.
++3. Thay `MCW Launcher.exe` **trước tất cả file còn lại**.
++4. Copy source EXE sang file temp đúng một lần.
++5. Nếu atomic replace gặp file-lock, chỉ retry `os.replace()` tối đa 120 lượt × 0,25 giây (xấp xỉ 30 giây).
++6. Chỉ sau khi EXE được thay thành công updater mới tiếp tục copy phần còn lại của release.
++7. Khi rollback, file nào vẫn giống backup sẽ được bỏ qua thay vì ghi đè vô ích.
++8. Launcher chỉ được restart sau lỗi khi rollback đã hoàn tất. Nếu rollback thất bại, updater không restart installation và ghi rõ trạng thái vào `updater.log`.
++
++## Test đã thêm
++
++- Executable luôn được copy trước các file update khác.
++- Mô phỏng hai lần `PermissionError/WinError 5` rồi thành công; EXE temp chỉ được copy một lần.
++- Rollback không rewrite executable nếu executable cũ chưa bị thay đổi.
++- Rollback failure không được phép restart launcher.
++
++Nhóm test updater hiện đạt `53 passed, 1 skipped`. Full test suite chưa chạy được trong môi trường đóng gói hiện tại vì thiếu dependency GUI `PySide6`; đây là giới hạn của môi trường kiểm thử, không phải failure của updater tests.
++
++## Smoke-test Windows
++
++1. Build/tag `v1.5.1-beta.2` bằng workflow hiện tại.
++2. Mở packaged `v1.5.1-beta.1` trên Windows.
++3. Cho launcher phát hiện Beta 2 và chọn update.
++4. Xác nhận launcher đóng, updater chạy và launcher mới tự mở lại.
++5. Kiểm tra About/version phải là `v1.5.1-beta.2`.
++6. Mở `logs/updater.log`; luồng thành công phải có `Replacing launcher executable before the remaining update files` và `Update to 1.5.1-beta.2 completed`.
++7. Nếu executable bị lock tạm thời, log có thể có `Launcher executable is still locked; retrying for up to 30 seconds`, sau đó phải tiếp tục khi lock được giải phóng.
++8. Không được xuất hiện installation mixed-version hoặc restart nếu log báo `Rollback failed`.
+diff -ruN '--exclude=CHANGES.diff' /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/src/config.py /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/src/config.py
+--- /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/src/config.py	2026-09-09 11:36:45.910438108 +0000
++++ /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/src/config.py	2026-09-09 11:35:52.029361790 +0000
+@@ -1,7 +1,7 @@
+ from __future__ import annotations
+ 
+-VERSION = "v1.5.1-beta.1"
+-VERSION_ID = "1.5.1-beta.1"
++VERSION = "v1.5.1-beta.2"
++VERSION_ID = "1.5.1-beta.2"
+ VERSION_TAG = f"v{VERSION_ID}"
+ UPDATE_CHANNEL = "beta"
+ GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
+diff -ruN '--exclude=CHANGES.diff' /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/src/core/update/update_applier.py /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/src/core/update/update_applier.py
+--- /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/src/core/update/update_applier.py	2026-09-09 11:36:45.895302554 +0000
++++ /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/src/core/update/update_applier.py	2026-09-09 11:34:06.073478760 +0000
+@@ -3,6 +3,7 @@
+ from dataclasses import dataclass
+ from datetime import datetime
+ import ctypes
++import filecmp
+ import json
+ import os
+ from pathlib import Path, PurePosixPath
+@@ -61,6 +62,7 @@
+ 
+ class UpdateApplier:
+     COPY_RETRIES = 30
++    EXECUTABLE_REPLACE_RETRIES = 120
+     COPY_RETRY_DELAY_SECONDS = 0.25
+ 
+     def __init__(self, request: UpdateApplyRequest) -> None:
+@@ -87,19 +89,24 @@
+             return 0
+         except Exception as error:
+             self._log(f"Update failed: {error}")
++            rollback_completed = False
+             try:
+                 self._restore_backup()
++                rollback_completed = True
+                 self._log("Rollback completed")
+             except Exception as rollback_error:
+                 self._log(f"Rollback failed: {rollback_error}")
+ 
+-            try:
+-                self._start_launcher()
+-                self._log("Previous launcher restarted after update failure")
+-            except Exception as restart_error:
+-                self._log(f"Could not restart the launcher after failure: {restart_error}")
++            if rollback_completed:
++                try:
++                    self._start_launcher()
++                    self._log("Previous launcher restarted after update failure")
++                except Exception as restart_error:
++                    self._log(f"Could not restart the launcher after failure: {restart_error}")
++            else:
++                self._log("Launcher was not restarted because rollback did not complete safely")
+ 
+-            self._show_error(str(error))
++            self._show_error(str(error), rollback_completed=rollback_completed)
+             return 1
+ 
+     def _backup_existing_files(self) -> None:
+@@ -116,7 +123,19 @@
+ 
+     def _copy_update_files(self) -> None:
+         self._log(f"Copying update from {self.request.source_directory} to {self.request.destination_directory}")
+-        for source_path in self._iter_source_files():
++        source_files = self._iter_source_files()
++        source_executable = self.request.source_directory / self.request.executable_name
++        destination_executable = self.request.destination_directory / self.request.executable_name
++
++        # Replace the launcher executable before mutating the rest of the installation.
++        # A PyInstaller/AV file lock can linger briefly after the launcher process exits;
++        # failing here first avoids leaving a mixed-version installation behind.
++        self._log("Replacing launcher executable before the remaining update files")
++        self._copy_with_retry(source_executable, destination_executable)
++
++        for source_path in source_files:
++            if source_path == source_executable:
++                continue
+             relative_path = source_path.relative_to(self.request.source_directory)
+             destination_path = self.request.destination_directory / relative_path
+             destination_path.parent.mkdir(parents=True, exist_ok=True)
+@@ -172,6 +191,8 @@
+             relative_path = backup_path.relative_to(self.backup_directory)
+             destination_path = self.request.destination_directory / relative_path
+             destination_path.parent.mkdir(parents=True, exist_ok=True)
++            if self._files_equal(backup_path, destination_path):
++                continue
+             self._copy_with_retry(backup_path, destination_path)
+ 
+     def _verify_updated_executable(self) -> None:
+@@ -206,20 +227,53 @@
+         )
+ 
+     def _copy_with_retry(self, source: Path, destination: Path) -> None:
++        retries = self._replace_retries_for(destination)
++        temporary = destination.with_name(f".{destination.name}.mcw-update-{uuid.uuid4().hex}.tmp")
+         last_error: OSError | None = None
+-        for attempt in range(self.COPY_RETRIES):
+-            temporary = destination.with_name(f".{destination.name}.mcw-update-{uuid.uuid4().hex}.tmp")
++
++        try:
++            # Copy once. Only the atomic rename is retried when Windows still holds
++            # a transient lock on the destination executable. Re-copying the full
++            # packaged EXE on every retry makes the lock window unnecessarily longer.
++            shutil.copy2(source, temporary)
++            for attempt in range(retries):
++                try:
++                    os.replace(temporary, destination)
++                    if attempt > 0 and self._is_launcher_executable(destination):
++                        self._log(f"Launcher executable became replaceable after {attempt + 1} attempts")
++                    return
++                except OSError as error:
++                    last_error = error
++                    if attempt == 0 and self._is_launcher_executable(destination):
++                        max_wait = retries * self.COPY_RETRY_DELAY_SECONDS
++                        self._log(f"Launcher executable is still locked; retrying for up to {max_wait:.0f} seconds")
++                    if attempt + 1 < retries:
++                        time.sleep(self.COPY_RETRY_DELAY_SECONDS)
++        finally:
+             try:
+-                shutil.copy2(source, temporary)
+-                os.replace(temporary, destination)
+-                return
+-            except OSError as error:
+-                last_error = error
+                 temporary.unlink(missing_ok=True)
+-                if attempt + 1 < self.COPY_RETRIES:
+-                    time.sleep(self.COPY_RETRY_DELAY_SECONDS)
++            except OSError:
++                pass
++
+         raise RuntimeError(f"Could not replace {destination}: {last_error}") from last_error
+ 
++    def _replace_retries_for(self, destination: Path) -> int:
++        if self._is_launcher_executable(destination):
++            return self.EXECUTABLE_REPLACE_RETRIES
++        return self.COPY_RETRIES
++
++    def _is_launcher_executable(self, path: Path) -> bool:
++        return path.name.casefold() == self.request.executable_name.casefold()
++
++    @staticmethod
++    def _files_equal(first: Path, second: Path) -> bool:
++        if not first.is_file() or not second.is_file():
++            return False
++        try:
++            return filecmp.cmp(first, second, shallow=False)
++        except OSError:
++            return False
++
+     def _iter_source_files(self) -> list[Path]:
+         return sorted((path for path in self.request.source_directory.rglob("*") if path.is_file()), key=lambda path: str(path).lower())
+ 
+@@ -261,12 +315,19 @@
+             time.sleep(0.2)
+         raise TimeoutError("The launcher did not close within two minutes.")
+ 
+-    def _show_error(self, message: str) -> None:
++    def _show_error(self, message: str, *, rollback_completed: bool = True) -> None:
+         if os.name != "nt":
+             return
++        recovery_note = ""
++        if not rollback_completed:
++            recovery_note = (
++                "\n\nRollback also failed, so MCW Launcher was not restarted. "
++                "Keep the updater log and reinstall/reapply the current release before launching again."
++            )
+         text = (
+             "MCW Launcher could not finish the update.\n\n"
+-            f"{message}\n\n"
++            f"{message}"
++            f"{recovery_note}\n\n"
+             f"Log: {self.request.persistent_log_path}"
+         )
+         try:
+diff -ruN '--exclude=CHANGES.diff' /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/test/core/update/test_update_applier.py /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/test/core/update/test_update_applier.py
+--- /mnt/data/mcw_beta1_original/MCW-Launcher-v1.5.1-beta.1-source/test/core/update/test_update_applier.py	2026-09-09 11:36:45.924440464 +0000
++++ /mnt/data/mcw_beta2_work/MCW-Launcher-v1.5.1-beta.1-source/test/core/update/test_update_applier.py	2026-09-09 11:34:31.040620573 +0000
+@@ -57,7 +57,7 @@
+     applier = UpdateApplier(request)
+     starts: list[bool] = []
+     monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
+-    monkeypatch.setattr(applier, "_show_error", lambda _message: None)
++    monkeypatch.setattr(applier, "_show_error", lambda _message, **_kwargs: None)
+     monkeypatch.setattr(applier, "_start_launcher", lambda: starts.append(True))
+ 
+     def fail_after_partial_copy() -> None:
+@@ -174,13 +174,109 @@
+     applier = UpdateApplier(request)
+     monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
+     monkeypatch.setattr(applier, "_start_launcher", lambda: None)
+-    monkeypatch.setattr(applier, "_show_error", lambda _message: None)
++    monkeypatch.setattr(applier, "_show_error", lambda _message, **_kwargs: None)
+     monkeypatch.setattr(applier, "_verify_updated_executable", lambda: (_ for _ in ()).throw(RuntimeError("verify failed")))
+ 
+     assert applier.run() == 1
+     assert stale.read_text(encoding="utf-8") == "obsolete"
+ 
+ 
++def test_update_applier_replaces_executable_before_other_files(tmp_path, monkeypatch) -> None:
++    request = make_request(tmp_path)
++    source_exe = request.source_directory / request.executable_name
++    source_exe.write_bytes(b"new-exe")
++    (request.source_directory / "lang").mkdir()
++    (request.source_directory / "lang" / "en-US.json").write_text("new", encoding="utf-8")
++    (request.destination_directory / request.executable_name).write_bytes(b"old-exe")
++
++    applier = UpdateApplier(request)
++    copied: list[Path] = []
++
++    def record_copy(_source: Path, destination: Path) -> None:
++        copied.append(destination.relative_to(request.destination_directory))
++
++    monkeypatch.setattr(applier, "_copy_with_retry", record_copy)
++    applier._copy_update_files()
++
++    assert copied[0] == Path(request.executable_name)
++    assert Path("lang/en-US.json") in copied[1:]
++
++
++def test_copy_with_retry_retries_locked_launcher_executable_without_recopied_temp(tmp_path, monkeypatch) -> None:
++    request = make_request(tmp_path)
++    source = request.source_directory / request.executable_name
++    destination = request.destination_directory / request.executable_name
++    source.write_bytes(b"new-exe")
++    destination.write_bytes(b"old-exe")
++    applier = UpdateApplier(request)
++
++    real_replace = os.replace
++    replace_calls = 0
++    copy_calls = 0
++
++    def fake_copy2(src, dst, *args, **kwargs):
++        nonlocal copy_calls
++        copy_calls += 1
++        return __import__("shutil").copyfile(src, dst)
++
++    def flaky_replace(src, dst):
++        nonlocal replace_calls
++        replace_calls += 1
++        if replace_calls < 3:
++            raise PermissionError(5, "Access is denied")
++        return real_replace(src, dst)
++
++    monkeypatch.setattr("src.core.update.update_applier.shutil.copy2", fake_copy2)
++    monkeypatch.setattr("src.core.update.update_applier.os.replace", flaky_replace)
++    monkeypatch.setattr("src.core.update.update_applier.time.sleep", lambda _seconds: None)
++
++    applier._copy_with_retry(source, destination)
++
++    assert destination.read_bytes() == b"new-exe"
++    assert replace_calls == 3
++    assert copy_calls == 1
++    assert "Launcher executable is still locked" in request.persistent_log_path.read_text(encoding="utf-8")
++
++
++def test_rollback_skips_unchanged_locked_executable(tmp_path, monkeypatch) -> None:
++    request = make_request(tmp_path)
++    source_exe = request.source_directory / request.executable_name
++    destination_exe = request.destination_directory / request.executable_name
++    source_exe.write_bytes(b"new-exe")
++    destination_exe.write_bytes(b"old-exe")
++    applier = UpdateApplier(request)
++    applier._backup_existing_files()
++
++    restored: list[Path] = []
++    monkeypatch.setattr(applier, "_copy_with_retry", lambda _src, dst: restored.append(dst))
++    applier._restore_backup()
++
++    assert restored == []
++    assert destination_exe.read_bytes() == b"old-exe"
++
++
++def test_update_applier_does_not_restart_when_rollback_fails(tmp_path, monkeypatch) -> None:
++    request = make_request(tmp_path)
++    (request.source_directory / request.executable_name).write_bytes(b"new-exe")
++    (request.destination_directory / request.executable_name).write_bytes(b"old-exe")
++    applier = UpdateApplier(request)
++    starts: list[bool] = []
++    shown: list[tuple[str, bool]] = []
++
++    monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
++    monkeypatch.setattr(applier, "_copy_update_files", lambda: (_ for _ in ()).throw(RuntimeError("copy failed")))
++    monkeypatch.setattr(applier, "_restore_backup", lambda: (_ for _ in ()).throw(RuntimeError("rollback failed")))
++    monkeypatch.setattr(applier, "_start_launcher", lambda: starts.append(True))
++    monkeypatch.setattr(applier, "_show_error", lambda message, *, rollback_completed=True: shown.append((message, rollback_completed)))
++
++    assert applier.run() == 1
++    assert starts == []
++    assert shown == [("copy failed", False)]
++    log = request.persistent_log_path.read_text(encoding="utf-8")
++    assert "Rollback failed: rollback failed" in log
++    assert "Launcher was not restarted because rollback did not complete safely" in log
++
++
+ @pytest.mark.skipif(os.name == "nt", reason="POSIX executable modes are validated by the Linux CI job")
+ def test_update_applier_atomically_installs_executable_linux_mode(tmp_path, monkeypatch) -> None:
+     source = tmp_path / "source"

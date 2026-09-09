@@ -1,0 +1,11 @@
+CHANGELOG.md
+CHANGED-FILES.txt
+CHANGES.diff
+COMMIT-NAME.txt
+DELIVERY-MANIFEST.txt
+README.md
+docs/UPDATE_PACKAGES.md
+docs/releases/v1.5.1-beta.2.md
+src/config.py
+src/core/update/update_applier.py
+test/core/update/test_update_applier.py

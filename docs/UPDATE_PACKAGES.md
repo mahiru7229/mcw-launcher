@@ -32,6 +32,20 @@ MCW-Launcher-v0.7.3-beta.1-windows-x64/
 
 `mcw-update.json` lets the updater verify that the downloaded package matches the selected GitHub release before replacing files.
 
+## Windows executable replacement safety
+
+The packaged Windows launcher updates itself through the detached updater copy. After the parent launcher PID exits, Windows can still hold `MCW Launcher.exe` briefly (for example while the PyInstaller bootloader or security software releases the image).
+
+From `v1.5.1-beta.2`:
+
+- `MCW Launcher.exe` is replaced before any other release file.
+- The new EXE is copied to an adjacent temporary file once, then only the atomic `os.replace()` operation is retried.
+- Executable replacement gets a longer retry window (about 30 seconds).
+- Rollback skips files that are still byte-identical to their backup.
+- The launcher is restarted after a failed update only when rollback completed successfully.
+
+This ordering prevents a transient EXE lock from leaving an installation where libraries/resources come from the new release but the launcher executable is still from the old release.
+
 ## Test an updater transition
 
 1. Build and publish the newer ZIP as an asset of a GitHub release with a higher semantic version.

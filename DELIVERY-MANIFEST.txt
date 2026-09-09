@@ -1,0 +1,24 @@
+MCW Launcher v1.5.1-beta.2
+
+Purpose
+- Harden Windows self-update after observed WinError 5 while replacing MCW Launcher.exe.
+
+Behavior changes
+- Replace launcher executable before remaining update files.
+- Copy executable temp file once and retry atomic replace for up to ~30 seconds.
+- Skip rollback writes when destination is already identical to backup.
+- Do not restart launcher when rollback fails.
+- Add explicit updater log messages for executable lock/retry and unsafe rollback failure.
+
+Validation
+- python -m pytest test/core/config/test_version_metadata.py test/core/update test/gui/controllers/test_update_controller_priority.py -q
+- Result: 54 passed, 1 skipped.
+- Full suite collection in this container is blocked by missing PySide6; updater tests themselves pass.
+
+Recommended commit
+fix(updater): harden Windows self-update file replacement
+
+Release smoke test
+- Build Windows x64 ZIP through GitHub Actions/tag v1.5.1-beta.2.
+- Update a packaged v1.5.1-beta.1 installation to v1.5.1-beta.2.
+- Verify updater.log and final launcher version.

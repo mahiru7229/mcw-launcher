@@ -2,6 +2,28 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.1-beta.2] - 2026-09-09
+
+### Changed
+
+- Windows updater thay `MCW Launcher.exe` trước các file còn lại để lỗi file-lock không tạo installation trộn nhiều phiên bản.
+- File tạm của executable chỉ được copy một lần; updater retry riêng thao tác atomic replace tối đa khoảng 30 giây thay vì copy lại toàn bộ EXE ở mỗi lượt.
+- Rollback bỏ qua file vẫn giống hệt backup, tránh cố ghi đè lại executable cũ khi update chưa từng thay được file đó.
+
+### Fixed
+
+- Sửa `WinError 5: Access is denied` có thể xảy ra khi PyInstaller/Windows/antivirus còn giữ `MCW Launcher.exe` trong thời gian ngắn sau khi process launcher đóng.
+- Không còn tự restart launcher nếu rollback cũng thất bại; updater giữ log và yêu cầu khôi phục/reinstall thay vì chạy một installation có thể không nhất quán.
+
+### Tests
+
+- Thêm regression tests cho executable-first update, transient file-lock retry, rollback bỏ qua executable không đổi và fail-safe restart policy.
+- Nhóm test updater đạt `53 passed, 1 skipped` trong môi trường build hiện tại.
+
+### Release status
+
+- Beta 2 cần smoke-test trực tiếp trên Windows packaged ZIP bằng luồng update từ `v1.5.1-beta.1` lên `v1.5.1-beta.2`.
+
 ## [1.5.1-beta.1] - 2026-09-09
 
 ### Added
@@ -246,6 +268,7 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 - Windows vẫn là nền tảng release chính của Alpha 1.
 
 [1.5.0-beta.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.1
+[1.5.1-beta.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.1-beta.2
 [1.5.1-beta.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.1-beta.1
 [1.5.0-beta.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.2
 [1.5.0-beta.3]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.3

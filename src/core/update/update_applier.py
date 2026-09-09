@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import ctypes
+import filecmp
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -61,6 +62,7 @@ class UpdateApplyRequest:
 
 class UpdateApplier:
     COPY_RETRIES = 30
+    EXECUTABLE_REPLACE_RETRIES = 120
     COPY_RETRY_DELAY_SECONDS = 0.25
 
     def __init__(self, request: UpdateApplyRequest) -> None:
@@ -87,19 +89,24 @@ class UpdateApplier:
             return 0
         except Exception as error:
             self._log(f"Update failed: {error}")
+            rollback_completed = False
             try:
                 self._restore_backup()
+                rollback_completed = True
                 self._log("Rollback completed")
             except Exception as rollback_error:
                 self._log(f"Rollback failed: {rollback_error}")
 
-            try:
-                self._start_launcher()
-                self._log("Previous launcher restarted after update failure")
-            except Exception as restart_error:
-                self._log(f"Could not restart the launcher after failure: {restart_error}")
+            if rollback_completed:
+                try:
+                    self._start_launcher()
+                    self._log("Previous launcher restarted after update failure")
+                except Exception as restart_error:
+                    self._log(f"Could not restart the launcher after failure: {restart_error}")
+            else:
+                self._log("Launcher was not restarted because rollback did not complete safely")
 
-            self._show_error(str(error))
+            self._show_error(str(error), rollback_completed=rollback_completed)
             return 1
 
     def _backup_existing_files(self) -> None:
@@ -116,7 +123,19 @@ class UpdateApplier:
 
     def _copy_update_files(self) -> None:
         self._log(f"Copying update from {self.request.source_directory} to {self.request.destination_directory}")
-        for source_path in self._iter_source_files():
+        source_files = self._iter_source_files()
+        source_executable = self.request.source_directory / self.request.executable_name
+        destination_executable = self.request.destination_directory / self.request.executable_name
+
+        # Replace the launcher executable before mutating the rest of the installation.
+        # A PyInstaller/AV file lock can linger briefly after the launcher process exits;
+        # failing here first avoids leaving a mixed-version installation behind.
+        self._log("Replacing launcher executable before the remaining update files")
+        self._copy_with_retry(source_executable, destination_executable)
+
+        for source_path in source_files:
+            if source_path == source_executable:
+                continue
             relative_path = source_path.relative_to(self.request.source_directory)
             destination_path = self.request.destination_directory / relative_path
             destination_path.parent.mkdir(parents=True, exist_ok=True)
@@ -172,6 +191,8 @@ class UpdateApplier:
             relative_path = backup_path.relative_to(self.backup_directory)
             destination_path = self.request.destination_directory / relative_path
             destination_path.parent.mkdir(parents=True, exist_ok=True)
+            if self._files_equal(backup_path, destination_path):
+                continue
             self._copy_with_retry(backup_path, destination_path)
 
     def _verify_updated_executable(self) -> None:
@@ -206,19 +227,52 @@ class UpdateApplier:
         )
 
     def _copy_with_retry(self, source: Path, destination: Path) -> None:
+        retries = self._replace_retries_for(destination)
+        temporary = destination.with_name(f".{destination.name}.mcw-update-{uuid.uuid4().hex}.tmp")
         last_error: OSError | None = None
-        for attempt in range(self.COPY_RETRIES):
-            temporary = destination.with_name(f".{destination.name}.mcw-update-{uuid.uuid4().hex}.tmp")
+
+        try:
+            # Copy once. Only the atomic rename is retried when Windows still holds
+            # a transient lock on the destination executable. Re-copying the full
+            # packaged EXE on every retry makes the lock window unnecessarily longer.
+            shutil.copy2(source, temporary)
+            for attempt in range(retries):
+                try:
+                    os.replace(temporary, destination)
+                    if attempt > 0 and self._is_launcher_executable(destination):
+                        self._log(f"Launcher executable became replaceable after {attempt + 1} attempts")
+                    return
+                except OSError as error:
+                    last_error = error
+                    if attempt == 0 and self._is_launcher_executable(destination):
+                        max_wait = retries * self.COPY_RETRY_DELAY_SECONDS
+                        self._log(f"Launcher executable is still locked; retrying for up to {max_wait:.0f} seconds")
+                    if attempt + 1 < retries:
+                        time.sleep(self.COPY_RETRY_DELAY_SECONDS)
+        finally:
             try:
-                shutil.copy2(source, temporary)
-                os.replace(temporary, destination)
-                return
-            except OSError as error:
-                last_error = error
                 temporary.unlink(missing_ok=True)
-                if attempt + 1 < self.COPY_RETRIES:
-                    time.sleep(self.COPY_RETRY_DELAY_SECONDS)
+            except OSError:
+                pass
+
         raise RuntimeError(f"Could not replace {destination}: {last_error}") from last_error
+
+    def _replace_retries_for(self, destination: Path) -> int:
+        if self._is_launcher_executable(destination):
+            return self.EXECUTABLE_REPLACE_RETRIES
+        return self.COPY_RETRIES
+
+    def _is_launcher_executable(self, path: Path) -> bool:
+        return path.name.casefold() == self.request.executable_name.casefold()
+
+    @staticmethod
+    def _files_equal(first: Path, second: Path) -> bool:
+        if not first.is_file() or not second.is_file():
+            return False
+        try:
+            return filecmp.cmp(first, second, shallow=False)
+        except OSError:
+            return False
 
     def _iter_source_files(self) -> list[Path]:
         return sorted((path for path in self.request.source_directory.rglob("*") if path.is_file()), key=lambda path: str(path).lower())
@@ -261,12 +315,19 @@ class UpdateApplier:
             time.sleep(0.2)
         raise TimeoutError("The launcher did not close within two minutes.")
 
-    def _show_error(self, message: str) -> None:
+    def _show_error(self, message: str, *, rollback_completed: bool = True) -> None:
         if os.name != "nt":
             return
+        recovery_note = ""
+        if not rollback_completed:
+            recovery_note = (
+                "\n\nRollback also failed, so MCW Launcher was not restarted. "
+                "Keep the updater log and reinstall/reapply the current release before launching again."
+            )
         text = (
             "MCW Launcher could not finish the update.\n\n"
-            f"{message}\n\n"
+            f"{message}"
+            f"{recovery_note}\n\n"
             f"Log: {self.request.persistent_log_path}"
         )
         try:
