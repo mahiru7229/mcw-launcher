@@ -1,28 +1,17 @@
 # MCW Launcher update packages
 
-Automatic updates use a GitHub Release ZIP. The ZIP must contain the packaged launcher executable and may contain any other file or directory that should overwrite the current installation.
+From `v1.5.1-beta.3`, automatic updates use **Updater Architecture v2**. Every GitHub Release ZIP contains both the launcher binary and a dedicated updater binary built from that same target release.
 
-## Build a release package
+## Package contract — schema 2
 
-After building the EXE with PyInstaller, pass the target version to the package builder. The version must match `src.config.VERSION_ID`:
-
-```powershell
-python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.3-beta.1"
-```
-
-The command creates:
+Windows:
 
 ```text
-MCW-Launcher-v0.7.3-beta.1-windows-x64.zip
-MCW-Launcher-v0.7.3-beta.1-windows-x64.zip.sha256
-```
-
-The package contains a single wrapper directory:
-
-```text
-MCW-Launcher-v0.7.3-beta.1-windows-x64/
+MCW-Launcher-v1.5.1-beta.3-windows-x64/
 ├── MCW Launcher.exe
 ├── mcw-update.json
+├── updater/
+│   └── MCW Updater.exe
 ├── lang/
 ├── themes/
 ├── docs/
@@ -30,39 +19,102 @@ MCW-Launcher-v0.7.3-beta.1-windows-x64/
 └── LICENSE
 ```
 
-`mcw-update.json` lets the updater verify that the downloaded package matches the selected GitHub release before replacing files.
+Linux:
 
-## Windows executable replacement safety
-
-The packaged Windows launcher updates itself through the detached updater copy. After the parent launcher PID exits, Windows can still hold `MCW Launcher.exe` briefly (for example while the PyInstaller bootloader or security software releases the image).
-
-From `v1.5.1-beta.2`:
-
-- `MCW Launcher.exe` is replaced before any other release file.
-- The new EXE is copied to an adjacent temporary file once, then only the atomic `os.replace()` operation is retried.
-- Executable replacement gets a longer retry window (about 30 seconds).
-- Rollback skips files that are still byte-identical to their backup.
-- The launcher is restarted after a failed update only when rollback completed successfully.
-
-This ordering prevents a transient EXE lock from leaving an installation where libraries/resources come from the new release but the launcher executable is still from the old release.
-
-## Test an updater transition
-
-1. Build and publish the newer ZIP as an asset of a GitHub release with a higher semantic version.
-2. The asset name should contain `MCW`, `windows`, and `x64`.
-3. Start a packaged launcher build that contains the current updater but reports an older test version.
-4. Use **Launcher Settings → Check for updates** if the automatic check has already run recently.
-5. Confirm the update prompt, release notes, package size, backup, overwrite, restart, and `logs/updater.log`.
-6. Confirm `config`, `instances`, `accounts`, and other user data remain intact.
-
-The updater copies and overwrites files present in the ZIP. It does not delete unrelated files from the installation directory.
-
-## One-command Windows release build
-
-From a clean working tree, run:
-
-```powershell
-.\build_release.ps1
+```text
+MCW-Launcher-v1.5.1-beta.3-linux-x64/
+├── mcw-launcher
+├── mcw-update.json
+├── updater/
+│   └── mcw-updater
+└── ...
 ```
 
-The script runs the release preflight, the complete test suite, removes previous build output, builds the windowed EXE, and creates the updater ZIP plus SHA-256 checksum. It reads the version from `src/config.py`; the API JSON publication time remains an external release setting and is not changed by the script.
+Example manifest:
+
+```json
+{
+  "schema_version": 2,
+  "version": "1.5.1-beta.3",
+  "platform": "windows-x64",
+  "executable": "MCW Launcher.exe",
+  "updater": "updater/MCW Updater.exe",
+  "files": [
+    "MCW Launcher.exe",
+    "mcw-update.json",
+    "updater/MCW Updater.exe"
+  ]
+}
+```
+
+The managed-file list also contains the release documentation, languages, themes, and other packaged files.
+
+## Security / fail-closed behavior
+
+Before installation, the launcher validates:
+
+- release SHA-256 digest or `.sha256` sidecar;
+- archive paths and duplicate paths;
+- manifest schema, version and platform;
+- launcher executable name;
+- bundled updater path;
+- every managed file exists;
+- no undeclared files are present;
+- Linux launcher and updater have executable mode.
+
+A schema-2 package missing its bundled updater is rejected. The launcher does not fall back to copying itself as an updater.
+
+## Handoff model
+
+The updater is taken from the **incoming** ZIP:
+
+```text
+current launcher
+  ↓ download + validate new ZIP
+incoming updater/MCW Updater.exe
+  ↓ copy to %TEMP%/mcw-launcher-updater-...
+launch incoming updater
+  ↓
+current launcher exits
+  ↓
+incoming updater applies target release
+```
+
+This ensures a fix to updater code becomes active during the transition *into* the release containing the fix.
+
+## Build package manually
+
+Windows example:
+
+```powershell
+python -m PyInstaller --clean --noconfirm mcw_launcher.spec
+python -m PyInstaller --clean --noconfirm mcw_updater.spec
+python -m tools.build_release_zip `
+  --exe ".\dist\MCW Launcher.exe" `
+  --updater ".\dist\MCW Updater.exe" `
+  --version "1.5.1-beta.3" `
+  --platform windows-x64
+```
+
+Linux example:
+
+```bash
+python -m PyInstaller --clean --noconfirm mcw_launcher.spec
+python -m PyInstaller --clean --noconfirm mcw_updater.spec
+python -m tools.build_release_zip \
+  --exe ./dist/mcw-launcher \
+  --updater ./dist/mcw-updater \
+  --version 1.5.1-beta.3 \
+  --platform linux-x64
+```
+
+## Windows v1.5.0 bridge
+
+`v1.5.0` predates this architecture and contains the updater bootstrap bug. Existing affected Windows installs should use `MCW Update Bridge v1.1.0` once to migrate directly to Beta 3. The Bridge verifies the Beta 3 schema-2 package and installs it without depending on v1.5.0 updater code.
+
+## Required live tests
+
+1. `v1.5.0 → Bridge v1.1.0 → v1.5.1-beta.3`.
+2. `v1.5.1-beta.3 → v1.5.1-beta.4` using automatic update.
+3. Confirm updater log identifies the target release and completes rollback safely on a forced failure.
+4. Confirm `config`, `instances`, accounts and saves remain unchanged.

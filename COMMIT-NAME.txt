@@ -1,1 +1,1 @@
-fix(updater): harden Windows self-update file replacement
+fix(updater): switch releases to bundled updater v2

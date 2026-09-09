@@ -80,7 +80,7 @@ def test_update_request_loads_and_validates_json(tmp_path) -> None:
     request_path = request.updater_directory / "request.json"
     request_path.write_text(
         """{
-  "schema_version": 1,
+  "schema_version": 2,
   "parent_pid": 123,
   "source_directory": "%s",
   "destination_directory": "%s",
@@ -133,7 +133,7 @@ def write_update_manifest(root: Path, files: list[str], version: str) -> None:
 
     (root / "mcw-update.json").write_text(
         json.dumps({
-            "schema_version": 1,
+            "schema_version": 2,
             "version": version,
             "platform": "windows-x64",
             "executable": "MCW Launcher.exe",

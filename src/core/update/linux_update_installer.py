@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import stat
 import subprocess
@@ -18,9 +18,12 @@ from src.models.update.update_info import PreparedUpdate
 
 
 class LinuxUpdateInstaller:
-    """Start a detached copy of the packaged launcher to apply a Linux update."""
+    """Launch the updater binary bundled inside the incoming Linux package."""
 
     STARTUP_GRACE_SECONDS = 1.0
+    PACKAGE_MANIFEST_NAME = "mcw-update.json"
+    PACKAGE_MANIFEST_SCHEMA_VERSION = 2
+    EXPECTED_UPDATER = PurePosixPath("updater/mcw-updater")
 
     @staticmethod
     def is_supported() -> bool:
@@ -51,17 +54,18 @@ class LinuxUpdateInstaller:
 
         cls._validate_paths(source, destination, executable)
         cls._verify_write_access(destination)
+        incoming_updater = cls._bundled_updater(source)
 
         updater_directory = Path(tempfile.gettempdir()) / f"mcw-launcher-updater-{uuid.uuid4().hex}"
         updater_directory.mkdir(parents=True, exist_ok=False, mode=0o700)
-        updater_executable = updater_directory / "mcw-launcher-updater"
+        updater_executable = updater_directory / "mcw-updater"
         request_path = updater_directory / "update-request.json"
 
         try:
-            shutil.copy2(executable, updater_executable)
+            shutil.copy2(incoming_updater, updater_executable)
             updater_executable.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
             request = {
-                "schema_version": 1,
+                "schema_version": 2,
                 "parent_pid": int(parent_pid if parent_pid is not None else os.getpid()),
                 "source_directory": str(source),
                 "destination_directory": str(destination),
@@ -79,7 +83,7 @@ class LinuxUpdateInstaller:
             if exit_code is not None:
                 detail = cls._read_startup_error(updater_directory, persistent_log)
                 raise RuntimeError(
-                    f"The Linux updater process exited before the launcher closed (code {exit_code}).{detail}"
+                    f"The bundled Linux updater exited before the launcher closed (code {exit_code}).{detail}"
                 )
             return request_path
         except Exception:
@@ -101,6 +105,30 @@ class LinuxUpdateInstaller:
             raise RuntimeError(f"The update ZIP does not contain a regular {executable.name} executable.")
         if incoming.stat().st_mode & 0o111 == 0:
             raise RuntimeError("The Linux launcher in the update ZIP is not executable.")
+
+    @classmethod
+    def _bundled_updater(cls, source: Path) -> Path:
+        manifest_path = source / cls.PACKAGE_MANIFEST_NAME
+        try:
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise RuntimeError(f"Could not read the bundled updater manifest: {error}") from error
+        if not isinstance(payload, dict):
+            raise RuntimeError("The update package manifest must be a JSON object.")
+        if int(payload.get("schema_version", 0) or 0) != cls.PACKAGE_MANIFEST_SCHEMA_VERSION:
+            raise RuntimeError("The update package does not use bundled-updater schema 2.")
+        if str(payload.get("platform") or "").strip().casefold() != "linux-x64":
+            raise RuntimeError("The update package does not target linux-x64.")
+        raw = str(payload.get("updater") or "").replace("\\", "/").strip()
+        path = PurePosixPath(raw)
+        if path != cls.EXPECTED_UPDATER:
+            raise RuntimeError(f"The update package must declare {cls.EXPECTED_UPDATER.as_posix()} as its updater.")
+        updater = source.joinpath(*path.parts)
+        if not updater.is_file() or updater.is_symlink():
+            raise RuntimeError(f"The bundled updater is missing or invalid: {path.as_posix()}")
+        if updater.stat().st_mode & 0o111 == 0:
+            raise RuntimeError("The bundled Linux updater is not executable.")
+        return updater
 
     @staticmethod
     def _verify_write_access(destination: Path) -> None:

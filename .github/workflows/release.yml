@@ -110,9 +110,11 @@ jobs:
           - os: windows-latest
             platform: windows-x64
             executable: dist/MCW Launcher.exe
+            updater: dist/MCW Updater.exe
           - os: ubuntu-22.04
             platform: linux-x64
             executable: dist/mcw-launcher
+            updater: dist/mcw-updater
     runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
@@ -148,13 +150,21 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"version={VERSION_ID}\n")
 
-      - name: Build native executable
+      - name: Build launcher executable
         run: python -m PyInstaller --clean --noconfirm mcw_launcher.spec
+
+      - name: Build bundled updater executable
+        run: python -m PyInstaller --clean --noconfirm mcw_updater.spec
+
+      - name: Verify bundled updater exists
+        shell: bash
+        run: test -f "${{ matrix.updater }}"
 
       - name: Build release ZIP and checksum
         run: >-
           python -m tools.build_release_zip
           --exe "${{ matrix.executable }}"
+          --updater "${{ matrix.updater }}"
           --version "${{ steps.version.outputs.version }}"
           --platform "${{ matrix.platform }}"
 

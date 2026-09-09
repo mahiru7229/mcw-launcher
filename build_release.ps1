@@ -24,6 +24,9 @@ function Invoke-Checked {
 if (-not (Test-Path ".\mcw_launcher.spec")) {
     throw "mcw_launcher.spec was not found. Run this script from the project root."
 }
+if (-not (Test-Path ".\mcw_updater.spec")) {
+    throw "mcw_updater.spec was not found. Run this script from the project root."
+}
 if (-not (Test-Path ".\tools\build_release_zip.py")) {
     throw "tools/build_release_zip.py was not found."
 }
@@ -52,7 +55,7 @@ if (-not $AllowDirty) {
 
 Write-Step "Running release preflight"
 Invoke-Checked "Release preflight" { python -m tools.release_preflight }
-Invoke-Checked "Python compilation" { python -m compileall -q launcher.py src tools }
+Invoke-Checked "Python compilation" { python -m compileall -q launcher.py updater.py src tools }
 
 if (-not $SkipTests) {
     Write-Step "Running complete regression suite"
@@ -64,16 +67,23 @@ Remove-Item ".\build" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item ".\dist" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item ".\release" -Recurse -Force -ErrorAction SilentlyContinue
 
-Write-Step "Building one-file windowed EXE"
-Invoke-Checked "PyInstaller build" { python -m PyInstaller --clean --noconfirm mcw_launcher.spec }
+Write-Step "Building launcher EXE"
+Invoke-Checked "Launcher PyInstaller build" { python -m PyInstaller --clean --noconfirm mcw_launcher.spec }
+
+Write-Step "Building bundled updater EXE"
+Invoke-Checked "Updater PyInstaller build" { python -m PyInstaller --clean --noconfirm mcw_updater.spec }
 
 $ExePath = Join-Path ".\dist" $ExeName
 if (-not (Test-Path $ExePath)) {
     throw "Expected EXE was not created: $ExePath"
 }
+$UpdaterPath = ".\dist\MCW Updater.exe"
+if (-not (Test-Path $UpdaterPath)) {
+    throw "Expected bundled updater was not created: $UpdaterPath"
+}
 
-Write-Step "Creating updater-compatible ZIP"
-Invoke-Checked "Release package build" { python -m tools.build_release_zip --exe $ExePath --version $Version }
+Write-Step "Creating updater-v2 ZIP"
+Invoke-Checked "Release package build" { python -m tools.build_release_zip --exe $ExePath --updater $UpdaterPath --version $Version }
 
 $ZipName = "MCW-Launcher-v$Version-windows-x64.zip"
 $ZipPath = Join-Path ".\release" $ZipName
@@ -98,6 +108,7 @@ Write-Host "Release build completed successfully." -ForegroundColor Green
 Write-Host "Version: $VersionTag"
 Write-Host "EXE: $ExePath"
 Write-Host "EXE SHA-256: $ExeHash"
+Write-Host "Updater: $UpdaterPath"
 Write-Host "ZIP: $ZipPath"
 Write-Host "ZIP SHA-256: $ZipHash"
 Write-Host "Checksum: $ShaPath"

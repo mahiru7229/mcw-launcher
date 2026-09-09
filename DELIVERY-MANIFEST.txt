@@ -1,24 +1,24 @@
-MCW Launcher v1.5.1-beta.2
+MCW Launcher v1.5.1-beta.3 delivery
 
-Purpose
-- Harden Windows self-update after observed WinError 5 while replacing MCW Launcher.exe.
+Primary change: Updater Architecture v2
 
-Behavior changes
-- Replace launcher executable before remaining update files.
-- Copy executable temp file once and retry atomic replace for up to ~30 seconds.
-- Skip rollback writes when destination is already identical to backup.
-- Do not restart launcher when rollback fails.
-- Add explicit updater log messages for executable lock/retry and unsafe rollback failure.
+- Dedicated entry point: updater.py
+- Dedicated PyInstaller spec: mcw_updater.spec
+- Windows package updater: updater/MCW Updater.exe
+- Linux package updater: updater/mcw-updater
+- mcw-update.json schema: 2
+- Manifest field `updater` is mandatory.
+- Launcher copies the updater from the INCOMING release ZIP to system temp.
+- No fallback to copying/renaming the currently installed launcher executable.
+- Update request schema: 2
+- Beta 2 executable-first/retry/rollback safety remains in the updater.
+- Bridge upgraded to v1.1.0 and pinned to v1.5.1-beta.3.
 
-Validation
-- python -m pytest test/core/config/test_version_metadata.py test/core/update test/gui/controllers/test_update_controller_priority.py -q
-- Result: 54 passed, 1 skipped.
-- Full suite collection in this container is blocked by missing PySide6; updater tests themselves pass.
-
-Recommended commit
-fix(updater): harden Windows self-update file replacement
-
-Release smoke test
-- Build Windows x64 ZIP through GitHub Actions/tag v1.5.1-beta.2.
-- Update a packaged v1.5.1-beta.1 installation to v1.5.1-beta.2.
-- Verify updater.log and final launcher version.
+Release build order:
+1. Apply these changed files to the repository.
+2. Commit and push.
+3. Publish GitHub pre-release tag v1.5.1-beta.3.
+4. release.yml builds Launcher + Updater independently for Windows/Linux.
+5. release.yml packages schema-2 ZIPs and uploads ZIP + SHA-256 assets.
+6. After release assets exist, run "Build MCW Update Bridge" manually.
+7. Bridge workflow uploads MCW-Update-Bridge-v1.1.0-windows-x64.exe + .sha256 to the Beta 3 release.

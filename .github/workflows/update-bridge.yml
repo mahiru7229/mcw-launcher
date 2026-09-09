@@ -1,0 +1,88 @@
+name: Build MCW Update Bridge
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Target release that the bridge installs
+        required: true
+        default: v1.5.1-beta.3
+        type: string
+      upload_to_release:
+        description: Upload bridge EXE and checksum to the target GitHub release
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Windows recovery bridge
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test/build dependencies
+        run: python -m pip install --upgrade pytest pyinstaller==6.22.2
+
+      - name: Run bridge tests
+        run: python -m pytest test/tools/test_update_bridge.py -q
+
+      - name: Validate workflow target
+        shell: pwsh
+        run: |
+          if ('${{ inputs.release_tag }}' -ne 'v1.5.1-beta.3') {
+            throw 'Bridge 1.1.0 is intentionally pinned to v1.5.1-beta.3. Update the bridge source and tests before changing the target.'
+          }
+
+      - name: Build standalone bridge EXE
+        shell: pwsh
+        run: |
+          python -m PyInstaller `
+            --noconfirm `
+            --clean `
+            --onefile `
+            --windowed `
+            --icon 'assets/icons/mcw_launcher.ico' `
+            --name 'MCW-Update-Bridge-v1.1.0-windows-x64' `
+            tools/update_bridge/update_bridge.py
+
+      - name: Build SHA-256 sidecar
+        shell: pwsh
+        run: |
+          $exe = 'dist/MCW-Update-Bridge-v1.1.0-windows-x64.exe'
+          $sum = (Get-FileHash -Path $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          [System.IO.File]::WriteAllText(
+            "$exe.sha256",
+            "$sum  MCW-Update-Bridge-v1.1.0-windows-x64.exe`n",
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MCW-Update-Bridge-v1.1.0-windows-x64
+          if-no-files-found: error
+          path: |
+            dist/MCW-Update-Bridge-v1.1.0-windows-x64.exe
+            dist/MCW-Update-Bridge-v1.1.0-windows-x64.exe.sha256
+
+      - name: Upload bridge to target release
+        if: ${{ inputs.upload_to_release }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload '${{ inputs.release_tag }}' \
+            'dist/MCW-Update-Bridge-v1.1.0-windows-x64.exe' \
+            'dist/MCW-Update-Bridge-v1.1.0-windows-x64.exe.sha256' \
+            --clobber

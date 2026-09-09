@@ -12,12 +12,12 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.5.1--beta.2-blue" alt="v1.5.1-beta.2">
+  <img src="https://img.shields.io/badge/version-v1.5.1--beta.3-blue" alt="v1.5.1-beta.3">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!WARNING]
-> `v1.5.1-beta.2` harden cơ chế self-update trên Windows: launcher executable được thay trước, retry file-lock lâu hơn và chỉ restart sau lỗi khi rollback hoàn tất an toàn.
+> `v1.5.1-beta.3` chuyển sang **Updater Architecture v2**: ZIP release chứa updater độc lập của chính phiên bản mới. Launcher không còn copy executable hiện tại để làm updater. Người dùng Windows còn ở v1.5.0 cần chạy Update Bridge v1.1.0 một lần.
 
 ## Tổng quan
 
@@ -35,7 +35,7 @@ Các nhóm tính năng chính:
 
 ## Trạng thái nền tảng
 
-| Nền tảng | Trạng thái v1.5.1 Beta 2 | Ghi chú |
+| Nền tảng | Trạng thái v1.5.1 Beta 3 | Ghi chú |
 | --- | --- | --- |
 | Windows 10/11 x64 | Đang hỗ trợ | Luồng chính và bản đóng gói PyInstaller hiện tại. |
 | Linux x64 | Đang hỗ trợ | Automatic update và desktop opener trong bản PyInstaller đã được kiểm thử trực tiếp trên Lubuntu. |
@@ -112,6 +112,7 @@ GitHub Release Actions chỉ build ZIP native Windows/Linux sau khi test cả ha
 ```text
 mcw-launcher/
 ├── launcher.py          # entry point và startup lifecycle
+├── updater.py           # updater v2 entry point
 ├── mcw_core/            # public facade/API dùng bởi GUI và consumer headless
 ├── src/core/            # implementation nghiệp vụ
 ├── src/gui/             # giao diện PySide6
@@ -134,6 +135,7 @@ GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, khô
 - [MCW Core API](docs/MCW_CORE_LIBRARY.md)
 - [Language packs](docs/LANGUAGE_PACKS.md)
 - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
+- [Release notes v1.5.1-beta.3](docs/releases/v1.5.1-beta.3.md)
 - [Release notes v1.5.1-beta.2](docs/releases/v1.5.1-beta.2.md)
 - [Release notes v1.5.1-beta.1](docs/releases/v1.5.1-beta.1.md)
 - [Changelog](CHANGELOG.md)

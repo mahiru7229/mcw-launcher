@@ -29,8 +29,8 @@ class UpdateApplyRequest:
     @classmethod
     def load(cls, path: Path) -> "UpdateApplyRequest":
         data = json.loads(Path(path).read_text(encoding="utf-8"))
-        if int(data.get("schema_version", 0)) != 1:
-            raise RuntimeError("Unsupported updater request schema.")
+        if int(data.get("schema_version", 0)) != 2:
+            raise RuntimeError("Unsupported updater request schema. MCW Updater v2 requires schema 2.")
 
         request = cls(
             parent_pid=int(data["parent_pid"]),

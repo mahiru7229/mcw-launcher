@@ -7,17 +7,6 @@ import tempfile
 import traceback
 
 
-def _run_update_mode() -> int | None:
-    if len(sys.argv) < 2 or sys.argv[1] != "--apply-update":
-        return None
-    if len(sys.argv) != 3:
-        return 2
-
-    from mcw_core.api.update.update_applier import run_update_applier
-
-    return run_update_applier(Path(sys.argv[2]))
-
-
 def _start_update_cleanup() -> None:
     from mcw_core.api.update.update_cleanup import UpdateCleanupWorker, consume_update_cleanup_arguments
 
@@ -95,10 +84,6 @@ def _validate_startup_dependencies(project_root: Path | None = None) -> None:
 
 
 def main() -> None:
-    update_result = _run_update_mode()
-    if update_result is not None:
-        raise SystemExit(update_result)
-
     _start_update_cleanup()
 
     from src.gui.application import create_application

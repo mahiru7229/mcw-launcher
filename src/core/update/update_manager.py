@@ -28,7 +28,7 @@ class UpdateManager:
     MAX_EXTRACTED_BYTES = 4 * 1024 * 1024 * 1024
     MAX_ARCHIVE_ENTRIES = 20_000
     PACKAGE_MANIFEST_NAME = "mcw-update.json"
-    PACKAGE_MANIFEST_SCHEMA_VERSION = 1
+    PACKAGE_MANIFEST_SCHEMA_VERSION = 2
 
     def __init__(
         self,
@@ -76,9 +76,9 @@ class UpdateManager:
         try:
             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError) as error:
-            raise RuntimeError(f"Invalid {cls.PACKAGE_MANIFEST_NAME}: {error}") from error
+            raise RuntimeError(f"Invalid {self.PACKAGE_MANIFEST_NAME}: {error}") from error
         if not isinstance(payload, dict):
-            raise RuntimeError(f"{cls.PACKAGE_MANIFEST_NAME} must contain a JSON object.")
+            raise RuntimeError(f"{self.PACKAGE_MANIFEST_NAME} must contain a JSON object.")
         if int(payload.get("schema_version", 0) or 0) != self.PACKAGE_MANIFEST_SCHEMA_VERSION:
             raise RuntimeError(f"Unsupported update package schema: {payload.get('schema_version')}")
         package_platform = str(payload.get("platform") or "").strip().casefold()
@@ -126,6 +126,24 @@ class UpdateManager:
             raise RuntimeError(f"The update package manifest must list {self.PACKAGE_MANIFEST_NAME} as a managed file.")
         if executable_name not in normalized_files:
             raise RuntimeError("The update package manifest must list its launcher executable as a managed file.")
+
+        updater_name = str(payload.get("updater") or "").replace("\\", "/").strip()
+        updater_relative = self._safe_archive_path(updater_name)
+        if updater_relative is None:
+            raise RuntimeError("The update package manifest does not declare a valid bundled updater.")
+        expected_updater = "updater/MCW Updater.exe" if self.platform_id == "windows-x64" else "updater/mcw-updater"
+        if updater_relative.as_posix() != expected_updater:
+            raise RuntimeError(
+                f"The update package declares an unexpected updater: expected {expected_updater}, found {updater_relative.as_posix()}."
+            )
+        updater_path = content_directory.joinpath(*updater_relative.parts)
+        if not updater_path.is_file():
+            raise RuntimeError(f"The update package does not contain the declared updater: {expected_updater}")
+        if expected_updater not in normalized_files:
+            raise RuntimeError("The update package manifest must list its bundled updater as a managed file.")
+        if self.platform_id == "linux-x64" and updater_path.stat().st_mode & 0o111 == 0:
+            raise RuntimeError("The Linux updater in the update package is not executable.")
+
         actual_files = {
             path.relative_to(content_directory).as_posix()
             for path in content_directory.rglob("*")
