@@ -141,9 +141,11 @@ class UpdateManager:
             raise RuntimeError(f"The update package does not contain the declared updater: {expected_updater}")
         if expected_updater not in normalized_files:
             raise RuntimeError("The update package manifest must list its bundled updater as a managed file.")
-        if self.platform_id == "linux-x64" and updater_path.stat().st_mode & 0o111 == 0:
-            raise RuntimeError("The Linux updater in the update package is not executable.")
 
+        # Validate the package allow-list before platform-specific filesystem
+        # metadata. This keeps security errors deterministic across hosts.
+        # In particular, Windows cannot faithfully represent POSIX executable
+        # bits for a Linux package assembled in a unit test.
         actual_files = {
             path.relative_to(content_directory).as_posix()
             for path in content_directory.rglob("*")
@@ -154,7 +156,10 @@ class UpdateManager:
             raise RuntimeError(
                 f"The update package contains an undeclared file: {undeclared_files[0]}"
             )
+
         if self.platform_id == "linux-x64":
+            if updater_path.stat().st_mode & 0o111 == 0:
+                raise RuntimeError("The Linux updater in the update package is not executable.")
             executable_mode = (content_directory / executable_name).stat().st_mode
             if executable_mode & 0o111 == 0:
                 raise RuntimeError("The Linux launcher in the update package is not executable.")
