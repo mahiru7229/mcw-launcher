@@ -89,6 +89,11 @@ class ModCapabilityIndex:
         if ModCapabilityIndex._normalize_id(top_level.mod_id) == wanted:
             capabilities.append(ModCapability(top_level.mod_id, top_level.version, "top_level", candidate.name))
         capabilities.extend(
+            ModCapability(mod_id, version or top_level.version, "top_level", candidate.name)
+            for mod_id, version in getattr(top_level, "provided_mods", ())
+            if ModCapabilityIndex._normalize_id(mod_id) == wanted
+        )
+        capabilities.extend(
             capability
             for capability in ModCapabilityIndex._scan_owner(candidate)
             if ModCapabilityIndex._normalize_id(capability.mod_id) == wanted

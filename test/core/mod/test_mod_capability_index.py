@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 import json
 import zipfile
 
@@ -123,6 +124,28 @@ def test_forge_style_version_with_letter_component_matches_maven_range():
     assert ModCompatibilityManager._matches_requirement("0.6.10", "[0.6.8.a,0.7)") is True
     assert ModCompatibilityManager._matches_requirement("0.6.8.a", "[0.6.8.a,0.7)") is True
     assert ModCompatibilityManager._matches_requirement("0.7.0", "[0.6.8.a,0.7)") is False
+
+
+def test_candidate_provides_secondary_top_level_mod_id(tmp_path, monkeypatch):
+    candidate = tmp_path / "multi-mod.jar"
+    candidate.write_bytes(b"candidate")
+    monkeypatch.setattr(
+        ModManager,
+        "read_mod",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            mod_id="primary_mod",
+            version="1.0.0",
+            provided_mods=(("required_api", "2.4.0"),),
+        ),
+    )
+    monkeypatch.setattr(ModCapabilityIndex, "_scan_owner", lambda _path: ())
+
+    capabilities = ModCapabilityIndex.provides(candidate, "required_api", "fabric")
+
+    assert len(capabilities) == 1
+    assert capabilities[0].source == "top_level"
+    assert capabilities[0].mod_id == "required_api"
+    assert capabilities[0].version == "2.4.0"
 
 
 def test_atm9_artifacts_embedded_expandability_satisfies_dependency_without_standalone_jar(tmp_path):

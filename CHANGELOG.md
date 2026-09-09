@@ -2,6 +2,28 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.1-beta.1] - 2026-09-09
+
+### Added
+
+- Tự tìm dependency mà modpack bỏ sót trên Modrinth bằng mod ID khai báo trong metadata của mod cha.
+- Xác minh candidate bằng hash, Minecraft version, loader, version constraint và mod ID đọc trực tiếp từ JAR trước khi thêm vào instance.
+- Lưu cache alias `mod ID → provider project` đã xác minh để những lần launch sau không phải tìm kiếm lại.
+
+### Changed
+
+- Gộp nhiều lỗi cùng thiếu một dependency thành một nhóm dễ đọc, đồng thời giữ nguyên danh sách mod cha trong provenance.
+- Giới hạn vòng hoàn tất dependency còn hai lượt; provider graph vẫn được duyệt đệ quy nhưng UI không lặp Resolving/Checking tới tám lần.
+
+### Security
+
+- Không tin tên/slug từ kết quả tìm kiếm và không cài candidate chỉ vì tên gần giống dependency.
+- Candidate không đúng mod ID, sai loader, sai Minecraft version hoặc không đạt version constraint bị loại mà không thay đổi instance.
+
+### Release status
+
+- Beta 1 cần smoke-test bằng một modpack có dependency bị manifest bỏ sót, đặc biệt trường hợp Fabric `cloth-config2`/Cloth Config API.
+
 ## [1.5.0] - 2026-09-03
 
 ### Added
@@ -224,6 +246,7 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 - Windows vẫn là nền tảng release chính của Alpha 1.
 
 [1.5.0-beta.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.1
+[1.5.1-beta.1]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.1-beta.1
 [1.5.0-beta.2]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.2
 [1.5.0-beta.3]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.3
 [1.5.0-beta.4]: https://github.com/mahiru7229/mcw-launcher/releases/tag/v1.5.0-beta.4

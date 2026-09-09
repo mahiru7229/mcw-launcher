@@ -6,6 +6,7 @@ from pathlib import Path
 import zipfile
 
 from src.core.fs.paths import Paths
+from src.core.mod.mod_capability_index import ModCapabilityIndex
 from src.core.mod.mod_manager import ModManager
 from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_downloader import ModrinthDownloader
@@ -330,6 +331,11 @@ class ModrinthContentManager:
                 metadata = ModManager.read_mod(downloaded_path, provider_version=str(entry.get("versionNumber") or ""))
                 expected_mod_id = str(entry.get("expectedModId") or "").strip().casefold()
                 provided_mod_ids = {metadata.mod_id.casefold()} | {mod_id.casefold() for mod_id, _version in getattr(metadata, "provided_mods", ()) if mod_id}
+                if expected_mod_id:
+                    provided_mod_ids.update(
+                        capability.mod_id.casefold()
+                        for capability in ModCapabilityIndex.provides(downloaded_path, expected_mod_id)
+                    )
                 if expected_mod_id and expected_mod_id not in provided_mod_ids:
                     provided_values = sorted(value for value in provided_mod_ids if value)
                     if len(provided_values) == 1:

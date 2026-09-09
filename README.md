@@ -12,16 +12,12 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.5.0-blue" alt="v1.5.0">
+  <img src="https://img.shields.io/badge/version-v1.5.1--beta.1-blue" alt="v1.5.1-beta.1">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
-> Looking for MCW Launcher Core ? Try this [launcher core](https://github.com/mahiru7229/mcw-launcher-core) to build your own launcher !
-
-> Try to create a Vercel CurseForge API for this launcher ? Try this [repository](https://github.com/mahiru7229/mcw-curseforge-gateway) to build your own !
-
-> [!NOTE]
-> `v1.5.0` là bản Stable đầu tiên hỗ trợ đầy đủ Windows x64 và Linux x64. Luồng cập nhật Linux, responsive UI và thao tác mở thư mục trong bản PyInstaller đã được kiểm thử trực tiếp qua chuỗi Beta.
+> [!WARNING]
+> `v1.5.1-beta.1` thử nghiệm cơ chế tự phục hồi dependency bị modpack khai báo thiếu. Candidate chỉ được cài sau khi file đã qua xác minh hash và JAR cung cấp đúng mod ID/version yêu cầu.
 
 ## Tổng quan
 
@@ -39,7 +35,7 @@ Các nhóm tính năng chính:
 
 ## Trạng thái nền tảng
 
-| Nền tảng | Trạng thái v1.5.0 | Ghi chú |
+| Nền tảng | Trạng thái v1.5.1 Beta 1 | Ghi chú |
 | --- | --- | --- |
 | Windows 10/11 x64 | Đang hỗ trợ | Luồng chính và bản đóng gói PyInstaller hiện tại. |
 | Linux x64 | Đang hỗ trợ | Automatic update và desktop opener trong bản PyInstaller đã được kiểm thử trực tiếp trên Lubuntu. |
@@ -138,7 +134,7 @@ GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, khô
 - [MCW Core API](docs/MCW_CORE_LIBRARY.md)
 - [Language packs](docs/LANGUAGE_PACKS.md)
 - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
-- [Release notes v1.5.0](docs/releases/v1.5.0.md)
+- [Release notes v1.5.1-beta.1](docs/releases/v1.5.1-beta.1.md)
 - [Changelog](CHANGELOG.md)
 
 ## Đóng góp và bảo mật
