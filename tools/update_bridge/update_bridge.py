@@ -30,9 +30,9 @@ import uuid
 import zipfile
 
 
-BRIDGE_VERSION = "1.2.0"
+BRIDGE_VERSION = "1.3.0"
 REPOSITORY = "mahiru7229/mcw-launcher"
-TARGET_TAG = "v1.5.1-beta.3"
+TARGET_TAG = "v1.5.1-beta.4"
 TARGET_VERSION = TARGET_TAG.removeprefix("v")
 
 
@@ -152,6 +152,21 @@ class InstallTransaction:
                     replace_file_with_retry(backup, destination, timeout_seconds=REPLACE_TIMEOUT_SECONDS)
             except Exception as error:  # best-effort recovery, report all failures
                 errors.append(f"{destination}: {error}")
+        # cleanup_paths can remove files that were not part of the managed-file
+        # transaction. Restore every backed-up file that is still missing or
+        # different after the normal reverse pass.
+        for backup in sorted((p for p in self.backup_directory.rglob("*") if p.is_file()), key=lambda p: len(p.parts)):
+            if backup.name == "BRIDGE-SUCCESS.txt":
+                continue
+            try:
+                relative = backup.relative_to(self.backup_directory)
+                destination = self.install_directory / relative
+                if destination.is_file() and destination.read_bytes() == backup.read_bytes():
+                    continue
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                replace_file_with_retry(backup, destination, timeout_seconds=REPLACE_TIMEOUT_SECONDS)
+            except Exception as error:
+                errors.append(f"{backup}: {error}")
         if errors:
             raise BridgeError("Rollback was incomplete: " + "; ".join(errors))
         logger("Rollback completed")
@@ -368,6 +383,62 @@ def validate_package_manifest(content_directory: Path, target_tag: str, platform
     return sorted(managed, key=lambda path: path.as_posix().casefold())
 
 
+def package_cleanup_paths(content_directory: Path) -> list[Path]:
+    manifest_path = content_directory / "mcw-update.json"
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as error:
+        raise BridgeError(f"Could not read cleanup policy from mcw-update.json: {error}") from error
+    raw_paths = payload.get("cleanup_paths", []) if isinstance(payload, dict) else []
+    if not isinstance(raw_paths, list):
+        raise BridgeError("cleanup_paths must be a list.")
+    result: list[Path] = []
+    seen: set[str] = set()
+    for raw in raw_paths:
+        value = str(raw or "").replace("\\", "/").strip().strip("/")
+        pure = PurePosixPath(value)
+        if not value or pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts) or ":" in pure.parts[0]:
+            raise BridgeError(f"Unsafe cleanup path in manifest: {raw}")
+        key = pure.as_posix().casefold()
+        if key not in seen:
+            seen.add(key)
+            result.append(Path(*pure.parts))
+    return sorted(result, key=lambda p: p.as_posix().casefold())
+
+
+def backup_cleanup_path(transaction: InstallTransaction, relative: Path) -> None:
+    target = transaction.install_directory / relative
+    if not target.exists() and not target.is_symlink():
+        return
+    if target.is_symlink():
+        raise BridgeError(f"Refusing to clean symbolic-link path: {target}")
+    if target.is_file():
+        backup = transaction.backup_directory / relative
+        backup.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(target, backup)
+        return
+    if target.is_dir():
+        for path in target.rglob("*"):
+            if path.is_symlink():
+                raise BridgeError(f"Refusing to clean directory containing symbolic link: {path}")
+            if path.is_file():
+                rel = path.relative_to(transaction.install_directory)
+                backup = transaction.backup_directory / rel
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, backup)
+
+
+def remove_cleanup_path(install_directory: Path, relative: Path, logger: Callable[[str], None]) -> None:
+    target = install_directory / relative
+    if not target.exists() and not target.is_symlink():
+        return
+    logger(f"Cleaning obsolete launcher path: {relative.as_posix()}")
+    if target.is_symlink() or target.is_file():
+        target.unlink(missing_ok=True)
+    elif target.is_dir():
+        shutil.rmtree(target)
+
+
 def replace_file_with_retry(source: Path, destination: Path, timeout_seconds: float = REPLACE_TIMEOUT_SECONDS) -> None:
     deadline = time.monotonic() + timeout_seconds
     last_error: OSError | None = None
@@ -423,6 +494,10 @@ def install_package(content_directory: Path, install_directory: Path, managed_fi
             transaction.mark_changed(relative)
             if relative == executable_relative:
                 logger(f"{contract.launcher_name} replaced successfully")
+        for cleanup_relative in package_cleanup_paths(content_directory):
+            backup_cleanup_path(transaction, cleanup_relative)
+            remove_cleanup_path(install_directory, cleanup_relative, logger)
+
         launcher = install_directory / contract.launcher_name
         if not launcher.is_file() or launcher.stat().st_size != (content_directory / contract.launcher_name).stat().st_size:
             raise BridgeError("The updated launcher executable failed verification.")
@@ -878,7 +953,7 @@ def cli_main(args: argparse.Namespace) -> int:
 def terminal_main(args: argparse.Namespace) -> int:
     contract = platform_contract()
     print(f"MCW Update Bridge {BRIDGE_VERSION} — {contract.display_name}")
-    print(f"One-time recovery: MCW Launcher 1.5.0 → {args.tag}")
+    print(f"Recovery/update bridge → {args.tag}")
     detected = auto_detect_install_directory(contract.platform_id)
     prompt = f"Launcher folder [{detected}]: " if detected else "Launcher folder: "
     entered = input(prompt).strip()
@@ -898,7 +973,7 @@ def terminal_main(args: argparse.Namespace) -> int:
 
 def main() -> int:
     contract = platform_contract()
-    parser = argparse.ArgumentParser(description="One-time recovery updater for MCW Launcher 1.5.0 installations.")
+    parser = argparse.ArgumentParser(description="Recovery updater for MCW Launcher installations.")
     parser.add_argument("--install-dir", type=Path, help=f"Folder containing {contract.launcher_name}")
     parser.add_argument("--tag", default=TARGET_TAG, help=f"Target GitHub release tag (default: {TARGET_TAG})")
     parser.add_argument("--force-close", action="store_true", help="Allow the bridge to terminate matching launcher processes if needed")

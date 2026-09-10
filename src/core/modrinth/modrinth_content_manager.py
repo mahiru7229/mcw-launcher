@@ -188,9 +188,24 @@ class ModrinthContentManager:
             elif ModrinthDownloader.verify(target, sha1=sha1, sha512=sha512, expected_size=size):
                 changed |= ModrinthContentManager._set_mod_download_state(entry, False, "")
             elif target.exists():
-                warning = "The tracked file was modified and was preserved."
-                changed |= ModrinthContentManager._set_mod_download_state(entry, False, warning)
-                ModrinthContentManager._append_warning(warnings, f"{title}: {warning}")
+                is_required_dependency = (
+                    bool(entry.get("managedByModpack", False))
+                    and str(entry.get("selectionReason") or "").strip().casefold() == "required_dependency"
+                )
+                if is_required_dependency:
+                    # Required dependencies are launcher-managed artifacts. If the
+                    # tracked provider file is stale/corrupt, preserving it leaves
+                    # dependency resolution permanently blocked even after a valid
+                    # replacement was discovered. Re-download managed dependencies,
+                    # while still preserving user/direct-install mods below.
+                    changed |= ModrinthContentManager._set_mod_download_state(
+                        entry, True, "Managed required dependency is stale and will be downloaded again."
+                    )
+                    missing.append(entry)
+                else:
+                    warning = "The tracked file was modified and was preserved."
+                    changed |= ModrinthContentManager._set_mod_download_state(entry, False, warning)
+                    ModrinthContentManager._append_warning(warnings, f"{title}: {warning}")
             else:
                 if not entry.get("pendingDownload"):
                     entry["pendingDownload"] = True

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import os
 
@@ -309,3 +310,27 @@ def test_update_applier_atomically_installs_executable_linux_mode(tmp_path, monk
     assert destination_executable.read_bytes() == b"new-linux"
     assert destination_executable.stat().st_mode & 0o777 == 0o755
     assert not list(destination.glob(".*.mcw-update-*.tmp"))
+
+
+def test_update_applier_cleanup_paths_removes_old_docs_without_error(tmp_path, monkeypatch) -> None:
+    request = make_request(tmp_path)
+    (request.source_directory / request.executable_name).write_bytes(b"new-exe")
+    (request.destination_directory / request.executable_name).write_bytes(b"old-exe")
+    docs = request.destination_directory / "docs"
+    docs.mkdir()
+    (docs / "old.md").write_text("legacy docs", encoding="utf-8")
+    (request.source_directory / "mcw-update.json").write_text(json.dumps({
+        "schema_version": 2,
+        "version": "1.5.1-beta.4",
+        "platform": "windows-x64",
+        "executable": request.executable_name,
+        "files": [request.executable_name, "mcw-update.json"],
+        "cleanup_paths": ["docs"],
+    }), encoding="utf-8")
+
+    applier = UpdateApplier(request)
+    monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
+    monkeypatch.setattr(applier, "_start_launcher", lambda: None)
+
+    assert applier.run() == 0
+    assert not docs.exists()

@@ -71,6 +71,7 @@ class UpdateApplier:
         self.temporary_log_path = request.updater_directory / "update.log"
         self.new_files: list[Path] = []
         self.stale_files = self._stale_managed_files()
+        self.cleanup_paths = self._cleanup_paths(self.request.source_directory)
 
     def run(self) -> int:
         try:
@@ -82,6 +83,7 @@ class UpdateApplier:
             self._backup_existing_files()
             self._copy_update_files()
             self._remove_stale_files()
+            self._remove_cleanup_paths()
             self._verify_updated_executable()
             self._start_launcher()
             self._log(f"Update to {self.request.target_version} completed")
@@ -121,6 +123,28 @@ class UpdateApplier:
             elif relative_path in source_relative and not destination_path.exists():
                 self.new_files.append(destination_path)
 
+        # cleanup_paths may intentionally remove content that was never part of
+        # a previous managed-file manifest (for example old bundled docs). Keep
+        # a recovery copy so a failed transaction can restore it.
+        for relative_path in self.cleanup_paths:
+            target = self.request.destination_directory / relative_path
+            if target.is_symlink():
+                raise RuntimeError(f"Refusing to clean symbolic-link path: {target}")
+            if target.is_file():
+                backup = self.backup_directory / relative_path
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(target, backup)
+            elif target.is_dir():
+                for file_path in target.rglob("*"):
+                    if file_path.is_symlink():
+                        raise RuntimeError(f"Refusing to clean directory containing a symbolic link: {file_path}")
+                    if not file_path.is_file():
+                        continue
+                    child_relative = file_path.relative_to(self.request.destination_directory)
+                    backup = self.backup_directory / child_relative
+                    backup.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(file_path, backup)
+
     def _copy_update_files(self) -> None:
         self._log(f"Copying update from {self.request.source_directory} to {self.request.destination_directory}")
         source_files = self._iter_source_files()
@@ -148,6 +172,49 @@ class UpdateApplier:
                 target.unlink(missing_ok=True)
             except OSError as error:
                 raise RuntimeError(f"Could not remove obsolete launcher file {target}: {error}") from error
+
+
+    def _remove_cleanup_paths(self) -> None:
+        for relative_path in self.cleanup_paths:
+            target = self.request.destination_directory / relative_path
+            if not target.exists() and not target.is_symlink():
+                continue
+            self._log(f"Cleaning obsolete launcher path: {relative_path.as_posix()}")
+            try:
+                if target.is_symlink() or target.is_file():
+                    target.unlink(missing_ok=True)
+                elif target.is_dir():
+                    shutil.rmtree(target)
+            except OSError as error:
+                raise RuntimeError(f"Could not clean obsolete launcher path {target}: {error}") from error
+
+    @staticmethod
+    def _cleanup_paths(root: Path) -> list[Path]:
+        manifest_path = Path(root) / "mcw-update.json"
+        try:
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError):
+            return []
+        values = payload.get("cleanup_paths") if isinstance(payload, dict) else None
+        if values is None:
+            return []
+        if not isinstance(values, list):
+            raise RuntimeError("The update package cleanup_paths value must be a list.")
+        result: list[Path] = []
+        seen: set[str] = set()
+        for raw in values:
+            normalized = str(raw or "").replace("\\", "/").strip().strip("/")
+            path = PurePosixPath(normalized)
+            if not normalized or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+                raise RuntimeError(f"Invalid cleanup path in update manifest: {raw}")
+            if ":" in path.parts[0]:
+                raise RuntimeError(f"Invalid cleanup path in update manifest: {raw}")
+            key = path.as_posix().casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(Path(*path.parts))
+        return sorted(result, key=lambda value: value.as_posix().casefold())
 
     def _stale_managed_files(self) -> list[Path]:
         previous = self._managed_files(self.request.destination_directory)

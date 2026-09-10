@@ -53,6 +53,19 @@ class UpdateManager:
         self._download_archive(info, archive_path, reporter)
 
         staging_directory = Paths.update_staging_root() / f"{self._safe_name(info.tag_name)}-{uuid.uuid4().hex}"
+        if info.install_strategy == "bridge":
+            staging_directory.mkdir(parents=True, exist_ok=False)
+            helper_path = staging_directory / info.asset.name
+            shutil.copy2(archive_path, helper_path)
+            if self.platform_id == "linux-x64":
+                helper_path.chmod(helper_path.stat().st_mode | 0o700)
+            return PreparedUpdate(
+                info=info,
+                archive_path=helper_path,
+                staging_directory=staging_directory,
+                content_directory=staging_directory,
+            )
+
         extraction_directory = staging_directory / "extracted"
         try:
             if reporter is not None:
@@ -141,6 +154,21 @@ class UpdateManager:
             raise RuntimeError(f"The update package does not contain the declared updater: {expected_updater}")
         if expected_updater not in normalized_files:
             raise RuntimeError("The update package manifest must list its bundled updater as a managed file.")
+
+        cleanup_paths = payload.get("cleanup_paths", [])
+        if not isinstance(cleanup_paths, list):
+            raise RuntimeError("The update package cleanup_paths value must be a list.")
+        cleanup_keys: set[str] = set()
+        for raw_cleanup in cleanup_paths:
+            cleanup = self._safe_archive_path(str(raw_cleanup or ""))
+            if cleanup is None:
+                raise RuntimeError("The update package contains an invalid cleanup path.")
+            key = cleanup.as_posix().casefold()
+            if key in cleanup_keys:
+                raise RuntimeError(f"The update package contains a duplicate cleanup path: {cleanup.as_posix()}")
+            cleanup_keys.add(key)
+            if key in normalized_file_keys or any(path_key.startswith(key + "/") for path_key in normalized_file_keys):
+                raise RuntimeError(f"The update package cannot both manage and clean the same path: {cleanup.as_posix()}")
 
         # Validate the package allow-list before platform-specific filesystem
         # metadata. This keeps security errors deterministic across hosts.

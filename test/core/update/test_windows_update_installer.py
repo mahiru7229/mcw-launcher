@@ -57,6 +57,7 @@ def test_installer_copies_incoming_bundled_updater_and_writes_schema2_request(tm
     monkeypatch.setattr("src.core.update.windows_update_installer.tempfile.gettempdir", lambda: str(updater_root))
     monkeypatch.setattr(WindowsUpdateInstaller, "_start_updater_process", classmethod(lambda cls, updater_executable, request_path, target: FakeProcess()))
     monkeypatch.setattr(WindowsUpdateInstaller, "STARTUP_GRACE_SECONDS", 0)
+    monkeypatch.setattr(WindowsUpdateInstaller, "_wait_for_ready", classmethod(lambda cls, process, ready_path, timeout_seconds: True))
 
     request_path = WindowsUpdateInstaller.launch(
         prepared,
@@ -93,6 +94,7 @@ def test_installer_never_falls_back_to_current_launcher_as_updater(tmp_path, mon
     monkeypatch.setattr("src.core.update.windows_update_installer.tempfile.gettempdir", lambda: str(updater_root))
     monkeypatch.setattr(WindowsUpdateInstaller, "_start_updater_process", classmethod(lambda cls, updater_executable, request_path, target: FakeProcess()))
     monkeypatch.setattr(WindowsUpdateInstaller, "STARTUP_GRACE_SECONDS", 0)
+    monkeypatch.setattr(WindowsUpdateInstaller, "_wait_for_ready", classmethod(lambda cls, process, ready_path, timeout_seconds: True))
 
     request_path = WindowsUpdateInstaller.launch(prepared, install_directory=destination, executable_path=executable, parent_pid=456)
 

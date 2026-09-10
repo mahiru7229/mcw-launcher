@@ -55,6 +55,8 @@ def test_build_release_zip_writes_schema2_manifest_and_bundled_updater(tmp_path:
         assert f"{root}/MCW Launcher.exe" in archive.namelist()
         assert f"{root}/updater/MCW Updater.exe" in archive.namelist()
         assert "updater/MCW Updater.exe" in manifest["files"]
+        assert manifest["cleanup_paths"] == ["docs"]
+        assert f"{root}/docs/keep.txt" not in archive.namelist()
     assert output.with_name(f"{output.name}.sha256").is_file()
 
 

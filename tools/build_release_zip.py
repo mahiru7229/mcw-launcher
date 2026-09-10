@@ -18,7 +18,8 @@ from src.config import VERSION_ID
 
 
 DEFAULT_FILES = ("README.md", "LICENSE")
-DEFAULT_DIRECTORIES = ("lang", "themes", "docs")
+DEFAULT_DIRECTORIES = ("lang", "themes")
+DEFAULT_CLEANUP_PATHS = ("docs",)
 SUPPORTED_PLATFORMS = ("windows-x64", "linux-x64")
 PACKAGE_MANIFEST_SCHEMA_VERSION = 2
 
@@ -112,6 +113,7 @@ def build_release_zip(
             "executable": executable.name,
             "updater": updater_relative.as_posix(),
             "files": sorted(set(managed_files)),
+            "cleanup_paths": list(DEFAULT_CLEANUP_PATHS),
         }
         (payload_root / "mcw-update.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",

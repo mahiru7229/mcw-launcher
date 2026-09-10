@@ -65,6 +65,7 @@ def test_linux_installer_copies_incoming_bundled_updater_and_writes_schema2_requ
     monkeypatch.setattr("src.core.update.linux_update_installer.tempfile.gettempdir", lambda: str(updater_root))
     monkeypatch.setattr(LinuxUpdateInstaller, "_start_updater_process", staticmethod(lambda updater_executable, request_path, target: FakeProcess()))
     monkeypatch.setattr(LinuxUpdateInstaller, "STARTUP_GRACE_SECONDS", 0)
+    monkeypatch.setattr(LinuxUpdateInstaller, "_wait_for_ready", classmethod(lambda cls, process, ready_path, timeout_seconds: True))
 
     request_path = LinuxUpdateInstaller.launch(
         prepared,

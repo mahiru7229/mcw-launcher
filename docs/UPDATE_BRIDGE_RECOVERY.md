@@ -6,13 +6,13 @@ The updater shipped in MCW Launcher `1.5.0` can enter a bootstrap deadlock on af
 
 ## Temporary recovery
 
-`MCW Update Bridge 1.2.0` is a standalone recovery executable for **Windows x64 and Linux x64**. Its default target is `v1.5.1-beta.3`.
+`MCW Update Bridge 1.3.0` is a standalone recovery executable for **Windows x64 and Linux x64**. Its default target is `v1.5.1-beta.4`.
 
 It performs a one-time migration without executing updater code from the installed 1.5.0 launcher:
 
 1. Detect the current platform and validate the selected launcher installation.
 2. Close only launcher processes whose executable path exactly matches that installation.
-3. Read the official GitHub release metadata for `v1.5.1-beta.3`.
+3. Read the official GitHub release metadata for `v1.5.1-beta.4`.
 4. Download the exact matching platform ZIP and its `.sha256` sidecar.
 5. Verify SHA-256 before extraction.
 6. Reject unsafe ZIP paths and validate `mcw-update.json` schema 2, platform, executable, bundled updater and managed-file allow-list.
@@ -29,13 +29,13 @@ The bridge does not delete unrelated installation files or user data.
 ## Recovery artifacts
 
 ```text
-MCW-Update-Bridge-v1.2.0-windows-x64.exe
-MCW-Update-Bridge-v1.2.0-windows-x64.exe.sha256
-MCW-Update-Bridge-v1.2.0-linux-x64
-MCW-Update-Bridge-v1.2.0-linux-x64.sha256
+MCW-Update-Bridge-v1.3.0-windows-x64.exe
+MCW-Update-Bridge-v1.3.0-windows-x64.exe.sha256
+MCW-Update-Bridge-v1.3.0-linux-x64
+MCW-Update-Bridge-v1.3.0-linux-x64.sha256
 ```
 
-## Beta 3 architecture boundary
+## Beta 4 architecture boundary
 
 The bridge is not the long-term updater. Starting with `1.5.1-beta.3`, each release package carries its own dedicated updater built from the **new release**:
 

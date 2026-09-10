@@ -64,6 +64,14 @@ if IS_WINDOWS:
         ],
     )
 
+UPDATER_EXCLUDES = [
+    "PyQt5", "PyQt6", "PySide2", "PySide6", "pytest",
+    "unittest", "numpy", "pandas", "matplotlib",
+]
+if not IS_WINDOWS:
+    # Linux keeps the recovery/update helper dependency-light and headless.
+    UPDATER_EXCLUDES.append("tkinter")
+
 analysis = Analysis(
     [str(ENTRY_POINT)],
     pathex=[str(PROJECT_ROOT)],
@@ -73,10 +81,7 @@ analysis = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[
-        "PyQt5", "PyQt6", "PySide2", "PySide6", "tkinter", "pytest",
-        "unittest", "numpy", "pandas", "matplotlib",
-    ],
+    excludes=UPDATER_EXCLUDES,
     noarchive=False,
     optimize=1,
 )

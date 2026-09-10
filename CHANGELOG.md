@@ -2,6 +2,18 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.1-beta.4] - 2026-09-10
+
+### Changed
+- Hoàn thiện updater độc lập: Windows `MCW Updater.exe` có GUI riêng, launcher chỉ đóng sau khi updater mới phát tín hiệu READY.
+- Thêm fallback sang updater hiện đang được cài nếu updater của release mới không thể khởi tạo.
+- Release ZIP không còn chứa `docs/`; manifest thêm `cleanup_paths: ["docs"]` để updater và Bridge dọn tài liệu cũ nếu tồn tại mà không báo lỗi khi không có.
+- Nâng MCW Update Bridge lên v1.3.0 và target `v1.5.1-beta.4`.
+- Thêm maintainer override `MCW-USE-BRIDGE`: chỉ khi marker này tồn tại cùng Bridge + SHA-256 thì launcher mới tự dùng Bridge thay updater thường.
+
+### Fixed
+- Required Modrinth dependency do launcher quản lý (ví dụ Cloth Config API) sẽ được tải lại nếu file tracked bị stale/hash mismatch, thay vì preserve rồi tiếp tục chặn launch.
+
 ## [1.5.1-beta.3] - 2026-09-09
 
 ### Added

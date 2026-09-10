@@ -19,6 +19,8 @@ class WindowsUpdateInstaller:
     """Launch the updater binary bundled inside the incoming Windows package."""
 
     STARTUP_GRACE_SECONDS = 1.0
+    READY_TIMEOUT_SECONDS = 5.0
+    READY_POLL_SECONDS = 0.05
     PACKAGE_MANIFEST_NAME = "mcw-update.json"
     PACKAGE_MANIFEST_SCHEMA_VERSION = 2
     EXPECTED_UPDATER = PurePosixPath("updater/MCW Updater.exe")
@@ -56,6 +58,7 @@ class WindowsUpdateInstaller:
         updater_directory.mkdir(parents=True, exist_ok=False)
         updater_executable = updater_directory / "MCW Updater.exe"
         request_path = updater_directory / "update-request.json"
+        ready_path = updater_directory / "updater-ready.json"
 
         try:
             # Critical v2 contract: execute updater code from the incoming release,
@@ -71,17 +74,36 @@ class WindowsUpdateInstaller:
                 "staging_directory": str(prepared.staging_directory.resolve()),
                 "persistent_log_path": str(persistent_log),
                 "target_version": str(prepared.info.version),
+                "ready_path": str(ready_path),
             }
             request_path.write_text(json.dumps(request, ensure_ascii=False, indent=2), encoding="utf-8")
             process = cls._start_updater_process(updater_executable, request_path, destination)
-            time.sleep(cls.STARTUP_GRACE_SECONDS)
+            if cls._wait_for_ready(process, ready_path, cls.READY_TIMEOUT_SECONDS):
+                return request_path
+
             exit_code = process.poll()
             if exit_code is not None:
                 detail = cls._read_startup_error(updater_directory, persistent_log)
                 raise RuntimeError(
                     f"The bundled updater exited before the launcher closed (code {exit_code}).{detail}"
                 )
-            return request_path
+            cls._stop_process(process)
+            installed_updater = destination.joinpath(*cls.EXPECTED_UPDATER.parts)
+            if installed_updater.is_file():
+                fallback_executable = updater_directory / "MCW Updater Fallback.exe"
+                shutil.copy2(installed_updater, fallback_executable)
+                ready_path.unlink(missing_ok=True)
+                fallback = cls._start_updater_process(fallback_executable, request_path, destination)
+                # Beta 3's installed updater predates the ready handshake. Accept
+                # a living legacy helper after the normal startup grace period.
+                time.sleep(cls.STARTUP_GRACE_SECONDS)
+                if fallback.poll() is None:
+                    return request_path
+                detail = cls._read_startup_error(updater_directory, persistent_log)
+                raise RuntimeError(f"Both incoming and installed fallback updaters failed to start.{detail}")
+
+            detail = cls._read_startup_error(updater_directory, persistent_log)
+            raise RuntimeError(f"The bundled updater did not signal ready and no installed fallback updater is available.{detail}")
         except Exception:
             shutil.rmtree(updater_directory, ignore_errors=True)
             raise
@@ -147,6 +169,29 @@ class WindowsUpdateInstaller:
             except OSError:
                 pass
         return subprocess.Popen(command, creationflags=base_flags, **kwargs)
+
+    @classmethod
+    def _wait_for_ready(cls, process: subprocess.Popen, ready_path: Path, timeout_seconds: float) -> bool:
+        deadline = time.monotonic() + max(0.0, timeout_seconds)
+        while time.monotonic() <= deadline:
+            if ready_path.is_file():
+                return True
+            if process.poll() is not None:
+                return False
+            time.sleep(cls.READY_POLL_SECONDS)
+        return ready_path.is_file()
+
+    @staticmethod
+    def _stop_process(process: subprocess.Popen) -> None:
+        try:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=2.0)
+                except Exception:
+                    process.kill()
+        except Exception:
+            pass
 
     @staticmethod
     def _read_startup_error(updater_directory: Path, persistent_log: Path) -> str:
