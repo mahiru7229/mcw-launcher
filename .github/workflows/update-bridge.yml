@@ -122,7 +122,6 @@ jobs:
 
           binary = Path(os.environ['BRIDGE_BINARY'])
           digest = hashlib.sha256(binary.read_bytes()).hexdigest()
-          # Write raw bytes so Windows cannot translate LF to CRLF.
           binary.with_name(binary.name + '.sha256').write_bytes(
               f'{digest}  {binary.name}\n'.encode('ascii')
           )
@@ -153,12 +152,7 @@ jobs:
         shell: bash
         run: |
           chmod +x dist/MCW-Update-Bridge-v1.3.0-linux-x64
-          # Be tolerant of sidecars produced by older Windows jobs that used CRLF.
-          python - <<'PY'
-          from pathlib import Path
-          for sidecar in Path('dist').glob('*.sha256'):
-              sidecar.write_bytes(sidecar.read_bytes().replace(b'\r', b''))
-          PY
+          sed -i 's/\r$//' dist/*.sha256
           (cd dist && sha256sum --check ./*.sha256)
 
       - name: Upload bridges to target release
@@ -171,6 +165,7 @@ jobs:
             dist/MCW-Update-Bridge-v1.3.0-windows-x64.exe.sha256 \
             dist/MCW-Update-Bridge-v1.3.0-linux-x64 \
             dist/MCW-Update-Bridge-v1.3.0-linux-x64.sha256 \
+            --repo '${{ github.repository }}' \
             --clobber
       - name: Activate emergency bridge override
         if: ${{ inputs.activate_release_override }}
@@ -179,5 +174,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           printf 'MCW Launcher emergency bridge override\n' > MCW-USE-BRIDGE
-          gh release upload '${{ inputs.release_tag }}' MCW-USE-BRIDGE --clobber
+          gh release upload '${{ inputs.release_tag }}' MCW-USE-BRIDGE \
+            --repo '${{ github.repository }}' \
+            --clobber
 

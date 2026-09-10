@@ -1,9 +1,8 @@
-# MCW Update Bridge v1.3.0 checksum CI fix
+# MCW Update Bridge v1.3.0 CI publish fix
 
-Fixes cross-platform SHA-256 sidecar verification when the Windows build writes CRLF line endings.
+Fixes two GitHub Actions portability issues in `.github/workflows/update-bridge.yml`:
 
-Changes:
-- Generate `.sha256` sidecars with raw ASCII bytes and LF-only newlines.
-- Normalize any `\r` bytes in downloaded sidecars before Linux `sha256sum --check`.
+1. SHA-256 sidecars are emitted with LF line endings and normalized before `sha256sum --check`.
+2. `gh release upload` receives `--repo "${{ github.repository }}"` so the publish job does not need a `.git` checkout.
 
-Apply this patch at the repository root, commit, push, then rerun the `Build MCW Update Bridge` workflow.
+Apply at repository root, then commit and rerun `Build MCW Update Bridge`.
