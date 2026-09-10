@@ -110,11 +110,11 @@ python -m tools.build_release_zip \
 
 ## Windows v1.5.0 bridge
 
-`v1.5.0` predates this architecture and contains the updater bootstrap bug. Existing affected Windows installs should use `MCW Update Bridge v1.1.0` once to migrate directly to Beta 3. The Bridge verifies the Beta 3 schema-2 package and installs it without depending on v1.5.0 updater code.
+`v1.5.0` predates this architecture and contains the updater bootstrap bug. Existing affected Windows/Linux installs should use `MCW Update Bridge v1.2.0` once to migrate directly to Beta 3. The Bridge verifies the Beta 3 schema-2 package and installs it without depending on v1.5.0 updater code.
 
 ## Required live tests
 
-1. `v1.5.0 → Bridge v1.1.0 → v1.5.1-beta.3`.
+1. `v1.5.0 → Bridge v1.2.0 → v1.5.1-beta.3`.
 2. `v1.5.1-beta.3 → v1.5.1-beta.4` using automatic update.
 3. Confirm updater log identifies the target release and completes rollback safely on a forced failure.
 4. Confirm `config`, `instances`, accounts and saves remain unchanged.

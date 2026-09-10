@@ -17,7 +17,7 @@
 </p>
 
 > [!WARNING]
-> `v1.5.1-beta.3` chuyển sang **Updater Architecture v2**: ZIP release chứa updater độc lập của chính phiên bản mới. Launcher không còn copy executable hiện tại để làm updater. Người dùng Windows còn ở v1.5.0 cần chạy Update Bridge v1.1.0 một lần.
+> `v1.5.1-beta.3` chuyển sang **Updater Architecture v2**: ZIP release chứa updater độc lập của chính phiên bản mới. Launcher không còn copy executable hiện tại để làm updater. Người dùng Windows/Linux còn ở v1.5.0 có thể chạy Update Bridge v1.2.0 một lần để migrate sang Beta 3.
 
 ## Tổng quan
 

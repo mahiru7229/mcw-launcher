@@ -1,48 +1,47 @@
-# Windows 1.5.0 updater recovery bridge
+# MCW Launcher 1.5.0 recovery bridge
 
 ## Incident
 
-The updater shipped in MCW Launcher `1.5.0` can remain unable to replace `MCW Launcher.exe` on Windows (`WinError 5`). Because that updater bootstraps by copying the **currently installed launcher executable** into a temporary updater executable, fixes included only in a newer release do not run until the old updater has already succeeded.
-
-This creates a bootstrap deadlock for affected `1.5.0` installations.
+The updater shipped in MCW Launcher `1.5.0` can enter a bootstrap deadlock on affected installations because the old updater path reuses updater code from the currently installed launcher. Fixes that exist only in a newer release are therefore not guaranteed to run before the old updater has already succeeded.
 
 ## Temporary recovery
 
-`MCW Update Bridge 1.1.0` is a standalone Windows executable whose default target is `v1.5.1-beta.3`.
+`MCW Update Bridge 1.2.0` is a standalone recovery executable for **Windows x64 and Linux x64**. Its default target is `v1.5.1-beta.3`.
 
 It performs a one-time migration without executing updater code from the installed 1.5.0 launcher:
 
-1. Validate the selected installation and `MCW Launcher.exe`.
-2. Close only the process whose full executable path matches that installation.
+1. Detect the current platform and validate the selected launcher installation.
+2. Close only launcher processes whose executable path exactly matches that installation.
 3. Read the official GitHub release metadata for `v1.5.1-beta.3`.
-4. Download the exact `windows-x64.zip` and its `.sha256` sidecar.
+4. Download the exact matching platform ZIP and its `.sha256` sidecar.
 5. Verify SHA-256 before extraction.
-6. Reject unsafe ZIP paths and validate `mcw-update.json` (`schema_version=2`, target version, platform, executable, managed files).
-7. Create a persistent rollback backup for files that will actually be changed.
-8. Replace `MCW Launcher.exe` before any other package file, retrying an atomic replacement for up to 60 seconds.
-9. Replace the remaining package-managed files.
-10. Roll back only files that were already changed if any installation step fails.
+6. Reject unsafe ZIP paths and validate `mcw-update.json` schema 2, platform, executable, bundled updater and managed-file allow-list.
+7. Create a persistent rollback backup only for files that will actually change.
+8. Replace the launcher executable before all other package files.
+9. Replace the remaining managed files and restore executable permission on Linux `mcw-launcher` and `updater/mcw-updater`.
+10. Roll back only files that were already changed if installation fails.
 11. Restart the updated launcher.
 
-The bridge does not delete unrelated installation files and does not update user data from the release package.
+Windows process matching uses the exact executable path. Linux process matching uses `/proc/<pid>/exe`; graceful close sends `SIGTERM` first, and force-close uses `SIGKILL` only when explicitly allowed.
+
+The bridge does not delete unrelated installation files or user data.
+
+## Recovery artifacts
+
+```text
+MCW-Update-Bridge-v1.2.0-windows-x64.exe
+MCW-Update-Bridge-v1.2.0-windows-x64.exe.sha256
+MCW-Update-Bridge-v1.2.0-linux-x64
+MCW-Update-Bridge-v1.2.0-linux-x64.sha256
+```
 
 ## Beta 3 architecture boundary
 
-The bridge is not the long-term updater.
-
-Starting with `1.5.1-beta.3`, the release package should carry a dedicated updater executable built from the **new release**:
+The bridge is not the long-term updater. Starting with `1.5.1-beta.3`, each release package carries its own dedicated updater built from the **new release**:
 
 ```text
-MCW-Launcher-v1.5.1-beta.3-windows-x64/
-├── MCW Launcher.exe
-├── mcw-update.json
-├── updater/
-│   └── MCW Updater.exe
-├── lang/
-├── themes/
-└── docs/
+Windows: updater/MCW Updater.exe
+Linux:   updater/mcw-updater
 ```
 
-The installed launcher should prepare/download/extract the package, then copy or execute `updater/MCW Updater.exe` from that extracted **new package**. It must not copy the currently running `MCW Launcher.exe` and rename that copy as the updater.
-
-This guarantees that updater fixes in release N are already active while installing release N, removing the bootstrap deadlock exposed by 1.5.0.
+The installed launcher downloads/extracts the new package and executes the bundled updater from that package. It must never copy the currently running launcher executable and rename that copy as the updater.

@@ -11,6 +11,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -29,22 +30,64 @@ import uuid
 import zipfile
 
 
-BRIDGE_VERSION = "1.1.0"
+BRIDGE_VERSION = "1.2.0"
 REPOSITORY = "mahiru7229/mcw-launcher"
 TARGET_TAG = "v1.5.1-beta.3"
 TARGET_VERSION = TARGET_TAG.removeprefix("v")
-PLATFORM_ID = "windows-x64"
-LAUNCHER_EXE = "MCW Launcher.exe"
+
+
+class BridgeError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class PlatformContract:
+    platform_id: str
+    launcher_name: str
+    updater_relative: str
+    display_name: str
+
+
+PLATFORM_CONTRACTS = {
+    "windows-x64": PlatformContract(
+        platform_id="windows-x64",
+        launcher_name="MCW Launcher.exe",
+        updater_relative="updater/MCW Updater.exe",
+        display_name="Windows x64",
+    ),
+    "linux-x64": PlatformContract(
+        platform_id="linux-x64",
+        launcher_name="mcw-launcher",
+        updater_relative="updater/mcw-updater",
+        display_name="Linux x64",
+    ),
+}
+
+
+def current_platform_id() -> str:
+    if os.name == "nt":
+        return "windows-x64"
+    if sys.platform.startswith("linux"):
+        return "linux-x64"
+    raise BridgeError(f"Unsupported bridge platform: {sys.platform}")
+
+
+def platform_contract(platform_id: str | None = None) -> PlatformContract:
+    key = (platform_id or current_platform_id()).strip().casefold()
+    try:
+        return PLATFORM_CONTRACTS[key]
+    except KeyError as error:
+        raise BridgeError(f"Unsupported MCW Launcher recovery platform: {platform_id}") from error
+
+
+PLATFORM_ID = current_platform_id() if (os.name == "nt" or sys.platform.startswith("linux")) else "unsupported"
+LAUNCHER_EXE = PLATFORM_CONTRACTS.get(PLATFORM_ID, PLATFORM_CONTRACTS["windows-x64"]).launcher_name
 USER_AGENT = f"MCW-Update-Bridge/{BRIDGE_VERSION} (+https://github.com/{REPOSITORY})"
 MAX_ARCHIVE_BYTES = 2 * 1024 * 1024 * 1024
 MAX_EXTRACTED_BYTES = 4 * 1024 * 1024 * 1024
 MAX_ARCHIVE_ENTRIES = 20_000
 REPLACE_TIMEOUT_SECONDS = 60.0
 REPLACE_RETRY_DELAY_SECONDS = 0.5
-
-
-class BridgeError(RuntimeError):
-    pass
 
 
 @dataclass(frozen=True)
@@ -174,9 +217,10 @@ def github_json(url: str) -> dict:
     return payload
 
 
-def select_release_package(payload: dict, target_tag: str) -> ReleasePackage:
+def select_release_package(payload: dict, target_tag: str, platform_id: str | None = None) -> ReleasePackage:
+    contract = platform_contract(platform_id)
     expected_version = normalize_tag(target_tag).removeprefix("v")
-    expected_archive = f"MCW-Launcher-v{expected_version}-{PLATFORM_ID}.zip"
+    expected_archive = f"MCW-Launcher-v{expected_version}-{contract.platform_id}.zip"
     assets = payload.get("assets")
     if not isinstance(assets, list):
         raise BridgeError("The GitHub release does not contain an asset list.")
@@ -196,13 +240,13 @@ def select_release_package(payload: dict, target_tag: str) -> ReleasePackage:
 
     archive = parsed.get(expected_archive)
     if archive is None:
-        candidates = [asset for asset in parsed.values() if asset.name.lower().endswith(f"-{PLATFORM_ID}.zip") and expected_version in asset.name]
+        candidates = [asset for asset in parsed.values() if asset.name.lower().endswith(f"-{contract.platform_id}.zip") and expected_version in asset.name]
         if len(candidates) == 1:
             archive = candidates[0]
     if archive is None:
         raise BridgeError(f"Release {target_tag} does not contain {expected_archive}.")
     if archive.size <= 0 or archive.size > MAX_ARCHIVE_BYTES:
-        raise BridgeError(f"The Windows update archive has an invalid size: {archive.size} bytes.")
+        raise BridgeError(f"The {contract.display_name} update archive has an invalid size: {archive.size} bytes.")
 
     checksum = parsed.get(f"{archive.name}.sha256")
     if checksum is None:
@@ -267,7 +311,8 @@ def safe_extract_archive(archive_path: Path, destination: Path) -> Path:
     return destination
 
 
-def validate_package_manifest(content_directory: Path, target_tag: str) -> list[Path]:
+def validate_package_manifest(content_directory: Path, target_tag: str, platform_id: str | None = None) -> list[Path]:
+    contract = platform_contract(platform_id)
     manifest_path = content_directory / "mcw-update.json"
     try:
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -278,14 +323,14 @@ def validate_package_manifest(content_directory: Path, target_tag: str) -> list[
 
     expected_version = normalize_tag(target_tag).removeprefix("v")
     if payload.get("schema_version") != 2:
-        raise BridgeError("Unsupported update package manifest schema; bridge 1.1.0 requires schema 2.")
+        raise BridgeError(f"Unsupported update package manifest schema; bridge {BRIDGE_VERSION} requires schema 2.")
     if str(payload.get("version") or "") != expected_version:
         raise BridgeError(f"Package version does not match {target_tag}.")
-    if str(payload.get("platform") or "").casefold() != PLATFORM_ID:
-        raise BridgeError("The package is not a Windows x64 MCW Launcher package.")
-    if str(payload.get("executable") or "") != LAUNCHER_EXE:
+    if str(payload.get("platform") or "").casefold() != contract.platform_id:
+        raise BridgeError(f"The package is not a {contract.display_name} MCW Launcher package.")
+    if str(payload.get("executable") or "") != contract.launcher_name:
         raise BridgeError("The package executable contract is invalid.")
-    if str(payload.get("updater") or "").replace("\\", "/") != "updater/MCW Updater.exe":
+    if str(payload.get("updater") or "").replace("\\", "/") != contract.updater_relative:
         raise BridgeError("The package bundled-updater contract is invalid.")
 
     raw_files = payload.get("files")
@@ -308,7 +353,7 @@ def validate_package_manifest(content_directory: Path, target_tag: str) -> list[
             raise BridgeError(f"Managed file is missing from the update package: {key}")
         managed.append(path)
 
-    required = {LAUNCHER_EXE, "mcw-update.json", "updater/MCW Updater.exe"}
+    required = {contract.launcher_name, "mcw-update.json", contract.updater_relative}
     if not required.issubset(normalized):
         raise BridgeError("The update manifest does not manage the launcher, bundled updater, and manifest itself.")
 
@@ -346,36 +391,43 @@ def replace_file_with_retry(source: Path, destination: Path, timeout_seconds: fl
     raise BridgeError(f"Could not replace {destination}: {last_error}") from last_error
 
 
-def validate_install_directory(path: Path) -> Path:
+def validate_install_directory(path: Path, platform_id: str | None = None) -> Path:
+    contract = platform_contract(platform_id)
     install = Path(path).expanduser().resolve()
-    launcher = install / LAUNCHER_EXE
+    launcher = install / contract.launcher_name
     if not install.is_dir():
         raise BridgeError(f"Launcher directory does not exist: {install}")
     if not launcher.is_file():
-        raise BridgeError(f"{LAUNCHER_EXE} was not found in {install}")
+        raise BridgeError(f"{contract.launcher_name} was not found in {install}")
     return install
 
 
-def install_package(content_directory: Path, install_directory: Path, managed_files: Iterable[Path], logger: Callable[[str], None], target_tag: str = TARGET_TAG) -> Path:
+def install_package(content_directory: Path, install_directory: Path, managed_files: Iterable[Path], logger: Callable[[str], None], target_tag: str = TARGET_TAG, platform_id: str | None = None) -> Path:
+    contract = platform_contract(platform_id)
     transaction = InstallTransaction.create(install_directory)
     managed = list(managed_files)
-    executable_relative = Path(LAUNCHER_EXE)
+    executable_relative = Path(contract.launcher_name)
+    linux_executable_paths = {Path(contract.launcher_name), Path(*PurePosixPath(contract.updater_relative).parts)} if contract.platform_id == "linux-x64" else set()
     ordered = [executable_relative] + [path for path in managed if path != executable_relative]
     try:
         logger(f"Backup directory: {transaction.backup_directory}")
-        logger("Replacing MCW Launcher.exe first")
+        logger(f"Replacing {contract.launcher_name} first")
         for relative in ordered:
             source = content_directory / relative
             destination = install_directory / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             transaction.backup_before_change(relative)
             replace_file_with_retry(source, destination)
+            if relative in linux_executable_paths:
+                destination.chmod(destination.stat().st_mode | 0o111)
             transaction.mark_changed(relative)
             if relative == executable_relative:
-                logger("MCW Launcher.exe replaced successfully")
-        launcher = install_directory / LAUNCHER_EXE
-        if not launcher.is_file() or launcher.stat().st_size != (content_directory / LAUNCHER_EXE).stat().st_size:
+                logger(f"{contract.launcher_name} replaced successfully")
+        launcher = install_directory / contract.launcher_name
+        if not launcher.is_file() or launcher.stat().st_size != (content_directory / contract.launcher_name).stat().st_size:
             raise BridgeError("The updated launcher executable failed verification.")
+        if contract.platform_id == "linux-x64" and not os.access(launcher, os.X_OK):
+            raise BridgeError("The updated Linux launcher is not executable.")
         (transaction.backup_directory / "BRIDGE-SUCCESS.txt").write_text(
             f"Bridge {BRIDGE_VERSION} installed {target_tag} at {datetime.now().isoformat()}\n",
             encoding="utf-8",
@@ -400,21 +452,24 @@ def bridge_update(
     target_tag: str = TARGET_TAG,
     status: Callable[[str], None] | None = None,
     progress: Callable[[int, int], None] | None = None,
+    platform_id: str | None = None,
 ) -> Path:
-    install = validate_install_directory(install_directory)
+    contract = platform_contract(platform_id)
+    install = validate_install_directory(install_directory, contract.platform_id)
     logger = BridgeLogger(install, status)
     logger(f"MCW Update Bridge {BRIDGE_VERSION} started")
     logger(f"Target: {target_tag}")
+    logger(f"Platform: {contract.display_name}")
     logger(f"Install directory: {install}")
     payload = github_json(release_api_url(repository, target_tag))
-    package = select_release_package(payload, target_tag)
+    package = select_release_package(payload, target_tag, contract.platform_id)
     logger(f"Selected release asset: {package.archive.name}")
 
     with tempfile.TemporaryDirectory(prefix="mcw-update-bridge-") as temporary:
         temporary_root = Path(temporary)
         archive_path = temporary_root / package.archive.name
         checksum_path = temporary_root / package.checksum.name
-        logger("Downloading Windows update package")
+        logger(f"Downloading {contract.display_name} update package")
         download_file(package.archive, archive_path, progress)
         download_file(package.checksum, checksum_path)
         expected_hash = parse_checksum(checksum_path.read_text(encoding="utf-8", errors="replace"), package.archive.name)
@@ -425,11 +480,11 @@ def bridge_update(
 
         extract_root = temporary_root / "extracted"
         content = safe_extract_archive(archive_path, extract_root)
-        managed = validate_package_manifest(content, target_tag)
+        managed = validate_package_manifest(content, target_tag, contract.platform_id)
         logger(f"Package manifest verified ({len(managed)} managed files)")
-        backup = install_package(content, install, managed, logger, target_tag=target_tag)
+        backup = install_package(content, install, managed, logger, target_tag=target_tag, platform_id=contract.platform_id)
 
-    launcher = install / LAUNCHER_EXE
+    launcher = install / contract.launcher_name
     try:
         subprocess.Popen(
             [str(launcher)],
@@ -463,15 +518,17 @@ def _candidate_install_directories() -> list[Path]:
     return result
 
 
-def auto_detect_install_directory() -> Path | None:
+def auto_detect_install_directory(platform_id: str | None = None) -> Path | None:
+    contract = platform_contract(platform_id)
     for candidate in _candidate_install_directories():
-        if (candidate / LAUNCHER_EXE).is_file():
+        if (candidate / contract.launcher_name).is_file():
             return candidate.resolve()
     return None
 
 
-# Windows-only process helpers. They intentionally target the exact launcher path,
-# not every process named MCW Launcher.exe.
+# Windows process helpers intentionally target the exact launcher path rather than
+# every process with the same filename. Linux uses /proc/<pid>/exe for the same
+# exact-path guarantee.
 TH32CS_SNAPPROCESS = 0x00000002
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 PROCESS_TERMINATE = 0x0001
@@ -520,7 +577,7 @@ def _windows_apis():
     return kernel32, user32
 
 
-def _process_path(pid: int) -> Path | None:
+def _windows_process_path(pid: int) -> Path | None:
     if os.name != "nt":
         return None
     kernel32, _ = _windows_apis()
@@ -538,66 +595,108 @@ def _process_path(pid: int) -> Path | None:
         kernel32.CloseHandle(handle)
 
 
-def launcher_process_ids(launcher_path: Path) -> list[int]:
-    if os.name != "nt":
-        return []
-    target = os.path.normcase(str(launcher_path.resolve()))
-    kernel32, _ = _windows_apis()
-    assert kernel32 is not None
-    snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-    if snapshot == INVALID_HANDLE_VALUE:
-        return []
-    result: list[int] = []
+def _linux_process_path(pid: int) -> Path | None:
+    if not sys.platform.startswith("linux"):
+        return None
     try:
-        entry = PROCESSENTRY32W()
-        entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
-        if not kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
+        return (Path("/proc") / str(pid) / "exe").resolve(strict=True)
+    except (FileNotFoundError, PermissionError, OSError, RuntimeError):
+        return None
+
+
+def launcher_process_ids(launcher_path: Path) -> list[int]:
+    target = launcher_path.resolve()
+    if os.name == "nt":
+        target_key = os.path.normcase(str(target))
+        kernel32, _ = _windows_apis()
+        assert kernel32 is not None
+        snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if snapshot == INVALID_HANDLE_VALUE:
+            return []
+        result: list[int] = []
+        try:
+            entry = PROCESSENTRY32W()
+            entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+            if not kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
+                return result
+            while True:
+                pid = int(entry.th32ProcessID)
+                if pid and pid != os.getpid() and str(entry.szExeFile).casefold() == launcher_path.name.casefold():
+                    path = _windows_process_path(pid)
+                    if path is not None and os.path.normcase(str(path.resolve())) == target_key:
+                        result.append(pid)
+                if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
+                    break
+        finally:
+            kernel32.CloseHandle(snapshot)
+        return sorted(set(result))
+
+    if sys.platform.startswith("linux"):
+        result: list[int] = []
+        proc = Path("/proc")
+        if not proc.is_dir():
             return result
-        while True:
-            pid = int(entry.th32ProcessID)
-            if pid and pid != os.getpid() and str(entry.szExeFile).casefold() == LAUNCHER_EXE.casefold():
-                path = _process_path(pid)
-                if path is not None and os.path.normcase(str(path.resolve())) == target:
-                    result.append(pid)
-            if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
-                break
-    finally:
-        kernel32.CloseHandle(snapshot)
-    return result
+        for child in proc.iterdir():
+            if not child.name.isdigit():
+                continue
+            pid = int(child.name)
+            if pid == os.getpid():
+                continue
+            path = _linux_process_path(pid)
+            if path is not None and path == target:
+                result.append(pid)
+        return sorted(set(result))
+
+    return []
 
 
 def request_graceful_close(pids: Iterable[int]) -> None:
-    if os.name != "nt":
+    wanted = {int(pid) for pid in pids if int(pid) > 0 and int(pid) != os.getpid()}
+    if os.name == "nt":
+        _, user32 = _windows_apis()
+        assert user32 is not None
+
+        @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        def callback(hwnd, _lparam):
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if int(pid.value) in wanted:
+                user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+            return True
+
+        user32.EnumWindows(callback, 0)
         return
-    wanted = set(int(pid) for pid in pids)
-    _, user32 = _windows_apis()
-    assert user32 is not None
 
-    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
-    def callback(hwnd, _lparam):
-        pid = wintypes.DWORD()
-        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-        if int(pid.value) in wanted:
-            user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
-        return True
-
-    user32.EnumWindows(callback, 0)
+    if sys.platform.startswith("linux"):
+        for pid in wanted:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError, OSError):
+                continue
 
 
 def force_terminate_processes(pids: Iterable[int]) -> None:
-    if os.name != "nt":
+    wanted = {int(pid) for pid in pids if int(pid) > 0 and int(pid) != os.getpid()}
+    if os.name == "nt":
+        kernel32, _ = _windows_apis()
+        assert kernel32 is not None
+        for pid in wanted:
+            handle = kernel32.OpenProcess(PROCESS_TERMINATE | PROCESS_SYNCHRONIZE, False, int(pid))
+            if not handle:
+                continue
+            try:
+                kernel32.TerminateProcess(handle, 1)
+                kernel32.WaitForSingleObject(handle, 5000)
+            finally:
+                kernel32.CloseHandle(handle)
         return
-    kernel32, _ = _windows_apis()
-    assert kernel32 is not None
-    for pid in pids:
-        handle = kernel32.OpenProcess(PROCESS_TERMINATE | PROCESS_SYNCHRONIZE, False, int(pid))
-        if not handle:
-            continue
-        try:
-            kernel32.TerminateProcess(handle, 1)
-            kernel32.WaitForSingleObject(handle, 5000)
-        finally:
-            kernel32.CloseHandle(handle)
+
+    if sys.platform.startswith("linux"):
+        for pid in wanted:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError, OSError):
+                continue
 
 
 class BridgeWindow:
@@ -606,7 +705,8 @@ class BridgeWindow:
         self.root.title("MCW Launcher Update Bridge")
         self.root.geometry("640x410")
         self.root.minsize(600, 380)
-        self.install_var = tk.StringVar(value=str(initial_directory or auto_detect_install_directory() or ""))
+        self.contract = platform_contract()
+        self.install_var = tk.StringVar(value=str(initial_directory or auto_detect_install_directory(self.contract.platform_id) or ""))
         self.status_var = tk.StringVar(value=f"Recovery bridge for MCW Launcher 1.5.0 → {TARGET_TAG}")
         self.progress_var = tk.DoubleVar(value=0.0)
         self.running = False
@@ -649,7 +749,7 @@ class BridgeWindow:
         ttk.Button(buttons, text="Exit", command=self.root.destroy).pack(side="right", padx=(0, 8))
 
     def _browse(self) -> None:
-        selected = filedialog.askdirectory(title="Select the folder containing MCW Launcher.exe")
+        selected = filedialog.askdirectory(title=f"Select the folder containing {self.contract.launcher_name}")
         if selected:
             self.install_var.set(selected)
 
@@ -674,7 +774,7 @@ class BridgeWindow:
         self.path_entry.configure(state=state)
 
     def _ensure_launcher_closed(self, install: Path) -> bool:
-        pids = launcher_process_ids(install / LAUNCHER_EXE)
+        pids = launcher_process_ids(install / self.contract.launcher_name)
         if not pids:
             return True
         if not messagebox.askyesno(
@@ -685,29 +785,26 @@ class BridgeWindow:
         request_graceful_close(pids)
         deadline = time.monotonic() + 8.0
         while time.monotonic() < deadline:
-            remaining = launcher_process_ids(install / LAUNCHER_EXE)
+            remaining = launcher_process_ids(install / self.contract.launcher_name)
             if not remaining:
                 return True
             self.root.update()
             time.sleep(0.2)
-        remaining = launcher_process_ids(install / LAUNCHER_EXE)
+        remaining = launcher_process_ids(install / self.contract.launcher_name)
         if remaining and messagebox.askyesno(
             "Force close required",
             "MCW Launcher did not close normally. Force close only the launcher process from this installation?",
         ):
             force_terminate_processes(remaining)
             time.sleep(0.5)
-            return not launcher_process_ids(install / LAUNCHER_EXE)
+            return not launcher_process_ids(install / self.contract.launcher_name)
         return False
 
     def _start(self) -> None:
         if self.running:
             return
-        if os.name != "nt":
-            messagebox.showerror("Unsupported platform", "MCW Update Bridge is intended for Windows x64 installations.")
-            return
         try:
-            install = validate_install_directory(Path(self.install_var.get()))
+            install = validate_install_directory(Path(self.install_var.get()), self.contract.platform_id)
         except Exception as error:
             messagebox.showerror("Invalid launcher folder", str(error))
             return
@@ -720,7 +817,7 @@ class BridgeWindow:
 
         def worker() -> None:
             try:
-                backup = bridge_update(install, status=self._append_log, progress=self._set_progress)
+                backup = bridge_update(install, status=self._append_log, progress=self._set_progress, platform_id=self.contract.platform_id)
             except Exception as error:
                 self.root.after(0, lambda: self._finish_error(error))
             else:
@@ -746,31 +843,65 @@ class BridgeWindow:
         )
 
 
+def _wait_for_launcher_exit(launcher: Path, timeout_seconds: float) -> list[int]:
+    deadline = time.monotonic() + timeout_seconds
+    remaining = launcher_process_ids(launcher)
+    while remaining and time.monotonic() < deadline:
+        time.sleep(0.2)
+        remaining = launcher_process_ids(launcher)
+    return remaining
+
+
 def cli_main(args: argparse.Namespace) -> int:
     try:
-        install = validate_install_directory(args.install_dir)
-        if os.name == "nt":
-            pids = launcher_process_ids(install / LAUNCHER_EXE)
-            if pids:
-                if not args.force_close:
-                    raise BridgeError("MCW Launcher is running. Close it first or pass --force-close.")
-                request_graceful_close(pids)
-                time.sleep(2)
-                remaining = launcher_process_ids(install / LAUNCHER_EXE)
-                if remaining:
-                    force_terminate_processes(remaining)
-        bridge_update(install, target_tag=args.tag, status=print)
+        contract = platform_contract()
+        install = validate_install_directory(args.install_dir, contract.platform_id)
+        launcher = install / contract.launcher_name
+        pids = launcher_process_ids(launcher)
+        if pids:
+            if not args.force_close:
+                raise BridgeError("MCW Launcher is running. Close it first or pass --force-close.")
+            request_graceful_close(pids)
+            remaining = _wait_for_launcher_exit(launcher, 8.0)
+            if remaining:
+                force_terminate_processes(remaining)
+                remaining = _wait_for_launcher_exit(launcher, 5.0)
+            if remaining:
+                raise BridgeError(f"Could not stop the launcher processes: {remaining}")
+        bridge_update(install, target_tag=args.tag, status=print, platform_id=contract.platform_id)
         return 0
     except Exception as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
 
 
+def terminal_main(args: argparse.Namespace) -> int:
+    contract = platform_contract()
+    print(f"MCW Update Bridge {BRIDGE_VERSION} — {contract.display_name}")
+    print(f"One-time recovery: MCW Launcher 1.5.0 → {args.tag}")
+    detected = auto_detect_install_directory(contract.platform_id)
+    prompt = f"Launcher folder [{detected}]: " if detected else "Launcher folder: "
+    entered = input(prompt).strip()
+    if not entered and detected is not None:
+        entered = str(detected)
+    if not entered:
+        print("ERROR: A launcher folder is required.", file=sys.stderr)
+        return 2
+    args.install_dir = Path(entered)
+    launcher = args.install_dir.expanduser().resolve() / contract.launcher_name
+    if launcher_process_ids(launcher) and not args.force_close:
+        answer = input("MCW Launcher is running. Close it automatically? [y/N]: ").strip().casefold()
+        if answer in {"y", "yes"}:
+            args.force_close = True
+    return cli_main(args)
+
+
 def main() -> int:
+    contract = platform_contract()
     parser = argparse.ArgumentParser(description="One-time recovery updater for MCW Launcher 1.5.0 installations.")
-    parser.add_argument("--install-dir", type=Path, help="Folder containing MCW Launcher.exe")
+    parser.add_argument("--install-dir", type=Path, help=f"Folder containing {contract.launcher_name}")
     parser.add_argument("--tag", default=TARGET_TAG, help=f"Target GitHub release tag (default: {TARGET_TAG})")
-    parser.add_argument("--force-close", action="store_true", help="Allow the bridge to terminate the matching launcher process if needed")
+    parser.add_argument("--force-close", action="store_true", help="Allow the bridge to terminate matching launcher processes if needed")
     parser.add_argument("--cli", action="store_true", help="Run without the graphical interface")
     args = parser.parse_args()
 
@@ -779,9 +910,11 @@ def main() -> int:
             parser.error("--install-dir is required in CLI mode")
         return cli_main(args)
 
+    # Linux release builds intentionally exclude Tk to keep the recovery binary
+    # small and dependency-light. Running the binary directly opens an
+    # interactive terminal recovery flow instead.
     if tk is None:
-        print("ERROR: Tk is not available. Use --cli --install-dir <path> or run the packaged Windows bridge.", file=sys.stderr)
-        return 2
+        return terminal_main(args)
     root = tk.Tk()
     BridgeWindow(root)
     root.mainloop()

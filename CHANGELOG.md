@@ -8,7 +8,7 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 
 - Thêm `MCW Updater.exe` / `mcw-updater` là binary updater độc lập, được build cùng release đích và đóng gói trong thư mục `updater/` của ZIP.
 - Thêm `updater.py` và `mcw_updater.spec` để updater không phụ thuộc entry point GUI của launcher.
-- Nâng Update Bridge lên v1.1.0, target trực tiếp `v1.5.1-beta.3` và xác minh package schema 2.
+- Nâng Update Bridge lên v1.2.0, hỗ trợ cả Windows x64 và Linux x64, target trực tiếp `v1.5.1-beta.3` và xác minh package schema 2.
 
 ### Changed
 
@@ -24,7 +24,7 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 
 ### Migration
 
-- Người dùng Windows đang ở v1.5.0 dùng `MCW Update Bridge v1.1.0` một lần để lên Beta 3.
+- Người dùng Windows/Linux đang ở v1.5.0 dùng `MCW Update Bridge v1.2.0` một lần để lên Beta 3.
 - Live gate quan trọng tiếp theo là `Beta 3 → Beta 4`, nhằm xác nhận updater được thực thi thực sự là updater nằm trong ZIP Beta 4.
 
 ## [1.5.1-beta.2] - 2026-09-09
