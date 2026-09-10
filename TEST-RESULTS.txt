@@ -1,34 +1,20 @@
-MCW Launcher v1.5.1-beta.3 verification
-Date: 2026-09-09
+MCW Launcher release verification
+Version: 1.5.1-beta.4
+Channel: beta
 
-PASS
-- python -m tools.release_preflight
-  Result: Release preflight passed for v1.5.1-beta.3 (beta)
-  Language parity: 2156 keys in en-US and vi-VN
-  Unresolved merge markers: 0
+Targeted Beta 4 regression baseline:
+331 passed, 2 warnings
 
-- updater/package/build-contract regression subset
-  Result: 91 passed
-  Coverage includes:
-  * UpdateApplier executable-first / rollback safety
-  * Windows incoming bundled updater handoff
-  * Linux incoming bundled updater handoff
-  * schema-2 update manifest validation
-  * Linux package roundtrip
-  * release ZIP launcher + updater layout
-  * updater PyInstaller spec static contract
-  * Update Bridge v1.1.0 schema-2 validation
-  * release workflow contract
+Covered areas:
+- updater v2 handoff / READY handshake / fallback
+- release package manifest and cleanup_paths
+- Windows/Linux updater package contract
+- Update Bridge recovery integration
+- Modrinth required dependency refresh
+- package extraction/security checks
+- release preflight/workflow/spec checks
 
-- python updater.py --version
-  Result: MCW Updater v1.5.1-beta.3
+Expected warnings:
+- 2 duplicate ZIP-member warnings from package-security regression tests.
 
-ENVIRONMENT LIMITATIONS
-- Full pytest collection cannot run in this container because PySide6 is not installed.
-- A native PyInstaller binary build cannot run in this container because PyInstaller is not installed.
-- GitHub Actions is therefore the required final native Windows/Linux build gate.
-
-REQUIRED LIVE GATES
-1. v1.5.0 -> MCW Update Bridge v1.1.0 -> v1.5.1-beta.3 (Windows)
-2. v1.5.1-beta.3 -> next beta using automatic update
-3. Confirm logs show the updater supplied by the incoming ZIP is launched.
+This file records the Beta 4 release-evidence baseline used by release_preflight.

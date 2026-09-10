@@ -1,1 +1,0 @@
-fix(updater): switch releases to bundled updater v2
