@@ -122,8 +122,9 @@ jobs:
 
           binary = Path(os.environ['BRIDGE_BINARY'])
           digest = hashlib.sha256(binary.read_bytes()).hexdigest()
-          binary.with_name(binary.name + '.sha256').write_text(
-              f'{digest}  {binary.name}\n', encoding='utf-8'
+          # Write raw bytes so Windows cannot translate LF to CRLF.
+          binary.with_name(binary.name + '.sha256').write_bytes(
+              f'{digest}  {binary.name}\n'.encode('ascii')
           )
 
       - name: Upload workflow artifact
@@ -152,6 +153,12 @@ jobs:
         shell: bash
         run: |
           chmod +x dist/MCW-Update-Bridge-v1.3.0-linux-x64
+          # Be tolerant of sidecars produced by older Windows jobs that used CRLF.
+          python - <<'PY'
+          from pathlib import Path
+          for sidecar in Path('dist').glob('*.sha256'):
+              sidecar.write_bytes(sidecar.read_bytes().replace(b'\r', b''))
+          PY
           (cd dist && sha256sum --check ./*.sha256)
 
       - name: Upload bridges to target release
