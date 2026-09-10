@@ -1,20 +1,26 @@
 MCW Launcher release verification
-Version: 1.5.1-beta.4
+Version: 1.5.1-beta.5
 Channel: beta
 
-Targeted Beta 4 regression baseline:
-331 passed, 2 warnings
+Local Beta 5 regression:
+- 335 passed, 2 warnings across core update/mod/package + release/spec/bridge suites.
+- 76 passed in the focused final updater/installer/spec/bridge/preflight regression rerun.
+- release_preflight: passed.
+- Windows/Linux release-package smoke build: passed (schema 2, bundled updater, docs cleanup, Linux executable bits).
+- release.yml and update-bridge.yml: YAML parse passed.
 
 Covered areas:
-- updater v2 handoff / READY handshake / fallback
-- release package manifest and cleanup_paths
-- Windows/Linux updater package contract
-- Update Bridge recovery integration
+- updater v2 READY handoff / installed-updater fallback
+- Windows exact-path process drain and executable DELETE/replace lock gate
+- executable-first replacement / retry / rollback
+- branded updater GUI asset/spec contract
+- Windows/Linux release manifest and docs cleanup
+- Update Bridge v1.4.0 recovery integration and CI publishing
 - Modrinth required dependency refresh
 - package extraction/security checks
 - release preflight/workflow/spec checks
 
 Expected warnings:
-- 2 duplicate ZIP-member warnings from package-security regression tests.
+- 2 duplicate ZIP-member warnings from intentional package-security regression tests.
 
-This file records the Beta 4 release-evidence baseline used by release_preflight.
+Local full `pytest test -q` could not collect GUI tests in the packaging environment because PySide6 is not installed there. The GitHub release workflow installs `.[dev]` and remains the full-suite native gate on Windows and Ubuntu.

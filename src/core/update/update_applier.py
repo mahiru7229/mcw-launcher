@@ -62,8 +62,10 @@ class UpdateApplyRequest:
 
 class UpdateApplier:
     COPY_RETRIES = 30
-    EXECUTABLE_REPLACE_RETRIES = 120
+    EXECUTABLE_REPLACE_RETRIES = 240
     COPY_RETRY_DELAY_SECONDS = 0.25
+    WINDOWS_RELEASE_TIMEOUT_SECONDS = 60.0
+    WINDOWS_RELEASE_POLL_SECONDS = 0.20
 
     def __init__(self, request: UpdateApplyRequest) -> None:
         self.request = request
@@ -78,7 +80,8 @@ class UpdateApplier:
             self._log(f"Updater process started for {self.request.target_version}")
             self._log(f"Waiting for launcher process {self.request.parent_pid}")
             self._wait_for_process_exit(self.request.parent_pid)
-            time.sleep(0.6)
+            self._log("Primary launcher process exited")
+            self._wait_for_launcher_release()
 
             self._backup_existing_files()
             self._copy_update_files()
@@ -288,6 +291,7 @@ class UpdateApplier:
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         else:
             kwargs["start_new_session"] = True
+        self._log("Starting updated launcher")
         subprocess.Popen(
             [str(executable), "--cleanup-update", str(self.request.updater_directory), str(os.getpid())],
             **kwargs,
@@ -381,6 +385,170 @@ class UpdateApplier:
                 return
             time.sleep(0.2)
         raise TimeoutError("The launcher did not close within two minutes.")
+
+    def _wait_for_launcher_release(self, timeout_seconds: float | None = None) -> None:
+        """Wait until no process owns this installation's launcher image and Windows grants delete access.
+
+        Waiting only for the GUI PID is insufficient for PyInstaller one-file/windowed applications:
+        a bootloader sibling or security scanner can retain a handle after that PID exits.  The
+        transaction therefore does not begin until the exact executable path is process-free and
+        can be opened with DELETE access.  Linux does not require this Windows-specific gate.
+        """
+        if PlatformInfo.current().os_name != "windows":
+            return
+
+        executable = (self.request.destination_directory / self.request.executable_name).resolve()
+        timeout = self.WINDOWS_RELEASE_TIMEOUT_SECONDS if timeout_seconds is None else max(0.0, timeout_seconds)
+        deadline = time.monotonic() + timeout
+        previous_pids: tuple[int, ...] | None = None
+        lock_logged = False
+
+        while True:
+            pids = tuple(self._matching_windows_processes(executable))
+            replaceable = self._windows_executable_replaceable(executable)
+            if not pids and replaceable:
+                self._log("Launcher installation is fully stopped and executable lock is released")
+                return
+
+            if pids != previous_pids:
+                previous_pids = pids
+                if pids:
+                    self._log(
+                        "Detected remaining launcher process(es) for this installation: "
+                        + ", ".join(str(pid) for pid in pids)
+                    )
+                else:
+                    self._log("No launcher process remains; waiting for executable lock to be released")
+            if not replaceable and not lock_logged:
+                self._log("Launcher executable lock is still active; waiting before update transaction")
+                lock_logged = True
+
+            if time.monotonic() >= deadline:
+                detail = f" process(es): {', '.join(str(pid) for pid in pids)}" if pids else ""
+                raise TimeoutError(
+                    f"{self.request.executable_name} is still in use after {timeout:.0f} seconds;"
+                    f" update was not started.{detail}"
+                )
+            time.sleep(self.WINDOWS_RELEASE_POLL_SECONDS)
+
+    @staticmethod
+    def _normalize_windows_path(path: Path | str) -> str:
+        value = os.path.normcase(os.path.normpath(str(path)))
+        if value.startswith("\\\\?\\"):
+            value = value[4:]
+        return value.rstrip("\\/")
+
+    @classmethod
+    def _matching_windows_processes(cls, executable: Path) -> list[int]:
+        """Return processes whose full image path is exactly the target launcher path.
+
+        Processes that cannot be queried are ignored here; the delete-access probe still prevents
+        the update from starting if one of those processes owns a non-share-delete file handle.
+        """
+        if os.name != "nt":
+            return []
+
+        from ctypes import wintypes
+
+        TH32CS_SNAPPROCESS = 0x00000002
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+        kernel32 = ctypes.windll.kernel32
+
+        class PROCESSENTRY32W(ctypes.Structure):
+            _fields_ = [
+                ("dwSize", wintypes.DWORD),
+                ("cntUsage", wintypes.DWORD),
+                ("th32ProcessID", wintypes.DWORD),
+                ("th32DefaultHeapID", ctypes.c_size_t),
+                ("th32ModuleID", wintypes.DWORD),
+                ("cntThreads", wintypes.DWORD),
+                ("th32ParentProcessID", wintypes.DWORD),
+                ("pcPriClassBase", wintypes.LONG),
+                ("dwFlags", wintypes.DWORD),
+                ("szExeFile", wintypes.WCHAR * 260),
+            ]
+
+        kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+        kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+        kernel32.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W)]
+        kernel32.Process32FirstW.restype = wintypes.BOOL
+        kernel32.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W)]
+        kernel32.Process32NextW.restype = wintypes.BOOL
+        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.QueryFullProcessImageNameW.argtypes = [
+            wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)
+        ]
+        kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+
+        snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if snapshot == INVALID_HANDLE_VALUE:
+            return []
+
+        wanted = cls._normalize_windows_path(executable)
+        own_pid = os.getpid()
+        matches: list[int] = []
+        entry = PROCESSENTRY32W()
+        entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+        try:
+            has_entry = bool(kernel32.Process32FirstW(snapshot, ctypes.byref(entry)))
+            while has_entry:
+                pid = int(entry.th32ProcessID)
+                if pid > 0 and pid != own_pid:
+                    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+                    if handle:
+                        try:
+                            size = wintypes.DWORD(32768)
+                            buffer = ctypes.create_unicode_buffer(size.value)
+                            if kernel32.QueryFullProcessImageNameW(handle, 0, buffer, ctypes.byref(size)):
+                                if cls._normalize_windows_path(buffer.value) == wanted:
+                                    matches.append(pid)
+                        finally:
+                            kernel32.CloseHandle(handle)
+                has_entry = bool(kernel32.Process32NextW(snapshot, ctypes.byref(entry)))
+        finally:
+            kernel32.CloseHandle(snapshot)
+        return sorted(set(matches))
+
+    @staticmethod
+    def _windows_executable_replaceable(executable: Path) -> bool:
+        """Probe whether Windows currently permits delete/replace access to the launcher image."""
+        if os.name != "nt" or not executable.exists():
+            return True
+
+        from ctypes import wintypes
+
+        DELETE = 0x00010000
+        FILE_SHARE_READ = 0x00000001
+        FILE_SHARE_WRITE = 0x00000002
+        FILE_SHARE_DELETE = 0x00000004
+        OPEN_EXISTING = 3
+        FILE_ATTRIBUTE_NORMAL = 0x00000080
+        INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+        kernel32 = ctypes.windll.kernel32
+        kernel32.CreateFileW.argtypes = [
+            wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
+            wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE,
+        ]
+        kernel32.CreateFileW.restype = wintypes.HANDLE
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        handle = kernel32.CreateFileW(
+            str(executable),
+            DELETE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            None,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            None,
+        )
+        if handle == INVALID_HANDLE_VALUE:
+            return False
+        kernel32.CloseHandle(handle)
+        return True
 
     def _show_error(self, message: str, *, rollback_completed: bool = True) -> None:
         if os.name != "nt":

@@ -30,9 +30,9 @@ import uuid
 import zipfile
 
 
-BRIDGE_VERSION = "1.3.0"
+BRIDGE_VERSION = "1.4.0"
 REPOSITORY = "mahiru7229/mcw-launcher"
-TARGET_TAG = "v1.5.1-beta.4"
+TARGET_TAG = "v1.5.1-beta.5"
 TARGET_VERSION = TARGET_TAG.removeprefix("v")
 
 

@@ -53,3 +53,11 @@ def test_updater_spec_uses_dedicated_entry_point() -> None:
     text = (PROJECT_ROOT / "mcw_updater.spec").read_text(encoding="utf-8")
     assert 'ENTRY_POINT = PROJECT_ROOT / "updater.py"' in text
     assert 'EXECUTABLE_NAME = "MCW Updater" if IS_WINDOWS else "mcw-updater"' in text
+
+
+def test_updater_spec_bundles_branding_assets_without_qt() -> None:
+    text = (PROJECT_ROOT / "mcw_updater.spec").read_text(encoding="utf-8")
+    assert 'APP_LOGO_PATH = PROJECT_ROOT / "assets" / "icons" / "mcw_launcher.png"' in text
+    assert '(str(APP_LOGO_PATH), "assets/icons")' in text
+    assert '"PySide6"' in text
+    assert 'upx=False' in text

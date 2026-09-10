@@ -1,6 +1,6 @@
 # MCW Update Bridge
 
-`MCW Update Bridge 1.3.0` is a one-time cross-platform recovery updater for MCW Launcher `1.5.0` installations that need to migrate to the schema-2 updater architecture in `v1.5.1-beta.4`.
+`MCW Update Bridge 1.4.0` is a one-time cross-platform recovery updater for MCW Launcher `1.5.0` installations that need to migrate to the schema-2 updater architecture in `v1.5.1-beta.5`.
 
 The bridge is a **separate executable**. It never copies or reuses the currently installed launcher executable as its updater process.
 
@@ -8,8 +8,8 @@ The bridge is a **separate executable**. It never copies or reuses the currently
 
 | Platform | Installed launcher | Release package | Bridge artifact |
 | --- | --- | --- | --- |
-| Windows x64 | `MCW Launcher.exe` | `MCW-Launcher-v1.5.1-beta.4-windows-x64.zip` | `MCW-Update-Bridge-v1.3.0-windows-x64.exe` |
-| Linux x64 | `mcw-launcher` | `MCW-Launcher-v1.5.1-beta.4-linux-x64.zip` | `MCW-Update-Bridge-v1.3.0-linux-x64` |
+| Windows x64 | `MCW Launcher.exe` | `MCW-Launcher-v1.5.1-beta.5-windows-x64.zip` | `MCW-Update-Bridge-v1.4.0-windows-x64.exe` |
+| Linux x64 | `mcw-launcher` | `MCW-Launcher-v1.5.1-beta.5-linux-x64.zip` | `MCW-Update-Bridge-v1.4.0-linux-x64` |
 
 Both paths require the matching `.sha256` release asset and a valid schema-2 `mcw-update.json`.
 
@@ -19,11 +19,11 @@ Both paths require the matching `.sha256` release asset and a valid schema-2 `mc
 MCW Launcher 1.5.0
       │
       ▼
-MCW Update Bridge 1.3.0       (separate process)
+MCW Update Bridge 1.4.0       (separate process)
       │
       ├─ identify the current platform
       ├─ close only launcher processes whose executable path matches this installation
-      ├─ fetch v1.5.1-beta.4 metadata from GitHub
+      ├─ fetch v1.5.1-beta.5 metadata from GitHub
       ├─ download the matching platform ZIP + .sha256
       ├─ verify SHA-256
       ├─ validate mcw-update.json schema 2 and managed-file allow-list
@@ -41,18 +41,18 @@ User data (`instances`, accounts, saves and configuration outside package-manage
 
 Use `.github/workflows/update-bridge.yml`:
 
-1. Push the Bridge 1.3.0 files.
+1. Push the Bridge 1.4.0 files.
 2. Open **Actions → Build MCW Update Bridge → Run workflow**.
-3. Leave `release_tag` as `v1.5.1-beta.4`.
+3. Leave `release_tag` as `v1.5.1-beta.5`.
 4. Enable `upload_to_release` if the release can still accept assets.
 
 GitHub Actions builds:
 
 ```text
-MCW-Update-Bridge-v1.3.0-windows-x64.exe
-MCW-Update-Bridge-v1.3.0-windows-x64.exe.sha256
-MCW-Update-Bridge-v1.3.0-linux-x64
-MCW-Update-Bridge-v1.3.0-linux-x64.sha256
+MCW-Update-Bridge-v1.4.0-windows-x64.exe
+MCW-Update-Bridge-v1.4.0-windows-x64.exe.sha256
+MCW-Update-Bridge-v1.4.0-linux-x64
+MCW-Update-Bridge-v1.4.0-linux-x64.sha256
 ```
 
 The Linux build is intentionally a small console recovery binary and excludes Tk.
@@ -62,14 +62,14 @@ The Linux build is intentionally a small console recovery binary and excludes Tk
 Make it executable, then run it:
 
 ```bash
-chmod +x MCW-Update-Bridge-v1.3.0-linux-x64
-./MCW-Update-Bridge-v1.3.0-linux-x64
+chmod +x MCW-Update-Bridge-v1.4.0-linux-x64
+./MCW-Update-Bridge-v1.4.0-linux-x64
 ```
 
 The terminal flow asks for the launcher folder. Or use explicit CLI mode:
 
 ```bash
-./MCW-Update-Bridge-v1.3.0-linux-x64 \
+./MCW-Update-Bridge-v1.4.0-linux-x64 \
   --cli \
   --install-dir "$HOME/MCW-Launcher"
 ```
@@ -77,7 +77,7 @@ The terminal flow asks for the launcher folder. Or use explicit CLI mode:
 If the matching `mcw-launcher` process is still running:
 
 ```bash
-./MCW-Update-Bridge-v1.3.0-linux-x64 \
+./MCW-Update-Bridge-v1.4.0-linux-x64 \
   --cli \
   --install-dir "$HOME/MCW-Launcher" \
   --force-close
@@ -87,7 +87,7 @@ On Linux the bridge identifies the exact installation using `/proc/<pid>/exe`, s
 
 ## Windows usage
 
-Run `MCW-Update-Bridge-v1.3.0-windows-x64.exe`, select the folder containing `MCW Launcher.exe`, and update to `v1.5.1-beta.4`.
+Run `MCW-Update-Bridge-v1.4.0-windows-x64.exe`, select the folder containing `MCW Launcher.exe`, and update to `v1.5.1-beta.5`.
 
 ## Recovery data
 

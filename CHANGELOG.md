@@ -2,6 +2,21 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.1-beta.5] - 2026-09-11
+
+### Fixed
+- Harden Windows updater handoff against `WinError 5`: after the primary PID exits, MCW Updater waits for every process using the exact launcher executable path and confirms Windows DELETE/replace access before starting the update transaction.
+- Keep executable-first atomic replacement/retry so a persistent lock fails before other release files are mutated.
+
+### Changed
+- Redesign `MCW Updater.exe` into a branded standalone update window with the MCW logo, target version, phase text and progress states.
+- Bundle updater logo/icon assets directly in `mcw_updater.spec` without pulling PySide6/Qt into the updater.
+- Move MCW Update Bridge to v1.4.0 with `v1.5.1-beta.5` as its default target, retaining checksum/publish CI fixes and opt-in `MCW-USE-BRIDGE`.
+- Continue excluding `docs/` from release ZIPs and cleaning legacy `docs/` through the update manifest.
+
+### Safety
+- If the launcher image remains locked after the pre-transaction release timeout, Beta 5 aborts before copying update files and reports recovery information instead of creating a mixed-version installation.
+
 ## [1.5.1-beta.4] - 2026-09-10
 
 ### Changed

@@ -11,6 +11,7 @@ if sys.platform == "win32":
 PROJECT_ROOT = Path(SPECPATH).resolve()
 ENTRY_POINT = PROJECT_ROOT / "updater.py"
 APP_ICON_PATH = PROJECT_ROOT / "assets" / "icons" / "mcw_launcher.ico"
+APP_LOGO_PATH = PROJECT_ROOT / "assets" / "icons" / "mcw_launcher.png"
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -28,6 +29,8 @@ if not ENTRY_POINT.is_file():
     raise FileNotFoundError(f"Updater entry point not found: {ENTRY_POINT}")
 if not APP_ICON_PATH.is_file():
     raise FileNotFoundError(f"Updater icon not found: {APP_ICON_PATH}")
+if not APP_LOGO_PATH.is_file():
+    raise FileNotFoundError(f"Updater logo not found: {APP_LOGO_PATH}")
 
 NUMERIC_VERSION = _numeric_version(VERSION_ID)
 IS_PRERELEASE = any(marker in VERSION_ID.casefold() for marker in ("alpha", "beta", "rc"))
@@ -76,7 +79,7 @@ analysis = Analysis(
     [str(ENTRY_POINT)],
     pathex=[str(PROJECT_ROOT)],
     binaries=[],
-    datas=[],
+    datas=[(str(APP_ICON_PATH), "assets/icons"), (str(APP_LOGO_PATH), "assets/icons")] if IS_WINDOWS else [],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

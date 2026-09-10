@@ -107,29 +107,29 @@ def test_linux_client_selects_only_linux_x64_package(tmp_path: Path) -> None:
 
 
 def test_release_marker_switches_update_to_verified_windows_bridge(tmp_path: Path) -> None:
-    client = GitHubReleaseClient("example/repo", "1.5.1-beta.3", "beta", tmp_path / "cache.json")
+    client = GitHubReleaseClient("example/repo", "1.5.1-beta.4", "beta", tmp_path / "cache.json")
     update = client._select_update([
-        release("v1.5.1-beta.4", True, [
-            asset("MCW-Launcher-v1.5.1-beta.4-windows-x64.zip"),
+        release("v1.5.1-beta.5", True, [
+            asset("MCW-Launcher-v1.5.1-beta.5-windows-x64.zip"),
             asset("MCW-USE-BRIDGE", size=1),
-            asset("MCW-Update-Bridge-v1.3.0-windows-x64.exe"),
-            asset("MCW-Update-Bridge-v1.3.0-windows-x64.exe.sha256"),
+            asset("MCW-Update-Bridge-v1.4.0-windows-x64.exe"),
+            asset("MCW-Update-Bridge-v1.4.0-windows-x64.exe.sha256"),
         ]),
     ])
 
     assert update is not None
     assert update.install_strategy == "bridge"
-    assert update.asset.name == "MCW-Update-Bridge-v1.3.0-windows-x64.exe"
+    assert update.asset.name == "MCW-Update-Bridge-v1.4.0-windows-x64.exe"
     assert update.asset.sha256_url and update.asset.sha256_url.endswith(".exe.sha256")
 
 
 def test_release_bridge_asset_does_not_override_without_marker(tmp_path: Path) -> None:
-    client = GitHubReleaseClient("example/repo", "1.5.1-beta.3", "beta", tmp_path / "cache.json")
+    client = GitHubReleaseClient("example/repo", "1.5.1-beta.4", "beta", tmp_path / "cache.json")
     update = client._select_update([
-        release("v1.5.1-beta.4", True, [
-            asset("MCW-Launcher-v1.5.1-beta.4-windows-x64.zip"),
-            asset("MCW-Update-Bridge-v1.3.0-windows-x64.exe"),
-            asset("MCW-Update-Bridge-v1.3.0-windows-x64.exe.sha256"),
+        release("v1.5.1-beta.5", True, [
+            asset("MCW-Launcher-v1.5.1-beta.5-windows-x64.zip"),
+            asset("MCW-Update-Bridge-v1.4.0-windows-x64.exe"),
+            asset("MCW-Update-Bridge-v1.4.0-windows-x64.exe.sha256"),
         ]),
     ])
 

@@ -321,7 +321,7 @@ def test_update_applier_cleanup_paths_removes_old_docs_without_error(tmp_path, m
     (docs / "old.md").write_text("legacy docs", encoding="utf-8")
     (request.source_directory / "mcw-update.json").write_text(json.dumps({
         "schema_version": 2,
-        "version": "1.5.1-beta.4",
+        "version": "1.5.1-beta.5",
         "platform": "windows-x64",
         "executable": request.executable_name,
         "files": [request.executable_name, "mcw-update.json"],
@@ -334,3 +334,68 @@ def test_update_applier_cleanup_paths_removes_old_docs_without_error(tmp_path, m
 
     assert applier.run() == 0
     assert not docs.exists()
+
+
+def test_windows_release_gate_waits_for_matching_process_and_file_lock(tmp_path, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    request = make_request(tmp_path)
+    executable = request.destination_directory / request.executable_name
+    executable.write_bytes(b"old-exe")
+    applier = UpdateApplier(request)
+
+    process_states = iter([[501, 502], [], []])
+    lock_states = iter([False, False, True])
+    monkeypatch.setattr(
+        "src.core.update.update_applier.PlatformInfo.current",
+        lambda: SimpleNamespace(os_name="windows"),
+    )
+    monkeypatch.setattr(applier, "_matching_windows_processes", lambda _path: next(process_states))
+    monkeypatch.setattr(applier, "_windows_executable_replaceable", lambda _path: next(lock_states))
+    monkeypatch.setattr(applier, "WINDOWS_RELEASE_POLL_SECONDS", 0)
+
+    applier._wait_for_launcher_release(timeout_seconds=1.0)
+
+    log = request.persistent_log_path.read_text(encoding="utf-8")
+    assert "Detected remaining launcher process(es) for this installation: 501, 502" in log
+    assert "No launcher process remains; waiting for executable lock to be released" in log
+    assert "Launcher installation is fully stopped and executable lock is released" in log
+
+
+def test_windows_release_gate_times_out_before_transaction_when_lock_remains(tmp_path, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    request = make_request(tmp_path)
+    executable = request.destination_directory / request.executable_name
+    executable.write_bytes(b"old-exe")
+    applier = UpdateApplier(request)
+
+    monkeypatch.setattr(
+        "src.core.update.update_applier.PlatformInfo.current",
+        lambda: SimpleNamespace(os_name="windows"),
+    )
+    monkeypatch.setattr(applier, "_matching_windows_processes", lambda _path: [])
+    monkeypatch.setattr(applier, "_windows_executable_replaceable", lambda _path: False)
+
+    with pytest.raises(TimeoutError, match="update was not started"):
+        applier._wait_for_launcher_release(timeout_seconds=0.0)
+
+
+def test_non_windows_release_gate_skips_windows_process_scan(tmp_path, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    request = make_request(tmp_path)
+    (request.destination_directory / request.executable_name).write_bytes(b"old-exe")
+    applier = UpdateApplier(request)
+
+    monkeypatch.setattr(
+        "src.core.update.update_applier.PlatformInfo.current",
+        lambda: SimpleNamespace(os_name="linux"),
+    )
+    monkeypatch.setattr(
+        applier,
+        "_matching_windows_processes",
+        lambda _path: (_ for _ in ()).throw(AssertionError("Windows scan must not run on Linux")),
+    )
+
+    applier._wait_for_launcher_release(timeout_seconds=0.0)

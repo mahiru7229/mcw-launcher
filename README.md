@@ -12,12 +12,12 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.5.1--beta.4-blue" alt="v1.5.1-beta.4">
+  <img src="https://img.shields.io/badge/version-v1.5.1--beta.5-blue" alt="v1.5.1-beta.5">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!WARNING]
-> `v1.5.1-beta.4` hoàn thiện **Updater Architecture v2**: updater độc lập có GUI trên Windows, launcher chờ tín hiệu READY trước khi đóng và có fallback sang updater đang cài. Release payload không còn đóng gói `docs/`; updater/bridge dọn `docs/` cũ an toàn. Maintainer có thể kích hoạt `MCW-USE-BRIDGE` để launcher tự chuyển sang recovery Bridge khi một release gặp lỗi nghiêm trọng.
+> `v1.5.1-beta.5` harden **Updater Architecture v2** trên Windows: updater có giao diện branded với logo/progress, chờ toàn bộ process dùng đúng launcher path thoát và xác nhận file-lock đã được nhả trước khi bắt đầu transaction để tránh `WinError 5`. Fallback updater, rollback an toàn, cleanup `docs/` và emergency `MCW-USE-BRIDGE` vẫn được giữ.
 
 ## Tổng quan
 
@@ -135,7 +135,7 @@ GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, khô
 - [MCW Core API](docs/MCW_CORE_LIBRARY.md)
 - [Language packs](docs/LANGUAGE_PACKS.md)
 - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
-- [Release notes v1.5.1-beta.4](docs/releases/v1.5.1-beta.4.md)
+- [Release notes v1.5.1-beta.5](docs/releases/v1.5.1-beta.5.md)
 - [Release notes v1.5.1-beta.3](docs/releases/v1.5.1-beta.3.md)
 - [Release notes v1.5.1-beta.2](docs/releases/v1.5.1-beta.2.md)
 - [Release notes v1.5.1-beta.1](docs/releases/v1.5.1-beta.1.md)

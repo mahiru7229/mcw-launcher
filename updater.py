@@ -8,13 +8,26 @@ import threading
 import time
 
 
-def _request_ready_path(request_path: Path) -> Path | None:
+def _resource_path(relative: str) -> Path:
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    return base / relative
+
+
+def _request_payload(request_path: Path) -> dict:
     try:
         payload = json.loads(Path(request_path).read_text(encoding="utf-8"))
     except Exception:
-        return None
-    raw = str(payload.get("ready_path") or "").strip() if isinstance(payload, dict) else ""
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _request_ready_path(request_path: Path) -> Path | None:
+    raw = str(_request_payload(request_path).get("ready_path") or "").strip()
     return Path(raw) if raw else None
+
+
+def _request_target_version(request_path: Path) -> str:
+    return str(_request_payload(request_path).get("target_version") or "").strip()
 
 
 def _signal_ready(request_path: Path) -> None:
@@ -43,26 +56,134 @@ def _gui_apply(request_path: Path) -> int:
 
     from src.core.update.update_applier import run_update_applier
 
+    # Deliberately self-contained: the updater must remain usable even if the
+    # launcher's GUI stack is broken. Tk ships with CPython and PyInstaller.
     root = tk.Tk()
     root.title("MCW Updater")
     root.resizable(False, False)
+    root.configure(bg="#0b1220")
+
+    width, height = 610, 430
+    root.geometry(f"{width}x{height}")
+    root.update_idletasks()
+    x = max(0, (root.winfo_screenwidth() - width) // 2)
+    y = max(0, (root.winfo_screenheight() - height) // 2)
+    root.geometry(f"{width}x{height}+{x}+{y}")
+
     try:
-        root.iconbitmap(str(Path(__file__).resolve().parent / "assets" / "icons" / "mcw_launcher.ico"))
+        root.iconbitmap(str(_resource_path("assets/icons/mcw_launcher.ico")))
     except Exception:
         pass
 
-    frame = ttk.Frame(root, padding=22)
-    frame.grid(row=0, column=0, sticky="nsew")
-    title = ttk.Label(frame, text="MCW Launcher Update", font=("Segoe UI", 14, "bold"))
-    title.grid(row=0, column=0, sticky="w")
-    status_var = tk.StringVar(value="Preparing updater...")
-    status = ttk.Label(frame, textvariable=status_var, width=52)
-    status.grid(row=1, column=0, sticky="w", pady=(12, 8))
-    progress = ttk.Progressbar(frame, mode="indeterminate", length=390)
-    progress.grid(row=2, column=0, sticky="ew")
-    progress.start(12)
-    note = ttk.Label(frame, text="Do not turn off the computer while launcher files are being replaced.", wraplength=390)
-    note.grid(row=3, column=0, sticky="w", pady=(10, 0))
+    style = ttk.Style(root)
+    try:
+        style.theme_use("clam")
+    except tk.TclError:
+        pass
+    style.configure(
+        "MCW.Horizontal.TProgressbar",
+        troughcolor="#172033",
+        background="#63a4ff",
+        bordercolor="#172033",
+        lightcolor="#63a4ff",
+        darkcolor="#63a4ff",
+        thickness=12,
+    )
+
+    container = tk.Frame(root, bg="#0b1220", padx=34, pady=28)
+    container.pack(fill="both", expand=True)
+
+    header = tk.Frame(container, bg="#0b1220")
+    header.pack(fill="x")
+
+    logo_image = None
+    try:
+        logo_image = tk.PhotoImage(file=str(_resource_path("assets/icons/mcw_launcher.png")))
+        # Source logo is 512x512; 6x subsampling yields an ~85px mark without Pillow.
+        logo_image = logo_image.subsample(6, 6)
+        logo = tk.Label(header, image=logo_image, bg="#0b1220", bd=0)
+        logo.pack(side="left", padx=(0, 18))
+    except Exception:
+        logo = tk.Label(
+            header,
+            text="MCW",
+            fg="#ffffff",
+            bg="#172033",
+            font=("Segoe UI", 18, "bold"),
+            width=5,
+            height=2,
+        )
+        logo.pack(side="left", padx=(0, 18))
+
+    heading = tk.Frame(header, bg="#0b1220")
+    heading.pack(side="left", fill="x", expand=True)
+    tk.Label(
+        heading,
+        text="MCW Updater",
+        fg="#f8fafc",
+        bg="#0b1220",
+        font=("Segoe UI", 20, "bold"),
+        anchor="w",
+    ).pack(fill="x")
+    target_version = _request_target_version(request_path)
+    target_text = f"Updating MCW Launcher to {target_version}" if target_version else "Updating MCW Launcher"
+    tk.Label(
+        heading,
+        text=target_text,
+        fg="#94a3b8",
+        bg="#0b1220",
+        font=("Segoe UI", 10),
+        anchor="w",
+    ).pack(fill="x", pady=(4, 0))
+
+    card = tk.Frame(container, bg="#111a2b", padx=22, pady=20, highlightthickness=1, highlightbackground="#22304a")
+    card.pack(fill="x", pady=(28, 0))
+
+    status_var = tk.StringVar(value="Preparing secure update...")
+    detail_var = tk.StringVar(value="The launcher will close only after the updater is ready.")
+    tk.Label(
+        card,
+        textvariable=status_var,
+        fg="#f8fafc",
+        bg="#111a2b",
+        font=("Segoe UI", 11, "bold"),
+        anchor="w",
+    ).pack(fill="x")
+    tk.Label(
+        card,
+        textvariable=detail_var,
+        fg="#94a3b8",
+        bg="#111a2b",
+        font=("Segoe UI", 9),
+        anchor="w",
+        justify="left",
+        wraplength=500,
+    ).pack(fill="x", pady=(6, 14))
+
+    progress = ttk.Progressbar(card, style="MCW.Horizontal.TProgressbar", mode="determinate", maximum=100, length=500)
+    progress.pack(fill="x")
+    progress["value"] = 6
+
+    footer = tk.Frame(container, bg="#0b1220")
+    footer.pack(fill="x", pady=(18, 0))
+    phase_var = tk.StringVar(value="Initializing updater")
+    tk.Label(
+        footer,
+        textvariable=phase_var,
+        fg="#64748b",
+        bg="#0b1220",
+        font=("Segoe UI", 9),
+        anchor="w",
+    ).pack(side="left")
+    tk.Label(
+        footer,
+        text="Safe update • automatic rollback",
+        fg="#64748b",
+        bg="#0b1220",
+        font=("Segoe UI", 9),
+        anchor="e",
+    ).pack(side="right")
+
     root.protocol("WM_DELETE_WINDOW", lambda: None)
     root.update_idletasks()
 
@@ -77,6 +198,30 @@ def _gui_apply(request_path: Path) -> int:
     last_line = ""
     log_path = request_path.parent / "update.log"
 
+    def map_progress(message: str) -> tuple[int, str, str]:
+        low = message.casefold()
+        if "waiting for launcher process" in low:
+            return 12, "Waiting for MCW Launcher to close", "The updater is waiting for the current launcher process to exit safely."
+        if "remaining launcher process" in low:
+            return 18, "Waiting for launcher processes", message
+        if "executable lock" in low or "replaceable" in low or "fully stopped" in low:
+            return 24, "Confirming launcher file is unlocked", message
+        if "creating rollback backup" in low:
+            return 34, "Creating recovery backup", "A rollback copy is being prepared before any launcher file is changed."
+        if "replacing launcher executable" in low:
+            return 50, "Updating launcher executable", "Replacing the main launcher only after Windows released the file lock."
+        if "copying update from" in low:
+            return 61, "Installing update files", "Applying the verified release payload."
+        if "cleaning obsolete launcher path" in low:
+            return 78, "Cleaning old files", message
+        if "starting updated launcher" in low:
+            return 92, "Starting MCW Launcher", "The update is installed and the new launcher is starting."
+        if "completed" in low:
+            return 100, "Update complete", "MCW Launcher was updated successfully."
+        if "failed" in low or "rollback" in low:
+            return max(int(progress["value"]), 10), "Recovery in progress", message
+        return int(progress["value"]), message, "MCW Updater is continuing the installation."
+
     def poll() -> None:
         nonlocal last_line
         try:
@@ -86,18 +231,33 @@ def _gui_apply(request_path: Path) -> int:
                 if line != last_line:
                     last_line = line
                     message = line.split("] ", 1)[-1]
-                    status_var.set(message)
+                    value, title, detail = map_progress(message)
+                    progress["value"] = value
+                    status_var.set(title)
+                    detail_var.set(detail)
+                    phase_var.set(message[:74])
         except OSError:
             pass
+
         try:
             code = results.get_nowait()
         except queue.Empty:
             root.after(120, poll)
             return
-        progress.stop()
-        status_var.set("Update completed. Starting MCW Launcher..." if code == 0 else "Update failed. Recovery was attempted.")
+
+        if code == 0:
+            progress["value"] = 100
+            status_var.set("Update complete")
+            detail_var.set("MCW Launcher has been updated successfully and is starting now.")
+            phase_var.set("Completed")
+            delay = 1100
+        else:
+            status_var.set("Update could not be completed")
+            detail_var.set("MCW Updater stopped safely and attempted automatic recovery. Check the updater log for details.")
+            phase_var.set("Recovery / failure")
+            delay = 2600
         root.update_idletasks()
-        root.after(900 if code == 0 else 1800, root.destroy)
+        root.after(delay, root.destroy)
         root._mcw_exit_code = code  # type: ignore[attr-defined]
 
     root.after(80, poll)
