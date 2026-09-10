@@ -37,7 +37,7 @@ def make_prepared(tmp_path: Path) -> tuple[PreparedUpdate, Path, Path]:
     bundled.chmod(0o755)
     (source / "mcw-update.json").write_text(json.dumps({
         "schema_version": 2,
-        "version": "1.5.1-beta.5",
+        "version": "1.5.1-beta.6",
         "platform": "linux-x64",
         "executable": "mcw-launcher",
         "updater": "updater/mcw-updater",
@@ -45,8 +45,8 @@ def make_prepared(tmp_path: Path) -> tuple[PreparedUpdate, Path, Path]:
     }), encoding="utf-8")
     info = UpdateInfo(
         current_version="1.5.1-beta.4",
-        version="1.5.1-beta.5",
-        tag_name="v1.5.1-beta.5",
+        version="1.5.1-beta.6",
+        tag_name="v1.5.1-beta.6",
         title="Beta 5",
         release_notes="notes",
         release_url="https://example.invalid/release",
@@ -79,7 +79,7 @@ def test_linux_installer_copies_incoming_bundled_updater_and_writes_schema2_requ
     helper = request_path.parent / "mcw-updater"
     assert request["schema_version"] == 2
     assert request["parent_pid"] == 456
-    assert request["target_version"] == "1.5.1-beta.5"
+    assert request["target_version"] == "1.5.1-beta.6"
     assert helper.read_bytes() == b"new-updater"
     assert helper.stat().st_mode & 0o777 == 0o700
 

@@ -1,26 +1,28 @@
 MCW Launcher release verification
-Version: 1.5.1-beta.5
+Version: 1.5.1-beta.6
 Channel: beta
 
-Local Beta 5 regression:
-- 335 passed, 2 warnings across core update/mod/package + release/spec/bridge suites.
-- 76 passed in the focused final updater/installer/spec/bridge/preflight regression rerun.
+Local Beta 6 regression:
+- 326 passed, 2 warnings across core update/modrinth/mod/package + release/spec/bridge suites.
+- 83 passed in the complete core update + Update Bridge regression suite.
+- 18 passed in the focused update-applier regression including Windows native transition / rename-away safety tests.
 - release_preflight: passed.
-- Windows/Linux release-package smoke build: passed (schema 2, bundled updater, docs cleanup, Linux executable bits).
-- release.yml and update-bridge.yml: YAML parse passed.
 
 Covered areas:
 - updater v2 READY handoff / installed-updater fallback
-- Windows exact-path process drain and executable DELETE/replace lock gate
-- executable-first replacement / retry / rollback
-- branded updater GUI asset/spec contract
+- Windows exact-path process drain without the Beta 5 false-positive DELETE probe
+- native ReplaceFileW / MoveFileExW executable transition
+- Windows rename-away fallback and immediate pathname restoration if new install fails
+- READONLY handling and numeric Win32 error logging
+- executable-first replacement / rollback
+- branded updater GUI status for native fallback phases
 - Windows/Linux release manifest and docs cleanup
-- Update Bridge v1.4.0 recovery integration and CI publishing
+- Update Bridge v1.5.0 recovery integration and CI publishing
 - Modrinth required dependency refresh
 - package extraction/security checks
-- release preflight/workflow/spec checks
+- release workflow/spec checks
 
 Expected warnings:
 - 2 duplicate ZIP-member warnings from intentional package-security regression tests.
 
-Local full `pytest test -q` could not collect GUI tests in the packaging environment because PySide6 is not installed there. The GitHub release workflow installs `.[dev]` and remains the full-suite native gate on Windows and Ubuntu.
+Local full `pytest test -q` may require PySide6 for GUI collection. The GitHub release workflow installs `.[dev]` and remains the full-suite native gate on Windows and Ubuntu.

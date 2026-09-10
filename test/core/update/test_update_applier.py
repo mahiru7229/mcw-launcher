@@ -38,7 +38,7 @@ def test_update_applier_replaces_files_and_restarts(tmp_path, monkeypatch) -> No
     applier = UpdateApplier(request)
     starts: list[bool] = []
     monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
-    monkeypatch.setattr(applier, "_start_launcher", lambda: starts.append(True))
+    monkeypatch.setattr(applier, "_start_launcher", lambda **_kwargs: starts.append(True))
 
     assert applier.run() == 0
     assert (request.destination_directory / "MCW Launcher.exe").read_bytes() == b"new-exe"
@@ -57,9 +57,10 @@ def test_update_applier_rolls_back_and_restarts_previous_launcher(tmp_path, monk
 
     applier = UpdateApplier(request)
     starts: list[bool] = []
+    restored_flags: list[bool] = []
     monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
     monkeypatch.setattr(applier, "_show_error", lambda _message, **_kwargs: None)
-    monkeypatch.setattr(applier, "_start_launcher", lambda: starts.append(True))
+    monkeypatch.setattr(applier, "_start_launcher", lambda **kwargs: (starts.append(True), restored_flags.append(bool(kwargs.get("restored")))))
 
     def fail_after_partial_copy() -> None:
         destination_exe.write_bytes(b"partial")
@@ -70,6 +71,7 @@ def test_update_applier_rolls_back_and_restarts_previous_launcher(tmp_path, monk
     assert applier.run() == 1
     assert destination_exe.read_bytes() == b"old-exe"
     assert starts == [True]
+    assert restored_flags == [True]
     log = request.persistent_log_path.read_text(encoding="utf-8")
     assert "Update failed: simulated copy failure" in log
     assert "Rollback completed" in log
@@ -156,7 +158,7 @@ def test_update_applier_removes_files_managed_by_previous_release(tmp_path, monk
 
     applier = UpdateApplier(request)
     monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
-    monkeypatch.setattr(applier, "_start_launcher", lambda: None)
+    monkeypatch.setattr(applier, "_start_launcher", lambda **_kwargs: None)
 
     assert applier.run() == 0
     assert not stale.exists()
@@ -174,7 +176,7 @@ def test_update_applier_restores_removed_managed_file_on_rollback(tmp_path, monk
 
     applier = UpdateApplier(request)
     monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
-    monkeypatch.setattr(applier, "_start_launcher", lambda: None)
+    monkeypatch.setattr(applier, "_start_launcher", lambda **_kwargs: None)
     monkeypatch.setattr(applier, "_show_error", lambda _message, **_kwargs: None)
     monkeypatch.setattr(applier, "_verify_updated_executable", lambda: (_ for _ in ()).throw(RuntimeError("verify failed")))
 
@@ -203,7 +205,7 @@ def test_update_applier_replaces_executable_before_other_files(tmp_path, monkeyp
     assert Path("lang/en-US.json") in copied[1:]
 
 
-def test_copy_with_retry_retries_locked_launcher_executable_without_recopied_temp(tmp_path, monkeypatch) -> None:
+def test_copy_with_retry_retries_generic_atomic_replace_without_recopied_temp(tmp_path, monkeypatch) -> None:
     request = make_request(tmp_path)
     source = request.source_directory / request.executable_name
     destination = request.destination_directory / request.executable_name
@@ -236,7 +238,6 @@ def test_copy_with_retry_retries_locked_launcher_executable_without_recopied_tem
     assert destination.read_bytes() == b"new-exe"
     assert replace_calls == 3
     assert copy_calls == 1
-    assert "Launcher executable is still locked" in request.persistent_log_path.read_text(encoding="utf-8")
 
 
 def test_rollback_skips_unchanged_locked_executable(tmp_path, monkeypatch) -> None:
@@ -267,7 +268,7 @@ def test_update_applier_does_not_restart_when_rollback_fails(tmp_path, monkeypat
     monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
     monkeypatch.setattr(applier, "_copy_update_files", lambda: (_ for _ in ()).throw(RuntimeError("copy failed")))
     monkeypatch.setattr(applier, "_restore_backup", lambda: (_ for _ in ()).throw(RuntimeError("rollback failed")))
-    monkeypatch.setattr(applier, "_start_launcher", lambda: starts.append(True))
+    monkeypatch.setattr(applier, "_start_launcher", lambda **_kwargs: starts.append(True))
     monkeypatch.setattr(applier, "_show_error", lambda message, *, rollback_completed=True: shown.append((message, rollback_completed)))
 
     assert applier.run() == 1
@@ -304,7 +305,7 @@ def test_update_applier_atomically_installs_executable_linux_mode(tmp_path, monk
     )
     applier = UpdateApplier(request)
     monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
-    monkeypatch.setattr(applier, "_start_launcher", lambda: None)
+    monkeypatch.setattr(applier, "_start_launcher", lambda **_kwargs: None)
 
     assert applier.run() == 0
     assert destination_executable.read_bytes() == b"new-linux"
@@ -321,7 +322,7 @@ def test_update_applier_cleanup_paths_removes_old_docs_without_error(tmp_path, m
     (docs / "old.md").write_text("legacy docs", encoding="utf-8")
     (request.source_directory / "mcw-update.json").write_text(json.dumps({
         "schema_version": 2,
-        "version": "1.5.1-beta.5",
+        "version": "1.5.1-beta.6",
         "platform": "windows-x64",
         "executable": request.executable_name,
         "files": [request.executable_name, "mcw-update.json"],
@@ -330,13 +331,13 @@ def test_update_applier_cleanup_paths_removes_old_docs_without_error(tmp_path, m
 
     applier = UpdateApplier(request)
     monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
-    monkeypatch.setattr(applier, "_start_launcher", lambda: None)
+    monkeypatch.setattr(applier, "_start_launcher", lambda **_kwargs: None)
 
     assert applier.run() == 0
     assert not docs.exists()
 
 
-def test_windows_release_gate_waits_for_matching_process_and_file_lock(tmp_path, monkeypatch) -> None:
+def test_windows_release_gate_waits_for_matching_processes_without_false_unlock_probe(tmp_path, monkeypatch) -> None:
     from types import SimpleNamespace
 
     request = make_request(tmp_path)
@@ -345,24 +346,23 @@ def test_windows_release_gate_waits_for_matching_process_and_file_lock(tmp_path,
     applier = UpdateApplier(request)
 
     process_states = iter([[501, 502], [], []])
-    lock_states = iter([False, False, True])
     monkeypatch.setattr(
         "src.core.update.update_applier.PlatformInfo.current",
         lambda: SimpleNamespace(os_name="windows"),
     )
     monkeypatch.setattr(applier, "_matching_windows_processes", lambda _path: next(process_states))
-    monkeypatch.setattr(applier, "_windows_executable_replaceable", lambda _path: next(lock_states))
     monkeypatch.setattr(applier, "WINDOWS_RELEASE_POLL_SECONDS", 0)
+    monkeypatch.setattr(applier, "WINDOWS_SETTLE_SECONDS", 0)
 
     applier._wait_for_launcher_release(timeout_seconds=1.0)
 
     log = request.persistent_log_path.read_text(encoding="utf-8")
     assert "Detected remaining launcher process(es) for this installation: 501, 502" in log
-    assert "No launcher process remains; waiting for executable lock to be released" in log
-    assert "Launcher installation is fully stopped and executable lock is released" in log
+    assert "No launcher process remains; Windows replacement transaction may begin" in log
+    assert "executable lock is released" not in log
 
 
-def test_windows_release_gate_times_out_before_transaction_when_lock_remains(tmp_path, monkeypatch) -> None:
+def test_windows_release_gate_times_out_before_transaction_when_process_remains(tmp_path, monkeypatch) -> None:
     from types import SimpleNamespace
 
     request = make_request(tmp_path)
@@ -374,11 +374,99 @@ def test_windows_release_gate_times_out_before_transaction_when_lock_remains(tmp
         "src.core.update.update_applier.PlatformInfo.current",
         lambda: SimpleNamespace(os_name="windows"),
     )
-    monkeypatch.setattr(applier, "_matching_windows_processes", lambda _path: [])
-    monkeypatch.setattr(applier, "_windows_executable_replaceable", lambda _path: False)
+    monkeypatch.setattr(applier, "_matching_windows_processes", lambda _path: [501])
+    monkeypatch.setattr(applier, "WINDOWS_RELEASE_POLL_SECONDS", 0)
+    monkeypatch.setattr(applier, "WINDOWS_SETTLE_SECONDS", 0)
 
     with pytest.raises(TimeoutError, match="update was not started"):
         applier._wait_for_launcher_release(timeout_seconds=0.0)
+
+
+def test_windows_launcher_replace_uses_rename_away_fallback(tmp_path, monkeypatch) -> None:
+    request = make_request(tmp_path)
+    source = request.source_directory / request.executable_name
+    destination = request.destination_directory / request.executable_name
+    source.write_bytes(b"new-exe")
+    destination.write_bytes(b"old-exe")
+    applier = UpdateApplier(request)
+
+    monkeypatch.setattr(applier, "_windows_file_attributes", lambda _path: None)
+    monkeypatch.setattr(applier, "_windows_replace_existing", lambda _src, _dst: (False, "MoveFileExW(REPLACE_EXISTING)", 5))
+
+    moves: list[tuple[str, str]] = []
+    def fake_move(src: Path, dst: Path, *, replace_existing: bool):
+        moves.append((src.name, dst.name))
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(src, dst)
+        return True, 0
+
+    monkeypatch.setattr(applier, "_windows_move_file", fake_move)
+    applier._copy_windows_launcher_with_retry(source, destination)
+
+    assert destination.read_bytes() == b"new-exe"
+    assert len(moves) == 2
+    assert moves[0][0] == request.executable_name
+    assert moves[1][1] == request.executable_name
+    log = request.persistent_log_path.read_text(encoding="utf-8")
+    assert "Direct launcher replacement blocked" in log
+    assert "using Windows rename-away fallback" in log
+    assert "installed successfully after rename-away fallback" in log
+
+
+def test_windows_rename_away_restores_old_launcher_when_new_install_fails(tmp_path, monkeypatch) -> None:
+    request = make_request(tmp_path)
+    source = request.source_directory / request.executable_name
+    destination = request.destination_directory / request.executable_name
+    source.write_bytes(b"new-exe")
+    destination.write_bytes(b"old-exe")
+    applier = UpdateApplier(request)
+    applier.EXECUTABLE_REPLACE_RETRIES = 1
+
+    monkeypatch.setattr(applier, "_windows_file_attributes", lambda _path: None)
+    monkeypatch.setattr(applier, "_windows_replace_existing", lambda _src, _dst: (False, "MoveFileExW(REPLACE_EXISTING)", 5))
+
+    call = 0
+    def fake_move(src: Path, dst: Path, *, replace_existing: bool):
+        nonlocal call
+        call += 1
+        if call == 1:  # old launcher -> retired
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(src, dst)
+            return True, 0
+        if call == 2:  # new launcher -> public path fails
+            return False, 32
+        if call == 3:  # retired -> public path must restore
+            os.replace(src, dst)
+            return True, 0
+        raise AssertionError("unexpected move")
+
+    monkeypatch.setattr(applier, "_windows_move_file", fake_move)
+    with pytest.raises(RuntimeError, match="Could not transition Windows launcher executable"):
+        applier._copy_windows_launcher_with_retry(source, destination)
+
+    assert destination.read_bytes() == b"old-exe"
+
+
+def test_windows_launcher_replace_clears_and_restores_readonly_on_failure(tmp_path, monkeypatch) -> None:
+    request = make_request(tmp_path)
+    source = request.source_directory / request.executable_name
+    destination = request.destination_directory / request.executable_name
+    source.write_bytes(b"new-exe")
+    destination.write_bytes(b"old-exe")
+    applier = UpdateApplier(request)
+    applier.EXECUTABLE_REPLACE_RETRIES = 1
+
+    attributes_written: list[int] = []
+    monkeypatch.setattr(applier, "_windows_file_attributes", lambda _path: 0x21)  # ARCHIVE | READONLY
+    monkeypatch.setattr(applier, "_windows_set_file_attributes", lambda _path, attrs: attributes_written.append(attrs) or True)
+    monkeypatch.setattr(applier, "_windows_replace_existing", lambda _src, _dst: (False, "MoveFileExW(REPLACE_EXISTING)", 5))
+    monkeypatch.setattr(applier, "_windows_move_file", lambda _src, _dst, *, replace_existing: (False, 5))
+
+    with pytest.raises(RuntimeError):
+        applier._copy_windows_launcher_with_retry(source, destination)
+
+    assert attributes_written == [0x20, 0x21]
+    assert destination.read_bytes() == b"old-exe"
 
 
 def test_non_windows_release_gate_skips_windows_process_scan(tmp_path, monkeypatch) -> None:

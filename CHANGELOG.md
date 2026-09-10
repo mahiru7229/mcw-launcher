@@ -2,6 +2,18 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.1-beta.6] - 2026-09-11
+
+### Fixed
+- Replace the Beta 5 DELETE-access preflight with the real Win32 executable transition as the source of truth.
+- Use `ReplaceFileW` / `MoveFileExW` for Windows launcher replacement and report the numeric Win32 error when Windows blocks the operation.
+- Add a rename-away fallback that retires the previous launcher image before installing the new executable when direct replacement is denied by a lingering mapped image.
+- Clear a stale READONLY attribute before replacement and restore it if the transition never succeeds.
+- Correct rollback restart logging so a restored launcher is not described as an updated launcher.
+
+### Recovery
+- MCW Update Bridge v1.5.0 now targets `v1.5.1-beta.6` while retaining LF-safe checksum generation and repository-independent GitHub release publishing.
+
 ## [1.5.1-beta.5] - 2026-09-11
 
 ### Fixed

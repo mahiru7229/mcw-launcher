@@ -204,8 +204,14 @@ def _gui_apply(request_path: Path) -> int:
             return 12, "Waiting for MCW Launcher to close", "The updater is waiting for the current launcher process to exit safely."
         if "remaining launcher process" in low:
             return 18, "Waiting for launcher processes", message
-        if "executable lock" in low or "replaceable" in low or "fully stopped" in low:
-            return 24, "Confirming launcher file is unlocked", message
+        if "windows replacement transaction may begin" in low:
+            return 24, "Preparing Windows executable transition", "The launcher process has exited. MCW Updater will now perform the real native replacement check."
+        if "direct launcher replacement blocked" in low:
+            return 46, "Windows is still holding the previous launcher", message
+        if "rename-away fallback" in low:
+            return 54, "Switching launcher safely", "The previous launcher image is being retired so the new executable can take its place."
+        if "launcher transition is still blocked" in low:
+            return 48, "Waiting for Windows to release the launcher", message
         if "creating rollback backup" in low:
             return 34, "Creating recovery backup", "A rollback copy is being prepared before any launcher file is changed."
         if "replacing launcher executable" in low:

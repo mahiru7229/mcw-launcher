@@ -66,6 +66,8 @@ class UpdateApplier:
     COPY_RETRY_DELAY_SECONDS = 0.25
     WINDOWS_RELEASE_TIMEOUT_SECONDS = 60.0
     WINDOWS_RELEASE_POLL_SECONDS = 0.20
+    WINDOWS_SETTLE_SECONDS = 0.75
+    WINDOWS_RETRIABLE_REPLACE_ERRORS = frozenset({5, 32, 33})  # ACCESS_DENIED / SHARING_VIOLATION / LOCK_VIOLATION
 
     def __init__(self, request: UpdateApplyRequest) -> None:
         self.request = request
@@ -104,7 +106,7 @@ class UpdateApplier:
 
             if rollback_completed:
                 try:
-                    self._start_launcher()
+                    self._start_launcher(restored=True)
                     self._log("Previous launcher restarted after update failure")
                 except Exception as restart_error:
                     self._log(f"Could not restart the launcher after failure: {restart_error}")
@@ -275,7 +277,7 @@ class UpdateApplier:
         if not self.request.executable_name.casefold().endswith(".exe") and updated_executable.stat().st_mode & 0o111 == 0:
             raise RuntimeError("The updated Linux launcher is not executable.")
 
-    def _start_launcher(self) -> None:
+    def _start_launcher(self, *, restored: bool = False) -> None:
         executable = self.request.destination_directory / self.request.executable_name
         if not executable.is_file():
             raise FileNotFoundError(f"Launcher executable does not exist: {executable}")
@@ -291,33 +293,29 @@ class UpdateApplier:
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         else:
             kwargs["start_new_session"] = True
-        self._log("Starting updated launcher")
+        self._log("Starting restored launcher after rollback" if restored else "Starting updated launcher")
         subprocess.Popen(
             [str(executable), "--cleanup-update", str(self.request.updater_directory), str(os.getpid())],
             **kwargs,
         )
 
     def _copy_with_retry(self, source: Path, destination: Path) -> None:
+        if self._is_launcher_executable(destination) and PlatformInfo.current().os_name == "windows":
+            self._copy_windows_launcher_with_retry(source, destination)
+            return
+
         retries = self._replace_retries_for(destination)
         temporary = destination.with_name(f".{destination.name}.mcw-update-{uuid.uuid4().hex}.tmp")
         last_error: OSError | None = None
 
         try:
-            # Copy once. Only the atomic rename is retried when Windows still holds
-            # a transient lock on the destination executable. Re-copying the full
-            # packaged EXE on every retry makes the lock window unnecessarily longer.
             shutil.copy2(source, temporary)
             for attempt in range(retries):
                 try:
                     os.replace(temporary, destination)
-                    if attempt > 0 and self._is_launcher_executable(destination):
-                        self._log(f"Launcher executable became replaceable after {attempt + 1} attempts")
                     return
                 except OSError as error:
                     last_error = error
-                    if attempt == 0 and self._is_launcher_executable(destination):
-                        max_wait = retries * self.COPY_RETRY_DELAY_SECONDS
-                        self._log(f"Launcher executable is still locked; retrying for up to {max_wait:.0f} seconds")
                     if attempt + 1 < retries:
                         time.sleep(self.COPY_RETRY_DELAY_SECONDS)
         finally:
@@ -327,6 +325,87 @@ class UpdateApplier:
                 pass
 
         raise RuntimeError(f"Could not replace {destination}: {last_error}") from last_error
+
+    def _copy_windows_launcher_with_retry(self, source: Path, destination: Path) -> None:
+        """Replace the Windows launcher using native semantics with a rename-away fallback.
+
+        A mapped PE image can outlive the GUI PID and still reject replace/delete even when a
+        DELETE-access CreateFile probe succeeds.  The real ReplaceFileW / MoveFileExW operation is
+        therefore the source of truth.  If replacing the existing pathname is blocked but Windows
+        permits renaming the old image, move it into the updater directory first and then install
+        the new image at the original pathname.  This mirrors robust native self-updaters and avoids
+        starting a mixed-version transaction when the executable cannot actually be transitioned.
+        """
+        temporary = destination.with_name(f".{destination.name}.mcw-update-{uuid.uuid4().hex}.tmp")
+        retired_directory = self.request.updater_directory / "retired"
+        retired_directory.mkdir(parents=True, exist_ok=True)
+        retired = retired_directory / f"{destination.name}.{uuid.uuid4().hex}.old"
+        original_attributes = self._windows_file_attributes(destination)
+        changed_readonly = False
+        last_detail = "unknown Windows replacement error"
+
+        try:
+            shutil.copy2(source, temporary)
+            if original_attributes is not None and original_attributes & 0x1:
+                if self._windows_set_file_attributes(destination, original_attributes & ~0x1):
+                    changed_readonly = True
+                    self._log("Cleared READONLY attribute from the installed launcher before replacement")
+                else:
+                    code = self._windows_last_error()
+                    self._log(f"Could not clear launcher READONLY attribute: {self._format_windows_error(code)}")
+
+            for attempt in range(self.EXECUTABLE_REPLACE_RETRIES):
+                direct_ok, direct_api, direct_error = self._windows_replace_existing(temporary, destination)
+                if direct_ok:
+                    if attempt:
+                        self._log(f"Launcher executable became replaceable after {attempt + 1} attempts")
+                    self._log(f"Launcher executable replaced successfully using {direct_api}")
+                    return
+
+                last_detail = f"{direct_api}: {self._format_windows_error(direct_error)}"
+                if attempt == 0:
+                    self._log(f"Direct launcher replacement blocked ({last_detail})")
+
+                # ERROR_ACCESS_DENIED / SHARING_VIOLATION / LOCK_VIOLATION are exactly the cases
+                # where rename-away can free the public pathname while an old image section drains.
+                if direct_error in self.WINDOWS_RETRIABLE_REPLACE_ERRORS and destination.exists():
+                    renamed, rename_error = self._windows_move_file(destination, retired, replace_existing=False)
+                    if renamed:
+                        self._log("Direct replacement is blocked; using Windows rename-away fallback")
+                        installed, install_error = self._windows_move_file(temporary, destination, replace_existing=False)
+                        if installed:
+                            self._log("Launcher executable installed successfully after rename-away fallback")
+                            self._cleanup_retired_windows_executable(retired)
+                            return
+
+                        # The old launcher pathname must be restored immediately if installing the
+                        # new file fails.  Do not continue with the rest of the update in this state.
+                        restored, restore_error = self._windows_move_file(retired, destination, replace_existing=False)
+                        if not restored:
+                            raise RuntimeError(
+                                "Windows rename-away fallback could not restore the previous launcher after "
+                                f"the new launcher install failed. install={self._format_windows_error(install_error)}; "
+                                f"restore={self._format_windows_error(restore_error)}"
+                            )
+                        last_detail = f"MoveFileExW(new launcher): {self._format_windows_error(install_error)}"
+                    else:
+                        last_detail = f"MoveFileExW(rename old launcher): {self._format_windows_error(rename_error)}"
+
+                if attempt + 1 < self.EXECUTABLE_REPLACE_RETRIES:
+                    if attempt == 0:
+                        max_wait = self.EXECUTABLE_REPLACE_RETRIES * self.COPY_RETRY_DELAY_SECONDS
+                        self._log(f"Launcher transition is still blocked; retrying for up to {max_wait:.0f} seconds")
+                    time.sleep(self.COPY_RETRY_DELAY_SECONDS)
+        finally:
+            # If replacement never succeeded, preserve the previous readonly state.
+            if changed_readonly and destination.exists() and temporary.exists() and original_attributes is not None:
+                self._windows_set_file_attributes(destination, original_attributes)
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+        raise RuntimeError(f"Could not transition Windows launcher executable {destination}: {last_detail}")
 
     def _replace_retries_for(self, destination: Path) -> int:
         if self._is_launcher_executable(destination):
@@ -387,12 +466,12 @@ class UpdateApplier:
         raise TimeoutError("The launcher did not close within two minutes.")
 
     def _wait_for_launcher_release(self, timeout_seconds: float | None = None) -> None:
-        """Wait until no process owns this installation's launcher image and Windows grants delete access.
+        """Wait for processes using this installation's launcher path to exit.
 
-        Waiting only for the GUI PID is insufficient for PyInstaller one-file/windowed applications:
-        a bootloader sibling or security scanner can retain a handle after that PID exits.  The
-        transaction therefore does not begin until the exact executable path is process-free and
-        can be opened with DELETE access.  Linux does not require this Windows-specific gate.
+        Beta 5 treated a successful CreateFile(DELETE) probe as proof that the executable could be
+        replaced.  Live logs demonstrated that Windows can still reject rename/replace afterward
+        (for example while a mapped image section drains).  Beta 6 deliberately avoids claiming the
+        file is unlocked here.  The definitive gate is the native replacement transaction itself.
         """
         if PlatformInfo.current().os_name != "windows":
             return
@@ -401,32 +480,29 @@ class UpdateApplier:
         timeout = self.WINDOWS_RELEASE_TIMEOUT_SECONDS if timeout_seconds is None else max(0.0, timeout_seconds)
         deadline = time.monotonic() + timeout
         previous_pids: tuple[int, ...] | None = None
-        lock_logged = False
 
         while True:
             pids = tuple(self._matching_windows_processes(executable))
-            replaceable = self._windows_executable_replaceable(executable)
-            if not pids and replaceable:
-                self._log("Launcher installation is fully stopped and executable lock is released")
-                return
+            if not pids:
+                if self.WINDOWS_SETTLE_SECONDS > 0:
+                    time.sleep(self.WINDOWS_SETTLE_SECONDS)
+                # Re-scan after a short settle window in case a PyInstaller sibling was still exiting.
+                pids = tuple(self._matching_windows_processes(executable))
+                if not pids:
+                    self._log("No launcher process remains; Windows replacement transaction may begin")
+                    return
 
             if pids != previous_pids:
                 previous_pids = pids
-                if pids:
-                    self._log(
-                        "Detected remaining launcher process(es) for this installation: "
-                        + ", ".join(str(pid) for pid in pids)
-                    )
-                else:
-                    self._log("No launcher process remains; waiting for executable lock to be released")
-            if not replaceable and not lock_logged:
-                self._log("Launcher executable lock is still active; waiting before update transaction")
-                lock_logged = True
+                self._log(
+                    "Detected remaining launcher process(es) for this installation: "
+                    + ", ".join(str(pid) for pid in pids)
+                )
 
             if time.monotonic() >= deadline:
                 detail = f" process(es): {', '.join(str(pid) for pid in pids)}" if pids else ""
                 raise TimeoutError(
-                    f"{self.request.executable_name} is still in use after {timeout:.0f} seconds;"
+                    f"{self.request.executable_name} is still running after {timeout:.0f} seconds;"
                     f" update was not started.{detail}"
                 )
             time.sleep(self.WINDOWS_RELEASE_POLL_SECONDS)
@@ -442,8 +518,8 @@ class UpdateApplier:
     def _matching_windows_processes(cls, executable: Path) -> list[int]:
         """Return processes whose full image path is exactly the target launcher path.
 
-        Processes that cannot be queried are ignored here; the delete-access probe still prevents
-        the update from starting if one of those processes owns a non-share-delete file handle.
+        Processes that cannot be queried are ignored here; the native replacement transaction is
+        still authoritative and will abort safely if an unqueryable process or filter blocks it.
         """
         if os.name != "nt":
             return []
@@ -514,41 +590,128 @@ class UpdateApplier:
         return sorted(set(matches))
 
     @staticmethod
-    def _windows_executable_replaceable(executable: Path) -> bool:
-        """Probe whether Windows currently permits delete/replace access to the launcher image."""
-        if os.name != "nt" or not executable.exists():
-            return True
+    def _windows_kernel32():
+        return ctypes.WinDLL("kernel32", use_last_error=True)
 
+    @staticmethod
+    def _windows_last_error() -> int:
+        try:
+            return int(ctypes.get_last_error())
+        except Exception:
+            return 0
+
+    @staticmethod
+    def _format_windows_error(code: int) -> str:
+        code = int(code or 0)
+        try:
+            detail = ctypes.FormatError(code).strip()
+        except Exception:
+            detail = ""
+        return f"Win32 error {code}" + (f" ({detail})" if detail else "")
+
+    @classmethod
+    def _windows_file_attributes(cls, path: Path) -> int | None:
+        if os.name != "nt" or not path.exists():
+            return None
         from ctypes import wintypes
+        kernel32 = cls._windows_kernel32()
+        kernel32.GetFileAttributesW.argtypes = [wintypes.LPCWSTR]
+        kernel32.GetFileAttributesW.restype = wintypes.DWORD
+        invalid = 0xFFFFFFFF
+        value = int(kernel32.GetFileAttributesW(str(path)))
+        return None if value == invalid else value
 
-        DELETE = 0x00010000
-        FILE_SHARE_READ = 0x00000001
-        FILE_SHARE_WRITE = 0x00000002
-        FILE_SHARE_DELETE = 0x00000004
-        OPEN_EXISTING = 3
-        FILE_ATTRIBUTE_NORMAL = 0x00000080
-        INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
-        kernel32 = ctypes.windll.kernel32
-        kernel32.CreateFileW.argtypes = [
-            wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
-            wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE,
-        ]
-        kernel32.CreateFileW.restype = wintypes.HANDLE
-        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
-        kernel32.CloseHandle.restype = wintypes.BOOL
-        handle = kernel32.CreateFileW(
-            str(executable),
-            DELETE,
-            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-            None,
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL,
-            None,
-        )
-        if handle == INVALID_HANDLE_VALUE:
+    @classmethod
+    def _windows_set_file_attributes(cls, path: Path, attributes: int) -> bool:
+        if os.name != "nt":
             return False
-        kernel32.CloseHandle(handle)
-        return True
+        from ctypes import wintypes
+        kernel32 = cls._windows_kernel32()
+        kernel32.SetFileAttributesW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD]
+        kernel32.SetFileAttributesW.restype = wintypes.BOOL
+        return bool(kernel32.SetFileAttributesW(str(path), int(attributes)))
+
+    @classmethod
+    def _windows_replace_existing(cls, replacement: Path, destination: Path) -> tuple[bool, str, int]:
+        """Try native replacement without modifying the old pathname on failure."""
+        if os.name != "nt":
+            raise RuntimeError("Windows replacement helper called on a non-Windows host.")
+        from ctypes import wintypes
+        kernel32 = cls._windows_kernel32()
+
+        if destination.exists():
+            REPLACEFILE_WRITE_THROUGH = 0x00000001
+            REPLACEFILE_IGNORE_MERGE_ERRORS = 0x00000002
+            kernel32.ReplaceFileW.argtypes = [
+                wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR,
+                wintypes.DWORD, wintypes.LPVOID, wintypes.LPVOID,
+            ]
+            kernel32.ReplaceFileW.restype = wintypes.BOOL
+            ctypes.set_last_error(0)
+            if kernel32.ReplaceFileW(
+                str(destination), str(replacement), None,
+                REPLACEFILE_WRITE_THROUGH | REPLACEFILE_IGNORE_MERGE_ERRORS,
+                None, None,
+            ):
+                return True, "ReplaceFileW", 0
+            replace_error = cls._windows_last_error()
+        else:
+            replace_error = 2
+
+        MOVEFILE_REPLACE_EXISTING = 0x00000001
+        MOVEFILE_WRITE_THROUGH = 0x00000008
+        kernel32.MoveFileExW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD]
+        kernel32.MoveFileExW.restype = wintypes.BOOL
+        ctypes.set_last_error(0)
+        if kernel32.MoveFileExW(
+            str(replacement), str(destination), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+        ):
+            return True, "MoveFileExW(REPLACE_EXISTING)", 0
+        move_error = cls._windows_last_error()
+        # Prefer the MoveFileEx error because it is the last operation and directly mirrors os.replace.
+        return False, "MoveFileExW(REPLACE_EXISTING)", int(move_error or replace_error)
+
+    @classmethod
+    def _windows_move_file(cls, source: Path, destination: Path, *, replace_existing: bool) -> tuple[bool, int]:
+        if os.name != "nt":
+            raise RuntimeError("Windows move helper called on a non-Windows host.")
+        from ctypes import wintypes
+        kernel32 = cls._windows_kernel32()
+        MOVEFILE_REPLACE_EXISTING = 0x00000001
+        MOVEFILE_WRITE_THROUGH = 0x00000008
+        flags = MOVEFILE_WRITE_THROUGH | (MOVEFILE_REPLACE_EXISTING if replace_existing else 0)
+        kernel32.MoveFileExW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD]
+        kernel32.MoveFileExW.restype = wintypes.BOOL
+        ctypes.set_last_error(0)
+        if kernel32.MoveFileExW(str(source), str(destination), flags):
+            return True, 0
+        return False, cls._windows_last_error()
+
+    def _cleanup_retired_windows_executable(self, retired: Path) -> None:
+        try:
+            retired.unlink(missing_ok=True)
+            return
+        except OSError as error:
+            self._log(f"Retired launcher is still referenced; deferring cleanup: {error}")
+
+        if os.name != "nt" or not retired.exists():
+            return
+        try:
+            from ctypes import wintypes
+            kernel32 = self._windows_kernel32()
+            MOVEFILE_DELAY_UNTIL_REBOOT = 0x00000004
+            kernel32.MoveFileExW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD]
+            kernel32.MoveFileExW.restype = wintypes.BOOL
+            ctypes.set_last_error(0)
+            if kernel32.MoveFileExW(str(retired), None, MOVEFILE_DELAY_UNTIL_REBOOT):
+                self._log("Retired launcher cleanup scheduled for the next Windows restart")
+            else:
+                self._log(
+                    "Could not schedule retired launcher cleanup: "
+                    + self._format_windows_error(self._windows_last_error())
+                )
+        except Exception as error:
+            self._log(f"Could not schedule retired launcher cleanup: {error}")
 
     def _show_error(self, message: str, *, rollback_completed: bool = True) -> None:
         if os.name != "nt":

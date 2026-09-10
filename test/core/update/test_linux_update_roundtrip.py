@@ -73,7 +73,7 @@ def test_packaged_beta1_to_beta2_linux_update_roundtrip_preserves_user_data(tmp_
         request.updater_directory.mkdir()
         applier = UpdateApplier(request)
         monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
-        monkeypatch.setattr(applier, "_start_launcher", lambda: None)
+        monkeypatch.setattr(applier, "_start_launcher", lambda **_kwargs: None)
 
         assert applier.run() == 0
         assert installed_executable.read_bytes() == b"beta-2-linux-binary"
