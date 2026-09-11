@@ -1,8 +1,9 @@
-# MCW Update Bridge v1.3.0 CI publish fix
+# Beta 6 Windows CI test fix
 
-Fixes two GitHub Actions portability issues in `.github/workflows/update-bridge.yml`:
+This patch updates `test/core/update/test_update_applier.py` so the generic atomic-replace test uses a normal managed file instead of `MCW Launcher.exe`.
 
-1. SHA-256 sidecars are emitted with LF line endings and normalized before `sha256sum --check`.
-2. `gh release upload` receives `--repo "${{ github.repository }}"` so the publish job does not need a `.git` checkout.
+Why: on Windows, Beta 6 intentionally routes the launcher executable through the native Windows replacement path, so patching `os.replace` no longer observes launcher replacement calls.
 
-Apply at repository root, then commit and rerun `Build MCW Update Bridge`.
+Validated:
+- `python -m pytest test/core/update/test_update_applier.py -q` -> 18 passed
+- `python -m pytest test/core/update -q` -> 65 passed

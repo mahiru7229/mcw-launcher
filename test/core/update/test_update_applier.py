@@ -207,10 +207,16 @@ def test_update_applier_replaces_executable_before_other_files(tmp_path, monkeyp
 
 def test_copy_with_retry_retries_generic_atomic_replace_without_recopied_temp(tmp_path, monkeypatch) -> None:
     request = make_request(tmp_path)
-    source = request.source_directory / request.executable_name
-    destination = request.destination_directory / request.executable_name
-    source.write_bytes(b"new-exe")
-    destination.write_bytes(b"old-exe")
+    # This test exercises the platform-neutral atomic-copy path. The launcher
+    # executable intentionally takes the native Windows transition path on
+    # Windows, so use an ordinary managed file here to keep the test generic
+    # on every CI runner.
+    source = request.source_directory / "lang" / "en-US.json"
+    destination = request.destination_directory / "lang" / "en-US.json"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    source.write_bytes(b"new-language")
+    destination.write_bytes(b"old-language")
     applier = UpdateApplier(request)
 
     real_replace = os.replace
@@ -235,7 +241,7 @@ def test_copy_with_retry_retries_generic_atomic_replace_without_recopied_temp(tm
 
     applier._copy_with_retry(source, destination)
 
-    assert destination.read_bytes() == b"new-exe"
+    assert destination.read_bytes() == b"new-language"
     assert replace_calls == 3
     assert copy_calls == 1
 
