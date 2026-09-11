@@ -52,11 +52,16 @@ class TaskQueue(QObject):
         if self._runner is not None:
             return
         self._runner = runner
-        self._runner.task_started.connect(self._on_task_started)
-        self._runner.task_progress.connect(self._on_task_progress)
-        self._runner.task_succeeded.connect(self._on_task_succeeded)
-        self._runner.task_failed.connect(self._on_task_failed)
-        self._runner.task_cancelled.connect(self._on_task_cancelled)
+        if hasattr(self._runner, "task_started"):
+            self._runner.task_started.connect(self._on_task_started)
+        if hasattr(self._runner, "task_progress"):
+            self._runner.task_progress.connect(self._on_task_progress)
+        if hasattr(self._runner, "task_succeeded"):
+            self._runner.task_succeeded.connect(self._on_task_succeeded)
+        if hasattr(self._runner, "task_failed"):
+            self._runner.task_failed.connect(self._on_task_failed)
+        if hasattr(self._runner, "task_cancelled"):
+            self._runner.task_cancelled.connect(self._on_task_cancelled)
 
     def active_tasks(self) -> list[TaskQueueItem]:
         return [item for item in self._items.values() if item.is_active]
@@ -69,8 +74,14 @@ class TaskQueue(QObject):
 
     def cancel_task(self, task_id: str) -> bool:
         if self._runner is not None:
-            return self._runner.cancel_task(task_id)
+            if hasattr(self._runner, "cancel_task"):
+                return bool(self._runner.cancel_task(task_id))
+            if hasattr(self._runner, "cancel"):
+                return bool(self._runner.cancel(task_id))
         return False
+
+    def update_progress(self, task_id: str, event: Any) -> None:
+        self._on_task_progress(task_id, event)
 
     def clear_completed(self) -> None:
         self._items = {k: v for k, v in self._items.items() if v.is_active}

@@ -212,8 +212,8 @@ def clean_workspace(
     for current_root, dirnames, filenames in os.walk(root, topdown=True):
         current_path = Path(current_root)
 
-        # Never enter .git
-        dirnames[:] = [d for d in dirnames if d != ".git"]
+        # Never enter .git or virtual environments
+        dirnames[:] = [d for d in dirnames if d not in {".git", ".venv", "venv", ".alpha2-venv"}]
 
         # Check directories to delete
         dirs_to_remove = []

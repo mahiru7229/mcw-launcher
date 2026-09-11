@@ -113,7 +113,7 @@ class AppState(QObject):
     def is_online(self) -> bool:
         return self._is_online
 
-    def set_online(self, online: bool) -> None:
+    def set_online(self, online: bool, _message: str = "") -> None:
         if self._is_online != online:
             self._is_online = bool(online)
             self.connectivity_changed.emit(self._is_online)
