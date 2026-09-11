@@ -34,6 +34,7 @@ from src.gui.application import create_application
 from src.gui.animation.motion_runtime import MotionRuntime
 from src.gui.app_restart import start_restarted_process
 from src.gui.config import GITHUB_REPOSITORY, LAUNCHER_NAME, VERSION_ID
+from src.gui.core import GuiContext, set_default_gui_context
 from src.gui.controllers.account_controller import AccountController
 from src.gui.controllers.curseforge_controller import CurseForgeController
 from src.gui.controllers.content_pack_controller import ContentPackController
@@ -153,6 +154,19 @@ class MainWindow(QMainWindow):
         self.launch_controller = LaunchController(self.task_runner)
         self.lan_hosting_controller = LanHostingController(self.task_runner)
         self.update_controller = UpdateController(self.task_runner, channel=self._startup_settings.get("update_channel", "stable"))
+        self.gui_context = GuiContext(task_runner=self.task_runner, parent=self)
+        self.gui_context.register_controller("instances", self.instance_controller)
+        self.gui_context.register_controller("accounts", self.account_controller)
+        self.gui_context.register_controller("connectivity", self.connectivity_controller)
+        self.gui_context.register_controller("launch", self.launch_controller)
+        self.gui_context.register_controller("updates", self.update_controller)
+        self.gui_context.register_controller("modrinth", self.modrinth_controller)
+        self.gui_context.register_controller("curseforge", self.curseforge_controller)
+        self.gui_context.register_controller("content_pack", self.content_pack_controller)
+        self.gui_context.register_controller("java", self.java_controller)
+        self.gui_context.register_controller("backup", self.backup_controller)
+        self.gui_context.register_controller("settings", self.gui_settings_controller)
+        set_default_gui_context(self.gui_context)
         self.running_instances_timer = QTimer(self)
         self._modrinth_tasks: set[str] = set()
         self._mod_catalog_tasks: set[str] = set()
