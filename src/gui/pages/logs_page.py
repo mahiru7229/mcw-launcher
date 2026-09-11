@@ -19,6 +19,7 @@ class LogsPage(BasePage):
     open_latest_game_log_requested = Signal()
     open_latest_crash_report_requested = Signal()
     report_issue_requested = Signal()
+    upload_mclogs_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__("Logs", "Frontend activity and structured progress events appear here.", "logs")
@@ -32,6 +33,7 @@ class LogsPage(BasePage):
         buttons = QHBoxLayout()
         copy_button = set_theme_icon(QPushButton("Copy all"), "icon.action.copy")
         clear_button = set_theme_icon(QPushButton("Clear"), "icon.action.clear")
+        self.upload_mclogs_button = set_theme_icon(QPushButton(tr("logs.upload_mclogs")), "icon.action.export")
         export_button = set_theme_icon(QPushButton("Export diagnostics"), "icon.action.export")
         report_button = set_theme_icon(QPushButton(tr("issue_report.error.report")), "icon.state.error")
         open_folder_button = set_theme_icon(QPushButton("Open logs folder"), "icon.action.folder")
@@ -39,6 +41,7 @@ class LogsPage(BasePage):
         open_crash_report_button = set_theme_icon(QPushButton("Open latest crash report"), "icon.state.error")
         copy_button.clicked.connect(lambda: QGuiApplication.clipboard().setText(self.output.toPlainText()))
         clear_button.clicked.connect(self.output.clear)
+        self.upload_mclogs_button.clicked.connect(self.upload_mclogs_requested.emit)
         export_button.clicked.connect(self.export_diagnostics_requested.emit)
         report_button.clicked.connect(self.report_issue_requested.emit)
         open_folder_button.clicked.connect(self.open_logs_folder_requested.emit)
@@ -50,6 +53,7 @@ class LogsPage(BasePage):
         buttons.addWidget(open_game_log_button)
         buttons.addWidget(open_crash_report_button)
         buttons.addWidget(open_folder_button)
+        buttons.addWidget(self.upload_mclogs_button)
         buttons.addWidget(export_button)
         buttons.addWidget(report_button)
         card.layout.addWidget(self.output, 1)
@@ -62,3 +66,6 @@ class LogsPage(BasePage):
 
     def activity_text(self) -> str:
         return self.output.toPlainText()
+
+    def retranslate_dynamic(self) -> None:
+        self.upload_mclogs_button.setText(tr("logs.upload_mclogs"))

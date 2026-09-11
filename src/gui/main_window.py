@@ -468,6 +468,7 @@ class MainWindow(QMainWindow):
         self.logs_page.open_logs_folder_requested.connect(self._open_logs_folder)
         self.logs_page.open_latest_game_log_requested.connect(self._open_latest_game_log)
         self.logs_page.open_latest_crash_report_requested.connect(self._open_latest_crash_report)
+        self.logs_page.upload_mclogs_requested.connect(self._upload_mclogs)
 
         self.launch_control.launch_clicked.connect(self._request_launch)
         self.launch_control.cancel_clicked.connect(self.launch_controller.cancel)
@@ -710,6 +711,8 @@ class MainWindow(QMainWindow):
         self.task_runner.task_cancelled.connect(self._on_task_cancelled)
         self.task_runner.task_succeeded.connect(self._on_diagnostics_task_succeeded)
         self.task_runner.task_failed.connect(self._on_diagnostics_task_failed)
+        self.task_runner.task_succeeded.connect(self._on_mclogs_task_succeeded)
+        self.task_runner.task_failed.connect(self._on_mclogs_task_failed)
         self.task_runner.task_settled.connect(self._on_task_settled)
         self.task_runner.busy_changed.connect(self._set_busy)
         self.task_runner.busy_changed.connect(self.mod_manager_dialog.set_busy)
@@ -2989,6 +2992,80 @@ class MainWindow(QMainWindow):
             self._pending_issue_dialog.set_collection_failed(str(error))
             return
         self._show_error(tr("diagnostics.export.title"), str(error))
+
+    def _upload_mclogs(self) -> None:
+        if self.task_runner.is_task_active("mclogs.upload"):
+            self.toast_manager.show(tr("diagnostics.busy"), "warning", tr("logs.upload_mclogs"))
+            return
+
+        content = ""
+        instance = self._selected_instance
+        if instance is not None:
+            crash_path = GameRuntimeManager.latest_crash_report(instance)
+            log_path = GameRuntimeManager.latest_game_log(instance)
+            candidates = []
+            if crash_path and crash_path.is_file():
+                candidates.append(crash_path)
+            if log_path and log_path.is_file():
+                candidates.append(log_path)
+            if candidates:
+                candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                try:
+                    content = candidates[0].read_text(encoding="utf-8", errors="replace")
+                except Exception:
+                    content = ""
+
+        if not content.strip():
+            content = self.logs_page.activity_text()
+
+        if not content.strip():
+            self.toast_manager.show(
+                tr("logs.empty_or_no_log"),
+                "warning",
+                tr("logs.upload_mclogs"),
+            )
+            return
+
+        from mcw_core.api.diagnostics.mclogs_client import McLogsClient
+
+        def task() -> dict:
+            return McLogsClient.upload(content)
+
+        started = self.task_runner.run(
+            "mclogs.upload",
+            task,
+            tr("logs.uploading_mclogs"),
+            blocking=False,
+        )
+        if not started:
+            self.toast_manager.show(tr("diagnostics.busy"), "warning", tr("logs.upload_mclogs"))
+
+    def _on_mclogs_task_succeeded(self, task_id: str, result: object) -> None:
+        if task_id != "mclogs.upload":
+            return
+        url = ""
+        if isinstance(result, dict):
+            url = str(result.get("url") or "")
+        if url:
+            clipboard = QGuiApplication.clipboard()
+            if clipboard is not None:
+                clipboard.setText(url)
+            self.logs_page.append(tr("logs.mclogs_success", url=url))
+            self.toast_manager.show(
+                tr("logs.mclogs_success", url=url),
+                "success",
+                tr("logs.upload_mclogs"),
+            )
+
+    def _on_mclogs_task_failed(self, task_id: str, error: object) -> None:
+        if task_id != "mclogs.upload":
+            return
+        self.logs_page.append(tr("logs.mclogs_failed", error=error))
+        self.toast_manager.show(
+            tr("logs.mclogs_failed", error=error),
+            "error",
+            tr("logs.upload_mclogs"),
+        )
 
     def _open_forge_logs(self, name: str) -> None:
         try:

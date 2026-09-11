@@ -2,6 +2,17 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.6.0-alpha.1] - 2026-09-11
+
+### Added
+- Introduce GUI Core architecture (`src/gui/core/`) including `GuiAppState`, `GuiTaskQueue`, and `GuiContext` inspired by modern launcher design patterns.
+- Add JVM flags presets in Instance Settings: Aikar's Flags (G1GC low-stutter), Generational ZGC (Java 21+ low latency), and Shenandoah GC.
+- Add automatic preset detection and custom flag synchronization.
+- Integrate mclo.gs log sharing into the Logs page with automatic sensitive data redaction and clipboard integration.
+
+### Changed
+- Bump development version to `v1.6.0-alpha.1` on branch `1.6`.
+
 ## [1.5.1] - 2026-09-11
 
 ### Stable

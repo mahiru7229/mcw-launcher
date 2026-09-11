@@ -2160,7 +2160,18 @@
     "storage.legacy.clean.completed": "Dọn lưu trữ hoàn tất",
     "storage.legacy.clean.completed_detail": "Đã hoàn tất dọn dữ liệu lưu trữ cũ đã chọn. Các mục đã xóa, bỏ qua và lỗi được tổng hợp trong hộp kết quả.",
     "storage.legacy.clean.failed": "Dọn lưu trữ thất bại",
-    "progress.task.working": "Đang xử lý..."
+    "progress.task.working": "Đang xử lý...",
+    "jvm_preset.label": "Preset cờ JVM",
+    "jvm_preset.default": "Mặc định (Trống)",
+    "jvm_preset.custom": "Tùy chỉnh",
+    "jvm_preset.aikar": "Aikar's Flags (G1GC - Chống giật lag)",
+    "jvm_preset.zgc": "Generational ZGC (Java 21+)",
+    "jvm_preset.shenandoah": "Shenandoah GC",
+    "logs.upload_mclogs": "Tải lên mclo.gs",
+    "logs.mclogs_success": "Đã tải log lên! Đã sao chép liên kết vào bộ nhớ tạm: {url}",
+    "logs.mclogs_failed": "Không thể tải log lên: {error}",
+    "logs.uploading_mclogs": "Đang tải nhật ký lên mclo.gs...",
+    "logs.empty_or_no_log": "Không có nội dung nhật ký để tải lên."
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

@@ -2160,7 +2160,18 @@
     "storage.legacy.clean.completed": "Storage cleanup complete",
     "storage.legacy.clean.completed_detail": "The selected legacy storage cleanup finished. Removed, skipped, and failed items are summarized in the result dialog.",
     "storage.legacy.clean.failed": "Storage cleanup failed",
-    "progress.task.working": "Working..."
+    "progress.task.working": "Working...",
+    "jvm_preset.label": "JVM Preset",
+    "jvm_preset.default": "Default (Empty)",
+    "jvm_preset.custom": "Custom",
+    "jvm_preset.aikar": "Aikar's Flags (G1GC - Low Stutter)",
+    "jvm_preset.zgc": "Generational ZGC (Java 21+)",
+    "jvm_preset.shenandoah": "Shenandoah GC",
+    "logs.upload_mclogs": "Upload to mclo.gs",
+    "logs.mclogs_success": "Log uploaded! URL copied to clipboard: {url}",
+    "logs.mclogs_failed": "Failed to upload log: {error}",
+    "logs.uploading_mclogs": "Uploading log to mclo.gs...",
+    "logs.empty_or_no_log": "No log content available to upload."
   },
   "aliases": {
     "MCW Launcher": "app.name",
