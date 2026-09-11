@@ -1,115 +1,46 @@
-# MCW Update Bridge
+# MCW Update Bridge 1.6.0
 
-`MCW Update Bridge 1.5.0` is a one-time cross-platform recovery updater for MCW Launcher `1.5.0` installations that need to migrate to the schema-2 updater architecture in `v1.5.1-beta.6`.
+`MCW Update Bridge 1.6.0` is the one-time recovery updater for MCW Launcher `1.5.0` installations whose legacy updater can fail while replacing the launcher executable. The default and workflow-pinned target is stable `v1.5.1`.
 
-The bridge is a **separate executable**. It never copies or reuses the currently installed launcher executable as its updater process.
+## Platform contract
 
-## Supported recovery targets
-
-| Platform | Installed launcher | Release package | Bridge artifact |
+| Platform | Installed launcher | Stable package | Bridge binary |
 | --- | --- | --- | --- |
-| Windows x64 | `MCW Launcher.exe` | `MCW-Launcher-v1.5.1-beta.6-windows-x64.zip` | `MCW-Update-Bridge-v1.5.0-windows-x64.exe` |
-| Linux x64 | `mcw-launcher` | `MCW-Launcher-v1.5.1-beta.6-linux-x64.zip` | `MCW-Update-Bridge-v1.5.0-linux-x64` |
+| Windows x64 | `MCW Launcher.exe` | `MCW-Launcher-v1.5.1-windows-x64.zip` | `MCW-Update-Bridge-v1.6.0-windows-x64.exe` |
+| Linux x64 | `mcw-launcher` | `MCW-Launcher-v1.5.1-linux-x64.zip` | `MCW-Update-Bridge-v1.6.0-linux-x64` |
 
-Both paths require the matching `.sha256` release asset and a valid schema-2 `mcw-update.json`.
+The Bridge downloads the matching stable package plus its `.sha256` sidecar, validates SHA-256 and schema-2 `mcw-update.json`, closes only launcher processes that match the exact selected installation path, keeps a rollback backup, installs the launcher first, then installs the remaining managed files.
 
-## Recovery flow
+On Windows, launcher replacement uses `ReplaceFileW` / `MoveFileExW` and a rename-away fallback for access, sharing, or lock errors. On Linux it restores executable bits for both the launcher and bundled updater.
 
-```text
-MCW Launcher 1.5.0
-      │
-      ▼
-MCW Update Bridge 1.5.0       (separate process)
-      │
-      ├─ identify the current platform
-      ├─ close only launcher processes whose executable path matches this installation
-      ├─ fetch v1.5.1-beta.6 metadata from GitHub
-      ├─ download the matching platform ZIP + .sha256
-      ├─ verify SHA-256
-      ├─ validate mcw-update.json schema 2 and managed-file allow-list
-      ├─ backup only files that will be changed
-      ├─ replace the launcher executable first
-      ├─ replace the remaining managed files
-      ├─ restore +x on Linux mcw-launcher and updater/mcw-updater
-      ├─ rollback only changed files if installation fails
-      └─ start the updated launcher
-```
+## Stable release workflow
 
-User data (`instances`, accounts, saves and configuration outside package-managed files) is not deleted by the bridge.
+Run **Build MCW Update Bridge** after the `v1.5.1` GitHub Release exists:
 
-## Build both recovery binaries
+- `release_tag`: `v1.5.1`
+- `upload_to_release`: `true`
+- `activate_release_override`: `false`
 
-Use `.github/workflows/update-bridge.yml`:
-
-1. Push the Bridge 1.5.0 files.
-2. Open **Actions → Build MCW Update Bridge → Run workflow**.
-3. Leave `release_tag` as `v1.5.1-beta.6`.
-4. Enable `upload_to_release` if the release can still accept assets.
-
-GitHub Actions builds:
+The workflow attaches:
 
 ```text
-MCW-Update-Bridge-v1.5.0-windows-x64.exe
-MCW-Update-Bridge-v1.5.0-windows-x64.exe.sha256
-MCW-Update-Bridge-v1.5.0-linux-x64
-MCW-Update-Bridge-v1.5.0-linux-x64.sha256
+MCW-Update-Bridge-v1.6.0-windows-x64.exe
+MCW-Update-Bridge-v1.6.0-windows-x64.exe.sha256
+MCW-Update-Bridge-v1.6.0-linux-x64
+MCW-Update-Bridge-v1.6.0-linux-x64.sha256
 ```
 
-The Linux build is intentionally a small console recovery binary and excludes Tk.
+Do **not** enable `MCW-USE-BRIDGE` for the normal stable release. Launcher 1.5.0 predates automatic Bridge routing, so affected 1.5.0 users must run the Bridge manually once. Beta 3 and newer installations should use the normal bundled updater.
 
-## Linux usage
+## Manual recovery
 
-Make it executable, then run it:
+Windows: run `MCW-Update-Bridge-v1.6.0-windows-x64.exe`, select the folder containing `MCW Launcher.exe`, and allow the Bridge to close the launcher if needed.
+
+Linux:
 
 ```bash
-chmod +x MCW-Update-Bridge-v1.5.0-linux-x64
-./MCW-Update-Bridge-v1.5.0-linux-x64
+chmod +x MCW-Update-Bridge-v1.6.0-linux-x64
+./MCW-Update-Bridge-v1.6.0-linux-x64
 ```
 
-The terminal flow asks for the launcher folder. Or use explicit CLI mode:
-
-```bash
-./MCW-Update-Bridge-v1.5.0-linux-x64 \
-  --cli \
-  --install-dir "$HOME/MCW-Launcher"
-```
-
-If the matching `mcw-launcher` process is still running:
-
-```bash
-./MCW-Update-Bridge-v1.5.0-linux-x64 \
-  --cli \
-  --install-dir "$HOME/MCW-Launcher" \
-  --force-close
-```
-
-On Linux the bridge identifies the exact installation using `/proc/<pid>/exe`, sends `SIGTERM` first, waits, then uses `SIGKILL` only when `--force-close` permits it and the launcher did not exit.
-
-## Windows usage
-
-Run `MCW-Update-Bridge-v1.5.0-windows-x64.exe`, select the folder containing `MCW Launcher.exe`, and update to `v1.5.1-beta.6`.
-
-## Recovery data
-
-Backup:
-
-```text
-<launcher>/cache/update-bridge/backup-YYYYMMDD-HHMMSS/
-```
-
-Log:
-
-```text
-<launcher>/logs/update-bridge.log
-```
-
-## Relationship to Beta 4
-
-The bridge remains a migration/recovery tool only. Normal updates from Beta 4 onward use the updater bundled inside the **new** release ZIP:
-
-```text
-Windows: updater/MCW Updater.exe
-Linux:   updater/mcw-updater
-```
-
-The installed old launcher executable is never renamed and reused as the updater in the new architecture.
+A persistent recovery log is written to `logs/update-bridge.log` and rollback backups are kept under `cache/update-bridge/`.

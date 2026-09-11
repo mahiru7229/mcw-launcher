@@ -1,25 +1,22 @@
 MCW Launcher release verification
-Version: 1.5.1-beta.7
-Channel: beta
+Version: 1.5.1
+Channel: stable
 
-Beta 7 focused dependency coverage:
-- Fabric fabric.mod.json provides aliases
-- cloth-config -> cloth-config2 dependency satisfaction
-- top-level and nested capability indexing
-- Modrinth dependency candidate alias verification
+Stable-candidate checks in this build workspace:
+- MCW Update Bridge v1.6.0 suite: 21 passed
+- public API/version checks: 39 passed
+- update/mod/Modrinth/package/release-tool regression: 319 passed, 2 expected warnings
+- release_preflight: PASS
+- Windows schema-2 package smoke: PASS
+- Linux schema-2 package smoke: PASS
 
-Focused parser/capability/compatibility/resolver suite:
-107 passed
-
-Core mod + Modrinth content suite:
-132 passed
-
-Broad core regression baseline:
-345 passed, 2 warnings
+Release-critical coverage:
+- Fabric provides aliases including cloth-config2 and nested-JAR capabilities
+- updater v2 Windows native replacement / rename-away fallback retained from Beta 6
+- Bridge v1.6.0 pinned to v1.5.1 with native Windows replacement fallback
+- package SHA-256/schema/cleanup contract
 
 Expected warnings:
 - 2 duplicate ZIP-member warnings from package-security regression tests.
 
-Full local test collection note:
-- This container does not have PySide6 installed, so the complete GUI-inclusive suite stops at collection in test/test_platform_open.py.
-- GitHub Actions remains the full-suite gate because release.yml installs .[dev] before pytest.
+The complete GUI suite is executed by GitHub Actions after installing .[dev]/PySide6; PySide6 is not installed in this local artifact workspace.

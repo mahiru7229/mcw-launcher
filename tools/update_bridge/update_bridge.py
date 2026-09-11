@@ -30,9 +30,9 @@ import uuid
 import zipfile
 
 
-BRIDGE_VERSION = "1.5.0"
+BRIDGE_VERSION = "1.6.0"
 REPOSITORY = "mahiru7229/mcw-launcher"
-TARGET_TAG = "v1.5.1-beta.6"
+TARGET_TAG = "v1.5.1"
 TARGET_VERSION = TARGET_TAG.removeprefix("v")
 
 
@@ -88,6 +88,7 @@ MAX_EXTRACTED_BYTES = 4 * 1024 * 1024 * 1024
 MAX_ARCHIVE_ENTRIES = 20_000
 REPLACE_TIMEOUT_SECONDS = 60.0
 REPLACE_RETRY_DELAY_SECONDS = 0.5
+WINDOWS_RETRIABLE_REPLACE_ERRORS = frozenset({5, 32, 33})
 
 
 @dataclass(frozen=True)
@@ -149,7 +150,7 @@ class InstallTransaction:
                 backup = self.backup_directory / relative
                 if backup.is_file():
                     destination.parent.mkdir(parents=True, exist_ok=True)
-                    replace_file_with_retry(backup, destination, timeout_seconds=REPLACE_TIMEOUT_SECONDS)
+                    replace_file_with_retry(backup, destination, timeout_seconds=REPLACE_TIMEOUT_SECONDS, logger=logger)
             except Exception as error:  # best-effort recovery, report all failures
                 errors.append(f"{destination}: {error}")
         # cleanup_paths can remove files that were not part of the managed-file
@@ -164,7 +165,7 @@ class InstallTransaction:
                 if destination.is_file() and destination.read_bytes() == backup.read_bytes():
                     continue
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                replace_file_with_retry(backup, destination, timeout_seconds=REPLACE_TIMEOUT_SECONDS)
+                replace_file_with_retry(backup, destination, timeout_seconds=REPLACE_TIMEOUT_SECONDS, logger=logger)
             except Exception as error:
                 errors.append(f"{backup}: {error}")
         if errors:
@@ -439,7 +440,197 @@ def remove_cleanup_path(install_directory: Path, relative: Path, logger: Callabl
         shutil.rmtree(target)
 
 
-def replace_file_with_retry(source: Path, destination: Path, timeout_seconds: float = REPLACE_TIMEOUT_SECONDS) -> None:
+def _windows_kernel32():
+    if os.name != "nt":
+        raise BridgeError("Windows file helper called on a non-Windows host.")
+    return ctypes.WinDLL("kernel32", use_last_error=True)
+
+
+def _windows_last_error() -> int:
+    try:
+        return int(ctypes.get_last_error())
+    except Exception:
+        return 0
+
+
+def _format_windows_error(code: int) -> str:
+    code = int(code or 0)
+    try:
+        detail = ctypes.FormatError(code).strip()
+    except Exception:
+        detail = ""
+    return f"Win32 error {code}" + (f" ({detail})" if detail else "")
+
+
+def _windows_file_attributes(path: Path) -> int | None:
+    if os.name != "nt" or not path.exists():
+        return None
+    kernel32 = _windows_kernel32()
+    kernel32.GetFileAttributesW.argtypes = [wintypes.LPCWSTR]
+    kernel32.GetFileAttributesW.restype = wintypes.DWORD
+    value = int(kernel32.GetFileAttributesW(str(path)))
+    return None if value == 0xFFFFFFFF else value
+
+
+def _windows_set_file_attributes(path: Path, attributes: int) -> bool:
+    kernel32 = _windows_kernel32()
+    kernel32.SetFileAttributesW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD]
+    kernel32.SetFileAttributesW.restype = wintypes.BOOL
+    return bool(kernel32.SetFileAttributesW(str(path), int(attributes)))
+
+
+def _windows_replace_existing(replacement: Path, destination: Path) -> tuple[bool, str, int]:
+    kernel32 = _windows_kernel32()
+    if destination.exists():
+        replace_write_through = 0x00000001
+        replace_ignore_merge_errors = 0x00000002
+        kernel32.ReplaceFileW.argtypes = [
+            wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR,
+            wintypes.DWORD, wintypes.LPVOID, wintypes.LPVOID,
+        ]
+        kernel32.ReplaceFileW.restype = wintypes.BOOL
+        ctypes.set_last_error(0)
+        if kernel32.ReplaceFileW(
+            str(destination), str(replacement), None,
+            replace_write_through | replace_ignore_merge_errors, None, None,
+        ):
+            return True, "ReplaceFileW", 0
+        replace_error = _windows_last_error()
+    else:
+        replace_error = 2
+
+    move_replace_existing = 0x00000001
+    move_write_through = 0x00000008
+    kernel32.MoveFileExW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD]
+    kernel32.MoveFileExW.restype = wintypes.BOOL
+    ctypes.set_last_error(0)
+    if kernel32.MoveFileExW(
+        str(replacement), str(destination), move_replace_existing | move_write_through
+    ):
+        return True, "MoveFileExW(REPLACE_EXISTING)", 0
+    move_error = _windows_last_error()
+    return False, "MoveFileExW(REPLACE_EXISTING)", int(move_error or replace_error)
+
+
+def _windows_move_file(source: Path, destination: Path, *, replace_existing: bool) -> tuple[bool, int]:
+    kernel32 = _windows_kernel32()
+    move_replace_existing = 0x00000001
+    move_write_through = 0x00000008
+    flags = move_write_through | (move_replace_existing if replace_existing else 0)
+    kernel32.MoveFileExW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD]
+    kernel32.MoveFileExW.restype = wintypes.BOOL
+    ctypes.set_last_error(0)
+    if kernel32.MoveFileExW(str(source), str(destination), flags):
+        return True, 0
+    return False, _windows_last_error()
+
+
+def _cleanup_retired_windows_executable(retired: Path, logger: Callable[[str], None] | None = None) -> None:
+    try:
+        retired.unlink(missing_ok=True)
+        return
+    except OSError as error:
+        if logger:
+            logger(f"Retired launcher is still referenced; deferring cleanup: {error}")
+    if os.name != "nt" or not retired.exists():
+        return
+    try:
+        kernel32 = _windows_kernel32()
+        move_delay_until_reboot = 0x00000004
+        kernel32.MoveFileExW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD]
+        kernel32.MoveFileExW.restype = wintypes.BOOL
+        ctypes.set_last_error(0)
+        if kernel32.MoveFileExW(str(retired), None, move_delay_until_reboot):
+            if logger:
+                logger("Retired launcher cleanup scheduled for the next Windows restart")
+        elif logger:
+            logger("Could not schedule retired launcher cleanup: " + _format_windows_error(_windows_last_error()))
+    except Exception as error:
+        if logger:
+            logger(f"Could not schedule retired launcher cleanup: {error}")
+
+
+def replace_windows_launcher_with_retry(
+    source: Path,
+    destination: Path,
+    timeout_seconds: float = REPLACE_TIMEOUT_SECONDS,
+    logger: Callable[[str], None] | None = None,
+) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    temporary = destination.with_name(f".{destination.name}.mcw-bridge-{uuid.uuid4().hex}.tmp")
+    retired_root = destination.parent / "cache" / "update-bridge" / "retired"
+    retired_root.mkdir(parents=True, exist_ok=True)
+    retired = retired_root / f"{destination.name}.{uuid.uuid4().hex}.old"
+    original_attributes = _windows_file_attributes(destination)
+    changed_readonly = False
+    last_detail = "unknown Windows replacement error"
+    try:
+        shutil.copy2(source, temporary)
+        if original_attributes is not None and original_attributes & 0x1:
+            if _windows_set_file_attributes(destination, original_attributes & ~0x1):
+                changed_readonly = True
+                if logger:
+                    logger("Cleared READONLY attribute from the installed launcher before replacement")
+
+        first_attempt = True
+        while True:
+            ok, api, error_code = _windows_replace_existing(temporary, destination)
+            if ok:
+                if logger:
+                    logger(f"Launcher executable replaced successfully using {api}")
+                return
+            last_detail = f"{api}: {_format_windows_error(error_code)}"
+            if first_attempt and logger:
+                logger(f"Direct launcher replacement blocked ({last_detail})")
+
+            if error_code in WINDOWS_RETRIABLE_REPLACE_ERRORS and destination.exists():
+                renamed, rename_error = _windows_move_file(destination, retired, replace_existing=False)
+                if renamed:
+                    if logger:
+                        logger("Direct replacement is blocked; using Windows rename-away fallback")
+                    installed, install_error = _windows_move_file(temporary, destination, replace_existing=False)
+                    if installed:
+                        if logger:
+                            logger("Launcher executable installed successfully after rename-away fallback")
+                        _cleanup_retired_windows_executable(retired, logger)
+                        return
+                    restored, restore_error = _windows_move_file(retired, destination, replace_existing=False)
+                    if not restored:
+                        raise BridgeError(
+                            "Windows rename-away fallback could not restore the previous launcher after "
+                            f"the new launcher install failed. install={_format_windows_error(install_error)}; "
+                            f"restore={_format_windows_error(restore_error)}"
+                        )
+                    last_detail = f"MoveFileExW(new launcher): {_format_windows_error(install_error)}"
+                else:
+                    last_detail = f"MoveFileExW(rename old launcher): {_format_windows_error(rename_error)}"
+
+            if time.monotonic() >= deadline:
+                break
+            if first_attempt and logger:
+                logger(f"Launcher transition is still blocked; retrying for up to {timeout_seconds:.0f} seconds")
+            first_attempt = False
+            time.sleep(REPLACE_RETRY_DELAY_SECONDS)
+    finally:
+        if changed_readonly and destination.exists() and temporary.exists() and original_attributes is not None:
+            _windows_set_file_attributes(destination, original_attributes)
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+    raise BridgeError(f"Could not transition Windows launcher executable {destination}: {last_detail}")
+
+
+def replace_file_with_retry(
+    source: Path,
+    destination: Path,
+    timeout_seconds: float = REPLACE_TIMEOUT_SECONDS,
+    logger: Callable[[str], None] | None = None,
+) -> None:
+    if os.name == "nt" and destination.name.casefold() == "mcw launcher.exe":
+        replace_windows_launcher_with_retry(source, destination, timeout_seconds, logger)
+        return
+
     deadline = time.monotonic() + timeout_seconds
     last_error: OSError | None = None
     temporary = destination.with_name(f".{destination.name}.mcw-bridge-{uuid.uuid4().hex}.tmp")
@@ -488,7 +679,7 @@ def install_package(content_directory: Path, install_directory: Path, managed_fi
             destination = install_directory / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             transaction.backup_before_change(relative)
-            replace_file_with_retry(source, destination)
+            replace_file_with_retry(source, destination, logger=logger)
             if relative in linux_executable_paths:
                 destination.chmod(destination.stat().st_mode | 0o111)
             transaction.mark_changed(relative)

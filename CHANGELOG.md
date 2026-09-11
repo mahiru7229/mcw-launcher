@@ -2,6 +2,13 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.1] - 2026-09-11
+
+### Stable
+- Promotes the tested Beta 7 dependency resolver to stable, including Fabric `provides` aliases and nested-JAR capabilities.
+- Keeps the hardened Windows updater transition from Beta 6, including native replacement and rename-away fallback.
+- Adds MCW Update Bridge v1.6.0 as the one-time recovery path from affected 1.5.0 installations directly to v1.5.1.
+
 ## [1.5.1-beta.7] - 2026-09-11
 
 ### Fixed

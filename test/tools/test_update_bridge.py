@@ -138,7 +138,7 @@ def test_install_package_replaces_executable_first_and_keeps_backup(
     calls: list[str] = []
     original = bridge.replace_file_with_retry
 
-    def recording_replace(source: Path, destination: Path, timeout_seconds: float = bridge.REPLACE_TIMEOUT_SECONDS) -> None:
+    def recording_replace(source: Path, destination: Path, timeout_seconds: float = bridge.REPLACE_TIMEOUT_SECONDS, logger=None) -> None:
         calls.append(destination.name)
         original(source, destination, timeout_seconds)
 
@@ -182,7 +182,7 @@ def test_install_package_rolls_back_only_changed_files(tmp_path: Path, monkeypat
     original = bridge.replace_file_with_retry
     failed_once = False
 
-    def fail_readme(source: Path, destination: Path, timeout_seconds: float = bridge.REPLACE_TIMEOUT_SECONDS) -> None:
+    def fail_readme(source: Path, destination: Path, timeout_seconds: float = bridge.REPLACE_TIMEOUT_SECONDS, logger=None) -> None:
         nonlocal failed_once
         if destination.name == "README.md" and not failed_once:
             failed_once = True
@@ -215,7 +215,7 @@ def test_failed_executable_replace_does_not_rollback_unchanged_executable(
 
     calls: list[tuple[str, str]] = []
 
-    def always_locked(source: Path, destination: Path, timeout_seconds: float = bridge.REPLACE_TIMEOUT_SECONDS) -> None:
+    def always_locked(source: Path, destination: Path, timeout_seconds: float = bridge.REPLACE_TIMEOUT_SECONDS, logger=None) -> None:
         calls.append((source.name, destination.name))
         raise bridge.BridgeError("simulated WinError 5")
 
@@ -241,3 +241,64 @@ def test_linux_graceful_and_force_close_use_term_then_kill(monkeypatch: pytest.M
     assert (111, signal.SIGTERM) in calls
     assert (222, signal.SIGTERM) in calls
     assert (111, signal.SIGKILL) in calls
+
+
+def test_stable_bridge_is_pinned_to_v151() -> None:
+    assert bridge.BRIDGE_VERSION == "1.6.0"
+    assert bridge.TARGET_TAG == "v1.5.1"
+    assert bridge.TARGET_VERSION == "1.5.1"
+
+
+def test_windows_launcher_replace_uses_rename_away_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / "new.exe"
+    destination = tmp_path / "MCW Launcher.exe"
+    source.write_bytes(b"new")
+    destination.write_bytes(b"old")
+    calls: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(bridge, "_windows_file_attributes", lambda _path: 0)
+    monkeypatch.setattr(bridge, "_windows_replace_existing", lambda _src, _dst: (False, "MoveFileExW(REPLACE_EXISTING)", 5))
+
+    def fake_move(src: Path, dst: Path, *, replace_existing: bool):
+        calls.append((src.name, dst.name))
+        os.replace(src, dst)
+        return True, 0
+
+    monkeypatch.setattr(bridge, "_windows_move_file", fake_move)
+    monkeypatch.setattr(bridge, "_cleanup_retired_windows_executable", lambda _path, _logger=None: None)
+    bridge.replace_windows_launcher_with_retry(source, destination, timeout_seconds=0.01)
+
+    assert destination.read_bytes() == b"new"
+    assert calls[0][0] == "MCW Launcher.exe"
+    assert calls[1][1] == "MCW Launcher.exe"
+
+
+def test_windows_rename_away_restores_old_launcher_if_new_install_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / "new.exe"
+    destination = tmp_path / "MCW Launcher.exe"
+    source.write_bytes(b"new")
+    destination.write_bytes(b"old")
+    move_count = 0
+
+    monkeypatch.setattr(bridge, "_windows_file_attributes", lambda _path: 0)
+    monkeypatch.setattr(bridge, "_windows_replace_existing", lambda _src, _dst: (False, "MoveFileExW(REPLACE_EXISTING)", 5))
+
+    def fake_move(src: Path, dst: Path, *, replace_existing: bool):
+        nonlocal move_count
+        move_count += 1
+        if move_count == 1:  # old launcher -> retired
+            os.replace(src, dst)
+            return True, 0
+        if move_count == 2:  # new temporary -> launcher fails
+            return False, 5
+        if move_count == 3:  # retired -> launcher restore
+            os.replace(src, dst)
+            return True, 0
+        raise AssertionError("unexpected move")
+
+    monkeypatch.setattr(bridge, "_windows_move_file", fake_move)
+    monkeypatch.setattr(bridge.time, "sleep", lambda _seconds: None)
+    with pytest.raises(bridge.BridgeError):
+        bridge.replace_windows_launcher_with_retry(source, destination, timeout_seconds=0.0)
+
+    assert destination.read_bytes() == b"old"
