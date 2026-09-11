@@ -798,7 +798,7 @@ def test_discovers_undeclared_modrinth_dependency_by_verified_jar_mod_id(tmp_pat
     def download(_file, destination, **_kwargs):
         destination.parent.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(destination, "w") as archive:
-            archive.writestr("fabric.mod.json", '{"schemaVersion":1,"id":"cloth-config2","version":"15.0.140+fabric","name":"Cloth Config API"}')
+            archive.writestr("fabric.mod.json", '{"schemaVersion":1,"id":"cloth-config","version":"15.0.140+fabric","name":"Cloth Config API","provides":["cloth-config2"]}')
         return destination
 
     monkeypatch.setattr(ModrinthClient, "search_projects", search)
@@ -881,7 +881,7 @@ def test_verified_alias_skips_modrinth_search_on_later_resolution(tmp_path, monk
     def download(_file, destination, **_kwargs):
         destination.parent.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(destination, "w") as archive:
-            archive.writestr("fabric.mod.json", '{"schemaVersion":1,"id":"cloth-config2","version":"15.0.140+fabric"}')
+            archive.writestr("fabric.mod.json", '{"schemaVersion":1,"id":"cloth-config","version":"15.0.140+fabric","provides":["cloth-config2"]}')
         return destination
 
     monkeypatch.setattr(ModrinthDownloader, "download_file", download)

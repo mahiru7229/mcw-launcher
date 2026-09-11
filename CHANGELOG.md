@@ -2,6 +2,17 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.5.1-beta.7] - 2026-09-11
+
+### Fixed
+- Parse Fabric `fabric.mod.json` `provides` aliases and expose them as installed dependency identities.
+- Treat aliases such as Cloth Config API `cloth-config2` as satisfied when the installed JAR declares the alias while keeping its primary ID (`cloth-config`).
+- Index Fabric `provides` aliases in capability discovery for top-level and safely nested Fabric JARs.
+- Verify auto-discovered Modrinth dependency candidates against Fabric aliases instead of requiring the requested dependency ID to be the primary mod ID.
+
+### Scope
+- No updater architecture changes in Beta 7; the Windows updater/recovery path remains the Beta 6 implementation.
+
 ## [1.5.1-beta.6] - 2026-09-11
 
 ### Fixed

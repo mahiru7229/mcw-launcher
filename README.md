@@ -12,12 +12,12 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.5.1--beta.6-blue" alt="v1.5.1-beta.6">
+  <img src="https://img.shields.io/badge/version-v1.5.1--beta.7-blue" alt="v1.5.1-beta.7">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!WARNING]
-> `v1.5.1-beta.6` sửa lớp thay thế executable trên Windows sau khi log thực tế của Beta 5 cho thấy probe DELETE có thể báo false-positive. Updater giờ dùng Win32 `ReplaceFileW`/`MoveFileExW`, có rename-away fallback cho mapped image, log Win32 error chi tiết, giữ GUI branded, rollback, cleanup `docs/` và emergency `MCW-USE-BRIDGE`.
+> `v1.5.1-beta.7` vá dependency resolver cho Fabric `provides`: alias mod ID như `cloth-config2` giờ được nhận diện từ `fabric.mod.json` ở cả JAR top-level và nested JAR. Updater Windows giữ nguyên lớp replacement đã ổn định từ Beta 6.
 
 ## Tổng quan
 
@@ -135,6 +135,7 @@ GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, khô
 - [MCW Core API](docs/MCW_CORE_LIBRARY.md)
 - [Language packs](docs/LANGUAGE_PACKS.md)
 - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
+- [Release notes v1.5.1-beta.7](docs/releases/v1.5.1-beta.7.md)
 - [Release notes v1.5.1-beta.6](docs/releases/v1.5.1-beta.6.md)
 - [Release notes v1.5.1-beta.3](docs/releases/v1.5.1-beta.3.md)
 - [Release notes v1.5.1-beta.2](docs/releases/v1.5.1-beta.2.md)

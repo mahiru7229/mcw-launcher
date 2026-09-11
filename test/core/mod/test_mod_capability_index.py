@@ -194,3 +194,59 @@ def test_embedded_dependency_version_is_still_validated(tmp_path):
     report = ModCompatibilityManager.scan(instance)
 
     assert any(issue.code == "dependency-version" and "expandability" in issue.mod_ids for issue in report.issues)
+
+
+def test_build_indexes_top_level_fabric_provides_alias(tmp_path):
+    instance = forge_instance(tmp_path, version="1.21.1")
+    instance.mod_loader = ("fabric", "0.16.14")
+    mods = Path(instance.instance_dir) / "mods"
+    mods.mkdir(parents=True, exist_ok=True)
+    path = mods / "cloth-config.jar"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            "fabric.mod.json",
+            json.dumps({
+                "schemaVersion": 1,
+                "id": "cloth-config",
+                "version": "15.0.140+fabric",
+                "provides": ["cloth-config2"],
+            }),
+        )
+
+    listed = ModManager.list_mods(instance)
+    capabilities = ModCapabilityIndex.build(instance, listed)
+
+    assert capabilities["cloth-config2"][0].source == "top_level"
+    assert capabilities["cloth-config2"][0].version == "15.0.140+fabric"
+
+
+def test_nested_fabric_provides_alias_is_indexed(tmp_path):
+    instance = forge_instance(tmp_path, version="1.21.1")
+    instance.mod_loader = ("fabric", "0.16.14")
+    mods = Path(instance.instance_dir) / "mods"
+    mods.mkdir(parents=True, exist_ok=True)
+    nested_buffer = BytesIO()
+    with zipfile.ZipFile(nested_buffer, "w", compression=zipfile.ZIP_DEFLATED) as nested:
+        nested.writestr(
+            "fabric.mod.json",
+            json.dumps({
+                "schemaVersion": 1,
+                "id": "cloth-config",
+                "version": "15.0.140+fabric",
+                "provides": ["cloth-config2"],
+            }),
+        )
+    owner = mods / "bundle.jar"
+    with zipfile.ZipFile(owner, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("fabric.mod.json", json.dumps({
+            "schemaVersion": 1,
+            "id": "bundle",
+            "version": "1.0.0",
+            "jars": [{"file": "META-INF/jars/cloth.jar"}],
+        }))
+        archive.writestr("META-INF/jars/cloth.jar", nested_buffer.getvalue())
+
+    capabilities = ModCapabilityIndex.build(instance)
+
+    assert capabilities["cloth-config2"][0].source == "embedded"
+    assert capabilities["cloth-config2"][0].version == "15.0.140+fabric"
