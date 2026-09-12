@@ -23,7 +23,12 @@ def test_launcher_distribution_version_when_installed() -> None:
     except PackageNotFoundError:
         return
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-    assert installed == project["version"]
+    try:
+        from packaging.version import Version
+        assert Version(installed) == Version(project["version"])
+    except ImportError:
+        assert installed == project["version"]
+
 
 
 def test_optifine_public_api_is_import_only() -> None:
