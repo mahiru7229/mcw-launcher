@@ -838,9 +838,16 @@ class InstanceWorkspacePage(BasePage):
         self.create_dialog.set_show_snapshots(self._show_snapshots)
         self.create_dialog.name_input.clear()
         self.create_dialog.reset_optifine_selection()
+        self.create_dialog.reset_jvm_preset()
         self.create_dialog.show()
         self.create_dialog.raise_()
         self.create_dialog.activateWindow()
+
+    def selected_create_jvm_arguments(self) -> list[str]:
+        return self.create_dialog.selected_jvm_arguments()
+
+    def selected_create_jvm_preset(self) -> str:
+        return self.create_dialog.selected_jvm_preset()
 
     def _open_management_dialog(self) -> None:
         instance = self._instances.get(self.current_instance_name())

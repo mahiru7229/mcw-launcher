@@ -379,8 +379,8 @@ class MainWindow(QMainWindow):
         self.instances_page.runtime_scan_requested.connect(self.java_controller.scan)
         self.instances_page.runtime_install_requested.connect(self.java_controller.install)
         self.instances_page.java_runtime_apply_requested.connect(self.instance_controller.set_java_runtime)
-        self.instances_page.create_requested.connect(self.instance_controller.create)
-        self.instances_page.create_with_optifine_requested.connect(self.instance_controller.create_with_optifine)
+        self.instances_page.create_requested.connect(self._on_create_instance_requested)
+        self.instances_page.create_with_optifine_requested.connect(self._on_create_instance_optifine_requested)
         self.instances_page.fabric_versions_requested.connect(self.mod_loader_controller.load_fabric_versions)
         self.instances_page.quilt_versions_requested.connect(self.mod_loader_controller.load_quilt_versions)
         self.instances_page.forge_versions_requested.connect(self.mod_loader_controller.load_forge_versions)
@@ -3066,6 +3066,14 @@ class MainWindow(QMainWindow):
             "error",
             tr("logs.upload_mclogs"),
         )
+
+    def _on_create_instance_requested(self, name: str, version_id: str, loader_name: str, loader_version: str) -> None:
+        jvm_arguments = getattr(self.instances_page, "selected_create_jvm_arguments", lambda: [])()
+        self.instance_controller.create(name, version_id, loader_name, loader_version, jvm_arguments=jvm_arguments)
+
+    def _on_create_instance_optifine_requested(self, name: str, version_id: str, loader_name: str, loader_version: str, source_path: object) -> None:
+        jvm_arguments = getattr(self.instances_page, "selected_create_jvm_arguments", lambda: [])()
+        self.instance_controller.create_with_optifine(name, version_id, loader_name, loader_version, source_path, jvm_arguments=jvm_arguments)
 
     def _open_forge_logs(self, name: str) -> None:
         try:

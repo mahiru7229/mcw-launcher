@@ -101,6 +101,36 @@ def test_workspace_create_dialog_emits_public_create_contract(gui_app):
     assert not hasattr(page.advanced_page, "create_requested")
 
 
+def test_workspace_create_dialog_jvm_preset_selection(gui_app):
+    from mcw_core.api.java.jvm_presets import JvmPresetId, get_preset_flags
+
+    page = InstanceWorkspacePage()
+    dialog = page.create_dialog
+
+    # Initially default preset
+    assert dialog.selected_jvm_preset() == JvmPresetId.DEFAULT
+    assert dialog.selected_jvm_arguments() == []
+    assert page.selected_create_jvm_preset() == JvmPresetId.DEFAULT
+    assert page.selected_create_jvm_arguments() == []
+
+    # Select Aikar preset
+    aikar_index = dialog.jvm_preset_combo.findData(JvmPresetId.AIKAR)
+    assert aikar_index >= 0
+    dialog.jvm_preset_combo.setCurrentIndex(aikar_index)
+
+    assert dialog.selected_jvm_preset() == JvmPresetId.AIKAR
+    expected_flags = get_preset_flags(JvmPresetId.AIKAR)
+    assert dialog.selected_jvm_arguments() == expected_flags
+    assert page.selected_create_jvm_arguments() == expected_flags
+    assert "-XX:+UseG1GC" in dialog.selected_jvm_arguments()
+
+    # Reset preset
+    dialog.reset_jvm_preset()
+    assert dialog.selected_jvm_preset() == JvmPresetId.DEFAULT
+    assert dialog.selected_jvm_arguments() == []
+
+
+
 def test_workspace_exposes_content_pack_management_for_selected_instance(gui_app):
     page = InstanceWorkspacePage()
     instance = make_instance("Visual Pack", ("fabric", "0.16.14"), "1.21.1")

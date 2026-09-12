@@ -88,3 +88,4 @@ class InstanceCreateRequest:
     loader_name: str = "vanilla"
     loader_version: str = "auto"
     on_progress: ProgressCallback | None = None
+    jvm_arguments: tuple[str, ...] = ()

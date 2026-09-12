@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QSignalBlocker, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
+from mcw_core.api.java.jvm_presets import JvmPresetId, get_preset_flags
 from mcw_core.api.language.language_manager import tr
 from src.gui.loader_version_options import loader_title, loader_version_entries
 from src.gui.theme.runtime import set_theme_icon
@@ -102,14 +103,18 @@ class CreateInstanceDialog(QDialog):
         self.loader_version_combo = QComboBox()
         self.loader_version_combo.setEnabled(False)
         self.loader_version_combo.currentIndexChanged.connect(self._update_create_state)
+        self.jvm_preset_combo = QComboBox()
+        self._populate_jvm_preset_combo()
         self.name_label = QLabel()
         self.version_label = QLabel()
         self.loader_label = QLabel()
         self.loader_version_label = QLabel()
+        self.jvm_preset_label = QLabel()
         form.addRow(self.name_label, self.name_input)
         form.addRow(self.version_label, self.version_combo)
         form.addRow(self.loader_label, self.loader_combo)
         form.addRow(self.loader_version_label, self.loader_version_combo)
+        form.addRow(self.jvm_preset_label, self.jvm_preset_combo)
         layout.addLayout(form)
 
         self.snapshots_checkbox = QCheckBox()
@@ -219,6 +224,26 @@ class CreateInstanceDialog(QDialog):
         self.optifine_detected_value.setText(tr("optifine.file.not_detected"))
         self._refresh_optifine_status()
         self._update_create_state()
+
+    def _populate_jvm_preset_combo(self) -> None:
+        with QSignalBlocker(self.jvm_preset_combo):
+            self.jvm_preset_combo.clear()
+            self.jvm_preset_combo.addItem(tr("jvm_preset.default"), JvmPresetId.DEFAULT)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.aikar"), JvmPresetId.AIKAR)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.zgc"), JvmPresetId.ZGC)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.shenandoah"), JvmPresetId.SHENANDOAH)
+
+    def selected_jvm_preset(self) -> str:
+        return str(self.jvm_preset_combo.currentData() or JvmPresetId.DEFAULT)
+
+    def selected_jvm_arguments(self) -> list[str]:
+        return get_preset_flags(self.selected_jvm_preset())
+
+    def reset_jvm_preset(self) -> None:
+        idx = self.jvm_preset_combo.findData(JvmPresetId.DEFAULT)
+        if idx >= 0:
+            with QSignalBlocker(self.jvm_preset_combo):
+                self.jvm_preset_combo.setCurrentIndex(idx)
 
     def _set_loader_versions(self, loader: str, game_version: str, versions: list[object]) -> None:
         key = (loader, str(game_version).strip())
@@ -450,6 +475,13 @@ class CreateInstanceDialog(QDialog):
         self.version_label.setText(tr("workspace.create.minecraft_version"))
         self.loader_label.setText(tr("workspace.create.loader"))
         self.loader_version_label.setText(tr("workspace.create.loader_version"))
+        self.jvm_preset_label.setText(tr("jvm_preset.label"))
+        current_preset = self.selected_jvm_preset()
+        self._populate_jvm_preset_combo()
+        idx = self.jvm_preset_combo.findData(current_preset)
+        if idx >= 0:
+            with QSignalBlocker(self.jvm_preset_combo):
+                self.jvm_preset_combo.setCurrentIndex(idx)
         self.snapshots_checkbox.setText(tr("workspace.create.show_snapshots"))
         self.loader_hint.setText(tr("workspace.create.loader_hint"))
         self.optifine_checkbox.setText(tr("optifine.create.checkbox"))
