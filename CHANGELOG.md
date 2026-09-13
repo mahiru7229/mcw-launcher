@@ -2,6 +2,19 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.6.0-alpha.3] - 2026-09-13
+
+### Added
+- Add update safety recovery tool (`updater.py --recovery`) with Tkinter GUI and CLI fallback to rollback backups or clear lock files when updates fail.
+- Add remote emergency hotfix and rollback bypass (`[MCW-EMERGENCY-HOTFIX]`, `[MCW-EMERGENCY-ROLLBACK]`) in update client.
+- Add persistent updater backup mirroring in installation directory (`updater/backup/`).
+- Add playtime tracking and last played timestamp on instances, formatted nicely and displayed in Workspace.
+- Add `TaskDrawerPopover` interactive background task list and control popover when clicking `GlobalTaskIndicator`.
+- Add JVM preset selection (Aikar, ZGC, Shenandoah, Default) and custom argument support to Modpack Import and Instance Settings dialogs.
+
+### Changed
+- Bump development version to `v1.6.0-alpha.3` on branch `1.6`.
+
 ## [1.6.0-alpha.2] - 2026-09-13
 
 ### Added
