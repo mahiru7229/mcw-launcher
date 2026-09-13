@@ -23,6 +23,7 @@ from mcw_core.api.hardware.gpu_preference_manager import GraphicsDetectionResult
 from mcw_core.api.instance.instance_manager import InstanceManager
 from mcw_core.api.instance.settings_manager import SettingsManager
 from mcw_core.api.instance.instance_run_lock import InstanceRunLock
+from mcw_core.api.integrations.discord import get_discord_rpc_service
 from mcw_core.api.language.language_manager import language_manager, tr
 from mcw_core.api.lan.lan_agent_manager import LanAgentManager
 from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
@@ -154,6 +155,8 @@ class MainWindow(QMainWindow):
         self.launch_controller = LaunchController(self.task_runner)
         self.lan_hosting_controller = LanHostingController(self.task_runner)
         self.update_controller = UpdateController(self.task_runner, channel=self._startup_settings.get("update_channel", "stable"))
+        self.discord_rpc_service = get_discord_rpc_service()
+        self.discord_rpc_service.set_enabled(bool(self._startup_settings.get("discord_rpc_enabled", True)))
         self.gui_context = GuiContext(task_runner=self.task_runner, parent=self)
         self.gui_context.register_controller("instances", self.instance_controller)
         self.gui_context.register_controller("accounts", self.account_controller)
@@ -675,6 +678,7 @@ class MainWindow(QMainWindow):
         self.launch_controller.launch_finished.connect(self.launch_control.set_result)
         self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
         self.launch_controller.launch_finished.connect(lambda _result: self.gui_settings_controller.set_game_running(True))
+        self.launch_controller.launch_finished.connect(self._on_game_launched_discord)
         self.launch_controller.game_exited.connect(self._on_game_exited)
         self.launch_controller.pause_requested.connect(self.launch_control.set_pause_pending)
         self.launch_controller.launch_paused.connect(self._on_launch_paused)
@@ -2163,7 +2167,10 @@ class MainWindow(QMainWindow):
             self.launch_control.set_exit_result(result)
         self.instance_controller.refresh_running(force=True)
         self.instance_controller.refresh(selected_name=result_name or selected_name)
-        self.gui_settings_controller.set_game_running(bool(InstanceRunLock.list_active()))
+        active_instances = InstanceRunLock.list_active()
+        self.gui_settings_controller.set_game_running(bool(active_instances))
+        if not active_instances:
+            self.discord_rpc_service.on_game_stopped()
         crashed = bool(getattr(result, "crashed", False))
         instance_name = str(getattr(result, "instance_name", "Minecraft"))
         exit_code = int(getattr(result, "exit_code", -1))
@@ -2181,6 +2188,27 @@ class MainWindow(QMainWindow):
             self.home_page.set_status(message)
             self.right_panel.set_status(message)
             self.logs_page.append(tr("Game session completed in {seconds} second(s).", seconds=duration))
+
+    def _on_game_launched_discord(self, result: object) -> None:
+        instance = self._selected_instance
+        instance_name = str(getattr(instance, "name", "") or getattr(result, "instance_name", "") or "Minecraft")
+        minecraft_version = str(
+            getattr(instance, "version_id", "")
+            or (result.get("minecraftVersion", "") if isinstance(result, dict) else "")
+            or ""
+        )
+        mod_loader = getattr(instance, "mod_loader", None)
+        loader_name = "vanilla"
+        loader_version = ""
+        if isinstance(mod_loader, (tuple, list)) and len(mod_loader) >= 2:
+            loader_name = str(mod_loader[0])
+            loader_version = str(mod_loader[1])
+        self.discord_rpc_service.on_game_started(
+            instance_name=instance_name,
+            minecraft_version=minecraft_version,
+            loader_name=loader_name,
+            loader_version=loader_version,
+        )
 
     def _on_repair_finished(self, result: object) -> None:
         instance_name = str(getattr(result, "instance_name", ""))
@@ -2327,6 +2355,7 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.set_settings(settings, preserve_unsaved=self.launcher_settings_page.is_dirty)
         self.instances_page.set_show_snapshots(bool(settings.get("show_snapshots", False)))
         self.launch_controller.set_debug_mode(bool(settings.get("debug_mode", False)))
+        self.discord_rpc_service.set_enabled(bool(settings.get("discord_rpc_enabled", True)))
         self.update_controller.set_channel(str(settings.get("update_channel", "stable")))
         include_beta = bool(settings.get("modrinth_include_beta", False))
         include_alpha = bool(settings.get("modrinth_include_alpha", False))
@@ -3320,6 +3349,7 @@ class MainWindow(QMainWindow):
         # intentionally left alive unless the user explicitly chooses Kill Instance.
         self.launch_controller.cancel()
         self.task_runner.begin_shutdown()
+        self.discord_rpc_service.shutdown()
         super().closeEvent(event)
 
 
