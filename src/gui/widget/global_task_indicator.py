@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QTimer, Qt
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QWidget
 
 from mcw_core.api.language.language_manager import tr
@@ -17,7 +18,9 @@ class GlobalTaskIndicator(QFrame):
     def __init__(self, task_queue: TaskQueue | None = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("GlobalTaskIndicator")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._queue: TaskQueue | None = None
+        self._drawer: QWidget | None = None
         self._hide_timer = QTimer(self)
         self._hide_timer.setSingleShot(True)
         self._hide_timer.timeout.connect(self._on_hide_timeout)
@@ -85,6 +88,8 @@ class GlobalTaskIndicator(QFrame):
         self._queue.queue_changed.connect(self._on_queue_changed)
         self._queue.task_updated.connect(self._on_task_updated)
         self._queue.task_completed.connect(self._on_task_completed)
+        if self._drawer is not None and hasattr(self._drawer, "attach_queue"):
+            self._drawer.attach_queue(queue)
         self.refresh()
 
     def refresh(self) -> None:
@@ -163,6 +168,26 @@ class GlobalTaskIndicator(QFrame):
     def _on_task_completed(self, _item: TaskQueueItem) -> None:
         self.refresh()
 
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._toggle_drawer()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def _toggle_drawer(self) -> None:
+        if self._drawer is None:
+            from src.gui.widget.task_drawer_popover import TaskDrawerPopover
+
+            self._drawer = TaskDrawerPopover(self._queue)
+        if self._drawer.isVisible():
+            self._drawer.hide()
+        else:
+            self._drawer.show_below(self)
+
     def _on_hide_timeout(self) -> None:
+        if self._drawer and self._drawer.isVisible():
+            self._hide_timer.start(1500)
+            return
         if self._queue and not self._queue.active_tasks():
             self.setVisible(False)

@@ -81,6 +81,7 @@ class InstanceManager:
             "created_at": created_at,
             "updated_at": now,
             "last_played": last_played,
+            "total_play_time_seconds": max(0, int(getattr(instance, "total_playtime_seconds", 0) or existing.get("total_play_time_seconds", 0) or 0)),
             "last_exit_code": last_exit_code,
             "last_launch_crashed": last_launch_crashed,
             "last_launch_state": last_launch_state,
@@ -141,6 +142,7 @@ class InstanceManager:
             favorite = bool(data.get("favorite", False))
             group = str(data.get("group") or "").strip()
             tags = InstanceManager._normalize_tags(data.get("tags", ()))
+            total_playtime_seconds = max(0, int(data.get("total_play_time_seconds", 0) or 0))
         except (KeyError, TypeError, ValueError) as error:
             raise RuntimeError(f"Invalid instance metadata: {source}") from error
         return Instance(
@@ -157,6 +159,7 @@ class InstanceManager:
             favorite=favorite,
             group=group,
             tags=tags,
+            total_playtime_seconds=total_playtime_seconds,
         )
 
     @staticmethod
@@ -891,6 +894,7 @@ class InstanceManager:
             favorite=bool(instance_data.get("favorite", False)),
             group=str(instance_data.get("group") or "").strip(),
             tags=InstanceManager._normalize_tags(instance_data.get("tags", ())),
+            total_playtime_seconds=max(0, int(instance_data.get("total_play_time_seconds", 0) or 0)),
         )
 
     @staticmethod

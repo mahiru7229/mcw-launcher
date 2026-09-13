@@ -35,6 +35,7 @@ from mcw_core.api.language.language_manager import tr
 from mcw_core.api.theme.theme_manager import theme_manager
 from src.gui.dialogs.create_instance_dialog import CreateInstanceDialog
 from src.gui.dialogs.instance_management_dialog import AdvancedInstanceManagerDialog, InstanceManagementDialog
+from src.gui.formatters.time_formatter import format_last_played, format_playtime
 from src.gui.media.minecraft_skin import minecraft_skin_face_icon
 from src.gui.pages.base_page import BasePage
 from src.gui.pages.instances_page import InstancesPage
@@ -230,6 +231,10 @@ class InstanceWorkspacePage(BasePage):
         self.library_meta_label.setObjectName("TinyLabel")
         self.library_meta_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.library_meta_label.setWordWrap(True)
+        self.playtime_label = QLabel()
+        self.playtime_label.setObjectName("TinyLabel")
+        self.playtime_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.playtime_label.setWordWrap(True)
 
         self.launch_button = set_theme_icon(QPushButton(), "icon.action.launch")
         self.launch_button.setObjectName("PrimaryButton")
@@ -269,6 +274,7 @@ class InstanceWorkspacePage(BasePage):
         self.action_panel.layout.addWidget(self.running_label)
         self.action_panel.layout.addWidget(self.health_label)
         self.action_panel.layout.addWidget(self.library_meta_label)
+        self.action_panel.layout.addWidget(self.playtime_label)
         self.action_panel.layout.addSpacing(4)
         self.action_panel.layout.addWidget(self.launch_button)
         self.action_panel.layout.addWidget(self.favorite_button)
@@ -701,6 +707,7 @@ class InstanceWorkspacePage(BasePage):
             self.running_label.setText("")
             self.health_label.setText("")
             self.library_meta_label.setText("")
+            self.playtime_label.setText("")
             self.favorite_button.setText(tr("workspace.action.favorite_add"))
             self.manage_mods_button.setEnabled(False)
             self.manage_content_packs_button.setEnabled(False)
@@ -737,6 +744,9 @@ class InstanceWorkspacePage(BasePage):
         group = str(getattr(instance, "group", "") or "").strip() or tr("workspace.library.ungrouped")
         tags = ", ".join(str(tag) for tag in tuple(getattr(instance, "tags", ()) or ())) or tr("workspace.library.no_tags")
         self.library_meta_label.setText(f"{tr('workspace.library.group_value', group=group)} • {tr('workspace.library.tags_value', tags=tags)}")
+        playtime_text = format_playtime(int(getattr(instance, "total_playtime_seconds", 0) or 0))
+        last_played_text = format_last_played(str(getattr(instance, "last_played", "") or ""))
+        self.playtime_label.setText(tr("workspace.playtime.meta", playtime=playtime_text, last_played=last_played_text))
         self.favorite_button.setText(tr("workspace.action.favorite_remove") if bool(getattr(instance, "favorite", False)) else tr("workspace.action.favorite_add"))
         self.manage_mods_button.setEnabled(enabled and loader_name in {"fabric", "quilt", "forge", "neoforge"})
         self.manage_content_packs_button.setEnabled(enabled)
