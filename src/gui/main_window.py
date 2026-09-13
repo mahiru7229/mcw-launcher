@@ -96,6 +96,7 @@ from src.gui.style import APP_STYLE
 from src.gui.task_progress import task_progress_profile
 from src.gui.task_runner import TaskRunner
 from src.gui.theme.runtime import ThemeRuntime
+from src.gui.widget.global_task_indicator import GlobalTaskIndicator
 from src.gui.widget.launch_control_style import LAUNCH_CONTROL_STYLE
 from src.gui.widget.launch_control_widget import LaunchControlWidget
 from src.gui.widget.right_panel_widget import RightPanelWidget
@@ -281,6 +282,8 @@ class MainWindow(QMainWindow):
         navigation_layout.addWidget(self.page_back_button)
         navigation_layout.addWidget(self.page_forward_button)
         navigation_layout.addStretch(1)
+        self.task_indicator = GlobalTaskIndicator(self.gui_context.tasks, parent=self.page_navigation)
+        navigation_layout.addWidget(self.task_indicator)
         self.connectivity_indicator = QLabel()
         self.connectivity_indicator.setObjectName("ConnectivityBadge")
         self._update_connectivity_indicator(None)
@@ -2524,6 +2527,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(tr(LAUNCHER_NAME))
         self._update_page_navigation()
         self._update_connectivity_indicator(self._last_connectivity_online)
+        self.task_indicator.retranslate_ui()
 
         for widget in (
             self.sidebar,

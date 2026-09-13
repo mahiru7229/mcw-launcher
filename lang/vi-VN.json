@@ -2179,7 +2179,11 @@
     "logs.mclogs_success": "Đã tải log lên! Đã sao chép liên kết vào bộ nhớ tạm: {url}",
     "logs.mclogs_failed": "Không thể tải log lên: {error}",
     "logs.uploading_mclogs": "Đang tải nhật ký lên mclo.gs...",
-    "logs.empty_or_no_log": "Không có nội dung nhật ký để tải lên."
+    "logs.empty_or_no_log": "Không có nội dung nhật ký để tải lên.",
+    "tasks.indicator.active_single": "{message} ({percent}%)",
+    "tasks.indicator.active_multiple": "Đang chạy {count} tác vụ ({percent}%)",
+    "tasks.indicator.completed": "Đã hoàn thành các tác vụ",
+    "tasks.indicator.tooltip_title": "Tác vụ nền"
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

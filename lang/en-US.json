@@ -2179,7 +2179,11 @@
     "logs.mclogs_success": "Log uploaded! URL copied to clipboard: {url}",
     "logs.mclogs_failed": "Failed to upload log: {error}",
     "logs.uploading_mclogs": "Uploading log to mclo.gs...",
-    "logs.empty_or_no_log": "No log content available to upload."
+    "logs.empty_or_no_log": "No log content available to upload.",
+    "tasks.indicator.active_single": "{message} ({percent}%)",
+    "tasks.indicator.active_multiple": "{count} tasks running ({percent}%)",
+    "tasks.indicator.completed": "Tasks completed",
+    "tasks.indicator.tooltip_title": "Background Tasks"
   },
   "aliases": {
     "MCW Launcher": "app.name",

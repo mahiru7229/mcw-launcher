@@ -2,6 +2,17 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.6.0-alpha.2] - 2026-09-13
+
+### Added
+- Introduce `GlobalTaskIndicator` on `MainWindow` top navigation bar displaying background task states, mini progress bar, percentage, and multi-task tooltip.
+- Add Discord Rich Presence (RPC) support displaying active game instance and playtime on Discord profile with toggle in Launcher Settings.
+- Add direct `.mrpack` modpack export support with automatic `modrinth.index.json` generation and hash calculation.
+- Add one-dir packaging architecture support (`mcw_launcher.spec`) and seamless updater migration from 1.5.1 one-file installations.
+
+### Changed
+- Bump development version to `v1.6.0-alpha.2` on branch `1.6`.
+
 ## [1.6.0-alpha.1] - 2026-09-11
 
 ### Added
