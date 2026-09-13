@@ -3251,11 +3251,14 @@ class MainWindow(QMainWindow):
 
     def _show_modpack_export_finished(self, result: object) -> None:
         path = Path(getattr(result, "output_path", ""))
+        mode = str(getattr(result, "mode", "")).strip().casefold()
         referenced = int(getattr(result, "referenced_files", 0) or 0)
         embedded = int(getattr(result, "embedded_files", 0) or 0)
         manual = int(getattr(result, "manual_files", 0) or 0)
         native = bool(getattr(result, "native_package_included", False))
-        if native:
+        if mode == "mrpack":
+            detail = tr("modpack_package.export.result.mrpack", indexed=referenced, overrides=embedded)
+        elif native:
             detail = tr("modpack_package.export.result.provider")
         else:
             detail = tr(

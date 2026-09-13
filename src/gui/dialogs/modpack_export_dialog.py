@@ -19,12 +19,17 @@ class ModpackExportDialog(QDialog):
 
     @property
     def options(self) -> ModpackExportOptions:
-        mode = ModpackExportOptions.PROVIDER_PROFILE if self.provider_radio.isChecked() else ModpackExportOptions.PORTABLE
+        if self.mrpack_radio.isChecked():
+            mode = ModpackExportOptions.MRPACK
+        elif self.provider_radio.isChecked():
+            mode = ModpackExportOptions.PROVIDER_PROFILE
+        else:
+            mode = ModpackExportOptions.PORTABLE
         portable_mode = str(self.portable_mode.currentData() or ModpackExportOptions.SMART)
         return ModpackExportOptions(mode=mode, portable_mode=portable_mode, include_saves=self.include_saves.isChecked())
 
     def _build_ui(self) -> None:
-        resize_dialog_to_screen(self, 720, 610, 590, 500)
+        resize_dialog_to_screen(self, 720, 640, 590, 520)
         self.setWindowTitle(tr("modpack_package.export.title"))
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 18, 18, 18)
@@ -38,8 +43,15 @@ class ModpackExportDialog(QDialog):
         intro.setWordWrap(True)
         root.addWidget(intro)
 
+        self.mrpack_radio = QRadioButton(tr("modpack_package.export.mrpack"))
+        self.mrpack_radio.setChecked(True)
+        mrpack_help = QLabel(tr("modpack_package.export.mrpack_help"))
+        mrpack_help.setObjectName("MutedLabel")
+        mrpack_help.setWordWrap(True)
+        root.addWidget(self.mrpack_radio)
+        root.addWidget(mrpack_help)
+
         self.provider_radio = QRadioButton(tr("modpack_package.export.provider_profile"))
-        self.provider_radio.setChecked(True)
         provider_help = QLabel(tr("modpack_package.export.provider_profile_help"))
         provider_help.setObjectName("MutedLabel")
         provider_help.setWordWrap(True)
@@ -66,6 +78,7 @@ class ModpackExportDialog(QDialog):
         root.addWidget(warning)
         root.addStretch(1)
 
+        self.mrpack_radio.toggled.connect(self._update_mode)
         self.provider_radio.toggled.connect(self._update_mode)
         self.portable_radio.toggled.connect(self._update_mode)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
@@ -80,12 +93,18 @@ class ModpackExportDialog(QDialog):
 
     def _update_mode(self) -> None:
         portable = self.portable_radio.isChecked()
+        mrpack = self.mrpack_radio.isChecked()
         self.portable_mode.setEnabled(portable)
-        self.include_saves.setEnabled(portable)
+        self.include_saves.setEnabled(portable or mrpack)
 
     def _choose_output(self) -> None:
         options = self.options
-        if options.mode == ModpackExportOptions.PROVIDER_PROFILE:
+        if options.mode == ModpackExportOptions.MRPACK:
+            suggested = f"{self._instance_name}.mrpack"
+            title = tr("modpack_package.export.mrpack_save_title")
+            file_filter = tr("modpack_package.export.mrpack_filter")
+            suffix = ".mrpack"
+        elif options.mode == ModpackExportOptions.PROVIDER_PROFILE:
             suggested = f"{self._instance_name}-MCW-Profile.zip"
             title = tr("modpack_package.export.provider_save_title")
             file_filter = tr("modpack_package.export.provider_filter")
