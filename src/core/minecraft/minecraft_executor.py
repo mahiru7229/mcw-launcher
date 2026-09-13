@@ -201,7 +201,19 @@ class MinecraftExecutor:
         return " | ".join(lines[-max(1, int(line_limit)):])
 
     @staticmethod
-    def run(instance: Instance, authentication: Authentication, account: Account, debug_mode: bool = False, on_progress: ProgressCallback | None = None, on_exit: Callable[[GameExitResult], None] | None = None, allow_compatibility_issues_once: bool = False, on_manual_content_required: Callable[[Exception], None] | None = None, on_compatibility_confirmation: Callable[[CompatibilityConfirmationRequired], bool] | None = None) -> dict:
+    def run(
+        instance: Instance,
+        authentication: Authentication,
+        account: Account,
+        debug_mode: bool = False,
+        on_progress: ProgressCallback | None = None,
+        on_exit: Callable[[GameExitResult], None] | None = None,
+        allow_compatibility_issues_once: bool = False,
+        on_manual_content_required: Callable[[Exception], None] | None = None,
+        on_compatibility_confirmation: Callable[[CompatibilityConfirmationRequired], bool] | None = None,
+        quick_play_singleplayer: str = "",
+        quick_play_multiplayer: str = "",
+    ) -> dict:
         run_lock = InstanceRunLock.acquire(instance)
         process_started = False
         process = None
@@ -323,8 +335,15 @@ class MinecraftExecutor:
 
             reporter.status(stage=ProgressStage.BUILDING_COMMAND, message="Building launch command...")
             lan_runtime_arguments = LanAgentManager.runtime_arguments(version, lan_auth_mode, instance, reporter)
+            build_kwargs: dict[str, object] = {}
             if lan_runtime_arguments:
-                command = LauncherManager.build(version, context, settings, account, runtime_jvm_arguments=lan_runtime_arguments)
+                build_kwargs["runtime_jvm_arguments"] = lan_runtime_arguments
+            if quick_play_singleplayer:
+                build_kwargs["quick_play_singleplayer"] = quick_play_singleplayer
+            if quick_play_multiplayer:
+                build_kwargs["quick_play_multiplayer"] = quick_play_multiplayer
+            if build_kwargs:
+                command = LauncherManager.build(version, context, settings, account, **build_kwargs)
             else:
                 command = LauncherManager.build(version, context, settings, account)
             LanAgentManager.append_log_path(

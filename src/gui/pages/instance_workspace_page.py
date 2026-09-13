@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, QSize, Qt, Signal
+from PySide6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QSize, Qt, Signal
 from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFrame,
+    QGraphicsOpacityEffect,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -24,7 +25,9 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSplitter,
+    QStackedWidget,
     QStyle,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -42,11 +45,16 @@ from src.gui.pages.instances_page import InstancesPage
 from src.gui.theme.accent_runtime import theme_accent_runtime
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
+from src.gui.widget.instance_live_logs_tab import InstanceLiveLogsTab
+from src.gui.widget.instance_mods_tab import InstanceModsTab
+from src.gui.widget.instance_screenshots_tab import InstanceScreenshotsTab
+from src.gui.widget.instance_worlds_tab import InstanceWorldsTab
 
 
 class InstanceWorkspacePage(BasePage):
     refresh_requested = Signal()
     selected_instance_changed = Signal(str)
+    quick_play_requested = Signal(str)
     create_requested = Signal(str, str, str, str)
     create_with_optifine_requested = Signal(str, str, str, str, object)
     rename_requested = Signal(str, str)
@@ -109,6 +117,7 @@ class InstanceWorkspacePage(BasePage):
         self._running_instances: list[object] = []
         self._health_reports: dict[str, object] = {}
         self._busy = False
+        self._last_animated_name = ""
 
         self.advanced_page = InstancesPage()
         self.advanced_dialog = AdvancedInstanceManagerDialog(self.advanced_page, self)
@@ -119,6 +128,13 @@ class InstanceWorkspacePage(BasePage):
         self._connect_dialogs()
         self._forward_advanced_signals()
         self.retranslate_dynamic()
+
+    def _get_theme_icon(self, key: str) -> QIcon:
+        path = theme_manager.resolve_asset(str(key))
+        if path is not None:
+            path = theme_accent_runtime.tinted_path(path, key)
+            return QIcon(str(path))
+        return QIcon()
 
     def _build_ui(self) -> None:
         toolbar = QFrame()
@@ -163,8 +179,10 @@ class InstanceWorkspacePage(BasePage):
         self.splitter.setObjectName("InstanceWorkspaceSplitter")
         self.splitter.setChildrenCollapsible(False)
 
+        # ----------------- Left Sidebar: Instance Library -----------------
         self.library_panel = QFrame()
         self.library_panel.setObjectName("InstanceLibrary")
+        self.library_panel.setMinimumWidth(240)
         library_layout = QVBoxLayout(self.library_panel)
         library_layout.setContentsMargins(12, 12, 12, 12)
         library_layout.setSpacing(10)
@@ -189,13 +207,12 @@ class InstanceWorkspacePage(BasePage):
 
         self.instance_list = QListWidget()
         self.instance_list.setObjectName("InstanceLibraryList")
-        self.instance_list.setViewMode(QListView.ViewMode.IconMode)
+        self.instance_list.setViewMode(QListView.ViewMode.ListMode)
         self.instance_list.setResizeMode(QListView.ResizeMode.Adjust)
         self.instance_list.setMovement(QListView.Movement.Static)
         self.instance_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.instance_list.setIconSize(QSize(56, 56))
-        self.instance_list.setGridSize(QSize(184, 112))
-        self.instance_list.setSpacing(6)
+        self.instance_list.setIconSize(QSize(36, 36))
+        self.instance_list.setSpacing(4)
         self.instance_list.setWordWrap(True)
         self.instance_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.instance_list.currentItemChanged.connect(self._list_selection_changed)
@@ -208,36 +225,69 @@ class InstanceWorkspacePage(BasePage):
         library_layout.addWidget(self.library_status)
         self.splitter.addWidget(self.library_panel)
 
+        # ----------------- Right Area: Hub Stack -----------------
+        self.hub_stack = QStackedWidget()
+        self.hub_stack.setObjectName("InstanceHubStack")
+
+        # Empty Hub (No instance selected)
+        self.empty_hub_widget = QWidget()
+        empty_layout = QVBoxLayout(self.empty_hub_widget)
+        empty_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty_layout.setSpacing(12)
+        self.empty_hub_icon = QLabel()
+        self.empty_hub_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_hub_icon.setPixmap(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogInfoView).pixmap(56, 56))
+        self.empty_hub_title = QLabel()
+        self.empty_hub_title.setObjectName("SectionTitle")
+        self.empty_hub_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_hub_desc = QLabel()
+        self.empty_hub_desc.setObjectName("MutedLabel")
+        self.empty_hub_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty_layout.addWidget(self.empty_hub_icon)
+        empty_layout.addWidget(self.empty_hub_title)
+        empty_layout.addWidget(self.empty_hub_desc)
+        self.hub_stack.addWidget(self.empty_hub_widget)
+
+        # Active Hub (Instance selected)
+        self.hub_widget = QWidget()
+        self.hub_widget.setObjectName("InstanceHubWidget")
+        hub_layout = QVBoxLayout(self.hub_widget)
+        hub_layout.setContentsMargins(8, 8, 8, 8)
+        hub_layout.setSpacing(8)
+
+        # Top Action Panel inside action_scroll
         self.action_panel = CardWidget("", object_name="InstanceActionPanel")
         self.action_panel.setMinimumWidth(300)
         self.instance_icon = QLabel()
         self.instance_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.instance_icon.setFixedHeight(76)
+        self.instance_icon.setFixedSize(56, 56)
         self.instance_name_label = QLabel()
         self.instance_name_label.setObjectName("SectionTitle")
-        self.instance_name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.instance_detail_label = QLabel()
         self.instance_detail_label.setObjectName("MutedLabel")
-        self.instance_detail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.instance_detail_label.setWordWrap(True)
         self.running_label = QLabel()
         self.running_label.setObjectName("TinyLabel")
-        self.running_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.health_label = QLabel()
         self.health_label.setObjectName("TinyLabel")
-        self.health_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.health_label.setWordWrap(True)
         self.library_meta_label = QLabel()
         self.library_meta_label.setObjectName("TinyLabel")
-        self.library_meta_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.library_meta_label.setWordWrap(True)
         self.playtime_label = QLabel()
         self.playtime_label.setObjectName("TinyLabel")
-        self.playtime_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.playtime_label.setWordWrap(True)
+
+        self.quick_play_button = set_theme_icon(QPushButton(), "icon.action.launch")
+        self.quick_play_button.setObjectName("SecondaryButton")
+        self.quick_play_button.setFixedHeight(34)
+        self.quick_play_button.clicked.connect(self._request_quick_play)
 
         self.launch_button = set_theme_icon(QPushButton(), "icon.action.launch")
         self.launch_button.setObjectName("PrimaryButton")
+        self.launch_button.setFixedHeight(34)
+        self.launch_button.clicked.connect(self._request_primary_action)
+
         self.edit_button = set_theme_icon(QPushButton(), "icon.action.edit")
         self.favorite_button = QPushButton()
         self.manage_mods_button = set_theme_icon(QPushButton(), "icon.action.mods")
@@ -253,10 +303,9 @@ class InstanceWorkspacePage(BasePage):
         self.delete_button = set_theme_icon(QPushButton(), "icon.action.remove")
         self.delete_button.setObjectName("DangerButton")
 
-        self.launch_button.clicked.connect(self._request_primary_action)
         self.edit_button.clicked.connect(self._open_management_dialog)
         self.favorite_button.clicked.connect(self._toggle_favorite)
-        self.manage_mods_button.clicked.connect(lambda: self.manage_mods_requested.emit(self.current_instance_name()))
+        self.manage_mods_button.clicked.connect(self._on_manage_mods_clicked)
         self.manage_content_packs_button.clicked.connect(lambda: self.manage_content_packs_requested.emit(self.current_instance_name()))
         self.manage_content_library_button.clicked.connect(lambda: self.manage_content_library_requested.emit(self.current_instance_name()))
         self.optifine_button.clicked.connect(lambda: self.manage_optifine_requested.emit(self.current_instance_name()))
@@ -268,42 +317,94 @@ class InstanceWorkspacePage(BasePage):
         self.export_button.clicked.connect(self._choose_export)
         self.delete_button.clicked.connect(self._confirm_delete)
 
-        self.action_panel.layout.addWidget(self.instance_icon)
-        self.action_panel.layout.addWidget(self.instance_name_label)
-        self.action_panel.layout.addWidget(self.instance_detail_label)
-        self.action_panel.layout.addWidget(self.running_label)
-        self.action_panel.layout.addWidget(self.health_label)
-        self.action_panel.layout.addWidget(self.library_meta_label)
-        self.action_panel.layout.addWidget(self.playtime_label)
-        self.action_panel.layout.addSpacing(4)
-        self.action_panel.layout.addWidget(self.launch_button)
-        self.action_panel.layout.addWidget(self.favorite_button)
-        self.action_panel.layout.addWidget(self.edit_button)
-        self.action_panel.layout.addWidget(self.manage_content_library_button)
-        self.action_panel.layout.addWidget(self.manage_mods_button)
-        self.action_panel.layout.addWidget(self.manage_content_packs_button)
-        self.action_panel.layout.addWidget(self.optifine_button)
-        self.action_panel.layout.addWidget(self.settings_button)
-        self.action_panel.layout.addWidget(self.change_icon_button)
-        self.action_panel.layout.addWidget(self.open_folder_button)
-        self.action_panel.layout.addWidget(self.repair_button)
-        self.action_panel.layout.addStretch(1)
-        self.action_panel.layout.addWidget(self.clone_button)
-        self.action_panel.layout.addWidget(self.export_button)
-        self.action_panel.layout.addWidget(self.delete_button)
+        # Header summary layout
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(12)
+        header_layout.addWidget(self.instance_icon)
+
+        meta_vbox = QVBoxLayout()
+        meta_vbox.setSpacing(2)
+        meta_vbox.addWidget(self.instance_name_label)
+        meta_vbox.addWidget(self.instance_detail_label)
+        badges_hbox = QHBoxLayout()
+        badges_hbox.setSpacing(8)
+        badges_hbox.addWidget(self.running_label)
+        badges_hbox.addWidget(self.health_label)
+        badges_hbox.addWidget(self.library_meta_label)
+        badges_hbox.addWidget(self.playtime_label)
+        badges_hbox.addStretch(1)
+        meta_vbox.addLayout(badges_hbox)
+        header_layout.addLayout(meta_vbox, 1)
+
+        primary_actions = QHBoxLayout()
+        primary_actions.setSpacing(8)
+        primary_actions.addWidget(self.quick_play_button)
+        primary_actions.addWidget(self.launch_button)
+        header_layout.addLayout(primary_actions)
+        self.action_panel.layout.addLayout(header_layout)
+
+        # Tools toolbar row
+        tools_layout = QHBoxLayout()
+        tools_layout.setSpacing(6)
+        tools_layout.addWidget(self.favorite_button)
+        tools_layout.addWidget(self.edit_button)
+        tools_layout.addWidget(self.settings_button)
+        tools_layout.addWidget(self.open_folder_button)
+        tools_layout.addWidget(self.change_icon_button)
+        tools_layout.addWidget(self.manage_content_library_button)
+        tools_layout.addWidget(self.manage_mods_button)
+        tools_layout.addWidget(self.manage_content_packs_button)
+        tools_layout.addWidget(self.optifine_button)
+        tools_layout.addWidget(self.repair_button)
+        tools_layout.addWidget(self.clone_button)
+        tools_layout.addWidget(self.export_button)
+        tools_layout.addWidget(self.delete_button)
+        tools_layout.addStretch(1)
+        self.action_panel.layout.addLayout(tools_layout)
+
         self.action_panel.layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+
         self.action_scroll = QScrollArea()
         self.action_scroll.setObjectName("InstanceActionScrollArea")
         self.action_scroll.setWidgetResizable(True)
         self.action_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.action_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.action_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.action_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.action_scroll.setWidget(self.action_panel)
         self.action_scroll.setMinimumWidth(300)
-        self.splitter.addWidget(self.action_scroll)
-        self.splitter.setStretchFactor(0, 1)
-        self.splitter.setStretchFactor(1, 0)
-        self.splitter.setSizes([820, 330])
+        self.action_scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        hub_layout.addWidget(self.action_scroll)
+
+        # Hub Tabs: Worlds, Screenshots, Live Logs, Mods
+        self.hub_tabs = QTabWidget()
+        self.hub_tabs.setObjectName("InstanceHubTabs")
+        self.worlds_tab = InstanceWorldsTab(self)
+        self.screenshots_tab = InstanceScreenshotsTab(self)
+        self.logs_tab = InstanceLiveLogsTab(self)
+        self.mods_tab = InstanceModsTab(self)
+
+        self.hub_tabs.addTab(self.worlds_tab, self._get_theme_icon("icon.action.download"), tr("workspace.tabs.worlds"))
+        self.hub_tabs.addTab(self.screenshots_tab, self._get_theme_icon("icon.action.screenshot"), tr("workspace.tabs.screenshots"))
+        self.hub_tabs.addTab(self.logs_tab, self._get_theme_icon("icon.action.logs"), tr("workspace.tabs.live_logs"))
+        self.hub_tabs.addTab(self.mods_tab, self._get_theme_icon("icon.action.mods"), tr("workspace.tabs.mods"))
+
+        self.worlds_tab.quick_play_requested.connect(self._request_quick_play_world)
+
+        hub_layout.addWidget(self.hub_tabs, 1)
+
+        # Animation effect on hub_widget
+        self._hub_opacity_effect = QGraphicsOpacityEffect(self.hub_widget)
+        self.hub_widget.setGraphicsEffect(self._hub_opacity_effect)
+        self._hub_anim = QPropertyAnimation(self._hub_opacity_effect, b"opacity")
+        self._hub_anim.setDuration(160)
+        self._hub_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        self.hub_stack.addWidget(self.hub_widget)
+        self.splitter.addWidget(self.hub_stack)
+
+        self.splitter.setStretchFactor(0, 0)
+        self.splitter.setStretchFactor(1, 1)
+        self.splitter.setSizes([280, 860])
         self.root_layout.addWidget(self.splitter, 1)
 
     def _connect_dialogs(self) -> None:
@@ -370,10 +471,10 @@ class InstanceWorkspacePage(BasePage):
 
     def set_compact_mode(self, compact: bool) -> None:
         super().set_compact_mode(compact)
-        self.instance_list.setGridSize(QSize(158, 104) if compact else QSize(184, 112))
-        self.instance_list.setIconSize(QSize(48, 48) if compact else QSize(56, 56))
+        self.instance_list.setIconSize(QSize(28, 28) if compact else QSize(36, 36))
         self.action_panel.setMinimumWidth(260 if compact else 300)
-        self.splitter.setSizes([680, 280] if compact else [820, 330])
+        self.action_scroll.setMinimumWidth(260 if compact else 300)
+        self.splitter.setSizes([240, 720] if compact else [280, 860])
 
     def set_versions(self, versions: list[object]) -> None:
         self._versions = list(versions)
@@ -488,7 +589,7 @@ class InstanceWorkspacePage(BasePage):
                 item = QListWidgetItem(self._instance_item_icon(instance), self._instance_item_text(instance))
                 item.setData(self.ITEM_NAME_ROLE, name)
                 item.setToolTip(self._instance_tooltip(instance))
-                item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
                 self.instance_list.addItem(item)
                 item.setHidden(not self._matches_library_filters(instance, query))
                 if name == selected_name:
@@ -701,6 +802,8 @@ class InstanceWorkspacePage(BasePage):
         self.launch_button.style().polish(self.launch_button)
 
         if instance is None:
+            self.hub_stack.setCurrentIndex(0)
+            self._last_animated_name = ""
             self.instance_icon.clear()
             self.instance_name_label.setText(tr("workspace.no_selection"))
             self.instance_detail_label.setText(tr("workspace.no_selection_detail"))
@@ -712,12 +815,25 @@ class InstanceWorkspacePage(BasePage):
             self.manage_mods_button.setEnabled(False)
             self.manage_content_packs_button.setEnabled(False)
             self.manage_content_library_button.setEnabled(False)
+            self.quick_play_button.setEnabled(False)
             self.management_dialog.set_instance(None)
+            self.worlds_tab.set_instance(None)
+            self.screenshots_tab.set_instance(None)
+            self.logs_tab.set_instance(None)
+            self.mods_tab.set_instance(None)
             return
+
+        self.hub_stack.setCurrentIndex(1)
+        if self._selected_name != self._last_animated_name:
+            self._last_animated_name = self._selected_name
+            self._hub_anim.stop()
+            self._hub_anim.setStartValue(0.35)
+            self._hub_anim.setEndValue(1.0)
+            self._hub_anim.start()
 
         loader_name, loader_version = self._instance_loader(instance)
         loader = loader_name.title() if loader_version in {"", "-1"} else f"{loader_name.title()} {loader_version}"
-        self.instance_icon.setPixmap(self._instance_item_icon(instance).pixmap(64, 64))
+        self.instance_icon.setPixmap(self._instance_item_icon(instance).pixmap(56, 56))
         self.instance_name_label.setText(str(instance.name))
         self.instance_detail_label.setText(
             tr(
@@ -752,6 +868,34 @@ class InstanceWorkspacePage(BasePage):
         self.manage_content_packs_button.setEnabled(enabled)
         self.manage_content_library_button.setEnabled(enabled)
         self.management_dialog.set_instance(instance)
+
+        self.worlds_tab.set_instance(instance)
+        self.screenshots_tab.set_instance(instance)
+        self.logs_tab.set_instance(instance)
+        self.mods_tab.set_instance(instance)
+
+        latest_world = self.worlds_tab.latest_world
+        if latest_world is not None:
+            self.quick_play_button.setEnabled(enabled and state != "running")
+            self.quick_play_button.setText(tr("workspace.action.quick_play_world", world=latest_world.name))
+            self.quick_play_button.setToolTip(tr("workspace.action.quick_play_world_tooltip", world=latest_world.name))
+        else:
+            self.quick_play_button.setEnabled(False)
+            self.quick_play_button.setText(tr("workspace.action.quick_play"))
+            self.quick_play_button.setToolTip(tr("workspace.action.quick_play_no_world"))
+
+    def _on_manage_mods_clicked(self) -> None:
+        self.hub_tabs.setCurrentWidget(self.mods_tab)
+        self.manage_mods_requested.emit(self.current_instance_name())
+
+    def _request_quick_play(self) -> None:
+        latest = self.worlds_tab.latest_world
+        if latest is not None and latest.folder_name:
+            self.quick_play_requested.emit(latest.folder_name)
+
+    def _request_quick_play_world(self, world_folder: str) -> None:
+        if world_folder:
+            self.quick_play_requested.emit(world_folder)
 
     def _update_library_status(self) -> None:
         total = len(self._instances)
@@ -1068,10 +1212,19 @@ class InstanceWorkspacePage(BasePage):
         self.clone_button.setText(tr("workspace.action.clone"))
         self.export_button.setText(tr("workspace.action.export"))
         self.delete_button.setText(tr("workspace.action.delete"))
+        self.hub_tabs.setTabText(0, tr("workspace.tabs.worlds"))
+        self.hub_tabs.setTabText(1, tr("workspace.tabs.screenshots"))
+        self.hub_tabs.setTabText(2, tr("workspace.tabs.live_logs"))
+        self.hub_tabs.setTabText(3, tr("workspace.tabs.mods"))
+        self.empty_hub_title.setText(tr("workspace.no_selection"))
+        self.empty_hub_desc.setText(tr("workspace.no_selection_detail"))
+        self.worlds_tab.retranslate_dynamic()
+        self.screenshots_tab.retranslate_dynamic()
+        self.logs_tab.retranslate_dynamic()
+        self.mods_tab.retranslate_dynamic()
         self.set_account(self._account)
         self.create_dialog.retranslate_dynamic()
         self.management_dialog.retranslate_dynamic()
-        self._render_selected()
         self.advanced_page.retranslate_dynamic()
         self.advanced_dialog.set_instance_name(self.current_instance_name())
         self._render_selected()

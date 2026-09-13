@@ -375,6 +375,7 @@ class MainWindow(QMainWindow):
 
         self.instances_page.refresh_requested.connect(self.instance_controller.refresh)
         self.instances_page.launch_requested.connect(self._request_launch)
+        self.instances_page.quick_play_requested.connect(lambda world: self._request_launch(quick_play_singleplayer=world))
         self.instances_page.kill_instance_requested.connect(self._request_kill_instance)
         self.instances_page.instance_settings_requested.connect(self._open_instance_settings_workspace)
         self.instances_page.manage_accounts_requested.connect(lambda: self.show_page("accounts"))
@@ -1014,10 +1015,10 @@ class MainWindow(QMainWindow):
         page.select_instance(instance_name)
         self.instance_settings_controller.load(instance_name)
 
-    def _request_launch(self) -> None:
+    def _request_launch(self, quick_play_singleplayer: str = "") -> None:
         if self._confirm_all_unsaved_settings():
             self.connectivity_controller.probe(force=True)
-            self.launch_controller.launch()
+            self.launch_controller.launch(quick_play_singleplayer=quick_play_singleplayer)
 
     def _request_kill_instance(self, instance_name: str) -> None:
         name = str(instance_name or "").strip()

@@ -31,6 +31,8 @@ class LaunchRequest:
     on_manual_content_required: Callable[[Exception], None] | None = None
     on_compatibility_confirmation: Callable[[Exception], bool] | None = None
     allow_compatibility_issues_once: bool = False
+    quick_play_singleplayer: str = ""
+    quick_play_multiplayer: str = ""
 
 
 @dataclass(frozen=True, slots=True)

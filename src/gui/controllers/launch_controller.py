@@ -57,7 +57,7 @@ class LaunchController(BaseController):
     def set_debug_mode(self, enabled: bool) -> None:
         self._debug_mode = enabled
 
-    def launch(self, allow_compatibility_issues_once: bool = False) -> None:
+    def launch(self, allow_compatibility_issues_once: bool = False, quick_play_singleplayer: str = "") -> None:
         if self._task_runner.is_task_active(self.TASK_ID):
             if self.waiting_for_compatibility_confirmation:
                 with self._state_lock:
@@ -104,6 +104,7 @@ class LaunchController(BaseController):
                         on_manual_content_required=self._on_manual_content_required,
                         on_compatibility_confirmation=self._on_compatibility_confirmation,
                         allow_compatibility_issues_once=allow_compatibility_issues_once,
+                        quick_play_singleplayer=quick_play_singleplayer,
                     )
                 )
                 return result.as_dict()

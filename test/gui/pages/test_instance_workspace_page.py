@@ -207,3 +207,32 @@ def test_workspace_favorite_action_emits_selected_state_change(gui_app):
     page.favorite_button.click()
 
     assert emitted == [("Favorite Me", True)]
+
+
+def test_workspace_hub_tabs_and_quick_play(gui_app, tmp_path):
+    page = InstanceWorkspacePage()
+    inst_dir = tmp_path / "QuickPlayInstance"
+    inst_dir.mkdir()
+    instance = make_instance("QuickPlayInstance")
+    instance.instance_dir = str(inst_dir)
+
+    # Verify hub tabs count and components
+    assert page.hub_tabs.count() == 4
+    assert page.worlds_tab is not None
+    assert page.screenshots_tab is not None
+    assert page.logs_tab is not None
+    assert page.mods_tab is not None
+
+    page.set_instances([instance], instance.name)
+
+    # By default, no worlds exist -> quick_play_button disabled
+    assert page.quick_play_button.isEnabled() is False
+
+    # Listen to quick_play_requested
+    emitted: list[str] = []
+    page.quick_play_requested.connect(emitted.append)
+
+    # Emitting from worlds_tab directly
+    page.worlds_tab.quick_play_requested.emit("SurvivalSave")
+    assert emitted == ["SurvivalSave"]
+
