@@ -147,3 +147,157 @@ def test_release_script_runs_directly_from_any_working_directory(tmp_path: Path)
     assert result.returncode == 0, result.stderr
     assert output.is_file()
     assert output.with_name(f"{output.name}.sha256").is_file()
+
+
+def test_build_release_zip_supports_onedir_directory_target(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "README.md").write_text("readme", encoding="utf-8")
+    (project / "LICENSE").write_text("license", encoding="utf-8")
+    for directory in ("lang", "themes"):
+        (project / directory).mkdir()
+        (project / directory / "file.txt").write_text(directory, encoding="utf-8")
+
+    app_dir = tmp_path / "dist" / "MCW Launcher"
+    app_dir.mkdir(parents=True)
+    exe_file = app_dir / "MCW Launcher.exe"
+    exe_file.write_bytes(b"stub-exe-content")
+
+    internal_dir = app_dir / "_internal"
+    internal_dir.mkdir()
+    (internal_dir / "python312.dll").write_bytes(b"python-dll")
+    pyside_dir = internal_dir / "PySide6"
+    pyside_dir.mkdir()
+    (pyside_dir / "QtCore.pyd").write_bytes(b"qt-core-pyd")
+
+    updater = tmp_path / "MCW Updater.exe"
+    updater.write_bytes(b"updater-exe-content")
+
+    output = project / "release" / f"MCW-Launcher-v{VERSION_ID}-windows-x64.zip"
+    build_release_zip(project, app_dir, updater, VERSION_ID, output, "windows-x64")
+
+    with zipfile.ZipFile(output) as archive:
+        root = f"MCW-Launcher-v{VERSION_ID}-windows-x64"
+        names = set(archive.namelist())
+        assert f"{root}/MCW Launcher.exe" in names
+        assert f"{root}/_internal/python312.dll" in names
+        assert f"{root}/_internal/PySide6/QtCore.pyd" in names
+        assert f"{root}/updater/MCW Updater.exe" in names
+        assert f"{root}/lang/file.txt" in names
+        assert f"{root}/themes/file.txt" in names
+
+        manifest = json.loads(archive.read(f"{root}/mcw-update.json"))
+        assert manifest["schema_version"] == 2
+        assert manifest["executable"] == "MCW Launcher.exe"
+        assert manifest["updater"] == "updater/MCW Updater.exe"
+        assert "_internal/python312.dll" in manifest["files"]
+        assert "_internal/PySide6/QtCore.pyd" in manifest["files"]
+        assert "MCW Launcher.exe" in manifest["files"]
+
+
+def test_build_release_zip_supports_onedir_executable_path_target(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "README.md").write_text("readme", encoding="utf-8")
+    (project / "LICENSE").write_text("license", encoding="utf-8")
+
+    app_dir = tmp_path / "dist" / "MCW Launcher"
+    app_dir.mkdir(parents=True)
+    exe_file = app_dir / "MCW Launcher.exe"
+    exe_file.write_bytes(b"stub-exe-content")
+
+    internal_dir = app_dir / "_internal"
+    internal_dir.mkdir()
+    (internal_dir / "python312.dll").write_bytes(b"python-dll")
+
+    updater = tmp_path / "MCW Updater.exe"
+    updater.write_bytes(b"updater-exe")
+
+    output = project / "release" / f"MCW-Launcher-v{VERSION_ID}-windows-x64.zip"
+    # Pass path directly to the executable file inside the onedir folder
+    build_release_zip(project, exe_file, updater, VERSION_ID, output, "windows-x64")
+
+    with zipfile.ZipFile(output) as archive:
+        root = f"MCW-Launcher-v{VERSION_ID}-windows-x64"
+        names = set(archive.namelist())
+        assert f"{root}/MCW Launcher.exe" in names
+        assert f"{root}/_internal/python312.dll" in names
+        manifest = json.loads(archive.read(f"{root}/mcw-update.json"))
+        assert "_internal/python312.dll" in manifest["files"]
+
+
+def test_onedir_package_upgrades_legacy_onefile_installation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.core.update.update_applier import UpdateApplier, UpdateApplyRequest
+
+    # 1. Simulate legacy 1.5.1 installation (single onefile .exe)
+    installation = tmp_path / "installed_app"
+    installation.mkdir()
+    legacy_exe = installation / "MCW Launcher.exe"
+    legacy_exe.write_bytes(b"legacy-100mb-exe-content")
+    (installation / "mcw-update.json").write_text(json.dumps({
+        "schema_version": 2,
+        "version": "1.5.1",
+        "platform": "windows-x64",
+        "executable": "MCW Launcher.exe",
+        "updater": "updater/MCW Updater.exe",
+        "files": ["MCW Launcher.exe", "updater/MCW Updater.exe", "mcw-update.json"],
+        "cleanup_paths": ["docs"],
+    }), encoding="utf-8")
+
+    # 2. Build onedir release ZIP for 1.6
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "README.md").write_text("readme-1.6", encoding="utf-8")
+    (project / "LICENSE").write_text("license", encoding="utf-8")
+
+    app_dir = tmp_path / "dist" / "MCW Launcher"
+    app_dir.mkdir(parents=True)
+    new_exe = app_dir / "MCW Launcher.exe"
+    new_exe.write_bytes(b"new-onedir-stub-300kb")
+    internal_dir = app_dir / "_internal"
+    internal_dir.mkdir()
+    (internal_dir / "python312.dll").write_bytes(b"runtime-dll")
+    (internal_dir / "Qt6Core.dll").write_bytes(b"qt6-core-dll")
+
+    updater = tmp_path / "MCW Updater.exe"
+    updater.write_bytes(b"bundled-updater-v2")
+
+    release_zip = project / f"MCW-Launcher-v{VERSION_ID}-windows-x64.zip"
+    build_release_zip(project, app_dir, updater, VERSION_ID, release_zip, "windows-x64")
+
+    # 3. Simulate downloading and unpacking to staging
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    with zipfile.ZipFile(release_zip) as archive:
+        archive.extractall(staging)
+    source_dir = staging / f"MCW-Launcher-v{VERSION_ID}-windows-x64"
+
+    # 4. Run UpdateApplier
+    updater_dir = tmp_path / "updater_temp"
+    updater_dir.mkdir()
+    request = UpdateApplyRequest(
+        parent_pid=9999,
+        source_directory=source_dir,
+        destination_directory=installation,
+        executable_name="MCW Launcher.exe",
+        updater_directory=updater_dir,
+        staging_directory=staging,
+        persistent_log_path=installation / "logs" / "updater.log",
+        target_version=VERSION_ID,
+    )
+    applier = UpdateApplier(request)
+    started: list[bool] = []
+    monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
+    monkeypatch.setattr(applier, "_wait_for_launcher_release", lambda: None)
+    monkeypatch.setattr(applier, "_start_launcher", lambda **_kw: started.append(True))
+
+    exit_code = applier.run()
+    assert exit_code == 0
+    assert started == [True]
+
+    # 5. Verify upgraded directory structure
+    assert (installation / "MCW Launcher.exe").read_bytes() == b"new-onedir-stub-300kb"
+    assert (installation / "_internal" / "python312.dll").read_bytes() == b"runtime-dll"
+    assert (installation / "_internal" / "Qt6Core.dll").read_bytes() == b"qt6-core-dll"
+    assert (installation / "README.md").read_text(encoding="utf-8") == "readme-1.6"
+

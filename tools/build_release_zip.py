@@ -33,8 +33,43 @@ def bundled_updater_relative_path(platform_id: str) -> Path:
     return Path("updater") / bundled_updater_name(platform_id)
 
 
-def copy_payload(project_root: Path, payload_root: Path, executable: Path, updater: Path, platform_id: str) -> Path:
+def resolve_launcher_target(target: Path, platform_id: str) -> tuple[Path, Path | None]:
+    """Resolve (launcher_executable_path, app_dir_or_none) from a file or directory target."""
+    target = Path(target).resolve()
+    exe_name = "MCW Launcher.exe" if platform_id == "windows-x64" else "mcw-launcher"
+    if target.is_dir():
+        executable = target / exe_name
+        if not executable.is_file():
+            raise FileNotFoundError(f"Launcher executable not found inside directory: {executable}")
+        return executable, target
+    if target.is_file():
+        if (target.parent / "_internal").is_dir():
+            return target, target.parent
+        return target, None
+    raise FileNotFoundError(f"Launcher executable not found: {target}")
+
+
+def copy_payload(
+    project_root: Path,
+    payload_root: Path,
+    executable: Path,
+    updater: Path,
+    platform_id: str,
+    app_dir: Path | None = None,
+) -> Path:
     shutil.copy2(executable, payload_root / executable.name)
+    if app_dir is not None and app_dir.is_dir():
+        internal_dir = app_dir / "_internal"
+        if internal_dir.is_dir():
+            shutil.copytree(internal_dir, payload_root / "_internal", dirs_exist_ok=True)
+        for item in app_dir.iterdir():
+            if item.name in {executable.name, "_internal"}:
+                continue
+            if item.is_file():
+                shutil.copy2(item, payload_root / item.name)
+            elif item.is_dir():
+                shutil.copytree(item, payload_root / item.name, dirs_exist_ok=True)
+
     updater_relative = bundled_updater_relative_path(platform_id)
     updater_destination = payload_root / updater_relative
     updater_destination.parent.mkdir(parents=True, exist_ok=True)
@@ -88,18 +123,17 @@ def build_release_zip(
     output: Path,
     platform_id: str = "windows-x64",
 ) -> Path:
-    if not executable.is_file():
-        raise FileNotFoundError(f"Launcher executable not found: {executable}")
+    platform_id = validate_platform(platform_id)
+    executable_file, app_dir = resolve_launcher_target(executable, platform_id)
     if not updater.is_file():
         raise FileNotFoundError(f"Bundled updater executable not found: {updater}")
-    platform_id = validate_platform(platform_id)
     package_name = f"MCW-Launcher-v{version}-{platform_id}"
     output.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="mcw-release-") as temporary:
         payload_root = Path(temporary) / package_name
         payload_root.mkdir(parents=True)
-        updater_relative = copy_payload(project_root, payload_root, executable, updater, platform_id)
+        updater_relative = copy_payload(project_root, payload_root, executable_file, updater, platform_id, app_dir)
         managed_files = sorted(
             path.relative_to(payload_root).as_posix()
             for path in payload_root.rglob("*")
@@ -110,7 +144,7 @@ def build_release_zip(
             "schema_version": PACKAGE_MANIFEST_SCHEMA_VERSION,
             "version": version,
             "platform": platform_id,
-            "executable": executable.name,
+            "executable": executable_file.name,
             "updater": updater_relative.as_posix(),
             "files": sorted(set(managed_files)),
             "cleanup_paths": list(DEFAULT_CLEANUP_PATHS),
@@ -121,7 +155,7 @@ def build_release_zip(
         )
 
         linux_executables = {
-            (payload_root / executable.name).resolve(),
+            (payload_root / executable_file.name).resolve(),
             (payload_root / updater_relative).resolve(),
         }
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:

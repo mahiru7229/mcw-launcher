@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import re
 import sys
 
@@ -203,22 +204,54 @@ analysis = Analysis(
 
 pyz = PYZ(analysis.pure)
 
-exe = EXE(
-    pyz,
-    analysis.scripts,
-    analysis.binaries,
-    analysis.datas,
-    [],
-    name=EXECUTABLE_NAME,
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,
-    console=False,
-    disable_windowed_traceback=False,
-    version=VERSION_RESOURCE,
-    icon=str(APP_ICON_PATH) if IS_WINDOWS else None,
-    manifest=WINDOWS_MANIFEST if IS_WINDOWS else None,
-    uac_admin=False,
-    uac_uiaccess=False,
-)
+BUILD_MODE = os.environ.get("MCW_BUILD_MODE", "onedir").strip().casefold()
+IS_ONEDIR = BUILD_MODE != "onefile"
+
+if IS_ONEDIR:
+    exe = EXE(
+        pyz,
+        analysis.scripts,
+        [],
+        exclude_binaries=True,
+        name=EXECUTABLE_NAME,
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=False,
+        console=False,
+        disable_windowed_traceback=False,
+        version=VERSION_RESOURCE,
+        icon=str(APP_ICON_PATH) if IS_WINDOWS else None,
+        manifest=WINDOWS_MANIFEST if IS_WINDOWS else None,
+        uac_admin=False,
+        uac_uiaccess=False,
+    )
+    coll = COLLECT(
+        exe,
+        analysis.binaries,
+        analysis.datas,
+        strip=False,
+        upx=False,
+        upx_exclude=[],
+        name=EXECUTABLE_NAME,
+    )
+else:
+    exe = EXE(
+        pyz,
+        analysis.scripts,
+        analysis.binaries,
+        analysis.datas,
+        [],
+        name=EXECUTABLE_NAME,
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=False,
+        console=False,
+        disable_windowed_traceback=False,
+        version=VERSION_RESOURCE,
+        icon=str(APP_ICON_PATH) if IS_WINDOWS else None,
+        manifest=WINDOWS_MANIFEST if IS_WINDOWS else None,
+        uac_admin=False,
+        uac_uiaccess=False,
+    )

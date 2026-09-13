@@ -73,17 +73,27 @@ Invoke-Checked "Launcher PyInstaller build" { python -m PyInstaller --clean --no
 Write-Step "Building bundled updater EXE"
 Invoke-Checked "Updater PyInstaller build" { python -m PyInstaller --clean --noconfirm mcw_updater.spec }
 
-$ExePath = Join-Path ".\dist" $ExeName
-if (-not (Test-Path $ExePath)) {
-    throw "Expected EXE was not created: $ExePath"
+$OnedirAppDir = Join-Path ".\dist" "MCW Launcher"
+$OnedirExePath = Join-Path $OnedirAppDir $ExeName
+$OnefileExePath = Join-Path ".\dist" $ExeName
+
+if (Test-Path $OnedirExePath) {
+    $ExeTarget = $OnedirAppDir
+    $ExeFile = $OnedirExePath
+} elseif (Test-Path $OnefileExePath) {
+    $ExeTarget = $OnefileExePath
+    $ExeFile = $OnefileExePath
+} else {
+    throw "Expected launcher executable was not created in .\dist (checked $OnedirExePath and $OnefileExePath)"
 }
+
 $UpdaterPath = ".\dist\MCW Updater.exe"
 if (-not (Test-Path $UpdaterPath)) {
     throw "Expected bundled updater was not created: $UpdaterPath"
 }
 
 Write-Step "Creating updater-v2 ZIP"
-Invoke-Checked "Release package build" { python -m tools.build_release_zip --exe $ExePath --updater $UpdaterPath --version $Version }
+Invoke-Checked "Release package build" { python -m tools.build_release_zip --exe $ExeTarget --updater $UpdaterPath --version $Version }
 
 $ZipName = "MCW-Launcher-v$Version-windows-x64.zip"
 $ZipPath = Join-Path ".\release" $ZipName
@@ -100,7 +110,7 @@ if (-not (Test-Path $ReleaseNotes)) {
     throw "Release notes were not found: $ReleaseNotes"
 }
 
-$ExeHash = (Get-FileHash $ExePath -Algorithm SHA256).Hash.ToLowerInvariant()
+$ExeHash = (Get-FileHash $ExeFile -Algorithm SHA256).Hash.ToLowerInvariant()
 $ZipHash = (Get-FileHash $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
 
 Write-Host ""
