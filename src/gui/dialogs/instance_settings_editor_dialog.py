@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import QSignalBlocker
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -24,6 +25,7 @@ from PySide6.QtWidgets import (
 
 from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
 from mcw_core.api.instance.settings_manager import SettingsManager
+from mcw_core.api.java.jvm_presets import JvmPresetId, detect_preset, get_preset_flags
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.system.memory import MemoryAllocationPolicy, SystemMemory
 from src.gui.window_sizing import resize_dialog_to_screen
@@ -151,6 +153,11 @@ class InstanceSettingsEditorDialog(QDialog):
         self.max_memory.valueChanged.connect(self._maximum_changed)
         java_form.addRow(tr("instance_defaults.memory.minimum"), self.min_memory)
         java_form.addRow(tr("instance_defaults.memory.maximum"), self.max_memory)
+        self.jvm_preset_label = QLabel(tr("jvm_preset.label"))
+        self.jvm_preset_combo = QComboBox()
+        self._populate_jvm_preset_combo()
+        self.jvm_preset_combo.currentIndexChanged.connect(self._on_jvm_preset_combo_changed)
+        java_form.addRow(self.jvm_preset_label, self.jvm_preset_combo)
         memory_limit = QLabel(
             tr(
                 "instance_defaults.memory.limit",
@@ -216,6 +223,7 @@ class InstanceSettingsEditorDialog(QDialog):
         hint.setWordWrap(True)
         self.jvm_arguments = QTextEdit()
         self.jvm_arguments.setPlaceholderText(tr("instance_defaults.arguments.jvm"))
+        self.jvm_arguments.textChanged.connect(self._sync_jvm_preset_from_text)
         self.game_arguments = QTextEdit()
         self.game_arguments.setPlaceholderText(tr("instance_defaults.arguments.game"))
         layout.addWidget(hint)
@@ -224,6 +232,35 @@ class InstanceSettingsEditorDialog(QDialog):
         layout.addWidget(QLabel(tr("instance_defaults.arguments.game")))
         layout.addWidget(self.game_arguments, 1)
         return tab
+
+    def _populate_jvm_preset_combo(self) -> None:
+        with QSignalBlocker(self.jvm_preset_combo):
+            self.jvm_preset_combo.clear()
+            self.jvm_preset_combo.addItem(tr("jvm_preset.default"), JvmPresetId.DEFAULT)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.aikar"), JvmPresetId.AIKAR)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.zgc"), JvmPresetId.ZGC)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.shenandoah"), JvmPresetId.SHENANDOAH)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.custom"), JvmPresetId.CUSTOM)
+
+    def _on_jvm_preset_combo_changed(self) -> None:
+        preset_id = self.jvm_preset_combo.currentData()
+        if not preset_id or preset_id == JvmPresetId.CUSTOM:
+            return
+        flags = get_preset_flags(preset_id)
+        with QSignalBlocker(self.jvm_arguments):
+            self.jvm_arguments.setPlainText("\n".join(flags))
+
+    def _sync_jvm_preset_from_text(self) -> None:
+        lines = self._lines(self.jvm_arguments.toPlainText())
+        detected = detect_preset(lines)
+        with QSignalBlocker(self.jvm_preset_combo):
+            idx = self.jvm_preset_combo.findData(detected)
+            if idx >= 0:
+                self.jvm_preset_combo.setCurrentIndex(idx)
+            else:
+                custom_idx = self.jvm_preset_combo.findData(JvmPresetId.CUSTOM)
+                if custom_idx >= 0:
+                    self.jvm_preset_combo.setCurrentIndex(custom_idx)
 
     def _apply_settings(self, data: dict | InstanceSettings | None) -> None:
         settings = SettingsManager.from_dict(data)
@@ -248,6 +285,7 @@ class InstanceSettingsEditorDialog(QDialog):
         self._set_combo(self.curseforge_failure_policy, settings.curseforge_failure_policy)
         self._set_combo(self.forge_preflight_failure_policy, settings.forge_preflight_failure_policy)
         self.jvm_arguments.setPlainText("\n".join(settings.jvm_arguments))
+        self._sync_jvm_preset_from_text()
         self.game_arguments.setPlainText("\n".join(settings.game_arguments))
 
     def _browse_java(self) -> None:
