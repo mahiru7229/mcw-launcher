@@ -150,6 +150,20 @@ class UpdateApplier:
                     backup.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(file_path, backup)
 
+        # Mirror backup to destination_directory / "updater" / "backup" so it survives
+        # as a permanent offline recovery path even after temp updater files are cleaned up.
+        persistent_backup = self.request.destination_directory / "updater" / "backup"
+        try:
+            persistent_backup.mkdir(parents=True, exist_ok=True)
+            for backup_file in self.backup_directory.rglob("*"):
+                if not backup_file.is_file():
+                    continue
+                dest = persistent_backup / backup_file.relative_to(self.backup_directory)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(backup_file, dest)
+        except Exception as err:
+            self._log(f"Notice: Could not write persistent recovery backup: {err}")
+
     def _copy_update_files(self) -> None:
         self._log(f"Copying update from {self.request.source_directory} to {self.request.destination_directory}")
         source_files = self._iter_source_files()

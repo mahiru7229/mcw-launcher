@@ -2183,7 +2183,8 @@
     "tasks.indicator.active_single": "{message} ({percent}%)",
     "tasks.indicator.active_multiple": "{count} tasks running ({percent}%)",
     "tasks.indicator.completed": "Tasks completed",
-    "tasks.indicator.tooltip_title": "Background Tasks"
+    "tasks.indicator.tooltip_title": "Background Tasks",
+    "startup.open_recovery_tool": "Open Recovery Tool"
   },
   "aliases": {
     "MCW Launcher": "app.name",
