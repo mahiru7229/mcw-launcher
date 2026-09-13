@@ -97,6 +97,10 @@ class GlobalTaskIndicator(QFrame):
     def retranslate_ui(self) -> None:
         self.refresh()
 
+    @staticmethod
+    def _format_percentage(value: int) -> str:
+        return f"{value}%"
+
     def _update_display(self, active_tasks: list[TaskQueueItem]) -> None:
         if not active_tasks:
             if self._hide_timer.isActive():
@@ -108,7 +112,7 @@ class GlobalTaskIndicator(QFrame):
                 self.text_label.setText(tr("tasks.indicator.completed"))
                 self.progress_bar.setRange(0, 100)
                 self.progress_bar.setValue(100)
-                self.percent_label.setText("100%")
+                self.percent_label.setText(self._format_percentage(100))
                 self.setToolTip(tr("tasks.indicator.completed"))
                 self._hide_timer.start(2500)
             else:
@@ -138,7 +142,7 @@ class GlobalTaskIndicator(QFrame):
             self.progress_bar.setRange(0, 100)
             val = max(0, min(100, int(percentage)))
             self.progress_bar.setValue(val)
-            self.percent_label.setText(f"{val}%")
+            self.percent_label.setText(self._format_percentage(val))
         else:
             self.progress_bar.setRange(0, 0)
             self.percent_label.setText("")
