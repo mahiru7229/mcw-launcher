@@ -2,6 +2,26 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.6.0-beta.2] - 2026-09-15
+
+### Added
+- Support dedicated GPU (dGPU) preference on Linux using switcheroo-control (`switcherooctl list`), with fallbacks to `lspci`, `/sys/bus/pci/devices`, and `/proc/driver/nvidia`.
+- Automatically inject discrete GPU environment variables for Minecraft Java runtime on Linux:
+  - NVIDIA PRIME Render Offload (`__NV_PRIME_RENDER_OFFLOAD=1`, `__GLX_VENDOR_LIBRARY_NAME=nvidia`, `__VK_LAYER_NV_optimus=NVIDIA_only`).
+  - Mesa DRI (`DRI_PRIME=1`).
+- Integrate SignPath.io v2 code signing into GitHub Actions release workflow.
+- Add NTFS `:Zone.Identifier` unblocking to prevent Windows SmartScreen / SAC blocks during update and extraction.
+- Add fallback to Windows Shell (`ShellExecuteExW`) when updater process launch is blocked by Smart App Control (`WinError 4551`).
+- Add empty directory cleanup (`_internal/`) on updater rollback.
+- Widen instance library sidebar (260px minimum, 320px default splitter) to prevent text truncation in instance list items.
+- Move instance metadata badges to a dedicated full-width row with word-wrap disabled.
+
+### Fixed
+- Prevent platform pollution in `UpdateApplier` unit tests by skipping Windows MessageBox test on Linux instead of mutating `os.name`.
+
+### Changed
+- Bump development version to `v1.6.0-beta.2` on branch `1.6`.
+
 ## [1.6.0-beta.1] - 2026-09-14
 
 ### Added
