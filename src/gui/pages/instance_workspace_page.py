@@ -185,7 +185,7 @@ class InstanceWorkspacePage(BasePage):
         # ----------------- Left Sidebar: Instance Library -----------------
         self.library_panel = QFrame()
         self.library_panel.setObjectName("InstanceLibrary")
-        self.library_panel.setMinimumWidth(240)
+        self.library_panel.setMinimumWidth(260)
         library_layout = QVBoxLayout(self.library_panel)
         library_layout.setContentsMargins(12, 12, 12, 12)
         library_layout.setSpacing(10)
@@ -273,15 +273,16 @@ class InstanceWorkspacePage(BasePage):
         self.instance_detail_label.setWordWrap(True)
         self.running_label = QLabel()
         self.running_label.setObjectName("TinyLabel")
+        self.running_label.setWordWrap(False)
         self.health_label = QLabel()
         self.health_label.setObjectName("TinyLabel")
-        self.health_label.setWordWrap(True)
+        self.health_label.setWordWrap(False)
         self.library_meta_label = QLabel()
         self.library_meta_label.setObjectName("TinyLabel")
-        self.library_meta_label.setWordWrap(True)
+        self.library_meta_label.setWordWrap(False)
         self.playtime_label = QLabel()
         self.playtime_label.setObjectName("TinyLabel")
-        self.playtime_label.setWordWrap(True)
+        self.playtime_label.setWordWrap(False)
 
         self.quick_play_button = set_theme_icon(QPushButton(), "icon.action.launch")
         self.quick_play_button.setObjectName("SecondaryButton")
@@ -337,17 +338,9 @@ class InstanceWorkspacePage(BasePage):
         header_layout.addWidget(self.instance_icon)
 
         meta_vbox = QVBoxLayout()
-        meta_vbox.setSpacing(2)
+        meta_vbox.setSpacing(4)
         meta_vbox.addWidget(self.instance_name_label)
         meta_vbox.addWidget(self.instance_detail_label)
-        badges_hbox = QHBoxLayout()
-        badges_hbox.setSpacing(8)
-        badges_hbox.addWidget(self.running_label)
-        badges_hbox.addWidget(self.health_label)
-        badges_hbox.addWidget(self.library_meta_label)
-        badges_hbox.addWidget(self.playtime_label)
-        badges_hbox.addStretch(1)
-        meta_vbox.addLayout(badges_hbox)
         header_layout.addLayout(meta_vbox, 1)
 
         primary_actions = QHBoxLayout()
@@ -357,6 +350,16 @@ class InstanceWorkspacePage(BasePage):
         primary_actions.addWidget(self.cancel_button)
         header_layout.addLayout(primary_actions)
         self.action_panel.layout.addLayout(header_layout)
+
+        # Full-width badges/metadata row
+        badges_hbox = QHBoxLayout()
+        badges_hbox.setSpacing(14)
+        badges_hbox.addWidget(self.running_label)
+        badges_hbox.addWidget(self.health_label)
+        badges_hbox.addWidget(self.library_meta_label)
+        badges_hbox.addWidget(self.playtime_label)
+        badges_hbox.addStretch(1)
+        self.action_panel.layout.addLayout(badges_hbox)
 
         # Tools Row 1: Instance Management & Files
         tools_row1 = QHBoxLayout()
@@ -426,7 +429,7 @@ class InstanceWorkspacePage(BasePage):
 
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 1)
-        self.splitter.setSizes([280, 860])
+        self.splitter.setSizes([320, 840])
         self.root_layout.addWidget(self.splitter, 1)
 
     def _connect_dialogs(self) -> None:
@@ -495,7 +498,7 @@ class InstanceWorkspacePage(BasePage):
         super().set_compact_mode(compact)
         self.instance_list.setIconSize(QSize(28, 28) if compact else QSize(36, 36))
         self.action_panel.setMinimumWidth(260 if compact else 300)
-        self.splitter.setSizes([240, 720] if compact else [280, 860])
+        self.splitter.setSizes([260, 720] if compact else [320, 840])
 
     def set_versions(self, versions: list[object]) -> None:
         self._versions = list(versions)
