@@ -64,6 +64,12 @@ class WindowsUpdateInstaller:
             # Critical v2 contract: execute updater code from the incoming release,
             # never a renamed/copy of the currently running launcher.
             shutil.copy2(incoming_updater, updater_executable)
+            if os.name == "nt":
+                try:
+                    import ctypes
+                    ctypes.windll.kernel32.DeleteFileW(f"{updater_executable}:Zone.Identifier")
+                except Exception:
+                    pass
             request = {
                 "schema_version": 2,
                 "parent_pid": int(parent_pid if parent_pid is not None else os.getpid()),
