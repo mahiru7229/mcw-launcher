@@ -53,6 +53,7 @@ class MCWCore:
                 on_compatibility_confirmation=request.on_compatibility_confirmation,
                 quick_play_singleplayer=request.quick_play_singleplayer,
                 quick_play_multiplayer=request.quick_play_multiplayer,
+                on_window_ready=request.on_window_ready,
             )
             return LaunchResult.from_legacy(result)
         finally:

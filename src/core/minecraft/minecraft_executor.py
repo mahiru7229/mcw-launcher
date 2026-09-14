@@ -213,6 +213,7 @@ class MinecraftExecutor:
         on_compatibility_confirmation: Callable[[CompatibilityConfirmationRequired], bool] | None = None,
         quick_play_singleplayer: str = "",
         quick_play_multiplayer: str = "",
+        on_window_ready: Callable[[int], None] | None = None,
     ) -> dict:
         run_lock = InstanceRunLock.acquire(instance)
         process_started = False
@@ -373,7 +374,27 @@ class MinecraftExecutor:
             run_lock.track_process(process)
             ProcessSupervisor.attach(process_session.session_id, process)
             GameRuntimeManager.record_start(instance, started_at, process_session.session_id)
-            watched = GameRuntimeManager.watch(process, instance, version.id, started_at, on_exit, process_session.session_id, crash_report_snapshot)
+            try:
+                watched = GameRuntimeManager.watch(
+                    process,
+                    instance,
+                    version.id,
+                    started_at,
+                    on_exit,
+                    process_session.session_id,
+                    crash_report_snapshot,
+                    on_window_ready=on_window_ready,
+                )
+            except TypeError:
+                watched = GameRuntimeManager.watch(
+                    process,
+                    instance,
+                    version.id,
+                    started_at,
+                    on_exit,
+                    process_session.session_id,
+                    crash_report_snapshot,
+                )
             if watched is False and callable(getattr(process, "poll", None)):
                 raise RuntimeError("Minecraft process could not be registered with the runtime manager.")
             reporter.status(stage=ProgressStage.FINISHED, message=f"Minecraft {version.id} launched successfully.")

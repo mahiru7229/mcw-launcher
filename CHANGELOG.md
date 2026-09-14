@@ -2,6 +2,31 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.6.0-beta.1] - 2026-09-14
+
+### Added
+- Introduce onedir packaging format for Windows and Linux with cold start in under 1 second.
+- Redesign Instance Workspace: remove bottom launch control bar, expand top action panel to 100% full view without scrollbars.
+- Add slim `CompactProgressWidget` in instance action panel displaying download %, install %, and network speed.
+- Add automatic foreground window activation for Minecraft game window upon launch / Quick Play.
+- Support seamless auto-updater migration from legacy 1.5.1 onefile installations to modern onedir structure.
+
+### Changed
+- Bump development version to `v1.6.0-beta.1` on branch `1.6`.
+- Organize instance tools into two clean, comfortable rows of 36px buttons with adjusted padding to avoid font clipping.
+
+## [1.6.0-alpha.4] - 2026-09-13
+
+### Added
+- Complete Instance Workspace redesign: sidebar instance list with quick filter and search, paired with tabbed hub (Worlds, Screenshots, Live Logs, Mods).
+- Add Quick Play integration for direct access to singleplayer worlds and multiplayer servers.
+- Fix missing text on World tab delete and open folder action buttons.
+- Fix ghost element artifacts and Qt painter / Shiboken C++ object lifecycle errors during rapid instance switching.
+- Fix Discord Rich Presence detecting wrong game process (Fortnite).
+
+### Changed
+- Bump development version to `v1.6.0-alpha.4` on branch `1.6`.
+
 ## [1.6.0-alpha.3] - 2026-09-13
 
 ### Added

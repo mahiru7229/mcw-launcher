@@ -137,12 +137,12 @@ class WorldCardWidget(QFrame):
         self.duplicate_button.clicked.connect(self._duplicate)
         btn_layout.addWidget(self.duplicate_button)
 
-        self.folder_button = set_theme_icon(QPushButton(), "icon.action.folder")
+        self.folder_button = set_theme_icon(QPushButton(tr("world.action.open_folder")), "icon.action.folder")
         self.folder_button.setToolTip(tr("world.action.open_folder"))
         self.folder_button.clicked.connect(lambda: open_local_path(self.instance_dir / "saves" / self.world.folder_name))
         btn_layout.addWidget(self.folder_button)
 
-        self.delete_button = set_theme_icon(QPushButton(), "icon.action.remove")
+        self.delete_button = set_theme_icon(QPushButton(tr("world.action.delete")), "icon.action.remove")
         self.delete_button.setObjectName("DangerButton")
         self.delete_button.setToolTip(tr("world.action.delete"))
         self.delete_button.clicked.connect(self._delete)

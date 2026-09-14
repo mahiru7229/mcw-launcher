@@ -205,3 +205,24 @@ def test_facade_singleton_service() -> None:
     service1 = get_discord_rpc_service()
     service2 = get_discord_rpc_service()
     assert service1 is service2
+
+
+def test_discord_client_id_default_and_override() -> None:
+    from src.core.integrations.discord.discord_rpc import (
+        DEFAULT_DISCORD_CLIENT_ID,
+        get_discord_client_id,
+    )
+
+    assert DEFAULT_DISCORD_CLIENT_ID == "762726289341677668"
+    assert get_discord_client_id() == "762726289341677668"
+    assert get_discord_client_id("123456789012345678") == "123456789012345678"
+
+    client = DiscordRpcClient()
+    assert client.client_id == "762726289341677668"
+    client.set_client_id("987654321098765432")
+    assert client.client_id == "987654321098765432"
+
+    service = DiscordRpcService(client=client, enabled=False)
+    service.set_client_id("111222333444555666")
+    assert client.client_id == "111222333444555666"
+

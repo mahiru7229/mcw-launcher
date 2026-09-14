@@ -35,12 +35,11 @@ def test_workspace_builds_instance_library_and_keeps_selected_instance(gui_app):
     assert page.manage_mods_button.isEnabled() is True
 
 
-def test_workspace_action_panel_scrolls_when_height_is_limited(gui_app):
+def test_workspace_action_panel_is_fully_visible_without_scroll(gui_app):
     page = InstanceWorkspacePage()
 
-    assert page.action_scroll.widget() is page.action_panel
-    assert page.action_scroll.widgetResizable() is True
-    assert page.action_scroll.minimumWidth() >= 300
+    assert page.action_panel.parentWidget() is page.hub_widget
+    assert page.action_panel.minimumWidth() >= 300
 
 
 def test_workspace_search_filters_by_loader_and_version(gui_app):
@@ -235,4 +234,82 @@ def test_workspace_hub_tabs_and_quick_play(gui_app, tmp_path):
     # Emitting from worlds_tab directly
     page.worlds_tab.quick_play_requested.emit("SurvivalSave")
     assert emitted == ["SurvivalSave"]
+
+
+def test_workspace_instance_switching_animation_lifecycle(gui_app, tmp_path):
+    page = InstanceWorkspacePage()
+    inst1 = make_instance("InstOne")
+    inst2 = make_instance("InstTwo")
+    page.set_instances([inst1, inst2], "InstOne")
+
+    # When first instance is selected, an animation should be created
+    assert page._hub_anim is not None
+    # Simulate animation finishing
+    page._hub_anim.finished.emit()
+    assert page.hub_widget.graphicsEffect() is None
+
+    # Switch to second instance - this previously crashed with RuntimeError: libshiboken: Internal C++ object already deleted
+    page._select_name("InstTwo", emit=True)
+    assert page._selected_name == "InstTwo"
+    assert page._hub_anim is not None
+    page._hub_anim.finished.emit()
+    assert page.hub_widget.graphicsEffect() is None
+
+
+def test_workspace_expanded_action_panel_and_buttons(gui_app):
+    page = InstanceWorkspacePage()
+    assert page.launch_button.minimumHeight() == 40 or page.launch_button.maximumHeight() == 40
+    assert page.quick_play_button.minimumHeight() == 40 or page.quick_play_button.maximumHeight() == 40
+    assert page.cancel_button is not None
+    assert page.cancel_button.isVisible() is False
+    assert page.launch_progress is not None
+    assert page.launch_progress.isVisible() is False
+
+    for btn in (
+        page.edit_button,
+        page.settings_button,
+        page.open_folder_button,
+        page.change_icon_button,
+        page.favorite_button,
+        page.repair_button,
+        page.manage_mods_button,
+        page.manage_content_packs_button,
+        page.manage_content_library_button,
+        page.optifine_button,
+        page.clone_button,
+        page.export_button,
+        page.delete_button,
+    ):
+        assert btn.maximumHeight() == 36
+
+
+def test_workspace_launch_active_lifecycle_and_cancel_signal(gui_app):
+    page = InstanceWorkspacePage()
+    page.show()
+    inst = make_instance("MyLaunchPack")
+    page.set_instances([inst], "MyLaunchPack")
+
+    # Initially idle
+    assert page.cancel_button.isVisible() is False
+    assert page.launch_progress.isVisible() is False
+    assert page.launch_button.isEnabled() is True
+
+    # When launch becomes active
+    page.set_launch_active(True)
+    assert page.cancel_button.isVisible() is True
+    assert page.launch_progress.isVisible() is True
+    assert page.launch_button.isEnabled() is False
+
+    # Emits cancel_launch_requested when cancel button clicked
+    cancelled = []
+    page.cancel_launch_requested.connect(lambda: cancelled.append(True))
+    page.cancel_button.click()
+    assert cancelled == [True]
+
+    # When launch finishes
+    page.set_launch_active(False)
+    assert page.cancel_button.isVisible() is False
+    assert page.launch_progress.isVisible() is False
+    assert page.launch_button.isEnabled() is True
+
 

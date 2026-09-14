@@ -33,6 +33,7 @@ class LaunchRequest:
     allow_compatibility_issues_once: bool = False
     quick_play_singleplayer: str = ""
     quick_play_multiplayer: str = ""
+    on_window_ready: Callable[[int], None] | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,5 +1,5 @@
 MCW Launcher release verification
-Version: 1.6.0-alpha.3
+Version: 1.6.0-beta.1
 Channel: beta
 
 Stable-candidate checks in this build workspace:

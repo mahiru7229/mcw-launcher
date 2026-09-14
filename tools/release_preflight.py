@@ -29,6 +29,8 @@ IGNORED_DIRECTORIES = {
     "dist",
     "pytest-of-root",
     "release",
+    "runtimes",
+    "venv",
 }
 CONFLICT_MARKERS = ("<<<<<<<", "=======", ">>>>>>>")
 PLACEHOLDER_PATTERN = re.compile(r"(?<!\{)\{([A-Za-z_][A-Za-z0-9_]*)[^{}]*\}(?!\})")

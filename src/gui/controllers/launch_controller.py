@@ -25,6 +25,7 @@ class LaunchController(BaseController):
     portable_manual_download_required = Signal(object)
     compatibility_confirmation_required = Signal(object)
     manual_content_required = Signal(object)
+    game_window_ready = Signal(int)
 
     TASK_ID = "minecraft.launch"
 
@@ -105,6 +106,7 @@ class LaunchController(BaseController):
                         on_compatibility_confirmation=self._on_compatibility_confirmation,
                         allow_compatibility_issues_once=allow_compatibility_issues_once,
                         quick_play_singleplayer=quick_play_singleplayer,
+                        on_window_ready=self._on_game_window_ready,
                     )
                 )
                 return result.as_dict()
@@ -228,6 +230,9 @@ class LaunchController(BaseController):
         bucket = 100 if percentage >= 100 else (percentage // 10) * 10
         return stage, bucket
 
+
+    def _on_game_window_ready(self, hwnd: int) -> None:
+        self.game_window_ready.emit(int(hwnd))
 
     def _on_game_exit(self, result: object) -> None:
         self.game_exited.emit(result)

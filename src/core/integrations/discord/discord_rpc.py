@@ -15,8 +15,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Official Minecraft Discord Application ID
-DEFAULT_DISCORD_CLIENT_ID = "432980957394370572"
+# Minecraft Discord Application ID (SimpleRPC / Minecraft)
+DEFAULT_DISCORD_CLIENT_ID = "762726289341677668"
 
 OP_HANDSHAKE = 0
 OP_FRAME = 1
@@ -25,7 +25,10 @@ OP_PING = 3
 OP_PONG = 4
 
 
-def get_discord_client_id() -> str:
+def get_discord_client_id(override: str | None = None) -> str:
+    cleaned = str(override or "").strip()
+    if cleaned:
+        return cleaned
     return str(os.environ.get("MCW_DISCORD_CLIENT_ID", DEFAULT_DISCORD_CLIENT_ID)).strip() or DEFAULT_DISCORD_CLIENT_ID
 
 
@@ -42,6 +45,13 @@ class DiscordRpcClient:
     @property
     def is_connected(self) -> bool:
         return self._connected
+
+    def set_client_id(self, client_id: str | None) -> None:
+        new_id = str(client_id or "").strip() or DEFAULT_DISCORD_CLIENT_ID
+        with self._lock:
+            if self.client_id != new_id:
+                self.client_id = new_id
+                self._close_internal()
 
     def connect(self) -> bool:
         with self._lock:
@@ -313,6 +323,18 @@ class DiscordRpcService:
             self._enqueue("clear", {})
             self._enqueue("close", {})
         elif current_activity is not None:
+            self._enqueue("update", current_activity)
+
+    def set_client_id(self, client_id: str | None) -> None:
+        new_id = str(client_id or "").strip() or DEFAULT_DISCORD_CLIENT_ID
+        with self._lock:
+            if self._client.client_id == new_id:
+                return
+            self._client.set_client_id(new_id)
+            current_activity = dict(self._current_activity) if self._current_activity is not None else None
+
+        self._enqueue("close", {})
+        if current_activity is not None and self.enabled:
             self._enqueue("update", current_activity)
 
     def _start_worker_if_needed(self) -> None:

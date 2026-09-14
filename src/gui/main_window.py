@@ -149,6 +149,8 @@ class MainWindow(QMainWindow):
         self._legacy_storage_notice = None
         self._legacy_cleanup_dialog = None
         self._last_connectivity_online: bool | None = None
+        self._last_launch_was_quick_play: bool = False
+        self._minimized_for_game: bool = False
         self.theme_runtime = ThemeRuntime()
         self.motion_runtime = MotionRuntime(parent=self)
         language_manager.reload()
@@ -157,6 +159,7 @@ class MainWindow(QMainWindow):
         self.lan_hosting_controller = LanHostingController(self.task_runner)
         self.update_controller = UpdateController(self.task_runner, channel=self._startup_settings.get("update_channel", "stable"))
         self.discord_rpc_service = get_discord_rpc_service()
+        self.discord_rpc_service.set_client_id(self._startup_settings.get("discord_client_id"))
         self.discord_rpc_service.set_enabled(bool(self._startup_settings.get("discord_rpc_enabled", True)))
         self.gui_context = GuiContext(task_runner=self.task_runner, parent=self)
         self.gui_context.register_controller("instances", self.instance_controller)
@@ -294,10 +297,10 @@ class MainWindow(QMainWindow):
         self.content_stack.setObjectName("ContentStack")
 
         self.launch_control = LaunchControlWidget(compact=self._display_profile.compact)
+        self.launch_control.setVisible(False)
 
         center_layout.addWidget(self.page_navigation)
         center_layout.addWidget(self.content_stack, 1)
-        center_layout.addWidget(self.launch_control)
 
         self.right_panel = RightPanelWidget(compact=self._display_profile.compact)
         self.right_panel.setFixedWidth(self._display_profile.right_panel_width)
@@ -376,6 +379,7 @@ class MainWindow(QMainWindow):
         self.instances_page.refresh_requested.connect(self.instance_controller.refresh)
         self.instances_page.launch_requested.connect(self._request_launch)
         self.instances_page.quick_play_requested.connect(lambda world: self._request_launch(quick_play_singleplayer=world))
+        self.instances_page.cancel_launch_requested.connect(self.launch_controller.cancel)
         self.instances_page.kill_instance_requested.connect(self._request_kill_instance)
         self.instances_page.instance_settings_requested.connect(self._open_instance_settings_workspace)
         self.instances_page.manage_accounts_requested.connect(lambda: self.show_page("accounts"))
@@ -680,9 +684,11 @@ class MainWindow(QMainWindow):
         self.lan_hosting_controller.progress_received.connect(self._on_progress)
         self.lan_hosting_controller.prepared.connect(self._on_lan_hosting_prepared)
         self.launch_controller.launch_finished.connect(self.launch_control.set_result)
+        self.launch_controller.launch_finished.connect(self.instances_page.set_launch_finished)
         self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
         self.launch_controller.launch_finished.connect(lambda _result: self.gui_settings_controller.set_game_running(True))
         self.launch_controller.launch_finished.connect(self._on_game_launched_discord)
+        self.launch_controller.game_window_ready.connect(self._on_game_window_ready)
         self.launch_controller.game_exited.connect(self._on_game_exited)
         self.launch_controller.pause_requested.connect(self.launch_control.set_pause_pending)
         self.launch_controller.launch_paused.connect(self._on_launch_paused)
@@ -1017,6 +1023,7 @@ class MainWindow(QMainWindow):
 
     def _request_launch(self, quick_play_singleplayer: str = "") -> None:
         if self._confirm_all_unsaved_settings():
+            self._last_launch_was_quick_play = bool(quick_play_singleplayer)
             self.connectivity_controller.probe(force=True)
             self.launch_controller.launch(quick_play_singleplayer=quick_play_singleplayer)
 
@@ -2164,7 +2171,18 @@ class MainWindow(QMainWindow):
             message += tr("\nNo damaged managed files were found, so no backup was needed.")
         self.toast_manager.show(message, "success", tr("Repair Modrinth modpack"))
 
+    def _on_game_window_ready(self, _hwnd: int) -> None:
+        minimize = self._last_launch_was_quick_play or bool(self.gui_settings_controller.current.get("minimize_on_launch", True))
+        if minimize and not self.isMinimized():
+            self._minimized_for_game = True
+            self.showMinimized()
+
     def _on_game_exited(self, result: object) -> None:
+        if getattr(self, "_minimized_for_game", False):
+            self._minimized_for_game = False
+            self.showNormal()
+            self.raise_()
+            self.activateWindow()
         selected_name = str(getattr(self._selected_instance, "name", ""))
         result_name = str(getattr(result, "instance_name", ""))
         if not selected_name or selected_name == result_name:
@@ -2359,6 +2377,7 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.set_settings(settings, preserve_unsaved=self.launcher_settings_page.is_dirty)
         self.instances_page.set_show_snapshots(bool(settings.get("show_snapshots", False)))
         self.launch_controller.set_debug_mode(bool(settings.get("debug_mode", False)))
+        self.discord_rpc_service.set_client_id(settings.get("discord_client_id"))
         self.discord_rpc_service.set_enabled(bool(settings.get("discord_rpc_enabled", True)))
         self.update_controller.set_channel(str(settings.get("update_channel", "stable")))
         include_beta = bool(settings.get("modrinth_include_beta", False))
@@ -2801,6 +2820,7 @@ class MainWindow(QMainWindow):
                 self.curseforge_manual_dialog.set_requirements(error.requirements)
                 status = tr("artifact.manual.launch_blocked", provider="CurseForge", count=len(error.requirements))
                 self.launch_control.set_failed(status, tr("artifact.manual.launch_blocked_detail", provider="CurseForge"))
+                self.instances_page.set_launch_failed(status, "")
                 self.home_page.set_status(status)
                 self.right_panel.set_status(status)
                 self.curseforge_manual_dialog.show()
@@ -2815,6 +2835,7 @@ class MainWindow(QMainWindow):
                 self.modrinth_manual_dialog.set_requirements(error.requirements)
                 status = tr("artifact.manual.launch_blocked", provider="Modrinth", count=len(error.requirements))
                 self.launch_control.set_failed(status, tr("artifact.manual.launch_blocked_detail", provider="Modrinth"))
+                self.instances_page.set_launch_failed(status, "")
                 self.home_page.set_status(status)
                 self.right_panel.set_status(status)
                 self.modrinth_manual_dialog.show()
@@ -2824,6 +2845,7 @@ class MainWindow(QMainWindow):
                 return
             view = LaunchErrorPresenter.present(error)
             self.launch_control.set_failed(view.status, view.progress_detail)
+            self.instances_page.set_launch_failed(view.status, view.progress_detail)
             self.home_page.set_status(view.status)
             self.right_panel.set_status(view.status)
             self.instance_controller.refresh_running(force=True)
@@ -2876,12 +2898,14 @@ class MainWindow(QMainWindow):
 
     def _on_launch_cancelled(self) -> None:
         self.launch_control.set_cancelled("launch.cancelled", "launch.cancelled_detail")
+        self.instances_page.set_launch_cancelled()
         message = tr("launch.cancelled")
         self.home_page.set_status(message)
         self.right_panel.set_status(message)
 
     def _set_launch_active(self, active: bool) -> None:
         self.launch_control.set_launch_active(active)
+        self.instances_page.set_launch_active(active)
         self.theme_runtime.reapply_assets(self.launch_control)
 
     def _progress_event_belongs_to_current_task(self, event: object) -> bool:
@@ -2915,6 +2939,7 @@ class MainWindow(QMainWindow):
             return
 
         self.launch_control.set_progress_event(event)
+        self.instances_page.set_progress_event(event)
 
         message = tr(str(getattr(event, "message", "Working...")))
         self.home_page.set_status(message)

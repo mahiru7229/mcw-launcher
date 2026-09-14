@@ -45,6 +45,7 @@ from src.gui.pages.instances_page import InstancesPage
 from src.gui.theme.accent_runtime import theme_accent_runtime
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
+from src.gui.widget.compact_progress_widget import CompactProgressWidget
 from src.gui.widget.instance_live_logs_tab import InstanceLiveLogsTab
 from src.gui.widget.instance_mods_tab import InstanceModsTab
 from src.gui.widget.instance_screenshots_tab import InstanceScreenshotsTab
@@ -100,6 +101,7 @@ class InstanceWorkspacePage(BasePage):
     java_runtime_apply_requested = Signal(str, str)
 
     launch_requested = Signal()
+    cancel_launch_requested = Signal()
     kill_instance_requested = Signal(str)
     instance_settings_requested = Signal(str)
     manage_accounts_requested = Signal()
@@ -118,6 +120,7 @@ class InstanceWorkspacePage(BasePage):
         self._health_reports: dict[str, object] = {}
         self._busy = False
         self._last_animated_name = ""
+        self._launch_active = False
 
         self.advanced_page = InstancesPage()
         self.advanced_dialog = AdvancedInstanceManagerDialog(self.advanced_page, self)
@@ -257,6 +260,8 @@ class InstanceWorkspacePage(BasePage):
 
         # Top Action Panel inside action_scroll
         self.action_panel = CardWidget("", object_name="InstanceActionPanel")
+        self.action_panel.layout.setContentsMargins(14, 12, 14, 12)
+        self.action_panel.layout.setSpacing(8)
         self.action_panel.setMinimumWidth(300)
         self.instance_icon = QLabel()
         self.instance_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -280,13 +285,22 @@ class InstanceWorkspacePage(BasePage):
 
         self.quick_play_button = set_theme_icon(QPushButton(), "icon.action.launch")
         self.quick_play_button.setObjectName("SecondaryButton")
-        self.quick_play_button.setFixedHeight(34)
+        self.quick_play_button.setFixedHeight(40)
+        self.quick_play_button.setMinimumWidth(120)
         self.quick_play_button.clicked.connect(self._request_quick_play)
 
         self.launch_button = set_theme_icon(QPushButton(), "icon.action.launch")
         self.launch_button.setObjectName("PrimaryButton")
-        self.launch_button.setFixedHeight(34)
+        self.launch_button.setFixedHeight(40)
+        self.launch_button.setMinimumWidth(130)
         self.launch_button.clicked.connect(self._request_primary_action)
+
+        self.cancel_button = set_theme_icon(QPushButton(tr("launch.cancel_button")), "icon.action.cancel")
+        self.cancel_button.setObjectName("SecondaryButton")
+        self.cancel_button.setFixedHeight(40)
+        self.cancel_button.setMinimumWidth(90)
+        self.cancel_button.clicked.connect(self.cancel_launch_requested.emit)
+        self.cancel_button.setVisible(False)
 
         self.edit_button = set_theme_icon(QPushButton(), "icon.action.edit")
         self.favorite_button = QPushButton()
@@ -340,40 +354,52 @@ class InstanceWorkspacePage(BasePage):
         primary_actions.setSpacing(8)
         primary_actions.addWidget(self.quick_play_button)
         primary_actions.addWidget(self.launch_button)
+        primary_actions.addWidget(self.cancel_button)
         header_layout.addLayout(primary_actions)
         self.action_panel.layout.addLayout(header_layout)
 
-        # Tools toolbar row
-        tools_layout = QHBoxLayout()
-        tools_layout.setSpacing(6)
-        tools_layout.addWidget(self.favorite_button)
-        tools_layout.addWidget(self.edit_button)
-        tools_layout.addWidget(self.settings_button)
-        tools_layout.addWidget(self.open_folder_button)
-        tools_layout.addWidget(self.change_icon_button)
-        tools_layout.addWidget(self.manage_content_library_button)
-        tools_layout.addWidget(self.manage_mods_button)
-        tools_layout.addWidget(self.manage_content_packs_button)
-        tools_layout.addWidget(self.optifine_button)
-        tools_layout.addWidget(self.repair_button)
-        tools_layout.addWidget(self.clone_button)
-        tools_layout.addWidget(self.export_button)
-        tools_layout.addWidget(self.delete_button)
-        tools_layout.addStretch(1)
-        self.action_panel.layout.addLayout(tools_layout)
+        # Tools Row 1: Instance Management & Files
+        tools_row1 = QHBoxLayout()
+        tools_row1.setSpacing(6)
+        for btn in (
+            self.edit_button,
+            self.settings_button,
+            self.open_folder_button,
+            self.change_icon_button,
+            self.favorite_button,
+            self.repair_button,
+        ):
+            btn.setFixedHeight(36)
+            tools_row1.addWidget(btn)
+        tools_row1.addStretch(1)
+        self.action_panel.layout.addLayout(tools_row1)
+
+        # Tools Row 2: Content & Actions
+        tools_row2 = QHBoxLayout()
+        tools_row2.setSpacing(6)
+        for btn in (
+            self.manage_mods_button,
+            self.manage_content_packs_button,
+            self.manage_content_library_button,
+            self.optifine_button,
+            self.clone_button,
+            self.export_button,
+            self.delete_button,
+        ):
+            btn.setFixedHeight(36)
+            tools_row2.addWidget(btn)
+        tools_row2.addStretch(1)
+        self.action_panel.layout.addLayout(tools_row2)
+
+        # Compact Progress Bar (shows download %, install %, network speed)
+        self.launch_progress = CompactProgressWidget(self.action_panel)
+        self.launch_progress.setVisible(False)
+        self.launch_progress.cancel_clicked.connect(self.cancel_launch_requested.emit)
+        self.action_panel.layout.addWidget(self.launch_progress)
 
         self.action_panel.layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
-
-        self.action_scroll = QScrollArea()
-        self.action_scroll.setObjectName("InstanceActionScrollArea")
-        self.action_scroll.setWidgetResizable(True)
-        self.action_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.action_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.action_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.action_scroll.setWidget(self.action_panel)
-        self.action_scroll.setMinimumWidth(300)
-        self.action_scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        hub_layout.addWidget(self.action_scroll)
+        self.action_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        hub_layout.addWidget(self.action_panel)
 
         # Hub Tabs: Worlds, Screenshots, Live Logs, Mods
         self.hub_tabs = QTabWidget()
@@ -392,12 +418,8 @@ class InstanceWorkspacePage(BasePage):
 
         hub_layout.addWidget(self.hub_tabs, 1)
 
-        # Animation effect on hub_widget
-        self._hub_opacity_effect = QGraphicsOpacityEffect(self.hub_widget)
-        self.hub_widget.setGraphicsEffect(self._hub_opacity_effect)
-        self._hub_anim = QPropertyAnimation(self._hub_opacity_effect, b"opacity")
-        self._hub_anim.setDuration(160)
-        self._hub_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        # Animation state on hub_widget
+        self._hub_anim: QPropertyAnimation | None = None
 
         self.hub_stack.addWidget(self.hub_widget)
         self.splitter.addWidget(self.hub_stack)
@@ -473,7 +495,6 @@ class InstanceWorkspacePage(BasePage):
         super().set_compact_mode(compact)
         self.instance_list.setIconSize(QSize(28, 28) if compact else QSize(36, 36))
         self.action_panel.setMinimumWidth(260 if compact else 300)
-        self.action_scroll.setMinimumWidth(260 if compact else 300)
         self.splitter.setSizes([240, 720] if compact else [280, 860])
 
     def set_versions(self, versions: list[object]) -> None:
@@ -773,6 +794,9 @@ class InstanceWorkspacePage(BasePage):
         if emit:
             self.selected_instance_changed.emit(self._selected_name)
 
+    def _on_hub_anim_finished(self) -> None:
+        pass
+
     def _render_selected(self) -> None:
         instance = self._instances.get(self.current_instance_name())
         enabled = instance is not None and not self._busy
@@ -789,19 +813,30 @@ class InstanceWorkspacePage(BasePage):
             self.delete_button,
         ):
             button.setEnabled(enabled)
-        self.launch_button.setEnabled(instance is not None and (state == "running" or not self._busy))
-        if state == "running":
+        is_running = state == "running"
+        self.launch_button.setEnabled(instance is not None and (is_running or (not self._busy and not self._launch_active)))
+        if is_running:
             self.launch_button.setObjectName("DangerButton")
             self.launch_button.setText(tr("workspace.action.kill"))
             set_theme_icon(self.launch_button, "icon.action.remove")
+            self.cancel_button.setVisible(False)
+        elif self._launch_active:
+            self.launch_button.setEnabled(False)
+            self.launch_button.setObjectName("PrimaryButton")
+            self.launch_button.setText(tr("workspace.action.launching"))
+            set_theme_icon(self.launch_button, "icon.action.launch")
+            self.cancel_button.setVisible(True)
         else:
             self.launch_button.setObjectName("PrimaryButton")
             self.launch_button.setText(tr("workspace.action.launch"))
             set_theme_icon(self.launch_button, "icon.action.launch")
+            self.cancel_button.setVisible(False)
         self.launch_button.style().unpolish(self.launch_button)
         self.launch_button.style().polish(self.launch_button)
 
         if instance is None:
+            self.cancel_button.setVisible(False)
+            self.launch_progress.setVisible(False)
             self.hub_stack.setCurrentIndex(0)
             self._last_animated_name = ""
             self.instance_icon.clear()
@@ -826,10 +861,29 @@ class InstanceWorkspacePage(BasePage):
         self.hub_stack.setCurrentIndex(1)
         if self._selected_name != self._last_animated_name:
             self._last_animated_name = self._selected_name
-            self._hub_anim.stop()
-            self._hub_anim.setStartValue(0.35)
-            self._hub_anim.setEndValue(1.0)
-            self._hub_anim.start()
+            if self._hub_anim is not None:
+                self._hub_anim.stop()
+                self._hub_anim = None
+            effect = QGraphicsOpacityEffect(self.hub_widget)
+            self.hub_widget.setGraphicsEffect(effect)
+            anim = QPropertyAnimation(effect, b"opacity", self)
+            anim.setDuration(160)
+            anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+            anim.setStartValue(0.35)
+            anim.setEndValue(1.0)
+
+            def _on_anim_finished() -> None:
+                try:
+                    if self.hub_widget.graphicsEffect() is effect:
+                        self.hub_widget.setGraphicsEffect(None)
+                except RuntimeError:
+                    pass
+                if self._hub_anim is anim:
+                    self._hub_anim = None
+
+            anim.finished.connect(_on_anim_finished)
+            self._hub_anim = anim
+            anim.start()
 
         loader_name, loader_version = self._instance_loader(instance)
         loader = loader_name.title() if loader_version in {"", "-1"} else f"{loader_name.title()} {loader_version}"
@@ -1033,6 +1087,29 @@ class InstanceWorkspacePage(BasePage):
     def _request_launch(self) -> None:
         self._request_primary_action()
 
+    def set_progress_event(self, event: object) -> None:
+        self.launch_progress.set_progress_event(event)
+
+    def set_launch_active(self, active: bool) -> None:
+        self._launch_active = bool(active)
+        self.launch_progress.set_active(self._launch_active)
+        self._render_selected()
+
+    def set_launch_paused(self) -> None:
+        pass
+
+    def set_launch_resumed(self) -> None:
+        pass
+
+    def set_launch_cancelled(self) -> None:
+        self.set_launch_active(False)
+
+    def set_launch_finished(self, _result: object = None) -> None:
+        self.set_launch_active(False)
+
+    def set_launch_failed(self, _status: str = "", _detail: str = "") -> None:
+        self.set_launch_active(False)
+
     def _choose_icon(self) -> None:
         name = self.current_instance_name()
         if not name:
@@ -1212,6 +1289,8 @@ class InstanceWorkspacePage(BasePage):
         self.clone_button.setText(tr("workspace.action.clone"))
         self.export_button.setText(tr("workspace.action.export"))
         self.delete_button.setText(tr("workspace.action.delete"))
+        self.cancel_button.setText(tr("launch.cancel_button"))
+        self.launch_progress.retranslate_dynamic()
         self.hub_tabs.setTabText(0, tr("workspace.tabs.worlds"))
         self.hub_tabs.setTabText(1, tr("workspace.tabs.screenshots"))
         self.hub_tabs.setTabText(2, tr("workspace.tabs.live_logs"))
