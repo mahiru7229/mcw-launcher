@@ -554,6 +554,8 @@ Best-effort Windows graphics preference integration.
 | `detect(cls)` | `GraphicsDetectionResult` |
 | `apply_for_executable(cls, executable: Path \| str, enabled: bool)` | `bool` |
 | `apply_to_java(cls, java_path: Path \| str, enabled: bool)` | `bool` |
+| `get_discrete_gpu_env(cls, detection: GraphicsDetectionResult \| None = None)` | `dict[str, str]` |
+| `get_launch_environment(cls, enabled: bool, base_env: dict[str, str] \| None = None, detection: GraphicsDetectionResult \| None = None)` | `dict[str, str] \| None` |
 | `adapter_summary(cls, adapters: Iterable[GraphicsAdapter])` | `str` |
 
 
