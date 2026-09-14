@@ -537,12 +537,12 @@ def test_start_launcher_falls_back_to_shell_on_winerror_4551(tmp_path, monkeypat
     assert shell_starts == [exe]
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows MessageBox error display requires Windows")
 def test_show_error_includes_sac_notice_on_4551(tmp_path, monkeypatch) -> None:
     request = make_request(tmp_path)
     applier = UpdateApplier(request)
     shown_boxes: list[str] = []
 
-    monkeypatch.setattr("os.name", "nt")
     monkeypatch.setattr(
         "ctypes.windll.user32.MessageBoxW",
         lambda _hwnd, text, _title, _type: shown_boxes.append(text) or 1,
