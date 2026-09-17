@@ -39,7 +39,7 @@ from mcw_core.api.theme.theme_manager import theme_manager
 from src.gui.dialogs.create_instance_dialog import CreateInstanceDialog
 from src.gui.dialogs.instance_management_dialog import AdvancedInstanceManagerDialog, InstanceManagementDialog
 from src.gui.formatters.time_formatter import format_last_played, format_playtime
-from src.gui.media.minecraft_skin import minecraft_skin_face_icon
+from src.gui.media.minecraft_skin import account_skin_face_icon, minecraft_skin_face_icon
 from src.gui.pages.base_page import BasePage
 from src.gui.pages.instances_page import InstancesPage
 from src.gui.theme.accent_runtime import theme_accent_runtime
@@ -193,20 +193,21 @@ class InstanceWorkspacePage(BasePage):
         self.search_input.textChanged.connect(self._apply_search)
         library_layout.addWidget(self.search_input)
 
-        filters = QHBoxLayout()
-        filters.setSpacing(6)
         self.group_filter = QComboBox()
         self.group_filter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.group_filter.currentIndexChanged.connect(lambda _index: self._rebuild_library(self.current_instance_name()))
+        library_layout.addWidget(self.group_filter)
+
+        sort_row = QHBoxLayout()
+        sort_row.setSpacing(6)
         self.sort_combo = QComboBox()
         self.sort_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.favorite_only_checkbox = QCheckBox()
-        self.group_filter.currentIndexChanged.connect(lambda _index: self._rebuild_library(self.current_instance_name()))
         self.sort_combo.currentIndexChanged.connect(lambda _index: self._rebuild_library(self.current_instance_name()))
         self.favorite_only_checkbox.toggled.connect(lambda _checked: self._rebuild_library(self.current_instance_name()))
-        filters.addWidget(self.group_filter, 1)
-        filters.addWidget(self.sort_combo, 1)
-        filters.addWidget(self.favorite_only_checkbox)
-        library_layout.addLayout(filters)
+        sort_row.addWidget(self.sort_combo, 1)
+        sort_row.addWidget(self.favorite_only_checkbox)
+        library_layout.addLayout(sort_row)
 
         self.instance_list = QListWidget()
         self.instance_list.setObjectName("InstanceLibraryList")
@@ -561,13 +562,10 @@ class InstanceWorkspacePage(BasePage):
 
         username = str(getattr(account, "username", "?") or "?")
         account_type = str(getattr(getattr(account, "account_type", None), "value", getattr(account, "account_type", "")) or "")
-        texture_path = AccountSkinManager.cached_texture(account)
-        if texture_path is not None:
-            icon = minecraft_skin_face_icon(texture_path, 32)
-            if not icon.isNull():
-                self.account_button.setIcon(icon)
-            else:
-                set_theme_icon(self.account_button, "icon.action.account")
+        icon = account_skin_face_icon(account, 32)
+        if not icon.isNull():
+            self.account_button.setIcon(icon)
+            self.account_button.setIconSize(QSize(22, 22))
         else:
             set_theme_icon(self.account_button, "icon.action.account")
 

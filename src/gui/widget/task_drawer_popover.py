@@ -250,6 +250,20 @@ class TaskDrawerPopover(QFrame):
         prog_row.addWidget(pct_label)
         layout.addLayout(prog_row)
 
+        if task.speed_text or task.progress_text:
+            detail_row = QHBoxLayout()
+            detail_row.setSpacing(6)
+            if task.progress_text:
+                prog_text_label = QLabel(task.progress_text)
+                prog_text_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
+                detail_row.addWidget(prog_text_label)
+            detail_row.addStretch(1)
+            if task.speed_text:
+                speed_text_label = QLabel(task.speed_text)
+                speed_text_label.setStyleSheet("color: #38bdf8; font-size: 10px; font-weight: bold;")
+                detail_row.addWidget(speed_text_label)
+            layout.addLayout(detail_row)
+
         return card
 
     def _render_completed_tasks(self, completed_tasks: list[TaskQueueItem]) -> None:

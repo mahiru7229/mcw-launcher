@@ -64,16 +64,16 @@ class ContentPackController(BaseController):
     def install_modrinth(self, instance_name: str, content_type: str, version_id: str) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
         kind = ContentPackManager.normalize_type(content_type)
-        return self._task_runner.run("content.install.modrinth", lambda: ContentPackManager.install_modrinth(InstanceManager.load(instance_name), kind, version_id, reporter), tr("task.content.install", content_type=ContentPackManager.display_name(kind)))
+        return self._task_runner.run("content.install.modrinth", lambda: ContentPackManager.install_modrinth(InstanceManager.load(instance_name), kind, version_id, reporter), tr("task.content.install", content_type=ContentPackManager.display_name(kind)), blocking=False)
 
     def install_curseforge(self, instance_name: str, content_type: str, project_name: str, project_url: str, file: object) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
         kind = ContentPackManager.normalize_type(content_type)
-        return self._task_runner.run("content.install.curseforge", lambda: ContentPackManager.install_curseforge(InstanceManager.load(instance_name), kind, file, project_name, project_url, reporter), tr("task.content.install", content_type=ContentPackManager.display_name(kind)))
+        return self._task_runner.run("content.install.curseforge", lambda: ContentPackManager.install_curseforge(InstanceManager.load(instance_name), kind, file, project_name, project_url, reporter), tr("task.content.install", content_type=ContentPackManager.display_name(kind)), blocking=False)
 
     def import_local(self, instance_name: str, content_type: str, source: Path) -> bool:
         kind = ContentPackManager.normalize_type(content_type)
-        return self._task_runner.run("content.install.local", lambda: ContentPackManager.import_local(InstanceManager.load(instance_name), kind, Path(source)), tr("task.content.import", content_type=ContentPackManager.display_name(kind)))
+        return self._task_runner.run("content.install.local", lambda: ContentPackManager.import_local(InstanceManager.load(instance_name), kind, Path(source)), tr("task.content.import", content_type=ContentPackManager.display_name(kind)), blocking=False)
 
     def refresh_entries(self, instance_name: str, content_type: str) -> bool:
         kind = ContentPackManager.normalize_type(content_type)

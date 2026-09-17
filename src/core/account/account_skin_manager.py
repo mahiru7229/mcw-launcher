@@ -33,6 +33,17 @@ class AccountSkinManager:
         return cls.cache_texture(account.uuid, skin_url)
 
     @classmethod
+    def cache_offline_account(cls, account: Account) -> Path | None:
+        username = str(getattr(account, "username", "") or "").strip()
+        if not username:
+            return None
+        url = f"https://minotar.net/skin/{username}"
+        try:
+            return cls.cache_texture(account.uuid, url)
+        except Exception:
+            return None
+
+    @classmethod
     def cache_texture(cls, profile_uuid: str, skin_url: str) -> Path:
         normalized_uuid = cls._normalize_uuid(profile_uuid)
         normalized_url = cls._validate_url(skin_url)

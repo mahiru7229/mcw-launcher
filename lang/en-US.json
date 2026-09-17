@@ -2285,7 +2285,13 @@
     "instance_mods.column.status": "Status",
     "instance_mods.column.name": "Mod Name",
     "instance_mods.column.size": "Size",
-    "instance_mods.column.modified": "Modified"
+    "instance_mods.column.modified": "Modified",
+    "account.microsoft.device_code.title": "Microsoft Sign-in",
+    "account.microsoft.device_code.instructions": "To sign in, open the link below in your web browser and enter this code:",
+    "account.microsoft.device_code.waiting": "Waiting for you to complete sign-in in your browser...",
+    "account.microsoft.device_code.copy": "Copy Code",
+    "account.microsoft.device_code.copied": "Copied!",
+    "account.microsoft.device_code.open_link": "Open Link"
   },
   "aliases": {
     "MCW Launcher": "app.name",

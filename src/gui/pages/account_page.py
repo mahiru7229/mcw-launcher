@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QComboBox, QGridLayout, QLabel, QLineEdit, QMessageBox, QPushButton
 
 from mcw_core.api.account.account_skin_manager import AccountSkinManager
 from mcw_core.api.language.language_manager import tr
-from src.gui.media.minecraft_skin import minecraft_skin_face_pixmap
+from src.gui.media.minecraft_skin import default_skin_face_pixmap, minecraft_skin_face_pixmap
 from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
@@ -189,10 +190,14 @@ class AccountPage(BasePage):
         self.uuid_value.setText(tr("UUID: {uuid}", uuid=account.uuid))
         self.selection_status.setText(tr("account.selection.active", username=account.username))
         texture = AccountSkinManager.cached_texture(account)
+        face = QPixmap()
         if texture is not None:
             face = minecraft_skin_face_pixmap(texture, 48)
-            if not face.isNull():
-                self.skin_preview.setPixmap(face)
+        if face.isNull():
+            variant = str(getattr(account, "skin_variant", "classic") or "classic")
+            face = default_skin_face_pixmap(variant, 48)
+        if not face.isNull():
+            self.skin_preview.setPixmap(face)
 
     def _confirm_remove(self) -> None:
         account_id = self.current_account_id()

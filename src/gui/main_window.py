@@ -77,6 +77,7 @@ from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEdit
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
 from src.gui.dialogs.optifine_dialog import OptiFineDialog
+from src.gui.dialogs.microsoft_device_code_dialog import MicrosoftDeviceCodeDialog
 from src.gui.dialogs.repair_center_dialog import RepairCenterDialog
 from src.gui.dialogs.update_dialog import UpdateDialog
 from src.gui.dialogs.unsaved_changes_dialog import UnsavedChangesDecision, prompt_unsaved_changes
@@ -330,6 +331,7 @@ class MainWindow(QMainWindow):
         self.curseforge_manual_dialog = CurseForgeManualDownloadDialog(self)
         self.portable_manual_dialog = CurseForgeManualDownloadDialog(self)
         self.repair_center_dialog = RepairCenterDialog(self)
+        self.microsoft_device_code_dialog = MicrosoftDeviceCodeDialog(self)
 
         self.pages = {
             "home": self.home_page,
@@ -375,6 +377,10 @@ class MainWindow(QMainWindow):
         self.account_page.refresh_requested.connect(self.account_controller.refresh)
         self.account_page.security_audit_requested.connect(self.account_controller.audit_security)
         self.account_page.security_reprotect_requested.connect(self.account_controller.reprotect_security)
+        self.microsoft_device_code_dialog.cancel_requested.connect(self.account_controller.cancel_microsoft)
+        self.account_controller.microsoft_device_code_received.connect(self._show_microsoft_device_code_dialog)
+        self.account_controller.accounts_changed.connect(lambda *_: self.microsoft_device_code_dialog.accept() if self.microsoft_device_code_dialog.isVisible() else None)
+        self.account_controller.microsoft_auth_state_changed.connect(lambda active, _: self.microsoft_device_code_dialog.close() if not active and self.microsoft_device_code_dialog.isVisible() else None)
 
         self.instances_page.refresh_requested.connect(self.instance_controller.refresh)
         self.instances_page.launch_requested.connect(self._request_launch)
@@ -765,6 +771,12 @@ class MainWindow(QMainWindow):
             controller.network_retry_available.connect(
                 lambda task_id, title, message, owner=controller: self._show_network_retry(owner, task_id, title, message)
             )
+
+    def _show_microsoft_device_code_dialog(self, response: object) -> None:
+        self.microsoft_device_code_dialog.set_data(response)
+        self.microsoft_device_code_dialog.show()
+        self.microsoft_device_code_dialog.raise_()
+        self.microsoft_device_code_dialog.activateWindow()
 
     def _initialize_data(self) -> None:
         settings = dict(self._startup_settings)

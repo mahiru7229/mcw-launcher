@@ -2285,7 +2285,13 @@
     "instance_mods.column.status": "Trạng thái",
     "instance_mods.column.name": "Tên Mod",
     "instance_mods.column.size": "Dung lượng",
-    "instance_mods.column.modified": "Thời gian sửa đổi"
+    "instance_mods.column.modified": "Thời gian sửa đổi",
+    "account.microsoft.device_code.title": "Đăng nhập Microsoft",
+    "account.microsoft.device_code.instructions": "Để đăng nhập, hãy mở liên kết bên dưới trên trình duyệt web và nhập mã này:",
+    "account.microsoft.device_code.waiting": "Đang chờ bạn hoàn tất đăng nhập trên trình duyệt web...",
+    "account.microsoft.device_code.copy": "Sao chép mã",
+    "account.microsoft.device_code.copied": "Đã sao chép!",
+    "account.microsoft.device_code.open_link": "Mở liên kết"
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

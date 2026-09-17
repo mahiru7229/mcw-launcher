@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from threading import Event
 from time import time
+from typing import Callable
 from uuid import uuid4
 
 from src.core.account.account_skin_manager import AccountSkinManager
@@ -14,6 +15,7 @@ from src.core.auth.microsoft.xbox_live_auth import XboxLiveAuthentication
 from src.core.auth.microsoft.xsts_auth import XSTSAuthentication
 from src.models.account.account import Account
 from src.models.account.account_source import AccountSource
+from src.models.auth.microsoft.device_code_response import DeviceCodeResponse
 from src.models.auth.microsoft.minecraft_profile import MinecraftProfile
 
 
@@ -21,11 +23,14 @@ class MicrosoftAccountAuthenticator:
     PROFILE_REFRESH_MARGIN_SECONDS = 120
 
     @staticmethod
-    def authenticate(cancel_event: Event | None = None) -> Account:
+    def authenticate(
+        cancel_event: Event | None = None,
+        on_device_code: Callable[[DeviceCodeResponse], None] | None = None,
+    ) -> Account:
         MicrosoftAuthenticationGate.require_enabled()
         if not str(MicrosoftAuthConfig.CLIENT_ID).strip():
             raise RuntimeError("Microsoft authentication is enabled but no client_id is configured.")
-        oauth_token = MicrosoftOAuth.authenticate() if cancel_event is None else MicrosoftOAuth.authenticate(cancel_event=cancel_event)
+        oauth_token = MicrosoftOAuth.authenticate(cancel_event=cancel_event, on_device_code=on_device_code)
         xbox_token = XboxLiveAuthentication.authenticate(oauth_token.access_token)
         xsts_token = XSTSAuthentication.authenticate(xbox_token)
         minecraft_token = MinecraftServicesAuthentication.authenticate(xsts_token)

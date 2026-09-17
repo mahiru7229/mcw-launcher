@@ -130,7 +130,7 @@ class ModController(BaseController):
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
         reporter = ProgressReporter(self.progress_received.emit)
-        self._task_runner.run("mods.update.apply", lambda: (instance_id, allowed_version_types, ModrinthModUpdateManager.update(instance, project_ids, allowed_version_types, reporter)), tr("task.mods.update_selected", count=len(project_ids)))
+        self._task_runner.run("mods.update.apply", lambda: (instance_id, allowed_version_types, ModrinthModUpdateManager.update(instance, project_ids, allowed_version_types, reporter)), tr("task.mods.update_selected", count=len(project_ids)), blocking=False)
 
     def update_all(self, allowed_version_types: tuple[str, ...]) -> None:
         instance = self._require_instance()
@@ -142,7 +142,7 @@ class ModController(BaseController):
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
         reporter = ProgressReporter(self.progress_received.emit)
-        self._task_runner.run("mods.update.apply", lambda: (instance_id, allowed_version_types, ModrinthModUpdateManager.update_all(instance, allowed_version_types, reporter)), tr("task.mods.update_all"))
+        self._task_runner.run("mods.update.apply", lambda: (instance_id, allowed_version_types, ModrinthModUpdateManager.update_all(instance, allowed_version_types, reporter)), tr("task.mods.update_all"), blocking=False)
 
     def set_locked(self, project_ids: list[str], locked: bool) -> None:
         instance = self._require_instance()

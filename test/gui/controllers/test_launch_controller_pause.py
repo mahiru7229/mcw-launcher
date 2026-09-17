@@ -90,7 +90,7 @@ def test_legacy_paused_task_still_emits_paused_signal_without_error_dialog() -> 
     assert errors == []
 
 
-def test_failed_launch_logs_full_error_without_opening_error_dialog() -> None:
+def test_failed_launch_logs_full_error_and_emits_error_dialog() -> None:
     runner = FakeTaskRunner()
     controller = LaunchController(runner)
     errors: list[tuple[str, str]] = []
@@ -103,7 +103,9 @@ def test_failed_launch_logs_full_error_without_opening_error_dialog() -> None:
 
     controller._on_task_failed(LaunchController.TASK_ID, error)
 
-    assert errors == []
+    assert len(errors) == 1
+    assert errors[0][0] == "Minecraft launch failed"
+    assert "Example mod uses the wrong loader" in errors[0][1]
     assert statuses == ["Launch failed"]
     assert logs == ["RuntimeError: Forge pre-launch check failed:\n- Example mod uses the wrong loader"]
 

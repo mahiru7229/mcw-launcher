@@ -43,6 +43,7 @@ class InstanceRunLock:
     LOCK_FILENAME = ".mcw-launcher.lock"
     SCHEMA_VERSION = 1
     MALFORMED_LOCK_GRACE_SECONDS = 5.0
+    PREPARING_LOCK_TIMEOUT_SECONDS = 120.0
     ACQUIRE_ATTEMPTS = 5
 
     @classmethod
@@ -97,6 +98,18 @@ class InstanceRunLock:
     def is_active(cls, instance: Instance) -> bool:
         snapshot = cls._read_snapshot(cls.lock_path_for(instance))
         return snapshot is not None and cls._snapshot_is_active(snapshot)
+
+    @classmethod
+    def is_game_running(cls, instance: Instance) -> bool:
+        snapshot = cls._read_snapshot(cls.lock_path_for(instance))
+        if snapshot is None or snapshot.payload is None:
+            return False
+        if not cls._snapshot_is_active(snapshot):
+            cls._remove_if_unchanged(cls.lock_path_for(instance), snapshot)
+            return False
+        state = snapshot.payload.get("state")
+        minecraft_pid = cls._read_pid(snapshot.payload.get("minecraft_pid"))
+        return state == "running" and minecraft_pid is not None and cls._is_process_alive(minecraft_pid)
 
     @classmethod
     def owns_preparing_lock(cls, instance: Instance, token: str | None) -> bool:
@@ -333,11 +346,15 @@ class InstanceRunLock:
         minecraft_pid = cls._read_pid(snapshot.payload.get("minecraft_pid"))
         state = snapshot.payload.get("state")
 
-        if state == "running" and minecraft_pid is not None:
-            return cls._is_process_alive(minecraft_pid)
+        if state == "running":
+            if minecraft_pid is not None:
+                return cls._is_process_alive(minecraft_pid)
+            return False
 
-        if launcher_pid is not None:
-            return cls._is_process_alive(launcher_pid)
+        if state == "preparing":
+            if launcher_pid is not None and cls._is_process_alive(launcher_pid):
+                return snapshot.age_seconds < cls.PREPARING_LOCK_TIMEOUT_SECONDS
+            return False
 
         return False
 

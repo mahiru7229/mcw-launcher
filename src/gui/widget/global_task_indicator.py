@@ -44,7 +44,7 @@ class GlobalTaskIndicator(QFrame):
         self.text_label = QLabel()
         self.text_label.setObjectName("TaskIndicatorText")
         self.text_label.setStyleSheet("color: #e2e8f0; font-size: 11px;")
-        self.text_label.setMaximumWidth(220)
+        self.text_label.setMaximumWidth(280)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setObjectName("TaskIndicatorProgress")
@@ -137,11 +137,13 @@ class GlobalTaskIndicator(QFrame):
 
         if count == 1:
             raw_msg = primary_task.message or tr("progress.task.working")
-            display_msg = raw_msg if len(raw_msg) <= 30 else raw_msg[:28] + "..."
-            self.text_label.setText(display_msg)
+            speed = f" [{primary_task.speed_text}]" if primary_task.speed_text else ""
+            display_msg = raw_msg if len(raw_msg) <= 24 else raw_msg[:22] + "..."
+            self.text_label.setText(f"{display_msg}{speed}")
         else:
             pct_str = f"{int(percentage)}%" if percentage is not None else ""
-            self.text_label.setText(tr("tasks.indicator.active_multiple", count=count, percent=pct_str).strip())
+            speed = f" [{primary_task.speed_text}]" if primary_task.speed_text else ""
+            self.text_label.setText(f"{tr('tasks.indicator.active_multiple', count=count, percent=pct_str).strip()}{speed}")
 
         if percentage is not None:
             self.progress_bar.setRange(0, 100)
@@ -156,7 +158,9 @@ class GlobalTaskIndicator(QFrame):
         lines = [f"<b>{title} ({count})</b>"]
         for task in active_tasks:
             pct = f" ({int(task.percentage)}%)" if task.percentage is not None else ""
-            lines.append(f"• {task.message}{pct}")
+            speed = f" • {task.speed_text}" if task.speed_text else ""
+            prog = f" [{task.progress_text}]" if task.progress_text else ""
+            lines.append(f"• {task.message}{prog}{speed}{pct}")
         self.setToolTip("<br/>".join(lines))
 
     def _on_queue_changed(self, _all_tasks: list[TaskQueueItem]) -> None:

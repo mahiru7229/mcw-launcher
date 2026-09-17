@@ -9,6 +9,28 @@ from PySide6.QtCore import QObject, Signal
 from src.gui.task_runner import TaskRunner
 
 
+def format_bytes(num_bytes: int | float) -> str:
+    if num_bytes < 1024:
+        return f"{num_bytes:.0f} B"
+    elif num_bytes < 1024 * 1024:
+        return f"{num_bytes / 1024:.1f} KB"
+    elif num_bytes < 1024 * 1024 * 1024:
+        return f"{num_bytes / (1024 * 1024):.1f} MB"
+    else:
+        return f"{num_bytes / (1024 * 1024 * 1024):.2f} GB"
+
+
+def format_speed(bytes_per_second: float | None) -> str:
+    if not bytes_per_second or bytes_per_second <= 0:
+        return ""
+    if bytes_per_second < 1024:
+        return f"{bytes_per_second:.0f} B/s"
+    elif bytes_per_second < 1024 * 1024:
+        return f"{bytes_per_second / 1024:.1f} KB/s"
+    else:
+        return f"{bytes_per_second / (1024 * 1024):.2f} MB/s"
+
+
 @dataclass(slots=True)
 class TaskQueueItem:
     """Snapshot representation of a background or download task."""
@@ -21,6 +43,11 @@ class TaskQueueItem:
     error: str | None = None
     blocking: bool = False
     created_at: float = field(default_factory=time.time)
+    bytes_per_second: float | None = None
+    current_bytes: int | None = None
+    total_bytes: int | None = None
+    speed_text: str = ""
+    progress_text: str = ""
 
     @property
     def is_active(self) -> bool:
@@ -108,6 +135,10 @@ class TaskQueue(QObject):
         message = getattr(event, "message", "")
         stage = getattr(event, "stage", None)
         stage_name = getattr(stage, "value", str(stage)) if stage is not None else ""
+        bytes_per_second = getattr(event, "bytes_per_second", None)
+        current = getattr(event, "current", None)
+        total = getattr(event, "total", None)
+        unit = getattr(event, "unit", None)
 
         if percentage is not None:
             item.percentage = float(percentage)
@@ -115,6 +146,20 @@ class TaskQueue(QObject):
             item.message = str(message)
         if stage_name:
             item.stage = stage_name
+        if bytes_per_second is not None:
+            item.bytes_per_second = float(bytes_per_second)
+            item.speed_text = format_speed(item.bytes_per_second)
+        if current is not None:
+            item.current_bytes = int(current)
+        if total is not None:
+            item.total_bytes = int(total)
+
+        if item.current_bytes is not None and item.total_bytes is not None and item.total_bytes > 0:
+            unit_name = getattr(unit, "name", str(unit)).upper()
+            if "BYTE" in unit_name:
+                item.progress_text = f"{format_bytes(item.current_bytes)} / {format_bytes(item.total_bytes)}"
+            else:
+                item.progress_text = f"{item.current_bytes}/{item.total_bytes}"
 
         self.task_updated.emit(item)
         self.queue_changed.emit(self.all_tasks())
