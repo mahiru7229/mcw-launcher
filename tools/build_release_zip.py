@@ -19,7 +19,7 @@ from src.config import VERSION_ID
 
 DEFAULT_FILES = ("README.md", "LICENSE")
 DEFAULT_DIRECTORIES = ("lang", "themes")
-DEFAULT_CLEANUP_PATHS = ("docs",)
+DEFAULT_CLEANUP_PATHS = ("docs", "_internal")
 SUPPORTED_PLATFORMS = ("windows-x64", "linux-x64")
 PACKAGE_MANIFEST_SCHEMA_VERSION = 2
 
@@ -139,7 +139,11 @@ def build_release_zip(
             for path in payload_root.rglob("*")
             if path.is_file()
         )
-        managed_files.append("mcw-update.json")
+        cleanup_paths = [
+            path
+            for path in DEFAULT_CLEANUP_PATHS
+            if not (path == "_internal" and (payload_root / "_internal").exists())
+        ]
         manifest = {
             "schema_version": PACKAGE_MANIFEST_SCHEMA_VERSION,
             "version": version,
@@ -147,7 +151,7 @@ def build_release_zip(
             "executable": executable_file.name,
             "updater": updater_relative.as_posix(),
             "files": sorted(set(managed_files)),
-            "cleanup_paths": list(DEFAULT_CLEANUP_PATHS),
+            "cleanup_paths": cleanup_paths,
         }
         (payload_root / "mcw-update.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",

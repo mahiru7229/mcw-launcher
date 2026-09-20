@@ -36,7 +36,7 @@ TEST_CACHE_DIRS = (".pytest_cache", ".mypy_cache", ".ruff_cache", "htmlcov")
 TEST_CACHE_FILES = (".coverage", "coverage.xml")
 
 # Build and distribution artifacts
-BUILD_DIRS = ("build", "dist", "release")
+BUILD_DIRS = ("build", "dist", "release", "_internal")
 BUILD_DIR_PATTERNS = ("*.egg-info",)
 
 # Directories that must NEVER be deleted

@@ -89,6 +89,7 @@ class UpdateApplier:
             self._copy_update_files()
             self._remove_stale_files()
             self._remove_cleanup_paths()
+            self._cleanup_legacy_onedir()
             self._verify_updated_executable()
             self._start_launcher()
             self._log(f"Update to {self.request.target_version} completed")
@@ -205,7 +206,13 @@ class UpdateApplier:
                 target.unlink(missing_ok=True)
             except OSError as error:
                 raise RuntimeError(f"Could not remove obsolete launcher file {target}: {error}") from error
-
+            parent = target.parent
+            while parent != self.request.destination_directory and parent.is_dir():
+                try:
+                    parent.rmdir()
+                    parent = parent.parent
+                except OSError:
+                    break
 
     def _remove_cleanup_paths(self) -> None:
         for relative_path in self.cleanup_paths:
@@ -220,6 +227,15 @@ class UpdateApplier:
                     shutil.rmtree(target)
             except OSError as error:
                 raise RuntimeError(f"Could not clean obsolete launcher path {target}: {error}") from error
+
+    def _cleanup_legacy_onedir(self) -> None:
+        """Ensure obsolete PyInstaller onedir artifacts (_internal) are scrubbed when updating to onefile."""
+        if (self.request.source_directory / "_internal").exists():
+            return
+        internal_dir = self.request.destination_directory / "_internal"
+        if internal_dir.is_dir():
+            self._log("Cleaning obsolete onedir _internal directory")
+            shutil.rmtree(internal_dir, ignore_errors=True)
 
     @staticmethod
     def _cleanup_paths(root: Path) -> list[Path]:

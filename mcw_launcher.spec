@@ -204,8 +204,8 @@ analysis = Analysis(
 
 pyz = PYZ(analysis.pure)
 
-BUILD_MODE = os.environ.get("MCW_BUILD_MODE", "onedir").strip().casefold()
-IS_ONEDIR = BUILD_MODE != "onefile"
+BUILD_MODE = os.environ.get("MCW_BUILD_MODE", "onefile").strip().casefold()
+IS_ONEDIR = BUILD_MODE == "onedir"
 
 if IS_ONEDIR:
     exe = EXE(

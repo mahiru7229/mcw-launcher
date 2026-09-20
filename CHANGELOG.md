@@ -2,6 +2,19 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.6.0] - 2026-09-20
+
+### Added
+- Promoted to stable release `v1.6.0` on branch `1.6`.
+- Restore single-file (`onefile`) distribution packaging for Windows (`MCW Launcher.exe`) and Linux (`mcw-launcher`) to maximize initial startup compatibility and avoid false-positive anti-malware/SmartScreen scans.
+- Add automatic legacy onedir artifact scrubbing: `UpdateApplier` automatically removes obsolete `_internal/` directory and prunes empty directory trees during updates from older onedir beta builds to 1.6.0.
+
+### Fixed
+- Fix CurseForge mod loader resolution, duplicated game version prefixes in Forge installer URLs, and older modpack loader detection.
+- Fix FTB instance running status reporting and prevent timeout eviction of preparing run locks during large downloads.
+- Fix CurseForge manual download dialog: multi-tier mod matching, automatic Downloads directory scanning, auto-close on completion, and safe cancellation.
+- Fix ATLauncher Forge loader normalization, instance auto-healing, and allow installation of packs with server-only archive actions and standard Forge launch wrappers.
+
 ## [1.6.0-beta.5] - 2026-09-20
 
 ### Added

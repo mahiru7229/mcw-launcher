@@ -55,7 +55,7 @@ def test_build_release_zip_writes_schema2_manifest_and_bundled_updater(tmp_path:
         assert f"{root}/MCW Launcher.exe" in archive.namelist()
         assert f"{root}/updater/MCW Updater.exe" in archive.namelist()
         assert "updater/MCW Updater.exe" in manifest["files"]
-        assert manifest["cleanup_paths"] == ["docs"]
+        assert manifest["cleanup_paths"] == ["docs", "_internal"]
         assert f"{root}/docs/keep.txt" not in archive.namelist()
     assert output.with_name(f"{output.name}.sha256").is_file()
 
@@ -300,4 +300,76 @@ def test_onedir_package_upgrades_legacy_onefile_installation(tmp_path: Path, mon
     assert (installation / "_internal" / "python312.dll").read_bytes() == b"runtime-dll"
     assert (installation / "_internal" / "Qt6Core.dll").read_bytes() == b"qt6-core-dll"
     assert (installation / "README.md").read_text(encoding="utf-8") == "readme-1.6"
+
+
+def test_onefile_package_upgrades_legacy_onedir_installation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.core.update.update_applier import UpdateApplier, UpdateApplyRequest
+
+    # 1. Simulate legacy onedir installation (with _internal folder and old dlls)
+    installation = tmp_path / "installed_app"
+    installation.mkdir()
+    (installation / "MCW Launcher.exe").write_bytes(b"old-onedir-exe")
+    internal_dir = installation / "_internal"
+    internal_dir.mkdir()
+    (internal_dir / "python312.dll").write_bytes(b"old-python-dll")
+    (internal_dir / "Qt6Core.dll").write_bytes(b"old-qt-dll")
+    (installation / "mcw-update.json").write_text(json.dumps({
+        "schema_version": 2,
+        "version": "1.6.0-beta.4",
+        "platform": "windows-x64",
+        "executable": "MCW Launcher.exe",
+        "updater": "updater/MCW Updater.exe",
+        "files": ["MCW Launcher.exe", "_internal/python312.dll", "_internal/Qt6Core.dll", "updater/MCW Updater.exe", "mcw-update.json"],
+        "cleanup_paths": ["docs"],
+    }), encoding="utf-8")
+
+    # 2. Build onefile release ZIP for 1.6.0
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "README.md").write_text("readme-1.6.0", encoding="utf-8")
+    (project / "LICENSE").write_text("license", encoding="utf-8")
+
+    new_onefile_exe = tmp_path / "MCW Launcher.exe"
+    new_onefile_exe.write_bytes(b"new-onefile-standalone-exe")
+    updater = tmp_path / "MCW Updater.exe"
+    updater.write_bytes(b"bundled-updater-v2")
+
+    release_zip = project / f"MCW-Launcher-v{VERSION_ID}-windows-x64.zip"
+    build_release_zip(project, new_onefile_exe, updater, VERSION_ID, release_zip, "windows-x64")
+
+    # 3. Simulate downloading and unpacking to staging
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    with zipfile.ZipFile(release_zip) as archive:
+        archive.extractall(staging)
+    source_dir = staging / f"MCW-Launcher-v{VERSION_ID}-windows-x64"
+
+    # 4. Run UpdateApplier
+    updater_dir = tmp_path / "updater_temp"
+    updater_dir.mkdir()
+    request = UpdateApplyRequest(
+        parent_pid=9999,
+        source_directory=source_dir,
+        destination_directory=installation,
+        executable_name="MCW Launcher.exe",
+        updater_directory=updater_dir,
+        staging_directory=staging,
+        persistent_log_path=installation / "logs" / "updater.log",
+        target_version=VERSION_ID,
+    )
+    applier = UpdateApplier(request)
+    started: list[bool] = []
+    monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
+    monkeypatch.setattr(applier, "_wait_for_launcher_release", lambda: None)
+    monkeypatch.setattr(applier, "_start_launcher", lambda **_kw: started.append(True))
+
+    exit_code = applier.run()
+    assert exit_code == 0
+    assert started == [True]
+
+    # 5. Verify upgraded onefile structure: _internal MUST BE GONE
+    assert (installation / "MCW Launcher.exe").read_bytes() == b"new-onefile-standalone-exe"
+    assert not (installation / "_internal").exists()
+    assert (installation / "README.md").read_text(encoding="utf-8") == "readme-1.6.0"
+
 
