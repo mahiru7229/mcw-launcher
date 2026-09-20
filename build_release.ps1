@@ -34,8 +34,15 @@ if (-not (Test-Path ".\tools\release_preflight.py")) {
     throw "tools/release_preflight.py was not found."
 }
 
-$Version = (python -c "from src.config import VERSION_ID; print(VERSION_ID)").Trim()
-$VersionTag = (python -c "from src.config import VERSION_TAG; print(VERSION_TAG)").Trim()
+$PythonExe = "python"
+if (Test-Path ".\venv\Scripts\python.exe") {
+    $PythonExe = ".\venv\Scripts\python.exe"
+} elseif (Test-Path ".\.venv\Scripts\python.exe") {
+    $PythonExe = ".\.venv\Scripts\python.exe"
+}
+
+$Version = (& $PythonExe -c "from src.config import VERSION_ID; print(VERSION_ID)").Trim()
+$VersionTag = (& $PythonExe -c "from src.config import VERSION_TAG; print(VERSION_TAG)").Trim()
 if ($LASTEXITCODE -ne 0 -or -not $Version -or -not $VersionTag) {
     throw "Unable to read release version from src/config.py."
 }
@@ -54,12 +61,12 @@ if (-not $AllowDirty) {
 }
 
 Write-Step "Running release preflight"
-Invoke-Checked "Release preflight" { python -m tools.release_preflight }
-Invoke-Checked "Python compilation" { python -m compileall -q launcher.py updater.py src tools }
+Invoke-Checked "Release preflight" { & $PythonExe -m tools.release_preflight }
+Invoke-Checked "Python compilation" { & $PythonExe -m compileall -q launcher.py updater.py src tools }
 
 if (-not $SkipTests) {
     Write-Step "Running complete regression suite"
-    Invoke-Checked "Tests" { python -m pytest test -q }
+    Invoke-Checked "Tests" { & $PythonExe -m pytest test -q }
 }
 
 Write-Step "Removing previous build output"
@@ -68,22 +75,32 @@ Remove-Item ".\dist" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item ".\release" -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Step "Building launcher EXE"
-Invoke-Checked "Launcher PyInstaller build" { python -m PyInstaller --clean --noconfirm mcw_launcher.spec }
+Invoke-Checked "Launcher PyInstaller build" { & $PythonExe -m PyInstaller --clean --noconfirm mcw_launcher.spec }
 
 Write-Step "Building bundled updater EXE"
-Invoke-Checked "Updater PyInstaller build" { python -m PyInstaller --clean --noconfirm mcw_updater.spec }
+Invoke-Checked "Updater PyInstaller build" { & $PythonExe -m PyInstaller --clean --noconfirm mcw_updater.spec }
 
-$ExePath = Join-Path ".\dist" $ExeName
-if (-not (Test-Path $ExePath)) {
-    throw "Expected EXE was not created: $ExePath"
+$OnedirAppDir = Join-Path ".\dist" "MCW Launcher"
+$OnedirExePath = Join-Path $OnedirAppDir $ExeName
+$OnefileExePath = Join-Path ".\dist" $ExeName
+
+if (Test-Path $OnedirExePath) {
+    $ExeTarget = $OnedirAppDir
+    $ExeFile = $OnedirExePath
+} elseif (Test-Path $OnefileExePath) {
+    $ExeTarget = $OnefileExePath
+    $ExeFile = $OnefileExePath
+} else {
+    throw "Expected launcher executable was not created in .\dist (checked $OnedirExePath and $OnefileExePath)"
 }
+
 $UpdaterPath = ".\dist\MCW Updater.exe"
 if (-not (Test-Path $UpdaterPath)) {
     throw "Expected bundled updater was not created: $UpdaterPath"
 }
 
 Write-Step "Creating updater-v2 ZIP"
-Invoke-Checked "Release package build" { python -m tools.build_release_zip --exe $ExePath --updater $UpdaterPath --version $Version }
+Invoke-Checked "Release package build" { & $PythonExe -m tools.build_release_zip --exe $ExeTarget --updater $UpdaterPath --version $Version }
 
 $ZipName = "MCW-Launcher-v$Version-windows-x64.zip"
 $ZipPath = Join-Path ".\release" $ZipName
@@ -100,13 +117,13 @@ if (-not (Test-Path $ReleaseNotes)) {
     throw "Release notes were not found: $ReleaseNotes"
 }
 
-$ExeHash = (Get-FileHash $ExePath -Algorithm SHA256).Hash.ToLowerInvariant()
+$ExeHash = (Get-FileHash $ExeFile -Algorithm SHA256).Hash.ToLowerInvariant()
 $ZipHash = (Get-FileHash $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
 
 Write-Host ""
 Write-Host "Release build completed successfully." -ForegroundColor Green
 Write-Host "Version: $VersionTag"
-Write-Host "EXE: $ExePath"
+Write-Host "EXE: $ExeFile"
 Write-Host "EXE SHA-256: $ExeHash"
 Write-Host "Updater: $UpdaterPath"
 Write-Host "ZIP: $ZipPath"

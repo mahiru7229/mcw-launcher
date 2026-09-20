@@ -4,6 +4,7 @@ from PySide6.QtCore import QSignalBlocker, Qt, Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSlider, QSpinBox, QTextEdit, QVBoxLayout
 
 from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
+from mcw_core.api.java.jvm_presets import JvmPresetId, detect_preset, get_preset_flags
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.system.memory import MemoryAllocationPolicy, SystemMemory
 from src.gui.pages.base_page import BasePage
@@ -215,6 +216,9 @@ class InstanceSettingsPage(BasePage):
         multiplayer_section.add_card(managed_checks_card, span=2)
 
         arguments_card = CardWidget("Custom arguments", "Enter one argument per line.")
+        self.jvm_preset_label = QLabel(tr("jvm_preset.label"))
+        self.jvm_preset_combo = QComboBox()
+        self._populate_jvm_preset_combo()
         self.jvm_arguments = QTextEdit()
         self.jvm_arguments.setObjectName("ArgumentEditor")
         self.jvm_arguments.setPlaceholderText("JVM arguments")
@@ -223,6 +227,8 @@ class InstanceSettingsPage(BasePage):
         self.game_arguments.setObjectName("ArgumentEditor")
         self.game_arguments.setPlaceholderText("Game arguments")
         self.game_arguments.setFixedHeight(90)
+        arguments_card.layout.addWidget(self.jvm_preset_label)
+        arguments_card.layout.addWidget(self.jvm_preset_combo)
         arguments_card.layout.addWidget(QLabel("JVM arguments"))
         arguments_card.layout.addWidget(self.jvm_arguments)
         arguments_card.layout.addWidget(QLabel("Game arguments"))
@@ -382,6 +388,13 @@ class InstanceSettingsPage(BasePage):
         self.java_path_input.setPlaceholderText(tr("java.selection.path_placeholder"))
         self.java_browse_button.setText(tr("java.selection.browse"))
         self.java_recovery_label.setText(tr("java.selection.recovery_hint"))
+        self.jvm_preset_label.setText(tr("jvm_preset.label"))
+        current_preset = self.jvm_preset_combo.currentData()
+        self._populate_jvm_preset_combo()
+        idx = self.jvm_preset_combo.findData(current_preset)
+        if idx >= 0:
+            with QSignalBlocker(self.jvm_preset_combo):
+                self.jvm_preset_combo.setCurrentIndex(idx)
 
     def _connect_dirty_tracking(self) -> None:
         self.java_mode_combo.currentIndexChanged.connect(self._refresh_dirty_state)
@@ -398,7 +411,9 @@ class InstanceSettingsPage(BasePage):
         self.modrinth_failure_policy.currentIndexChanged.connect(self._refresh_dirty_state)
         self.curseforge_failure_policy.currentIndexChanged.connect(self._refresh_dirty_state)
         self.forge_preflight_failure_policy.currentIndexChanged.connect(self._refresh_dirty_state)
+        self.jvm_arguments.textChanged.connect(self._sync_jvm_preset_from_text)
         self.jvm_arguments.textChanged.connect(self._refresh_dirty_state)
+        self.jvm_preset_combo.currentIndexChanged.connect(self._on_jvm_preset_combo_changed)
         self.game_arguments.textChanged.connect(self._refresh_dirty_state)
 
     def _refresh_dirty_state(self, *_args) -> None:
@@ -465,7 +480,38 @@ class InstanceSettingsPage(BasePage):
         self._set_combo_data(self.forge_preflight_failure_policy, ManagedContentPolicy.normalize_instance(data.get("forge_preflight_failure_policy")))
         self._update_lan_help()
         self.jvm_arguments.setPlainText("\n".join(data.get("jvm_arguments", [])))
+        self._sync_jvm_preset_from_text()
         self.game_arguments.setPlainText("\n".join(data.get("game_arguments", [])))
+
+    def _populate_jvm_preset_combo(self) -> None:
+        with QSignalBlocker(self.jvm_preset_combo):
+            self.jvm_preset_combo.clear()
+            self.jvm_preset_combo.addItem(tr("jvm_preset.default"), JvmPresetId.DEFAULT)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.aikar"), JvmPresetId.AIKAR)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.zgc"), JvmPresetId.ZGC)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.shenandoah"), JvmPresetId.SHENANDOAH)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.custom"), JvmPresetId.CUSTOM)
+
+    def _on_jvm_preset_combo_changed(self) -> None:
+        preset_id = self.jvm_preset_combo.currentData()
+        if not preset_id or preset_id == JvmPresetId.CUSTOM:
+            return
+        flags = get_preset_flags(preset_id)
+        with QSignalBlocker(self.jvm_arguments):
+            self.jvm_arguments.setPlainText("\n".join(flags))
+        self._refresh_dirty_state()
+
+    def _sync_jvm_preset_from_text(self) -> None:
+        lines = self._lines(self.jvm_arguments.toPlainText())
+        detected = detect_preset(lines)
+        with QSignalBlocker(self.jvm_preset_combo):
+            idx = self.jvm_preset_combo.findData(detected)
+            if idx >= 0:
+                self.jvm_preset_combo.setCurrentIndex(idx)
+            else:
+                custom_idx = self.jvm_preset_combo.findData(JvmPresetId.CUSTOM)
+                if custom_idx >= 0:
+                    self.jvm_preset_combo.setCurrentIndex(custom_idx)
 
     def _update_java_mode(self, *_args, enabled: bool | None = None) -> None:
         custom = str(self.java_mode_combo.currentData() or "auto") == "custom"

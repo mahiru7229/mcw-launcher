@@ -1,0 +1,233 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+import time
+from typing import Any
+
+from PySide6.QtCore import QObject, Signal
+
+from src.gui.task_runner import TaskRunner
+
+
+def format_bytes(num_bytes: int | float) -> str:
+    if num_bytes < 1024:
+        return f"{num_bytes:.0f} B"
+    elif num_bytes < 1024 * 1024:
+        return f"{num_bytes / 1024:.1f} KB"
+    elif num_bytes < 1024 * 1024 * 1024:
+        return f"{num_bytes / (1024 * 1024):.1f} MB"
+    else:
+        return f"{num_bytes / (1024 * 1024 * 1024):.2f} GB"
+
+
+def format_speed(bytes_per_second: float | None) -> str:
+    if not bytes_per_second or bytes_per_second <= 0:
+        return ""
+    if bytes_per_second < 1024:
+        return f"{bytes_per_second:.0f} B/s"
+    elif bytes_per_second < 1024 * 1024:
+        return f"{bytes_per_second / 1024:.1f} KB/s"
+    else:
+        return f"{bytes_per_second / (1024 * 1024):.2f} MB/s"
+
+
+@dataclass(slots=True)
+class TaskQueueItem:
+    """Snapshot representation of a background or download task."""
+
+    task_id: str
+    message: str
+    stage: str = ""
+    detail: str = ""
+    percentage: float | None = None
+    status: str = "running"  # running, succeeded, failed, cancelled
+    error: str | None = None
+    blocking: bool = False
+    created_at: float = field(default_factory=time.time)
+    bytes_per_second: float | None = None
+    current_bytes: int | None = None
+    total_bytes: int | None = None
+    speed_text: str = ""
+    progress_text: str = ""
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == "running"
+
+
+class TaskQueue(QObject):
+    """Central task and download queue manager for the GUI.
+
+    Bridges TaskRunner events into a unified task drawer / queue representation,
+    similar to Modrinth App's global download and background task drawer.
+    """
+
+    task_enqueued = Signal(object)
+    task_updated = Signal(object)
+    task_completed = Signal(object)
+    queue_changed = Signal(list)
+
+    MAX_HISTORY = 50
+
+    def __init__(self, runner: TaskRunner | None = None, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._runner: TaskRunner | None = None
+        self._items: dict[str, TaskQueueItem] = {}
+        if runner is not None:
+            self.attach_runner(runner)
+
+    def attach_runner(self, runner: TaskRunner) -> None:
+        if self._runner is not None:
+            return
+        self._runner = runner
+        if hasattr(self._runner, "task_started"):
+            self._runner.task_started.connect(self._on_task_started)
+        if hasattr(self._runner, "task_progress"):
+            self._runner.task_progress.connect(self._on_task_progress)
+        if hasattr(self._runner, "task_succeeded"):
+            self._runner.task_succeeded.connect(self._on_task_succeeded)
+        if hasattr(self._runner, "task_failed"):
+            self._runner.task_failed.connect(self._on_task_failed)
+        if hasattr(self._runner, "task_cancelled"):
+            self._runner.task_cancelled.connect(self._on_task_cancelled)
+
+    def active_tasks(self) -> list[TaskQueueItem]:
+        return [item for item in self._items.values() if item.is_active]
+
+    def all_tasks(self) -> list[TaskQueueItem]:
+        return list(self._items.values())
+
+    def get_task(self, task_id: str) -> TaskQueueItem | None:
+        return self._items.get(task_id)
+
+    def cancel_task(self, task_id: str) -> bool:
+        if self._runner is not None:
+            if hasattr(self._runner, "cancel_task"):
+                return bool(self._runner.cancel_task(task_id))
+            if hasattr(self._runner, "cancel"):
+                return bool(self._runner.cancel(task_id))
+        return False
+
+    def update_progress(self, task_id: str, event: Any) -> None:
+        self._on_task_progress(task_id, event)
+
+    def clear_completed(self) -> None:
+        self._items = {k: v for k, v in self._items.items() if v.is_active}
+        self.queue_changed.emit(self.all_tasks())
+
+    def _on_task_started(self, task_id: str, message: str, blocking: bool) -> None:
+        item = TaskQueueItem(
+            task_id=task_id,
+            message=message,
+            blocking=blocking,
+            status="running",
+        )
+        self._items[task_id] = item
+        self._prune_history()
+        self.task_enqueued.emit(item)
+        self.queue_changed.emit(self.all_tasks())
+
+    def _on_task_progress(self, task_id: str, event: Any) -> None:
+        item = self._items.get(task_id)
+        if item is None:
+            if self._runner is not None and hasattr(self._runner, "is_task_active") and not self._runner.is_task_active(task_id):
+                return
+            item = TaskQueueItem(
+                task_id=task_id,
+                message=str(getattr(event, "message", "") or task_id),
+                status="running",
+            )
+            self._items[task_id] = item
+            self._prune_history()
+            self.task_enqueued.emit(item)
+
+        event_state = getattr(event, "state", None)
+        if event_state is not None:
+            state_val = getattr(event_state, "value", str(event_state)).lower()
+            if state_val == "succeeded":
+                item.status = "succeeded"
+                item.percentage = 100.0
+                self.task_completed.emit(item)
+                self.queue_changed.emit(self.all_tasks())
+                return
+            elif state_val == "failed":
+                item.status = "failed"
+                item.error = str(getattr(event, "detail", "") or getattr(event, "message", "") or "Failed")
+                self.task_completed.emit(item)
+                self.queue_changed.emit(self.all_tasks())
+                return
+            elif state_val == "cancelled":
+                item.status = "cancelled"
+                self.task_completed.emit(item)
+                self.queue_changed.emit(self.all_tasks())
+                return
+
+        percentage = getattr(event, "percentage", None)
+        message = getattr(event, "message", "")
+        detail = getattr(event, "detail", "")
+        stage = getattr(event, "stage", None)
+        stage_name = getattr(stage, "value", str(stage)) if stage is not None else ""
+        bytes_per_second = getattr(event, "bytes_per_second", None)
+        current = getattr(event, "current", None)
+        total = getattr(event, "total", None)
+        unit = getattr(event, "unit", None)
+
+        if percentage is not None:
+            item.percentage = float(percentage)
+        if message:
+            item.message = str(message)
+        if detail:
+            item.detail = str(detail)
+        if stage_name:
+            item.stage = stage_name
+        if bytes_per_second is not None:
+            item.bytes_per_second = float(bytes_per_second)
+            item.speed_text = format_speed(item.bytes_per_second)
+        if current is not None:
+            item.current_bytes = int(current)
+        if total is not None:
+            item.total_bytes = int(total)
+
+        if item.current_bytes is not None and item.total_bytes is not None and item.total_bytes > 0:
+            unit_name = getattr(unit, "name", str(unit)).upper()
+            if "BYTE" in unit_name:
+                item.progress_text = f"{format_bytes(item.current_bytes)} / {format_bytes(item.total_bytes)}"
+            else:
+                item.progress_text = f"{item.current_bytes}/{item.total_bytes}"
+
+        self.task_updated.emit(item)
+
+    def _on_task_succeeded(self, task_id: str, _result: Any) -> None:
+        item = self._items.get(task_id)
+        if item is None:
+            return
+        item.status = "succeeded"
+        item.percentage = 100.0
+        self.task_completed.emit(item)
+        self.queue_changed.emit(self.all_tasks())
+
+    def _on_task_failed(self, task_id: str, error: Any) -> None:
+        item = self._items.get(task_id)
+        if item is None:
+            return
+        item.status = "failed"
+        item.error = str(error)
+        self.task_completed.emit(item)
+        self.queue_changed.emit(self.all_tasks())
+
+    def _on_task_cancelled(self, task_id: str) -> None:
+        item = self._items.get(task_id)
+        if item is None:
+            return
+        item.status = "cancelled"
+        self.task_completed.emit(item)
+        self.queue_changed.emit(self.all_tasks())
+
+    def _prune_history(self) -> None:
+        if len(self._items) <= self.MAX_HISTORY:
+            return
+        # Keep all active tasks, prune oldest completed
+        completed = [k for k, v in self._items.items() if not v.is_active]
+        to_remove = len(self._items) - self.MAX_HISTORY
+        for k in completed[:to_remove]:
+            del self._items[k]

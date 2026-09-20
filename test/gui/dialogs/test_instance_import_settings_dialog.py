@@ -7,6 +7,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from src.core.instance.settings_manager import SettingsManager
+from src.core.java.jvm_presets import JvmPresetId, get_preset_flags
 from src.core.language.language_manager import tr
 from src.gui.dialogs.instance_import_settings_dialog import InstanceImportSettingsDialog
 from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
@@ -61,6 +62,20 @@ def test_settings_editor_round_trips_every_instance_setting(gui_app) -> None:
     assert dialog.settings_data == SettingsManager.normalize_dict(source)
     assert "4 GB" in dialog.summary(source)
     assert dialog.cancel_button.text() == tr("common.cancel")
+
+
+def test_settings_editor_jvm_preset_selection(gui_app) -> None:
+    source = _settings(4096)
+    dialog = InstanceSettingsEditorDialog(source, total_memory_mb=8192)
+
+    aikar_idx = dialog.jvm_preset_combo.findData(JvmPresetId.AIKAR)
+    assert aikar_idx >= 0
+    dialog.jvm_preset_combo.setCurrentIndex(aikar_idx)
+    assert dialog.jvm_arguments.toPlainText().strip() == "\n".join(get_preset_flags(JvmPresetId.AIKAR)).strip()
+    assert dialog.settings_data["java"]["arguments"] == get_preset_flags(JvmPresetId.AIKAR)
+
+    dialog.jvm_arguments.setPlainText("-Xms2G\n-Xmx4G")
+    assert dialog.jvm_preset_combo.currentData() == JvmPresetId.CUSTOM
 
 
 def test_import_defaults_to_overwriting_with_launcher_defaults(gui_app) -> None:

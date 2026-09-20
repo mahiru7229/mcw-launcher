@@ -99,11 +99,13 @@ class LauncherSettingsPage(BasePage):
         self.show_snapshots = QCheckBox("Show non-release versions by default")
         self.remember_window_size = QCheckBox("Remember window size and position")
         self.debug_mode = QCheckBox("Enable debug launch information")
+        self.minimize_on_launch = QCheckBox(tr("launcher_settings.launch.minimize_on_launch"))
         behavior_card.layout.addWidget(QLabel("Startup page"))
         behavior_card.layout.addWidget(self.start_page_combo)
         behavior_card.layout.addWidget(self.show_snapshots)
         behavior_card.layout.addWidget(self.remember_window_size)
         behavior_card.layout.addWidget(self.debug_mode)
+        behavior_card.layout.addWidget(self.minimize_on_launch)
         general_section.add_card(behavior_card)
 
         bandwidth_card = CardWidget("Download bandwidth", "The limit is shared by all simultaneous downloads. Leave it disabled for unlimited speed.")
@@ -246,6 +248,20 @@ class LauncherSettingsPage(BasePage):
         self.gpu_card.layout.addWidget(self.prefer_dedicated_gpu)
         self.gpu_card.layout.addWidget(self.gpu_status_label)
         runtime_section.add_card(self.gpu_card)
+
+        self.discord_rpc_card = CardWidget(tr("discord_rpc.launcher.title"), tr("discord_rpc.launcher.description"))
+        self.discord_rpc_card.set_compact_mode(True)
+        self.discord_rpc_card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        self.discord_rpc_enabled = QCheckBox(tr("discord_rpc.launcher.toggle"))
+        self.discord_rpc_enabled.setChecked(True)
+        self.discord_rpc_card.layout.addWidget(self.discord_rpc_enabled)
+        self.discord_client_id_label = QLabel(tr("discord_rpc.launcher.custom_client_id"))
+        self.discord_client_id_input = QLineEdit()
+        self.discord_client_id_input.setPlaceholderText(tr("discord_rpc.launcher.custom_client_id_placeholder"))
+        self.discord_client_id_input.setClearButtonEnabled(True)
+        self.discord_rpc_card.layout.addWidget(self.discord_client_id_label)
+        self.discord_rpc_card.layout.addWidget(self.discord_client_id_input)
+        runtime_section.add_card(self.discord_rpc_card)
 
         self.instance_defaults_card = CardWidget(
             tr("instance_defaults.launcher.title"),
@@ -502,7 +518,10 @@ class LauncherSettingsPage(BasePage):
         self.show_snapshots.toggled.connect(self._refresh_dirty_state)
         self.remember_window_size.toggled.connect(self._refresh_dirty_state)
         self.debug_mode.toggled.connect(self._refresh_dirty_state)
+        self.minimize_on_launch.toggled.connect(self._refresh_dirty_state)
         self.prefer_dedicated_gpu.toggled.connect(self._refresh_dirty_state)
+        self.discord_rpc_enabled.toggled.connect(self._refresh_dirty_state)
+        self.discord_client_id_input.textChanged.connect(self._refresh_dirty_state)
         self.limit_download_speed.toggled.connect(self._refresh_dirty_state)
         self.download_limit_mbps.valueChanged.connect(self._refresh_dirty_state)
         self.download_performance_mode.currentIndexChanged.connect(self._refresh_dirty_state)
@@ -879,6 +898,9 @@ class LauncherSettingsPage(BasePage):
             "show_snapshots": self.show_snapshots.isChecked(),
             "debug_mode": self.debug_mode.isChecked(),
             "prefer_dedicated_gpu": self.prefer_dedicated_gpu.isEnabled() and self.prefer_dedicated_gpu.isChecked(),
+            "discord_rpc_enabled": self.discord_rpc_enabled.isChecked(),
+            "discord_client_id": self.discord_client_id_input.text().strip(),
+            "minimize_on_launch": self.minimize_on_launch.isChecked(),
             "remember_window_size": self.remember_window_size.isChecked(),
             "language": self.language_combo.currentData() or "en-US",
             "show_content_descriptions": self.show_content_descriptions.isChecked(),
@@ -963,6 +985,7 @@ class LauncherSettingsPage(BasePage):
         self.language_restart_hint.setText(tr("launcher_settings.language.restart_hint"))
         self.reload_languages_button.setText(tr("launcher_settings.language.reload"))
         self.unsaved_label.setText(tr("settings.unsaved.banner"))
+        self.minimize_on_launch.setText(tr("launcher_settings.launch.minimize_on_launch"))
         if self.first_run_card.title_label is not None:
             self.first_run_card.title_label.setText(tr("launcher_settings.first_run.title"))
         if self.first_run_card.subtitle_label is not None:
@@ -996,6 +1019,13 @@ class LauncherSettingsPage(BasePage):
             self.gpu_card.subtitle_label.setText(tr("gpu.preference.detail"))
         self.prefer_dedicated_gpu.setText(tr("gpu.preference.toggle"))
         self._update_gpu_status()
+        if self.discord_rpc_card.title_label is not None:
+            self.discord_rpc_card.title_label.setText(tr("discord_rpc.launcher.title"))
+        if self.discord_rpc_card.subtitle_label is not None:
+            self.discord_rpc_card.subtitle_label.setText(tr("discord_rpc.launcher.description"))
+        self.discord_rpc_enabled.setText(tr("discord_rpc.launcher.toggle"))
+        self.discord_client_id_label.setText(tr("discord_rpc.launcher.custom_client_id"))
+        self.discord_client_id_input.setPlaceholderText(tr("discord_rpc.launcher.custom_client_id_placeholder"))
         for index, label in enumerate(self.curseforge_gateway_labels, start=1):
             label.setText(tr("curseforge.gateway.slot", index=index))
         self.reveal_curseforge_gateways.setText(tr("curseforge.gateway.reveal.toggle"))
@@ -1064,7 +1094,10 @@ class LauncherSettingsPage(BasePage):
             self.start_page_combo,
             self.show_snapshots,
             self.debug_mode,
+            self.minimize_on_launch,
             self.prefer_dedicated_gpu,
+            self.discord_rpc_enabled,
+            self.discord_client_id_input,
             self.remember_window_size,
             self.auto_check_updates,
             self.notify_legacy_cache_cleanup,
@@ -1094,7 +1127,10 @@ class LauncherSettingsPage(BasePage):
         self.start_page_combo.setCurrentIndex(max(0, index))
         self.show_snapshots.setChecked(bool(settings.get("show_snapshots", False)))
         self.debug_mode.setChecked(bool(settings.get("debug_mode", False)))
+        self.minimize_on_launch.setChecked(bool(settings.get("minimize_on_launch", True)))
         self.prefer_dedicated_gpu.setChecked(bool(settings.get("prefer_dedicated_gpu", False)) and self._gpu_detection.has_dedicated_gpu)
+        self.discord_rpc_enabled.setChecked(bool(settings.get("discord_rpc_enabled", True)))
+        self.discord_client_id_input.setText(str(settings.get("discord_client_id", "") or ""))
         self.remember_window_size.setChecked(bool(settings.get("remember_window_size", True)))
         self.auto_check_updates.setChecked(bool(settings.get("auto_check_updates", True)))
         self.notify_legacy_cache_cleanup.setChecked(bool(settings.get("notify_legacy_cache_cleanup", True)))

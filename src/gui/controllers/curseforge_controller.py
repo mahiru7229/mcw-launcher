@@ -127,7 +127,7 @@ class CurseForgeController(BaseController):
                 allow_unverified=allow_unverified,
             )
 
-        return self._task_runner.run("curseforge.install.mod", task, tr("task.curseforge.install_mod", instance=instance_name))
+        return self._task_runner.run("curseforge.install.mod", task, tr("task.curseforge.install_mod", instance=instance_name), blocking=False)
 
     def install_manual_file(self, instance_name: str, requirement: CurseForgeManualDownload, source: Path, launch_lock_token: str | None = None) -> bool:
         task_id = f"curseforge.install.manual.{requirement.project_id}"

@@ -83,6 +83,42 @@ def _validate_startup_dependencies(project_root: Path | None = None) -> None:
         )
 
 
+def _find_recovery_executable() -> Path | None:
+    if getattr(sys, "frozen", False):
+        launcher_dir = Path(sys.executable).resolve().parent
+    else:
+        launcher_dir = Path(__file__).resolve().parent
+
+    candidates = [
+        launcher_dir / "updater" / "MCW Updater.exe",
+        launcher_dir / "updater" / "mcw-updater",
+        launcher_dir / "updater.py",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _launch_recovery_tool(executable: Path) -> None:
+    import os
+    import subprocess
+
+    cmd = [str(executable), "--recovery"]
+    if executable.suffix == ".py":
+        cmd = [sys.executable, str(executable), "--recovery"]
+    parent_dir = executable.parent.parent if executable.parent.name == "updater" else executable.parent
+    kwargs: dict = {"cwd": str(parent_dir)}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:
+        kwargs["start_new_session"] = True
+    try:
+        subprocess.Popen(cmd, **kwargs)
+    except Exception:
+        pass
+
+
 def main() -> None:
     _start_update_cleanup()
 
@@ -184,9 +220,21 @@ def main() -> None:
         splash.show_error()
         splash.raise_()
         splash.activateWindow()
-        path_text = str(error_path) if error_path is not None else tr("startup.error_log_unavailable")
-        stage_text = tr(startup_stage_key)
-        QMessageBox.critical(splash, tr("startup.failed_title"), tr("startup.failed_message", error=error, stage=stage_text, path=path_text))
+        msg_box = QMessageBox(splash)
+        msg_box.setIcon(QMessageBox.Icon.Critical)
+        msg_box.setWindowTitle(tr("startup.failed_title"))
+        msg_box.setText(tr("startup.failed_message", error=error, stage=stage_text, path=path_text))
+
+        recovery_exe = _find_recovery_executable()
+        recovery_btn = None
+        if recovery_exe is not None:
+            recovery_btn = msg_box.addButton(tr("startup.open_recovery_tool"), QMessageBox.ButtonRole.ActionRole)
+        msg_box.addButton(QMessageBox.StandardButton.Close)
+
+        msg_box.exec()
+        if recovery_btn is not None and msg_box.clickedButton() == recovery_btn:
+            _launch_recovery_tool(recovery_exe)
+
         splash.close()
         raise SystemExit(1) from None
 

@@ -149,7 +149,14 @@ class InstanceController(BaseController):
             return
         self.refresh(selected_name=instance.name)
 
-    def create(self, name: str, version_id: str, loader_name: str = "vanilla", loader_version: str = LoaderService.AUTO) -> bool:
+    def create(
+        self,
+        name: str,
+        version_id: str,
+        loader_name: str = "vanilla",
+        loader_version: str = LoaderService.AUTO,
+        jvm_arguments: object = None,
+    ) -> bool:
         name = self._validated_name(name)
         version_id = version_id.strip()
         loader_name, loader_version = self._core.loaders.normalize((loader_name, loader_version))
@@ -157,6 +164,8 @@ class InstanceController(BaseController):
             if not version_id:
                 self._emit_error("Create instance", "Select a Minecraft version first.")
             return False
+
+        normalized_jvm_args = tuple(str(arg) for arg in jvm_arguments) if isinstance(jvm_arguments, (list, tuple)) else ()
 
         def task() -> Any:
             return self._core.instances.create(
@@ -166,12 +175,21 @@ class InstanceController(BaseController):
                     loader_name=loader_name,
                     loader_version=loader_version,
                     on_progress=self._on_loader_progress,
+                    jvm_arguments=normalized_jvm_args,
                 )
             )
 
         return self._task_runner.run(self.CREATE_TASK_ID, task, tr("task.instance.create", name=name))
 
-    def create_with_optifine(self, name: str, version_id: str, loader_name: str, loader_version: str, source_path: object) -> bool:
+    def create_with_optifine(
+        self,
+        name: str,
+        version_id: str,
+        loader_name: str,
+        loader_version: str,
+        source_path: object,
+        jvm_arguments: object = None,
+    ) -> bool:
         name = self._validated_name(name)
         version_id = str(version_id or "").strip()
         loader_name, loader_version = self._core.loaders.normalize((loader_name, loader_version))
@@ -179,6 +197,8 @@ class InstanceController(BaseController):
             if not version_id:
                 self._emit_error("Create instance", "Select a Minecraft version first.")
             return False
+
+        normalized_jvm_args = tuple(str(arg) for arg in jvm_arguments) if isinstance(jvm_arguments, (list, tuple)) else ()
 
         def task() -> Any:
             return self._core.instances.create_with_optifine(
@@ -188,6 +208,7 @@ class InstanceController(BaseController):
                     loader_name=loader_name,
                     loader_version=loader_version,
                     on_progress=self._on_loader_progress,
+                    jvm_arguments=normalized_jvm_args,
                 ),
                 Path(source_path),
                 "auto",

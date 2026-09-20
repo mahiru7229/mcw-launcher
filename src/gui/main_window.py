@@ -23,6 +23,7 @@ from mcw_core.api.hardware.gpu_preference_manager import GraphicsDetectionResult
 from mcw_core.api.instance.instance_manager import InstanceManager
 from mcw_core.api.instance.settings_manager import SettingsManager
 from mcw_core.api.instance.instance_run_lock import InstanceRunLock
+from mcw_core.api.integrations.discord import get_discord_rpc_service
 from mcw_core.api.language.language_manager import language_manager, tr
 from mcw_core.api.lan.lan_agent_manager import LanAgentManager
 from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
@@ -34,6 +35,7 @@ from src.gui.application import create_application
 from src.gui.animation.motion_runtime import MotionRuntime
 from src.gui.app_restart import start_restarted_process
 from src.gui.config import GITHUB_REPOSITORY, LAUNCHER_NAME, VERSION_ID
+from src.gui.core import GuiContext, set_default_gui_context
 from src.gui.controllers.account_controller import AccountController
 from src.gui.controllers.curseforge_controller import CurseForgeController
 from src.gui.controllers.content_pack_controller import ContentPackController
@@ -75,6 +77,7 @@ from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEdit
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
 from src.gui.dialogs.optifine_dialog import OptiFineDialog
+from src.gui.dialogs.microsoft_device_code_dialog import MicrosoftDeviceCodeDialog
 from src.gui.dialogs.repair_center_dialog import RepairCenterDialog
 from src.gui.dialogs.update_dialog import UpdateDialog
 from src.gui.dialogs.unsaved_changes_dialog import UnsavedChangesDecision, prompt_unsaved_changes
@@ -94,6 +97,7 @@ from src.gui.style import APP_STYLE
 from src.gui.task_progress import task_progress_profile
 from src.gui.task_runner import TaskRunner
 from src.gui.theme.runtime import ThemeRuntime
+from src.gui.widget.global_task_indicator import GlobalTaskIndicator
 from src.gui.widget.launch_control_style import LAUNCH_CONTROL_STYLE
 from src.gui.widget.launch_control_widget import LaunchControlWidget
 from src.gui.widget.right_panel_widget import RightPanelWidget
@@ -146,6 +150,8 @@ class MainWindow(QMainWindow):
         self._legacy_storage_notice = None
         self._legacy_cleanup_dialog = None
         self._last_connectivity_online: bool | None = None
+        self._last_launch_was_quick_play: bool = False
+        self._minimized_for_game: bool = False
         self.theme_runtime = ThemeRuntime()
         self.motion_runtime = MotionRuntime(parent=self)
         language_manager.reload()
@@ -153,6 +159,22 @@ class MainWindow(QMainWindow):
         self.launch_controller = LaunchController(self.task_runner)
         self.lan_hosting_controller = LanHostingController(self.task_runner)
         self.update_controller = UpdateController(self.task_runner, channel=self._startup_settings.get("update_channel", "stable"))
+        self.discord_rpc_service = get_discord_rpc_service()
+        self.discord_rpc_service.set_client_id(self._startup_settings.get("discord_client_id"))
+        self.discord_rpc_service.set_enabled(bool(self._startup_settings.get("discord_rpc_enabled", True)))
+        self.gui_context = GuiContext(task_runner=self.task_runner, parent=self)
+        self.gui_context.register_controller("instances", self.instance_controller)
+        self.gui_context.register_controller("accounts", self.account_controller)
+        self.gui_context.register_controller("connectivity", self.connectivity_controller)
+        self.gui_context.register_controller("launch", self.launch_controller)
+        self.gui_context.register_controller("updates", self.update_controller)
+        self.gui_context.register_controller("modrinth", self.modrinth_controller)
+        self.gui_context.register_controller("curseforge", self.curseforge_controller)
+        self.gui_context.register_controller("content_pack", self.content_pack_controller)
+        self.gui_context.register_controller("java", self.java_controller)
+        self.gui_context.register_controller("backup", self.backup_controller)
+        self.gui_context.register_controller("settings", self.gui_settings_controller)
+        set_default_gui_context(self.gui_context)
         self.running_instances_timer = QTimer(self)
         self._modrinth_tasks: set[str] = set()
         self._mod_catalog_tasks: set[str] = set()
@@ -175,6 +197,8 @@ class MainWindow(QMainWindow):
         self._modrinth_pending_modpack_install: ModrinthModpackManualDownloadRequired | None = None
         self._curseforge_manual_instance_name = ""
         self._curseforge_pending_modpack_install: CurseForgeModpackManualDownloadRequired | None = None
+        self._curseforge_manual_is_auto = False
+        self._modrinth_manual_is_auto = False
         self._manual_launch_provider = ""
         self._manual_launch_lock_token = ""
         self._portable_manual_request: object | None = None
@@ -264,6 +288,8 @@ class MainWindow(QMainWindow):
         navigation_layout.addWidget(self.page_back_button)
         navigation_layout.addWidget(self.page_forward_button)
         navigation_layout.addStretch(1)
+        self.task_indicator = GlobalTaskIndicator(self.gui_context.tasks, parent=self.page_navigation)
+        navigation_layout.addWidget(self.task_indicator)
         self.connectivity_indicator = QLabel()
         self.connectivity_indicator.setObjectName("ConnectivityBadge")
         self._update_connectivity_indicator(None)
@@ -274,10 +300,10 @@ class MainWindow(QMainWindow):
         self.content_stack.setObjectName("ContentStack")
 
         self.launch_control = LaunchControlWidget(compact=self._display_profile.compact)
+        self.launch_control.setVisible(False)
 
         center_layout.addWidget(self.page_navigation)
         center_layout.addWidget(self.content_stack, 1)
-        center_layout.addWidget(self.launch_control)
 
         self.right_panel = RightPanelWidget(compact=self._display_profile.compact)
         self.right_panel.setFixedWidth(self._display_profile.right_panel_width)
@@ -307,6 +333,7 @@ class MainWindow(QMainWindow):
         self.curseforge_manual_dialog = CurseForgeManualDownloadDialog(self)
         self.portable_manual_dialog = CurseForgeManualDownloadDialog(self)
         self.repair_center_dialog = RepairCenterDialog(self)
+        self.microsoft_device_code_dialog = MicrosoftDeviceCodeDialog(self)
 
         self.pages = {
             "home": self.home_page,
@@ -352,9 +379,15 @@ class MainWindow(QMainWindow):
         self.account_page.refresh_requested.connect(self.account_controller.refresh)
         self.account_page.security_audit_requested.connect(self.account_controller.audit_security)
         self.account_page.security_reprotect_requested.connect(self.account_controller.reprotect_security)
+        self.microsoft_device_code_dialog.cancel_requested.connect(self.account_controller.cancel_microsoft)
+        self.account_controller.microsoft_device_code_received.connect(self._show_microsoft_device_code_dialog)
+        self.account_controller.accounts_changed.connect(lambda *_: self.microsoft_device_code_dialog.accept() if self.microsoft_device_code_dialog.isVisible() else None)
+        self.account_controller.microsoft_auth_state_changed.connect(lambda active, _: self.microsoft_device_code_dialog.close() if not active and self.microsoft_device_code_dialog.isVisible() else None)
 
         self.instances_page.refresh_requested.connect(self.instance_controller.refresh)
         self.instances_page.launch_requested.connect(self._request_launch)
+        self.instances_page.quick_play_requested.connect(lambda world: self._request_launch(quick_play_singleplayer=world))
+        self.instances_page.cancel_launch_requested.connect(self.launch_controller.cancel)
         self.instances_page.kill_instance_requested.connect(self._request_kill_instance)
         self.instances_page.instance_settings_requested.connect(self._open_instance_settings_workspace)
         self.instances_page.manage_accounts_requested.connect(lambda: self.show_page("accounts"))
@@ -365,8 +398,8 @@ class MainWindow(QMainWindow):
         self.instances_page.runtime_scan_requested.connect(self.java_controller.scan)
         self.instances_page.runtime_install_requested.connect(self.java_controller.install)
         self.instances_page.java_runtime_apply_requested.connect(self.instance_controller.set_java_runtime)
-        self.instances_page.create_requested.connect(self.instance_controller.create)
-        self.instances_page.create_with_optifine_requested.connect(self.instance_controller.create_with_optifine)
+        self.instances_page.create_requested.connect(self._on_create_instance_requested)
+        self.instances_page.create_with_optifine_requested.connect(self._on_create_instance_optifine_requested)
         self.instances_page.fabric_versions_requested.connect(self.mod_loader_controller.load_fabric_versions)
         self.instances_page.quilt_versions_requested.connect(self.mod_loader_controller.load_quilt_versions)
         self.instances_page.forge_versions_requested.connect(self.mod_loader_controller.load_forge_versions)
@@ -454,6 +487,7 @@ class MainWindow(QMainWindow):
         self.logs_page.open_logs_folder_requested.connect(self._open_logs_folder)
         self.logs_page.open_latest_game_log_requested.connect(self._open_latest_game_log)
         self.logs_page.open_latest_crash_report_requested.connect(self._open_latest_crash_report)
+        self.logs_page.upload_mclogs_requested.connect(self._upload_mclogs)
 
         self.launch_control.launch_clicked.connect(self._request_launch)
         self.launch_control.cancel_clicked.connect(self.launch_controller.cancel)
@@ -550,10 +584,12 @@ class MainWindow(QMainWindow):
         self.modrinth_controller.modpack_installed.connect(self._modrinth_modpack_installed)
         self.modrinth_controller.modpack_manual_download_required.connect(self._modrinth_modpack_manual_download_required)
         self.modrinth_manual_dialog.files_selected.connect(self._install_manual_modrinth_files)
+        self.modrinth_manual_dialog.cancelled.connect(self._on_manual_download_dialog_cancelled)
         self.launch_controller.portable_manual_download_required.connect(self._portable_manual_download_required)
         self.launch_controller.compatibility_confirmation_required.connect(self._confirm_compatibility_launch)
         self.launch_controller.manual_content_required.connect(self._on_launch_manual_content_required)
         self.portable_manual_dialog.files_selected.connect(self._install_portable_manual_files)
+        self.portable_manual_dialog.cancelled.connect(self._on_manual_download_dialog_cancelled)
         self.instance_controller.portable_manual_files_installed.connect(self._portable_manual_files_installed)
 
         self.curseforge_mod_dialog.search_requested.connect(self._search_curseforge_mods)
@@ -643,6 +679,7 @@ class MainWindow(QMainWindow):
         self.content_pack_controller.entries_changed.connect(self.content_pack_manager_dialog.set_entries)
         self.content_pack_controller.installed.connect(self._content_pack_installed)
         self.curseforge_manual_dialog.files_selected.connect(self._install_manual_curseforge_files)
+        self.curseforge_manual_dialog.cancelled.connect(self._on_manual_download_dialog_cancelled)
 
         self.launch_controller.progress_received.connect(self._on_progress)
         self.launch_controller.progress_received.connect(lambda _event: self.instance_controller.refresh_running())
@@ -657,9 +694,12 @@ class MainWindow(QMainWindow):
         self.update_controller.progress_received.connect(self._on_progress)
         self.lan_hosting_controller.progress_received.connect(self._on_progress)
         self.lan_hosting_controller.prepared.connect(self._on_lan_hosting_prepared)
-        self.launch_controller.launch_finished.connect(self.launch_control.set_result)
         self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
+        self.launch_controller.launch_finished.connect(self.launch_control.set_result)
+        self.launch_controller.launch_finished.connect(self.instances_page.set_launch_finished)
         self.launch_controller.launch_finished.connect(lambda _result: self.gui_settings_controller.set_game_running(True))
+        self.launch_controller.launch_finished.connect(self._on_game_launched_discord)
+        self.launch_controller.game_window_ready.connect(self._on_game_window_ready)
         self.launch_controller.game_exited.connect(self._on_game_exited)
         self.launch_controller.pause_requested.connect(self.launch_control.set_pause_pending)
         self.launch_controller.launch_paused.connect(self._on_launch_paused)
@@ -696,6 +736,8 @@ class MainWindow(QMainWindow):
         self.task_runner.task_cancelled.connect(self._on_task_cancelled)
         self.task_runner.task_succeeded.connect(self._on_diagnostics_task_succeeded)
         self.task_runner.task_failed.connect(self._on_diagnostics_task_failed)
+        self.task_runner.task_succeeded.connect(self._on_mclogs_task_succeeded)
+        self.task_runner.task_failed.connect(self._on_mclogs_task_failed)
         self.task_runner.task_settled.connect(self._on_task_settled)
         self.task_runner.busy_changed.connect(self._set_busy)
         self.task_runner.busy_changed.connect(self.mod_manager_dialog.set_busy)
@@ -734,6 +776,12 @@ class MainWindow(QMainWindow):
             controller.network_retry_available.connect(
                 lambda task_id, title, message, owner=controller: self._show_network_retry(owner, task_id, title, message)
             )
+
+    def _show_microsoft_device_code_dialog(self, response: object) -> None:
+        self.microsoft_device_code_dialog.set_data(response)
+        self.microsoft_device_code_dialog.show()
+        self.microsoft_device_code_dialog.raise_()
+        self.microsoft_device_code_dialog.activateWindow()
 
     def _initialize_data(self) -> None:
         settings = dict(self._startup_settings)
@@ -990,10 +1038,11 @@ class MainWindow(QMainWindow):
         page.select_instance(instance_name)
         self.instance_settings_controller.load(instance_name)
 
-    def _request_launch(self) -> None:
+    def _request_launch(self, quick_play_singleplayer: str = "") -> None:
         if self._confirm_all_unsaved_settings():
+            self._last_launch_was_quick_play = bool(quick_play_singleplayer)
             self.connectivity_controller.probe(force=True)
-            self.launch_controller.launch()
+            self.launch_controller.launch(quick_play_singleplayer=quick_play_singleplayer)
 
     def _request_kill_instance(self, instance_name: str) -> None:
         name = str(instance_name or "").strip()
@@ -1382,18 +1431,23 @@ class MainWindow(QMainWindow):
             self._modrinth_pending_modpack_install = None
         QMessageBox.information(self, tr("modrinth.modpack.install"), tr("modrinth.modpack.installed", name=selected_name))
 
-    def _install_manual_modrinth_files(self, sources: object) -> None:
+    def _install_manual_modrinth_files(self, sources: object, auto_detected: bool | None = None) -> None:
         paths = [Path(source) for source in sources] if isinstance(sources, (list, tuple)) else []
         if not paths:
             return
+        if auto_detected is None:
+            auto_detected = getattr(self.modrinth_manual_dialog, "last_files_auto_detected", False)
+        self._modrinth_manual_is_auto = bool(auto_detected)
         if self._modrinth_pending_modpack_install is not None:
             if len(paths) != 1:
-                QMessageBox.warning(self, tr("artifact.manual.modpack_archive_title", provider="Modrinth"), tr("artifact.manual.modpack_single_file", provider="Modrinth"))
+                if not auto_detected:
+                    QMessageBox.warning(self, tr("artifact.manual.modpack_archive_title", provider="Modrinth"), tr("artifact.manual.modpack_single_file", provider="Modrinth"))
                 return
             self.modrinth_controller.install_manual_modpack(self._modrinth_pending_modpack_install, paths[0])
             return
         if not self._modrinth_manual_instance_name:
-            QMessageBox.warning(self, tr("artifact.manual.title", provider="Modrinth"), tr("curseforge.mod.no_instance"))
+            if not auto_detected:
+                QMessageBox.warning(self, tr("artifact.manual.title", provider="Modrinth"), tr("curseforge.mod.no_instance"))
             return
         started = self.modrinth_controller.install_manual_files(
             self._modrinth_manual_instance_name,
@@ -1404,6 +1458,8 @@ class MainWindow(QMainWindow):
         self.modrinth_manual_dialog.set_import_busy(started)
 
     def _modrinth_manual_files_installed(self, instance_name: str, result: object) -> None:
+        is_auto = self._modrinth_manual_is_auto
+        self._modrinth_manual_is_auto = False
         imported = tuple(getattr(result, "imported", ()) or ())
         added_mods = tuple(getattr(result, "added_mods", ()) or ())
         rejected = tuple(getattr(result, "rejected", ()) or ())
@@ -1413,6 +1469,22 @@ class MainWindow(QMainWindow):
                 self.modrinth_manual_dialog.mark_installed(requirement)
         if self.mod_controller.current_instance is not None and self.mod_controller.current_instance.name == instance_name:
             self.mod_controller.refresh()
+
+        if self.modrinth_manual_dialog.remaining_count == 0 and (not rejected or is_auto):
+            self._resume_launch_after_manual_content("modrinth", instance_name, self.modrinth_manual_dialog)
+            return
+
+        if is_auto:
+            if rejected:
+                self.modrinth_controller.log_created.emit(
+                    f"Modrinth auto-detected files skipped: {len(rejected)} file(s)"
+                )
+            if imported:
+                self.modrinth_controller.log_created.emit(
+                    f"Modrinth auto-imported {len(imported)} file(s)"
+                )
+            return
+
         lines = []
         if imported:
             lines.append(tr("artifact.manual.batch_imported", provider="Modrinth", count=len(imported)))
@@ -1425,6 +1497,10 @@ class MainWindow(QMainWindow):
             lines.append(tr("curseforge.manual.all_imported"))
         elif imported:
             lines.append(tr("curseforge.manual.remaining", count=self.modrinth_manual_dialog.remaining_count))
+        if self.modrinth_manual_dialog.remaining_count == 0 and not rejected:
+            self._resume_launch_after_manual_content("modrinth", instance_name, self.modrinth_manual_dialog)
+            return
+
         message = "\n\n".join(lines) or tr("curseforge.manual.batch_no_files")
         if rejected:
             QMessageBox.warning(self, tr("artifact.manual.title", provider="Modrinth"), message)
@@ -1837,18 +1913,23 @@ class MainWindow(QMainWindow):
             launch_lock_token=self._manual_launch_lock_token or None,
         )
 
-    def _install_manual_curseforge_files(self, sources: object) -> None:
+    def _install_manual_curseforge_files(self, sources: object, auto_detected: bool | None = None) -> None:
         paths = [Path(source) for source in sources] if isinstance(sources, (list, tuple)) else []
         if not paths:
             return
+        if auto_detected is None:
+            auto_detected = getattr(self.curseforge_manual_dialog, "last_files_auto_detected", False)
+        self._curseforge_manual_is_auto = bool(auto_detected)
         if self._curseforge_pending_modpack_install is not None:
             if len(paths) != 1:
-                QMessageBox.warning(self, tr("curseforge.manual.modpack_archive_title"), tr("curseforge.manual.modpack_single_file"))
+                if not auto_detected:
+                    QMessageBox.warning(self, tr("curseforge.manual.modpack_archive_title"), tr("curseforge.manual.modpack_single_file"))
                 return
             self.curseforge_controller.install_manual_modpack(self._curseforge_pending_modpack_install, paths[0])
             return
         if not self._curseforge_manual_instance_name:
-            QMessageBox.warning(self, tr("curseforge.manual.title"), tr("curseforge.mod.no_instance"))
+            if not auto_detected:
+                QMessageBox.warning(self, tr("curseforge.manual.title"), tr("curseforge.mod.no_instance"))
             return
         started = self.curseforge_controller.install_manual_files(
             self._curseforge_manual_instance_name,
@@ -1862,13 +1943,16 @@ class MainWindow(QMainWindow):
         self.curseforge_manual_dialog.mark_installed(requirement)
         if self.mod_controller.current_instance is not None and self.mod_controller.current_instance.name == instance_name:
             self.mod_controller.refresh()
-        message = tr("curseforge.manual.imported", name=installed_name)
         if self.curseforge_manual_dialog.remaining_count == 0:
-            message += "\n\n" + tr("curseforge.manual.all_imported")
+            self._resume_launch_after_manual_content("curseforge", instance_name, self.curseforge_manual_dialog)
+            return
+        message = tr("curseforge.manual.imported", name=installed_name)
         QMessageBox.information(self, tr("curseforge.manual.title"), message)
         self._resume_launch_after_manual_content("curseforge", instance_name, self.curseforge_manual_dialog)
 
     def _curseforge_manual_files_installed(self, instance_name: str, result: object) -> None:
+        is_auto = self._curseforge_manual_is_auto
+        self._curseforge_manual_is_auto = False
         imported = tuple(getattr(result, "imported", ()) or ())
         added_mods = tuple(getattr(result, "added_mods", ()) or ())
         rejected = tuple(getattr(result, "rejected", ()) or ())
@@ -1878,6 +1962,21 @@ class MainWindow(QMainWindow):
                 self.curseforge_manual_dialog.mark_installed(requirement)
         if self.mod_controller.current_instance is not None and self.mod_controller.current_instance.name == instance_name:
             self.mod_controller.refresh()
+
+        if self.curseforge_manual_dialog.remaining_count == 0 and (not rejected or is_auto):
+            self._resume_launch_after_manual_content("curseforge", instance_name, self.curseforge_manual_dialog)
+            return
+
+        if is_auto:
+            if rejected:
+                self.curseforge_controller.log_created.emit(
+                    f"CurseForge auto-detected files skipped: {len(rejected)} file(s)"
+                )
+            if imported:
+                self.curseforge_controller.log_created.emit(
+                    f"CurseForge auto-imported {len(imported)} file(s)"
+                )
+            return
 
         lines: list[str] = []
         if imported:
@@ -1902,6 +2001,12 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.information(self, tr("curseforge.manual.title"), message)
         self._resume_launch_after_manual_content("curseforge", instance_name, self.curseforge_manual_dialog)
+
+    def _on_manual_download_dialog_cancelled(self) -> None:
+        if self._manual_launch_provider or self.launch_controller.waiting_for_manual_content or self.launch_controller.is_active:
+            self._manual_launch_provider = ""
+            self._manual_launch_lock_token = ""
+            self.launch_controller.cancel()
 
     def _curseforge_modpack_manual_download_required(self, request: object) -> None:
         if not isinstance(request, CurseForgeModpackManualDownloadRequired):
@@ -2139,14 +2244,28 @@ class MainWindow(QMainWindow):
             message += tr("\nNo damaged managed files were found, so no backup was needed.")
         self.toast_manager.show(message, "success", tr("Repair Modrinth modpack"))
 
+    def _on_game_window_ready(self, _hwnd: int) -> None:
+        minimize = self._last_launch_was_quick_play or bool(self.gui_settings_controller.current.get("minimize_on_launch", True))
+        if minimize and not self.isMinimized():
+            self._minimized_for_game = True
+            self.showMinimized()
+
     def _on_game_exited(self, result: object) -> None:
+        if getattr(self, "_minimized_for_game", False):
+            self._minimized_for_game = False
+            self.showNormal()
+            self.raise_()
+            self.activateWindow()
         selected_name = str(getattr(self._selected_instance, "name", ""))
         result_name = str(getattr(result, "instance_name", ""))
         if not selected_name or selected_name == result_name:
             self.launch_control.set_exit_result(result)
         self.instance_controller.refresh_running(force=True)
         self.instance_controller.refresh(selected_name=result_name or selected_name)
-        self.gui_settings_controller.set_game_running(bool(InstanceRunLock.list_active()))
+        active_instances = InstanceRunLock.list_active()
+        self.gui_settings_controller.set_game_running(bool(active_instances))
+        if not active_instances:
+            self.discord_rpc_service.on_game_stopped()
         crashed = bool(getattr(result, "crashed", False))
         instance_name = str(getattr(result, "instance_name", "Minecraft"))
         exit_code = int(getattr(result, "exit_code", -1))
@@ -2164,6 +2283,27 @@ class MainWindow(QMainWindow):
             self.home_page.set_status(message)
             self.right_panel.set_status(message)
             self.logs_page.append(tr("Game session completed in {seconds} second(s).", seconds=duration))
+
+    def _on_game_launched_discord(self, result: object) -> None:
+        instance = self._selected_instance
+        instance_name = str(getattr(instance, "name", "") or getattr(result, "instance_name", "") or "Minecraft")
+        minecraft_version = str(
+            getattr(instance, "version_id", "")
+            or (result.get("minecraftVersion", "") if isinstance(result, dict) else "")
+            or ""
+        )
+        mod_loader = getattr(instance, "mod_loader", None)
+        loader_name = "vanilla"
+        loader_version = ""
+        if isinstance(mod_loader, (tuple, list)) and len(mod_loader) >= 2:
+            loader_name = str(mod_loader[0])
+            loader_version = str(mod_loader[1])
+        self.discord_rpc_service.on_game_started(
+            instance_name=instance_name,
+            minecraft_version=minecraft_version,
+            loader_name=loader_name,
+            loader_version=loader_version,
+        )
 
     def _on_repair_finished(self, result: object) -> None:
         instance_name = str(getattr(result, "instance_name", ""))
@@ -2291,8 +2431,6 @@ class MainWindow(QMainWindow):
             self.instances_page.select_instance(instance.name)
             self.instance_settings_page.select_instance(instance.name)
             self.instance_settings_controller.load(instance.name)
-            if (Path(instance.instance_dir) / ".mcw" / "modrinth-pack.json").is_file():
-                QTimer.singleShot(0, lambda name=instance.name: self.modpack_lifecycle_controller.scan(name))
 
     def _restore_selected_instance(self, instance_name: str) -> None:
         self._restoring_instance_selection = True
@@ -2310,6 +2448,8 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.set_settings(settings, preserve_unsaved=self.launcher_settings_page.is_dirty)
         self.instances_page.set_show_snapshots(bool(settings.get("show_snapshots", False)))
         self.launch_controller.set_debug_mode(bool(settings.get("debug_mode", False)))
+        self.discord_rpc_service.set_client_id(settings.get("discord_client_id"))
+        self.discord_rpc_service.set_enabled(bool(settings.get("discord_rpc_enabled", True)))
         self.update_controller.set_channel(str(settings.get("update_channel", "stable")))
         include_beta = bool(settings.get("modrinth_include_beta", False))
         include_alpha = bool(settings.get("modrinth_include_alpha", False))
@@ -2478,6 +2618,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(tr(LAUNCHER_NAME))
         self._update_page_navigation()
         self._update_connectivity_indicator(self._last_connectivity_online)
+        self.task_indicator.retranslate_ui()
 
         for widget in (
             self.sidebar,
@@ -2750,6 +2891,7 @@ class MainWindow(QMainWindow):
                 self.curseforge_manual_dialog.set_requirements(error.requirements)
                 status = tr("artifact.manual.launch_blocked", provider="CurseForge", count=len(error.requirements))
                 self.launch_control.set_failed(status, tr("artifact.manual.launch_blocked_detail", provider="CurseForge"))
+                self.instances_page.set_launch_failed(status, "")
                 self.home_page.set_status(status)
                 self.right_panel.set_status(status)
                 self.curseforge_manual_dialog.show()
@@ -2764,6 +2906,7 @@ class MainWindow(QMainWindow):
                 self.modrinth_manual_dialog.set_requirements(error.requirements)
                 status = tr("artifact.manual.launch_blocked", provider="Modrinth", count=len(error.requirements))
                 self.launch_control.set_failed(status, tr("artifact.manual.launch_blocked_detail", provider="Modrinth"))
+                self.instances_page.set_launch_failed(status, "")
                 self.home_page.set_status(status)
                 self.right_panel.set_status(status)
                 self.modrinth_manual_dialog.show()
@@ -2773,6 +2916,7 @@ class MainWindow(QMainWindow):
                 return
             view = LaunchErrorPresenter.present(error)
             self.launch_control.set_failed(view.status, view.progress_detail)
+            self.instances_page.set_launch_failed(view.status, view.progress_detail)
             self.home_page.set_status(view.status)
             self.right_panel.set_status(view.status)
             self.instance_controller.refresh_running(force=True)
@@ -2825,12 +2969,14 @@ class MainWindow(QMainWindow):
 
     def _on_launch_cancelled(self) -> None:
         self.launch_control.set_cancelled("launch.cancelled", "launch.cancelled_detail")
+        self.instances_page.set_launch_cancelled()
         message = tr("launch.cancelled")
         self.home_page.set_status(message)
         self.right_panel.set_status(message)
 
     def _set_launch_active(self, active: bool) -> None:
         self.launch_control.set_launch_active(active)
+        self.instances_page.set_launch_active(active)
         self.theme_runtime.reapply_assets(self.launch_control)
 
     def _progress_event_belongs_to_current_task(self, event: object) -> bool:
@@ -2864,6 +3010,17 @@ class MainWindow(QMainWindow):
             return
 
         self.launch_control.set_progress_event(event)
+        self.instances_page.set_progress_event(event)
+
+        task_id = str(getattr(self, "_progress_task_id", "") or "")
+        if (
+            task_id
+            and hasattr(self, "launch_controller")
+            and task_id != self.launch_controller.TASK_ID
+            and self.task_runner.is_task_active(task_id)
+        ):
+            if hasattr(self, "gui_context") and getattr(self.gui_context, "tasks", None) is not None:
+                self.gui_context.tasks.update_progress(task_id, event)
 
         message = tr(str(getattr(event, "message", "Working...")))
         self.home_page.set_status(message)
@@ -2975,6 +3132,88 @@ class MainWindow(QMainWindow):
             self._pending_issue_dialog.set_collection_failed(str(error))
             return
         self._show_error(tr("diagnostics.export.title"), str(error))
+
+    def _upload_mclogs(self) -> None:
+        if self.task_runner.is_task_active("mclogs.upload"):
+            self.toast_manager.show(tr("diagnostics.busy"), "warning", tr("logs.upload_mclogs"))
+            return
+
+        content = ""
+        instance = self._selected_instance
+        if instance is not None:
+            crash_path = GameRuntimeManager.latest_crash_report(instance)
+            log_path = GameRuntimeManager.latest_game_log(instance)
+            candidates = []
+            if crash_path and crash_path.is_file():
+                candidates.append(crash_path)
+            if log_path and log_path.is_file():
+                candidates.append(log_path)
+            if candidates:
+                candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                try:
+                    content = candidates[0].read_text(encoding="utf-8", errors="replace")
+                except Exception:
+                    content = ""
+
+        if not content.strip():
+            content = self.logs_page.activity_text()
+
+        if not content.strip():
+            self.toast_manager.show(
+                tr("logs.empty_or_no_log"),
+                "warning",
+                tr("logs.upload_mclogs"),
+            )
+            return
+
+        from mcw_core.api.diagnostics.mclogs_client import McLogsClient
+
+        def task() -> dict:
+            return McLogsClient.upload(content)
+
+        started = self.task_runner.run(
+            "mclogs.upload",
+            task,
+            tr("logs.uploading_mclogs"),
+            blocking=False,
+        )
+        if not started:
+            self.toast_manager.show(tr("diagnostics.busy"), "warning", tr("logs.upload_mclogs"))
+
+    def _on_mclogs_task_succeeded(self, task_id: str, result: object) -> None:
+        if task_id != "mclogs.upload":
+            return
+        url = ""
+        if isinstance(result, dict):
+            url = str(result.get("url") or "")
+        if url:
+            clipboard = QGuiApplication.clipboard()
+            if clipboard is not None:
+                clipboard.setText(url)
+            self.logs_page.append(tr("logs.mclogs_success", url=url))
+            self.toast_manager.show(
+                tr("logs.mclogs_success", url=url),
+                "success",
+                tr("logs.upload_mclogs"),
+            )
+
+    def _on_mclogs_task_failed(self, task_id: str, error: object) -> None:
+        if task_id != "mclogs.upload":
+            return
+        self.logs_page.append(tr("logs.mclogs_failed", error=error))
+        self.toast_manager.show(
+            tr("logs.mclogs_failed", error=error),
+            "error",
+            tr("logs.upload_mclogs"),
+        )
+
+    def _on_create_instance_requested(self, name: str, version_id: str, loader_name: str, loader_version: str) -> None:
+        jvm_arguments = getattr(self.instances_page, "selected_create_jvm_arguments", lambda: [])()
+        self.instance_controller.create(name, version_id, loader_name, loader_version, jvm_arguments=jvm_arguments)
+
+    def _on_create_instance_optifine_requested(self, name: str, version_id: str, loader_name: str, loader_version: str, source_path: object) -> None:
+        jvm_arguments = getattr(self.instances_page, "selected_create_jvm_arguments", lambda: [])()
+        self.instance_controller.create_with_optifine(name, version_id, loader_name, loader_version, source_path, jvm_arguments=jvm_arguments)
 
     def _open_forge_logs(self, name: str) -> None:
         try:
@@ -3123,11 +3362,14 @@ class MainWindow(QMainWindow):
 
     def _show_modpack_export_finished(self, result: object) -> None:
         path = Path(getattr(result, "output_path", ""))
+        mode = str(getattr(result, "mode", "")).strip().casefold()
         referenced = int(getattr(result, "referenced_files", 0) or 0)
         embedded = int(getattr(result, "embedded_files", 0) or 0)
         manual = int(getattr(result, "manual_files", 0) or 0)
         native = bool(getattr(result, "native_package_included", False))
-        if native:
+        if mode == "mrpack":
+            detail = tr("modpack_package.export.result.mrpack", indexed=referenced, overrides=embedded)
+        elif native:
             detail = tr("modpack_package.export.result.provider")
         else:
             detail = tr(
@@ -3221,6 +3463,7 @@ class MainWindow(QMainWindow):
         # intentionally left alive unless the user explicitly chooses Kill Instance.
         self.launch_controller.cancel()
         self.task_runner.begin_shutdown()
+        self.discord_rpc_service.shutdown()
         super().closeEvent(event)
 
 

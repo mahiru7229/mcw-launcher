@@ -1,10 +1,22 @@
 from __future__ import annotations
-
+ 
 import copy
 
-from PySide6.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QLabel, QLineEdit, QPushButton, QVBoxLayout
+from PySide6.QtCore import QSignalBlocker
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+)
 
 from mcw_core.api.instance.settings_manager import SettingsManager
+from mcw_core.api.java.jvm_presets import JvmPresetId, detect_preset, get_preset_flags
 from mcw_core.api.language.language_manager import tr
 from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
 from src.gui.window_sizing import resize_dialog_to_screen
@@ -19,6 +31,7 @@ class ModpackImportSettingsDialog(QDialog):
         self._settings = SettingsManager.normalize_dict(base)
         self._reviewed = False
         self._build_ui()
+        self._sync_jvm_preset_from_settings()
 
     @property
     def instance_name(self) -> str:
@@ -69,6 +82,16 @@ class ModpackImportSettingsDialog(QDialog):
         self.optional_checkbox.setChecked(bool(self._preview.install_optional_files))
         root.addWidget(self.optional_checkbox)
 
+        preset_row = QHBoxLayout()
+        preset_row.setSpacing(8)
+        self.jvm_preset_label = QLabel(tr("jvm_preset.label"))
+        self.jvm_preset_combo = QComboBox()
+        self._populate_jvm_preset_combo()
+        self.jvm_preset_combo.currentIndexChanged.connect(self._on_jvm_preset_changed)
+        preset_row.addWidget(self.jvm_preset_label)
+        preset_row.addWidget(self.jvm_preset_combo, 1)
+        root.addLayout(preset_row)
+
         self.settings_summary = QLabel(InstanceSettingsEditorDialog.summary(self._settings))
         self.settings_summary.setObjectName("MutedLabel")
         self.settings_summary.setWordWrap(True)
@@ -93,6 +116,35 @@ class ModpackImportSettingsDialog(QDialog):
         buttons.rejected.connect(self.reject)
         root.addWidget(buttons)
 
+    def _populate_jvm_preset_combo(self) -> None:
+        with QSignalBlocker(self.jvm_preset_combo):
+            self.jvm_preset_combo.clear()
+            self.jvm_preset_combo.addItem(tr("jvm_preset.default"), JvmPresetId.DEFAULT)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.aikar"), JvmPresetId.AIKAR)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.zgc"), JvmPresetId.ZGC)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.shenandoah"), JvmPresetId.SHENANDOAH)
+            self.jvm_preset_combo.addItem(tr("jvm_preset.custom"), JvmPresetId.CUSTOM)
+
+    def _on_jvm_preset_changed(self) -> None:
+        preset_id = self.jvm_preset_combo.currentData()
+        if not preset_id or preset_id == JvmPresetId.CUSTOM:
+            return
+        flags = get_preset_flags(preset_id)
+        self._settings.setdefault("java", {})["arguments"] = flags
+        self.settings_summary.setText(InstanceSettingsEditorDialog.summary(self._settings))
+
+    def _sync_jvm_preset_from_settings(self) -> None:
+        args = self._settings.get("java", {}).get("arguments", [])
+        detected = detect_preset(args)
+        with QSignalBlocker(self.jvm_preset_combo):
+            idx = self.jvm_preset_combo.findData(detected)
+            if idx >= 0:
+                self.jvm_preset_combo.setCurrentIndex(idx)
+            else:
+                custom_idx = self.jvm_preset_combo.findData(JvmPresetId.CUSTOM)
+                if custom_idx >= 0:
+                    self.jvm_preset_combo.setCurrentIndex(custom_idx)
+
     def _review_settings(self) -> bool:
         editor = InstanceSettingsEditorDialog(self._settings, self, title=tr("instance_import.settings.editor_title", name=self.instance_name or self._preview.name))
         if not editor.exec():
@@ -100,6 +152,7 @@ class ModpackImportSettingsDialog(QDialog):
         self._settings = editor.settings_data
         self._reviewed = True
         self.settings_summary.setText(InstanceSettingsEditorDialog.summary(self._settings))
+        self._sync_jvm_preset_from_settings()
         return True
 
     def _accept(self) -> None:

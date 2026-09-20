@@ -31,7 +31,7 @@ def test_find_merge_markers_reports_release_text_files(tmp_path: Path) -> None:
 
 
 def test_find_merge_markers_ignores_local_test_and_environment_artifacts(tmp_path: Path) -> None:
-    for directory in (".alpha2-venv", ".venv", "pytest-of-root"):
+    for directory in (".alpha2-venv", ".venv", "pytest-of-root", "instances", "logs"):
         path = tmp_path / directory / "fixture.py"
         path.parent.mkdir(parents=True)
         path.write_text("<<<<<<< fixture\n", encoding="utf-8")

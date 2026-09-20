@@ -216,9 +216,16 @@ class MotionRuntime(QObject):
         animation.setEasingCurve(easing_curve(definition.easing))
 
         def finish() -> None:
-            if not visible:
-                widget.hide()
-            effect.setOpacity(1.0)
+            try:
+                if not visible:
+                    widget.hide()
+                    effect.setOpacity(1.0)
+                elif widget.graphicsEffect() is effect:
+                    widget.setGraphicsEffect(None)
+                else:
+                    effect.setOpacity(1.0)
+            except RuntimeError:
+                pass
             widget._mcw_visibility_animation = None
 
         animation.finished.connect(finish)
@@ -242,7 +249,20 @@ class MotionRuntime(QObject):
         animation.setKeyValueAt(0.45, 0.55 if self.mode == MotionMode.FULL else 0.75)
         animation.setKeyValueAt(1.0, 1.0)
         animation.setEasingCurve(easing_curve(self.definition.launch_control.easing))
-        animation.finished.connect(lambda: effect.setOpacity(1.0))
+
+        def finish_pulse() -> None:
+            try:
+                effect.setOpacity(1.0)
+            except RuntimeError:
+                pass
+            try:
+                if widget.graphicsEffect() is effect:
+                    widget.setGraphicsEffect(None)
+            except RuntimeError:
+                pass
+            widget._mcw_pulse_animation = None
+
+        animation.finished.connect(finish_pulse)
         widget._mcw_pulse_animation = animation
         animation.start()
 
@@ -256,33 +276,26 @@ class MotionRuntime(QObject):
         self._installed_application = application
 
     def _handle_button_event(self, button: QPushButton, event: QEvent) -> None:
-        if bool(button.property("motionVisibilityOnly")):
-            return
-        event_type = event.type()
-        if event_type not in {QEvent.Type.Enter, QEvent.Type.Leave, QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease, QEvent.Type.EnabledChange}:
-            return
-        if self.mode == MotionMode.OFF or not button.isEnabled():
-            self._animate_button_strength(button, 0.0, 0)
-            return
-        definition = self.definition.button
-        if event_type == QEvent.Type.MouseButtonPress:
-            target = definition.press_strength
-            duration = definition.press_duration_ms
-        elif event_type == QEvent.Type.MouseButtonRelease:
-            target = definition.hover_strength if button.underMouse() else 0.0
-            duration = definition.press_duration_ms
-        elif event_type == QEvent.Type.Enter:
-            target = definition.hover_strength
-            duration = definition.hover_duration_ms
-        else:
-            target = 0.0
-            duration = definition.hover_duration_ms
-        if self.mode == MotionMode.REDUCED:
-            target *= 0.5
-        self._animate_button_strength(button, target, self.duration(duration))
+        # Buttons are styled via Qt Style Sheets (QSS) which natively handle
+        # :hover, :pressed, and :disabled states without offscreen rasterization.
+        # Clean up any lingering QGraphicsEffect to avoid QWidgetEffectSource / Painter conflicts.
+        effect = getattr(button, "_mcw_button_effect", None)
+        if effect is not None:
+            if button.graphicsEffect() is effect:
+                button.setGraphicsEffect(None)
+            button._mcw_button_effect = None
+        animation = getattr(button, "_mcw_button_animation", None)
+        if isinstance(animation, QPropertyAnimation):
+            animation.stop()
+            button._mcw_button_animation = None
 
     def _animate_button_strength(self, button: QPushButton, target: float, duration: int) -> None:
         effect = getattr(button, "_mcw_button_effect", None)
+        if float(target) <= 0.001:
+            if effect is not None and button.graphicsEffect() is effect:
+                button.setGraphicsEffect(None)
+            button._mcw_button_effect = None
+            return
         if not isinstance(effect, QGraphicsColorizeEffect):
             if button.graphicsEffect() is not None:
                 return
@@ -302,6 +315,14 @@ class MotionRuntime(QObject):
         animation.setStartValue(effect.strength())
         animation.setEndValue(float(target))
         animation.setEasingCurve(easing_curve(self.definition.button.easing))
+
+        def finish() -> None:
+            if float(target) <= 0.001 and button.graphicsEffect() is effect:
+                button.setGraphicsEffect(None)
+                button._mcw_button_effect = None
+            button._mcw_button_animation = None
+
+        animation.finished.connect(finish)
         button._mcw_button_animation = animation
         animation.start()
 
@@ -359,9 +380,12 @@ class MotionRuntime(QObject):
             animation = getattr(widget, "_mcw_button_animation", None)
             if isinstance(animation, QPropertyAnimation):
                 animation.stop()
+                widget._mcw_button_animation = None
             effect = getattr(widget, "_mcw_button_effect", None)
-            if isinstance(effect, QGraphicsColorizeEffect):
-                effect.setStrength(0.0)
+            if effect is not None:
+                if widget.graphicsEffect() is effect:
+                    widget.setGraphicsEffect(None)
+                widget._mcw_button_effect = None
 
     def _stop_page_animation(self) -> None:
         animation = self._page_animation

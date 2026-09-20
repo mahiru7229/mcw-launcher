@@ -2,6 +2,155 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.6.0] - 2026-09-20
+
+### Added
+- Promoted to stable release `v1.6.0` on branch `1.6`.
+- Restore single-file (`onefile`) distribution packaging for Windows (`MCW Launcher.exe`) and Linux (`mcw-launcher`) to maximize initial startup compatibility and avoid false-positive anti-malware/SmartScreen scans.
+- Add automatic legacy onedir artifact scrubbing: `UpdateApplier` automatically removes obsolete `_internal/` directory and prunes empty directory trees during updates from older onedir beta builds to 1.6.0.
+
+### Fixed
+- Fix CurseForge mod loader resolution, duplicated game version prefixes in Forge installer URLs, and older modpack loader detection.
+- Fix FTB instance running status reporting and prevent timeout eviction of preparing run locks during large downloads.
+- Fix CurseForge manual download dialog: multi-tier mod matching, automatic Downloads directory scanning, auto-close on completion, and safe cancellation.
+- Fix ATLauncher Forge loader normalization, instance auto-healing, and allow installation of packs with server-only archive actions and standard Forge launch wrappers.
+
+## [1.6.0-beta.5] - 2026-09-20
+
+### Added
+- Enhance CurseForge gateway compatibility with modern endpoint deployments (`https://mcw-curseforge-gateway-mavuika-iota.vercel.app/api/curseforge`).
+- Add flexible mod loader identifier and structure parsing in `CurseForgePackInstaller`:
+  - Support prefixed loader IDs (e.g. `1.20.1-47.3.0` -> `47.3.0`, `loader-0.15.11` -> `0.15.11`).
+  - Support list of dicts, list of strings, or single dict `modLoaders`/`modLoader` in modpack manifests.
+  - Expand loader alias mappings (`forge`, `minecraftforge`, `fabric`, `fabric-loader`, `quilt`, `quilt-loader`, `neoforge`, `neoforged`, `neo`).
+- Parse mod loaders and Minecraft versions from `sortableGameVersions` in `CurseForgeClient` for older modpacks (1.7.10, 1.12.2).
+- Automatically resolve target loader matching modpack file in `CurseForgeBrowserDialog`.
+- Add `InstanceRunLock.touch()` and periodic heartbeat touching in `FTBContentManager` during large modpack validation and downloads.
+
+### Fixed
+- Fix CurseForge 404 installer URL download failure caused by duplicated game version coordinate prefixes.
+- Fix FTB instance running status not reported to launcher:
+  - Prevent preparing run locks owned by the active launcher process from expiring and being pruned during long downloads/content validation.
+  - Auto-recreate missing lock files with state `running` in `_update_owned_lock` when the game process starts.
+  - Fix button state flicker in `MainWindow` by syncing running instance state before signaling launch completion.
+
+### Changed
+- Bump development version to `v1.6.0-beta.5` on branch `1.6`.
+
+## [1.6.0-beta.4] - 2026-09-20
+
+### Added
+- Redesign GlobalTaskIndicator with modern Modrinth-style 3-tier layout:
+  - Top row: Status icon, Stage Badge pill, bold task description.
+  - Middle row: 7px prominent progress bar with Modrinth green (`#00af5c`).
+  - Bottom row: Network speed, progress byte counts, and completion percentage.
+  - Red failure state with detailed error messaging.
+- Add reusable `ActiveTaskCard` with in-place data updates and completed card caching in `TaskDrawerPopover`.
+- Introduce ~30 FPS throttling for progress update events to eliminate GUI freezing during high-frequency downloads and file scanning.
+
+### Fixed
+- Eliminate modpack selection lag by removing automatic background scanning on instance selection in `MainWindow`.
+- Fix local GUI freeze when opening TaskDrawerPopover and transitioning between tasks by avoiding widget allocation/destruction thrashing.
+- Fix Modrinth loader compatibility check when a multi-loader mod depends on loader-specific projects (e.g. Quilted Fabric API on Fabric).
+- Fix Microsoft login cancellation hang by properly handling `task_cancelled` in `AccountController`.
+- Fix default Steve and Alex textures and support texture URLs from Mojang CDN.
+- Avoid duplicate progress dispatch in `MainWindow._on_launch_progress`.
+
+### Changed
+- Remove legacy compact progress bar from action panel in `InstanceWorkspacePage`.
+- Bump development version to `v1.6.0-beta.4` on branch `1.6`.
+
+## [1.6.0-beta.3] - 2026-09-17
+
+### Added
+- Dynamic Loader Library Discovery for Fabric, Quilt, Forge, and NeoForge loaders.
+- Global Task Drawer with background task execution and speed metrics.
+- Microsoft OAuth Device Code Flow with copy code and browser launch support.
+- Launch error notification dialog for Java runtime, mod incompatibilities, and early crashes.
+
+### Changed
+- Bump development version to `v1.6.0-beta.3` on branch `1.6`.
+
+## [1.6.0-beta.2] - 2026-09-15
+
+### Added
+- Support dedicated GPU (dGPU) preference on Linux using switcheroo-control (`switcherooctl list`), with fallbacks to `lspci`, `/sys/bus/pci/devices`, and `/proc/driver/nvidia`.
+- Automatically inject discrete GPU environment variables for Minecraft Java runtime on Linux:
+  - NVIDIA PRIME Render Offload (`__NV_PRIME_RENDER_OFFLOAD=1`, `__GLX_VENDOR_LIBRARY_NAME=nvidia`, `__VK_LAYER_NV_optimus=NVIDIA_only`).
+  - Mesa DRI (`DRI_PRIME=1`).
+- Integrate SignPath.io v2 code signing into GitHub Actions release workflow.
+- Add NTFS `:Zone.Identifier` unblocking to prevent Windows SmartScreen / SAC blocks during update and extraction.
+- Add fallback to Windows Shell (`ShellExecuteExW`) when updater process launch is blocked by Smart App Control (`WinError 4551`).
+- Add empty directory cleanup (`_internal/`) on updater rollback.
+- Widen instance library sidebar (260px minimum, 320px default splitter) to prevent text truncation in instance list items.
+- Move instance metadata badges to a dedicated full-width row with word-wrap disabled.
+
+### Fixed
+- Prevent platform pollution in `UpdateApplier` unit tests by skipping Windows MessageBox test on Linux instead of mutating `os.name`.
+
+### Changed
+- Bump development version to `v1.6.0-beta.2` on branch `1.6`.
+
+## [1.6.0-beta.1] - 2026-09-14
+
+### Added
+- Introduce onedir packaging format for Windows and Linux with cold start in under 1 second.
+- Redesign Instance Workspace: remove bottom launch control bar, expand top action panel to 100% full view without scrollbars.
+- Add slim `CompactProgressWidget` in instance action panel displaying download %, install %, and network speed.
+- Add automatic foreground window activation for Minecraft game window upon launch / Quick Play.
+- Support seamless auto-updater migration from legacy 1.5.1 onefile installations to modern onedir structure.
+
+### Changed
+- Bump development version to `v1.6.0-beta.1` on branch `1.6`.
+- Organize instance tools into two clean, comfortable rows of 36px buttons with adjusted padding to avoid font clipping.
+
+## [1.6.0-alpha.4] - 2026-09-13
+
+### Added
+- Complete Instance Workspace redesign: sidebar instance list with quick filter and search, paired with tabbed hub (Worlds, Screenshots, Live Logs, Mods).
+- Add Quick Play integration for direct access to singleplayer worlds and multiplayer servers.
+- Fix missing text on World tab delete and open folder action buttons.
+- Fix ghost element artifacts and Qt painter / Shiboken C++ object lifecycle errors during rapid instance switching.
+- Fix Discord Rich Presence detecting wrong game process (Fortnite).
+
+### Changed
+- Bump development version to `v1.6.0-alpha.4` on branch `1.6`.
+
+## [1.6.0-alpha.3] - 2026-09-13
+
+### Added
+- Add update safety recovery tool (`updater.py --recovery`) with Tkinter GUI and CLI fallback to rollback backups or clear lock files when updates fail.
+- Add remote emergency hotfix and rollback bypass (`[MCW-EMERGENCY-HOTFIX]`, `[MCW-EMERGENCY-ROLLBACK]`) in update client.
+- Add persistent updater backup mirroring in installation directory (`updater/backup/`).
+- Add playtime tracking and last played timestamp on instances, formatted nicely and displayed in Workspace.
+- Add `TaskDrawerPopover` interactive background task list and control popover when clicking `GlobalTaskIndicator`.
+- Add JVM preset selection (Aikar, ZGC, Shenandoah, Default) and custom argument support to Modpack Import and Instance Settings dialogs.
+
+### Changed
+- Bump development version to `v1.6.0-alpha.3` on branch `1.6`.
+
+## [1.6.0-alpha.2] - 2026-09-13
+
+### Added
+- Introduce `GlobalTaskIndicator` on `MainWindow` top navigation bar displaying background task states, mini progress bar, percentage, and multi-task tooltip.
+- Add Discord Rich Presence (RPC) support displaying active game instance and playtime on Discord profile with toggle in Launcher Settings.
+- Add direct `.mrpack` modpack export support with automatic `modrinth.index.json` generation and hash calculation.
+- Add one-dir packaging architecture support (`mcw_launcher.spec`) and seamless updater migration from 1.5.1 one-file installations.
+
+### Changed
+- Bump development version to `v1.6.0-alpha.2` on branch `1.6`.
+
+## [1.6.0-alpha.1] - 2026-09-11
+
+### Added
+- Introduce GUI Core architecture (`src/gui/core/`) including `GuiAppState`, `GuiTaskQueue`, and `GuiContext` inspired by modern launcher design patterns.
+- Add JVM flags presets in Instance Settings: Aikar's Flags (G1GC low-stutter), Generational ZGC (Java 21+ low latency), and Shenandoah GC.
+- Add automatic preset detection and custom flag synchronization.
+- Integrate mclo.gs log sharing into the Logs page with automatic sensitive data redaction and clipboard integration.
+
+### Changed
+- Bump development version to `v1.6.0-alpha.1` on branch `1.6`.
+
 ## [1.5.1] - 2026-09-11
 
 ### Stable

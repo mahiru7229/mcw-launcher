@@ -91,5 +91,5 @@ Khi kiểm tra GUI Stable, xác nhận:
 
 - Beta 1 → Beta 2 là gate cập nhật thật đầu tiên trên Linux; vẫn giữ bản Beta 1 ZIP để rollback thủ công nếu môi trường desktop có lỗi ngoài dự kiến.
 - Updater không gọi `sudo`. Thư mục cài đặt không ghi được sẽ yêu cầu update thủ công.
-- GPU preference integration chỉ hỗ trợ Windows; Linux trả trạng thái unsupported và không chặn launch.
+- GPU preference integration: Hỗ trợ cả Windows (DirectX registry) và Linux (qua `switcherooctl`, NVIDIA PRIME Render Offload `__NV_PRIME_RENDER_OFFLOAD=1` `__GLX_VENDOR_LIBRARY_NAME=nvidia`, và Mesa `DRI_PRIME=1`). Khi khởi chạy trên Linux, launcher sẽ tự động inject các biến môi trường này vào tiến trình Java của Minecraft. Có thể kiểm tra bằng phím F3 trong game để xem dòng card đồ họa ở góc trên bên phải.
 - Linux ARM64 có nhận diện/metadata đúng nhưng chưa được xác nhận bằng launch thực tế.

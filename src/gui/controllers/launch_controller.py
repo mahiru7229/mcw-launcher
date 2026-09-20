@@ -25,6 +25,7 @@ class LaunchController(BaseController):
     portable_manual_download_required = Signal(object)
     compatibility_confirmation_required = Signal(object)
     manual_content_required = Signal(object)
+    game_window_ready = Signal(int)
 
     TASK_ID = "minecraft.launch"
 
@@ -57,7 +58,7 @@ class LaunchController(BaseController):
     def set_debug_mode(self, enabled: bool) -> None:
         self._debug_mode = enabled
 
-    def launch(self, allow_compatibility_issues_once: bool = False) -> None:
+    def launch(self, allow_compatibility_issues_once: bool = False, quick_play_singleplayer: str = "") -> None:
         if self._task_runner.is_task_active(self.TASK_ID):
             if self.waiting_for_compatibility_confirmation:
                 with self._state_lock:
@@ -104,6 +105,8 @@ class LaunchController(BaseController):
                         on_manual_content_required=self._on_manual_content_required,
                         on_compatibility_confirmation=self._on_compatibility_confirmation,
                         allow_compatibility_issues_once=allow_compatibility_issues_once,
+                        quick_play_singleplayer=quick_play_singleplayer,
+                        on_window_ready=self._on_game_window_ready,
                     )
                 )
                 return result.as_dict()
@@ -211,6 +214,8 @@ class LaunchController(BaseController):
 
     def _on_progress(self, event: ProgressEvent) -> None:
         self.progress_received.emit(event)
+        if hasattr(self._task_runner, "task_progress") and self._task_runner.is_task_active(self.TASK_ID):
+            self._task_runner.task_progress.emit(self.TASK_ID, event)
         key = self._progress_log_key(event)
         with self._progress_log_lock:
             if key == self._last_progress_log_key:
@@ -227,6 +232,9 @@ class LaunchController(BaseController):
         bucket = 100 if percentage >= 100 else (percentage // 10) * 10
         return stage, bucket
 
+
+    def _on_game_window_ready(self, hwnd: int) -> None:
+        self.game_window_ready.emit(int(hwnd))
 
     def _on_game_exit(self, result: object) -> None:
         self.game_exited.emit(result)
@@ -304,6 +312,7 @@ class LaunchController(BaseController):
 
         self.status_changed.emit(view.status)
         self.log_created.emit(f"{type(error).__name__}: {error}")
+        self.error_created.emit(view.title, view.message)
 
     @staticmethod
     def _format_progress(event: ProgressEvent) -> str:

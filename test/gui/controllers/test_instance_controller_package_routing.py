@@ -153,3 +153,32 @@ def test_java_runtime_update_uses_public_instance_service(gui_app, monkeypatch: 
     assert instances.updated == ("ATM9", r"C:\Java17\bin\javaw.exe")
     assert profiles == [profile]
     assert refreshed == ["ATM9"]
+
+
+def test_instance_controller_create_passes_jvm_arguments(gui_app) -> None:
+    class _CreateInstances(_Instances):
+        def __init__(self) -> None:
+            super().__init__()
+            self.created_request = None
+
+        def create(self, request) -> object:
+            self.created_request = request
+            return SimpleNamespace(name=request.name)
+
+    instances = _CreateInstances()
+    controller = _controller(instances)
+    controller._core.loaders = SimpleNamespace(normalize=lambda pair: pair)
+
+    success = controller.create(
+        "My Instance",
+        "1.21.1",
+        "fabric",
+        "0.16.0",
+        jvm_arguments=["-XX:+UseG1GC", "-XX:G1ReservePercent=20"],
+    )
+    assert success is True
+    assert instances.created_request is not None
+    assert instances.created_request.name == "My Instance"
+    assert instances.created_request.version_id == "1.21.1"
+    assert instances.created_request.jvm_arguments == ("-XX:+UseG1GC", "-XX:G1ReservePercent=20")
+

@@ -81,6 +81,7 @@ class TaskRunner(QObject):
     """
 
     task_started = Signal(str, str, bool)
+    task_progress = Signal(str, object)
     task_succeeded = Signal(str, object)
     task_failed = Signal(str, object)
     task_cancel_requested = Signal(str)
@@ -268,6 +269,8 @@ class TaskRunner(QObject):
         for context in contexts:
             self._request_cancel_context(context)
         return bool(contexts)
+
+    cancel_task = cancel
 
     def cancel_group(self, group: str) -> int:
         normalized = str(group).strip()

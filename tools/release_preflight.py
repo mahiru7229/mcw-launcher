@@ -21,14 +21,21 @@ TEXT_SUFFIXES = {".json", ".md", ".ps1", ".py", ".txt", ".yml", ".yaml"}
 IGNORED_DIRECTORIES = {
     ".alpha2-venv",
     ".git",
+    ".mcw",
     ".pytest_cache",
     ".venv",
     "__pycache__",
+    "accounts",
+    "backups",
     "build",
     "cache",
     "dist",
+    "instances",
+    "logs",
     "pytest-of-root",
     "release",
+    "runtimes",
+    "venv",
 }
 CONFLICT_MARKERS = ("<<<<<<<", "=======", ">>>>>>>")
 PLACEHOLDER_PATTERN = re.compile(r"(?<!\{)\{([A-Za-z_][A-Za-z0-9_]*)[^{}]*\}(?!\})")

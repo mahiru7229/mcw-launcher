@@ -35,12 +35,11 @@ def test_workspace_builds_instance_library_and_keeps_selected_instance(gui_app):
     assert page.manage_mods_button.isEnabled() is True
 
 
-def test_workspace_action_panel_scrolls_when_height_is_limited(gui_app):
+def test_workspace_action_panel_is_fully_visible_without_scroll(gui_app):
     page = InstanceWorkspacePage()
 
-    assert page.action_scroll.widget() is page.action_panel
-    assert page.action_scroll.widgetResizable() is True
-    assert page.action_scroll.minimumWidth() >= 300
+    assert page.action_panel.parentWidget() is page.hub_widget
+    assert page.action_panel.minimumWidth() >= 300
 
 
 def test_workspace_search_filters_by_loader_and_version(gui_app):
@@ -99,6 +98,36 @@ def test_workspace_create_dialog_emits_public_create_contract(gui_app):
     assert emitted == [("New Quilt", "1.21.1", "quilt", "0.27.1")]
     assert not hasattr(page.advanced_page, "create_name_input")
     assert not hasattr(page.advanced_page, "create_requested")
+
+
+def test_workspace_create_dialog_jvm_preset_selection(gui_app):
+    from mcw_core.api.java.jvm_presets import JvmPresetId, get_preset_flags
+
+    page = InstanceWorkspacePage()
+    dialog = page.create_dialog
+
+    # Initially default preset
+    assert dialog.selected_jvm_preset() == JvmPresetId.DEFAULT
+    assert dialog.selected_jvm_arguments() == []
+    assert page.selected_create_jvm_preset() == JvmPresetId.DEFAULT
+    assert page.selected_create_jvm_arguments() == []
+
+    # Select Aikar preset
+    aikar_index = dialog.jvm_preset_combo.findData(JvmPresetId.AIKAR)
+    assert aikar_index >= 0
+    dialog.jvm_preset_combo.setCurrentIndex(aikar_index)
+
+    assert dialog.selected_jvm_preset() == JvmPresetId.AIKAR
+    expected_flags = get_preset_flags(JvmPresetId.AIKAR)
+    assert dialog.selected_jvm_arguments() == expected_flags
+    assert page.selected_create_jvm_arguments() == expected_flags
+    assert "-XX:+UseG1GC" in dialog.selected_jvm_arguments()
+
+    # Reset preset
+    dialog.reset_jvm_preset()
+    assert dialog.selected_jvm_preset() == JvmPresetId.DEFAULT
+    assert dialog.selected_jvm_arguments() == []
+
 
 
 def test_workspace_exposes_content_pack_management_for_selected_instance(gui_app):
@@ -177,3 +206,127 @@ def test_workspace_favorite_action_emits_selected_state_change(gui_app):
     page.favorite_button.click()
 
     assert emitted == [("Favorite Me", True)]
+
+
+def test_workspace_hub_tabs_and_quick_play(gui_app, tmp_path):
+    page = InstanceWorkspacePage()
+    inst_dir = tmp_path / "QuickPlayInstance"
+    inst_dir.mkdir()
+    instance = make_instance("QuickPlayInstance")
+    instance.instance_dir = str(inst_dir)
+
+    # Verify hub tabs count and components
+    assert page.hub_tabs.count() == 4
+    assert page.worlds_tab is not None
+    assert page.screenshots_tab is not None
+    assert page.logs_tab is not None
+    assert page.mods_tab is not None
+
+    page.set_instances([instance], instance.name)
+
+    # By default, no worlds exist -> quick_play_button disabled
+    assert page.quick_play_button.isEnabled() is False
+
+    # Listen to quick_play_requested
+    emitted: list[str] = []
+    page.quick_play_requested.connect(emitted.append)
+
+    # Emitting from worlds_tab directly
+    page.worlds_tab.quick_play_requested.emit("SurvivalSave")
+    assert emitted == ["SurvivalSave"]
+
+
+def test_workspace_instance_switching_animation_lifecycle(gui_app, tmp_path):
+    page = InstanceWorkspacePage()
+    inst1 = make_instance("InstOne")
+    inst2 = make_instance("InstTwo")
+    page.set_instances([inst1, inst2], "InstOne")
+
+    # When first instance is selected, an animation should be created
+    assert page._hub_anim is not None
+    # Simulate animation finishing
+    page._hub_anim.finished.emit()
+    assert page.hub_widget.graphicsEffect() is None
+
+    # Switch to second instance - this previously crashed with RuntimeError: libshiboken: Internal C++ object already deleted
+    page._select_name("InstTwo", emit=True)
+    assert page._selected_name == "InstTwo"
+    assert page._hub_anim is not None
+    page._hub_anim.finished.emit()
+    assert page.hub_widget.graphicsEffect() is None
+
+
+def test_workspace_expanded_action_panel_and_buttons(gui_app):
+    page = InstanceWorkspacePage()
+    assert page.launch_button.minimumHeight() == 40 or page.launch_button.maximumHeight() == 40
+    assert page.quick_play_button.minimumHeight() == 40 or page.quick_play_button.maximumHeight() == 40
+    assert page.cancel_button is not None
+    assert page.cancel_button.isVisible() is False
+    assert page.launch_progress is None
+
+    for btn in (
+        page.edit_button,
+        page.settings_button,
+        page.open_folder_button,
+        page.change_icon_button,
+        page.favorite_button,
+        page.repair_button,
+        page.manage_mods_button,
+        page.manage_content_packs_button,
+        page.manage_content_library_button,
+        page.optifine_button,
+        page.clone_button,
+        page.export_button,
+        page.delete_button,
+    ):
+        assert btn.maximumHeight() == 36
+
+
+def test_workspace_launch_active_lifecycle_and_cancel_signal(gui_app):
+    page = InstanceWorkspacePage()
+    page.show()
+    inst = make_instance("MyLaunchPack")
+    page.set_instances([inst], "MyLaunchPack")
+
+    # Initially idle
+    assert page.cancel_button.isVisible() is False
+    assert page.launch_button.isEnabled() is True
+
+    # When launch becomes active
+    page.set_launch_active(True)
+    assert page.cancel_button.isVisible() is True
+    assert page.launch_button.isEnabled() is False
+
+    # Emits cancel_launch_requested when cancel button clicked
+    cancelled = []
+    page.cancel_launch_requested.connect(lambda: cancelled.append(True))
+    page.cancel_button.click()
+    assert cancelled == [True]
+
+    # When launch finishes
+    page.set_launch_active(False)
+    assert page.cancel_button.isVisible() is False
+    assert page.launch_button.isEnabled() is True
+
+
+def test_workspace_cancel_button_clickable_even_when_busy(gui_app):
+    page = InstanceWorkspacePage()
+    page.show()
+    inst = make_instance("BusyLaunchPack")
+    page.set_instances([inst], "BusyLaunchPack")
+
+    page.set_launch_active(True)
+    page.set_busy(True)
+
+    assert page.interaction_locked is False
+    assert page.cancel_button.isVisible() is True
+    assert page.cancel_button.isEnabled() is True
+    assert page.instance_list.isEnabled() is False
+
+    cancelled = []
+    page.cancel_launch_requested.connect(lambda: cancelled.append(True))
+    page.cancel_button.click()
+    assert cancelled == [True]
+
+
+

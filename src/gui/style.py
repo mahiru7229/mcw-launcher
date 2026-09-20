@@ -77,6 +77,33 @@ QFrame#InstanceActionPanel {
     border-right-color: #0d0e0c;
 }
 
+QFrame#InstanceActionPanel QPushButton {
+    padding: 4px 12px;
+}
+
+QFrame#InstanceActionPanel QPushButton#PrimaryButton,
+QFrame#InstanceActionPanel QPushButton#SecondaryButton {
+    padding: 6px 14px;
+}
+
+QFrame#CompactProgressWidget {
+    background: #252822;
+    border: 2px solid #161713;
+    border-radius: 4px;
+}
+
+QLabel#ProgressMetricLabel {
+    color: #e0e6db;
+    font-size: 8.5pt;
+    font-weight: 600;
+}
+
+QLabel#ProgressDetailLabel {
+    color: #f0f4ec;
+    font-size: 8.5pt;
+    font-weight: 500;
+}
+
 QListWidget#InstanceLibraryList {
     background: #20221f;
     color: #ffffff;

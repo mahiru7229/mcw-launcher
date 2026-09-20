@@ -12,12 +12,12 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.5.1-blue" alt="v1.5.1">
+  <img src="https://img.shields.io/badge/version-v1.6.0-blue" alt="v1.6.0">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
-> [!WARNING]
-> `v1.5.1` là bản stable hợp nhất updater v2 đã được harden trên Windows, recovery Bridge cho 1.5.0 và dependency resolver hỗ trợ Fabric `provides`/alias mod ID như `cloth-config2`.
+> [!NOTE]
+> `v1.6.0` là bản stable chính thức, chuyển đổi hoàn toàn về định dạng phân phối một tệp thực thi (`one-file`). Phiên bản này bao gồm cơ chế tự động dọn dẹp tàn dư onedir từ các bản beta cũ, vá triệt để các lỗi CurseForge, FTB và ATLauncher.
 
 ## Tổng quan
 
@@ -35,12 +35,12 @@ Các nhóm tính năng chính:
 
 ## Trạng thái nền tảng
 
-| Nền tảng | Trạng thái v1.5.1 Beta 3 | Ghi chú |
+| Nền tảng | Trạng thái v1.6.0 | Ghi chú |
 | --- | --- | --- |
-| Windows 10/11 x64 | Đang hỗ trợ | Luồng chính và bản đóng gói PyInstaller hiện tại. |
-| Linux x64 | Đang hỗ trợ | Automatic update và desktop opener trong bản PyInstaller đã được kiểm thử trực tiếp trên Lubuntu. |
+| Windows 10/11 x64 | Đang hỗ trợ | Phân phối dạng tệp thực thi duy nhất (`MCW Launcher.exe`). |
+| Linux x64 | Đang hỗ trợ | Phân phối dạng tệp thực thi duy nhất (`mcw-launcher`). Automatic update và desktop opener đã được kiểm thử trên Lubuntu. |
 | Linux ARM64 | Nền tảng ban đầu | Nhận diện và metadata Java đúng; chưa có cam kết launch game. |
-| macOS | Chưa hỗ trợ | Chưa nằm trong phạm vi v1.5. |
+| macOS | Chưa hỗ trợ | Chưa nằm trong phạm vi v1.6. |
 
 ## Yêu cầu
 
@@ -105,7 +105,7 @@ Build Windows hiện tại:
 .\build_release.ps1
 ```
 
-GitHub Release Actions chỉ build ZIP native Windows/Linux sau khi test cả hai nền tảng đạt. v1.5.0 chưa cung cấp AppImage hoặc `.deb`; updater Linux hoạt động với ZIP `linux-x64` đặt trong thư mục người dùng có quyền ghi.
+GitHub Release Actions chỉ build ZIP native Windows/Linux sau khi test cả hai nền tảng đạt. v1.6.0 không cung cấp AppImage hoặc `.deb`; updater Linux hoạt động với ZIP `linux-x64` đặt trong thư mục người dùng có quyền ghi.
 
 ## Kiến trúc repository
 
@@ -135,11 +135,9 @@ GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, khô
 - [MCW Core API](docs/MCW_CORE_LIBRARY.md)
 - [Language packs](docs/LANGUAGE_PACKS.md)
 - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
-- [Release notes v1.5.1](docs/releases/v1.5.1.md)
-- [Release notes v1.5.1-beta.6](docs/releases/v1.5.1-beta.6.md)
-- [Release notes v1.5.1-beta.3](docs/releases/v1.5.1-beta.3.md)
-- [Release notes v1.5.1-beta.2](docs/releases/v1.5.1-beta.2.md)
-- [Release notes v1.5.1-beta.1](docs/releases/v1.5.1-beta.1.md)
+- [Release notes v1.6.0](docs/releases/v1.6.0.md)
+- [Release notes v1.6.0-beta.5](docs/releases/v1.6.0-beta.5.md)
+- [Release notes v1.6.0-beta.4](docs/releases/v1.6.0-beta.4.md)
 - [Changelog](CHANGELOG.md)
 
 ## Đóng góp và bảo mật

@@ -24,6 +24,7 @@ class AccountController(BaseController):
     accounts_changed = Signal(list, str)
     selected_account_changed = Signal(object)
     microsoft_auth_state_changed = Signal(bool, str)
+    microsoft_device_code_received = Signal(object)
     security_report_changed = Signal(object)
 
     USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_]{3,16}$")
@@ -36,6 +37,7 @@ class AccountController(BaseController):
         self._profile_sync_account_id = ""
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
+        self._task_runner.task_cancelled.connect(self._on_task_cancelled)
 
     def refresh(self) -> None:
         try:
@@ -74,18 +76,27 @@ class AccountController(BaseController):
         self.microsoft_auth_state_changed.emit(True, tr("account.microsoft.waiting"))
         started = self._task_runner.run(
             self.MICROSOFT_TASK_ID,
-            lambda: AccountManager.create_microsoft_account(cancel_event=self._microsoft_cancel_event),
+            lambda: AccountManager.create_microsoft_account(
+                cancel_event=self._microsoft_cancel_event,
+                on_device_code=self._on_microsoft_device_code,
+            ),
             tr("account.microsoft.waiting"),
             blocking=False,
         )
         if not started:
             self.microsoft_auth_state_changed.emit(False, tr("account.microsoft.status_available"))
 
+    def _on_microsoft_device_code(self, response: object) -> None:
+        self.microsoft_device_code_received.emit(response)
+
     def cancel_microsoft(self) -> None:
         if not self._task_runner.is_task_active(self.MICROSOFT_TASK_ID):
+            self._microsoft_cancel_event.clear()
+            self.microsoft_auth_state_changed.emit(False, tr("account.microsoft.status_available"))
             return
         self._microsoft_cancel_event.set()
         self.microsoft_auth_state_changed.emit(True, tr("account.microsoft.cancelling"))
+        self._task_runner.cancel(self.MICROSOFT_TASK_ID)
 
     def audit_security(self) -> None:
         self._task_runner.run(
@@ -141,28 +152,43 @@ class AccountController(BaseController):
             return
         account_id = str(getattr(account, "account_id", "") or "")
         account_type = str(getattr(getattr(account, "account_type", None), "value", "") or "").casefold()
-        if not account_id or account_type != "microsoft" or account_id in self._profile_sync_attempted:
+        if not account_id or account_id in self._profile_sync_attempted:
             return
-        if getattr(account, "skin_url", None) and AccountSkinManager.cached_texture(account) is not None:
-            return
-        if self._task_runner.is_task_active(self.PROFILE_SYNC_TASK_ID):
-            return
-        self._profile_sync_attempted.add(account_id)
-        self._profile_sync_account_id = account_id
-        self._task_runner.run(
-            self.PROFILE_SYNC_TASK_ID,
-            lambda: AccountManager.synchronize_microsoft_profile(account_id),
-            tr("account.skin.loading"),
-            blocking=False,
-        )
+
+        if account_type == "microsoft":
+            if getattr(account, "skin_url", None) and AccountSkinManager.cached_texture(account) is not None:
+                return
+            if self._task_runner.is_task_active(self.PROFILE_SYNC_TASK_ID):
+                return
+            self._profile_sync_attempted.add(account_id)
+            self._profile_sync_account_id = account_id
+            self._task_runner.run(
+                self.PROFILE_SYNC_TASK_ID,
+                lambda: AccountManager.synchronize_microsoft_profile(account_id),
+                tr("account.skin.loading"),
+                blocking=False,
+            )
+        elif account_type == "offline":
+            if AccountSkinManager.cached_texture(account) is not None:
+                return
+            if self._task_runner.is_task_active(self.PROFILE_SYNC_TASK_ID):
+                return
+            self._profile_sync_attempted.add(account_id)
+            self._profile_sync_account_id = account_id
+            self._task_runner.run(
+                self.PROFILE_SYNC_TASK_ID,
+                lambda: AccountSkinManager.cache_offline_account(account),
+                tr("account.skin.loading"),
+                blocking=False,
+            )
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
         if task_id == self.PROFILE_SYNC_TASK_ID:
             self._profile_sync_account_id = ""
-            account = result
-            username = str(getattr(account, "username", ""))
-            self.log_created.emit(tr("account.skin.ready", username=username))
+            username = str(getattr(result, "username", "") if result is not None else "")
+            if username:
+                self.log_created.emit(tr("account.skin.ready", username=username))
             self.refresh()
             return
         if task_id == self.SECURITY_AUDIT_TASK_ID:
@@ -213,3 +239,11 @@ class AccountController(BaseController):
             return
 
         self._emit_error(tr("account.microsoft.title"), error)
+ 
+    @Slot(str)
+    def _on_task_cancelled(self, task_id: str) -> None:
+        if task_id == self.MICROSOFT_TASK_ID:
+            self._microsoft_cancel_event.clear()
+            self.microsoft_auth_state_changed.emit(False, tr("account.microsoft.status_available"))
+            self.status_changed.emit(tr("account.microsoft.cancelled"))
+            self.log_created.emit(tr("account.microsoft.cancelled"))
