@@ -1226,6 +1226,8 @@
     "artifact.manual.launch_resuming_log": "Đã nhập đủ các file thủ công bắt buộc; tiếp tục phiên launch đang tạm dừng.",
     "artifact.manual.batch_imported": "Đã nhập {count} file {provider} bắt buộc.",
     "artifact.manual.modpack_single_file": "Hãy chọn đúng một file modpack {provider}.",
+    "artifact.manual.auto_detect": "Tự động nhận diện từ thư mục Downloads",
+    "artifact.manual.cancel_launch": "Hủy khởi chạy",
     "instances.manage.loading_neoforge": "Đang tải các phiên bản NeoForge tương thích...",
     "launcher_settings.java.install_label": "Cài runtime Java do launcher quản lý",
     "launcher_settings.java.version": "Java {major}",

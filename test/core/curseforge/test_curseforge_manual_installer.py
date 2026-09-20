@@ -283,3 +283,45 @@ def test_manual_import_rejects_unowned_active_launch_lock(tmp_path, monkeypatch)
 
     with pytest.raises(RuntimeError, match="Close Minecraft"):
         CurseForgeManualInstaller.install(instance, requirement, source, launch_lock_token="wrong-token")
+
+
+def test_manual_match_handles_browser_duplicate_suffix(tmp_path, monkeypatch):
+    source = tmp_path / "ExampleMod-1.0 (1).jar"
+    content = b"mod content"
+    source.write_bytes(content)
+    digest = sha1(content, usedforsecurity=False).hexdigest()
+    requirement = CurseForgeManualDownload(
+        project_id=1, file_id=2, project_name="Example", file_name="ExampleMod-1.0.jar",
+        file_size=len(content), sha1=digest, project_url="", reason="", managed_kind="pack"
+    )
+    matched = CurseForgeManualInstaller._match_requirement(source, len(content), digest, [requirement])
+    assert matched == requirement
+
+
+def test_manual_match_handles_prefix_match(tmp_path, monkeypatch):
+    source = tmp_path / "SRParasites-1.12.2v1.9.21.jar"
+    content = b"updated parasite mod"
+    source.write_bytes(content)
+    digest = sha1(content, usedforsecurity=False).hexdigest()
+    requirement = CurseForgeManualDownload(
+        project_id=100, file_id=200, project_name="Scape and Run: Parasites",
+        file_name="SRParasites-1.12.2v1.9.11.jar", file_size=1000, sha1="differenthash",
+        project_url="", reason="", managed_kind="pack"
+    )
+    matched = CurseForgeManualInstaller._match_requirement(source, len(content), digest, [requirement])
+    assert matched == requirement
+
+
+def test_manual_match_single_remaining_requirement_fallback(tmp_path, monkeypatch):
+    source = tmp_path / "CustomDownloadedMod-1.0.jar"
+    content = b"some mod"
+    source.write_bytes(content)
+    digest = sha1(content, usedforsecurity=False).hexdigest()
+    requirement = CurseForgeManualDownload(
+        project_id=50, file_id=60, project_name="Special Mod",
+        file_name="original-special-mod.jar", file_size=999, sha1="diffhash",
+        project_url="", reason="", managed_kind="pack"
+    )
+    matched = CurseForgeManualInstaller._match_requirement(source, len(content), digest, [requirement])
+    assert matched == requirement
+

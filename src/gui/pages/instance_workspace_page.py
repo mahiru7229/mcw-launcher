@@ -586,7 +586,7 @@ class InstanceWorkspacePage(BasePage):
 
     def set_busy(self, busy: bool) -> None:
         self._busy = bool(busy)
-        self.set_interaction_locked(busy)
+        self.set_interaction_locked(busy and not self._launch_active)
         self.advanced_page.set_busy(busy)
         self._render_selected()
 
@@ -1093,6 +1093,12 @@ class InstanceWorkspacePage(BasePage):
         self._launch_active = bool(active)
         if self.launch_progress is not None:
             self.launch_progress.set_active(self._launch_active)
+        self.set_interaction_locked(self._busy and not self._launch_active)
+        self.instance_list.setEnabled(not self._launch_active)
+        self.search_input.setEnabled(not self._launch_active)
+        self.group_filter.setEnabled(not self._launch_active)
+        self.sort_combo.setEnabled(not self._launch_active)
+        self.favorite_only_checkbox.setEnabled(not self._launch_active)
         self._render_selected()
 
     def set_launch_paused(self) -> None:

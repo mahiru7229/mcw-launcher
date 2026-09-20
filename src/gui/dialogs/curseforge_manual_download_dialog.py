@@ -1,24 +1,32 @@
-from __future__ import annotations
-
+import re
 from pathlib import Path
 
-from PySide6.QtCore import QUrl, Qt, Signal
+from PySide6.QtCore import QTimer, QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QAbstractItemView, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
+from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.curseforge.curseforge_links import best_manual_download_url
 from src.gui.window_sizing import resize_dialog_to_screen
+
+
 class CurseForgeManualDownloadDialog(QDialog):
     files_selected = Signal(object)
+    cancelled = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._requirements: list[object] = []
         self._installed: set[tuple[str, str, str, str]] = set()
+        self._scanned_files: set[Path] = set()
         self._instance_name = ""
         self._provider_name = "CurseForge"
         self._import_busy = False
+
+        self._downloads_timer = QTimer(self)
+        self._downloads_timer.setInterval(1500)
+        self._downloads_timer.timeout.connect(self._scan_downloads_folder)
+
         resize_dialog_to_screen(self, 980, 560, 700, 420)
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 18, 18, 18)
@@ -50,13 +58,22 @@ class CurseForgeManualDownloadDialog(QDialog):
         actions = QHBoxLayout()
         self.open_page_button = QPushButton()
         self.add_files_button = QPushButton()
+        self.auto_detect_checkbox = QCheckBox()
+        self.auto_detect_checkbox.setChecked(True)
+        self.cancel_button = QPushButton()
+        self.cancel_button.setObjectName("SecondaryButton")
         self.close_button = QPushButton()
+
         self.open_page_button.clicked.connect(self._open_page)
         self.add_files_button.clicked.connect(self._select_files)
-        self.close_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self._on_cancel_clicked)
+        self.close_button.clicked.connect(self._on_close_clicked)
+
         actions.addWidget(self.open_page_button)
         actions.addWidget(self.add_files_button)
+        actions.addWidget(self.auto_detect_checkbox)
         actions.addStretch()
+        actions.addWidget(self.cancel_button)
         actions.addWidget(self.close_button)
         root.addLayout(actions)
         self.retranslate_dynamic()
@@ -72,11 +89,15 @@ class CurseForgeManualDownloadDialog(QDialog):
         provider = next(iter(providers), "manual") if len(providers) == 1 else "mixed"
         self._provider_name = {"modrinth": "Modrinth", "curseforge": "CurseForge"}.get(provider, "MCWPack")
         self._installed.clear()
+        self._scanned_files.clear()
         self.retranslate_dynamic()
 
     def mark_installed(self, requirement: object) -> None:
         self._installed.add(self._requirement_key(requirement))
         self._render()
+        if self.remaining_count == 0:
+            self._downloads_timer.stop()
+            self.accept()
 
     def set_import_busy(self, busy: bool) -> None:
         self._import_busy = bool(busy)
@@ -180,6 +201,97 @@ class CurseForgeManualDownloadDialog(QDialog):
         if selected:
             self.files_selected.emit([Path(path) for path in selected])
 
+    def _scan_downloads_folder(self) -> None:
+        if not self.auto_detect_checkbox.isChecked() or self._import_busy or self.remaining_count == 0:
+            return
+        downloads_dir = Path.home() / "Downloads"
+        if not downloads_dir.is_dir():
+            return
+
+        allowed_exts = {".mrpack", ".zip"} if self.is_modpack_archive_mode else {".jar", ".zip"}
+        candidates: list[Path] = []
+        try:
+            for entry in downloads_dir.iterdir():
+                if not entry.is_file():
+                    continue
+                if entry.suffix.casefold() in {".crdownload", ".part", ".tmp", ".download"}:
+                    continue
+                if entry.suffix.casefold() not in allowed_exts:
+                    continue
+                if entry in self._scanned_files:
+                    continue
+                try:
+                    if entry.stat().st_size == 0:
+                        continue
+                except OSError:
+                    continue
+
+                if self._could_match_any_requirement(entry):
+                    candidates.append(entry)
+                    self._scanned_files.add(entry)
+        except OSError:
+            return
+
+        if candidates and not self._import_busy:
+            self.files_selected.emit(candidates)
+
+    def _could_match_any_requirement(self, file_path: Path) -> bool:
+        clean_stem = re.sub(r"\s*(?:\(\d+\)|_\d+|\s-\sCopy|\sCopy)$", "", file_path.stem, flags=re.IGNORECASE)
+        clean_name_cf = (clean_stem + file_path.suffix).casefold()
+        file_name_cf = file_path.name.casefold()
+
+        for req in self.remaining_requirements:
+            req_file_cf = str(getattr(req, "file_name", "")).casefold()
+            req_proj_cf = str(getattr(req, "project_name", "")).casefold()
+            if clean_name_cf == req_file_cf or file_name_cf == req_file_cf:
+                return True
+            req_prefix = re.split(r"[-_vV\d]", Path(req_file_cf).stem)[0].casefold()
+            src_prefix = re.split(r"[-_vV\d]", clean_stem)[0].casefold()
+            if req_prefix and src_prefix and len(req_prefix) >= 3 and req_prefix == src_prefix:
+                return True
+            if (len(clean_stem) >= 3 and clean_stem.casefold() in req_proj_cf) or (len(req_prefix) >= 3 and req_prefix in req_proj_cf):
+                return True
+
+        if len(self.remaining_requirements) == 1:
+            only_req = self.remaining_requirements[0]
+            if Path(str(getattr(only_req, "file_name", ""))).suffix.casefold() == file_path.suffix.casefold():
+                return True
+
+        return False
+
+    def _on_cancel_clicked(self) -> None:
+        self._downloads_timer.stop()
+        self.cancelled.emit()
+        self.reject()
+
+    def _on_close_clicked(self) -> None:
+        self._downloads_timer.stop()
+        if self.remaining_count > 0:
+            self.cancelled.emit()
+            self.reject()
+        else:
+            self.accept()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._downloads_timer.start()
+
+    def hideEvent(self, event) -> None:
+        self._downloads_timer.stop()
+        super().hideEvent(event)
+
+    def closeEvent(self, event) -> None:
+        self._downloads_timer.stop()
+        if self.remaining_count > 0:
+            self.cancelled.emit()
+        super().closeEvent(event)
+
+    def reject(self) -> None:
+        self._downloads_timer.stop()
+        if self.remaining_count > 0:
+            self.cancelled.emit()
+        super().reject()
+
     def retranslate_dynamic(self) -> None:
         title_key = "artifact.manual.modpack_archive_title" if self.is_modpack_archive_mode else "artifact.manual.title"
         title = tr(title_key, provider=self._provider_name)
@@ -194,5 +306,7 @@ class CurseForgeManualDownloadDialog(QDialog):
         ])
         self.open_page_button.setText(tr("artifact.manual.open_link"))
         self.add_files_button.setText(tr("artifact.manual.add_modpack_file") if self.is_modpack_archive_mode else tr("artifact.manual.add_files"))
+        self.auto_detect_checkbox.setText(tr("artifact.manual.auto_detect"))
+        self.cancel_button.setText(tr("artifact.manual.cancel_launch"))
         self.close_button.setText(tr("common.close"))
         self._render()

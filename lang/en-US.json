@@ -1226,6 +1226,8 @@
     "artifact.manual.launch_resuming_log": "All required manual files were imported; resuming the paused launch.",
     "artifact.manual.batch_imported": "Imported {count} required {provider} file(s).",
     "artifact.manual.modpack_single_file": "Select exactly one {provider} modpack archive.",
+    "artifact.manual.auto_detect": "Auto-import from Downloads folder",
+    "artifact.manual.cancel_launch": "Cancel launch",
     "instances.manage.loading_neoforge": "Loading compatible NeoForge versions...",
     "launcher_settings.java.install_label": "Install a managed Java runtime",
     "launcher_settings.java.version": "Java {major}",

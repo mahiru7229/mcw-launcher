@@ -154,7 +154,10 @@ class CurseForgeContentManager:
             reporter.files(stage=ProgressStage.CHECKING_MODS, message=message, current=0, total=total)
         for index, item in enumerate(combined, start=1):
             path = Path(instance.instance_dir) / item["path"]
-            valid = path.is_file() and CurseForgeContentManager._verify(path, item["sha1"], item["size"])
+            valid = path.is_file() and (
+                CurseForgeContentManager._verify(path, item["sha1"], item["size"])
+                or (bool(item["entry"].get("manualImport")) and path.stat().st_size > 0)
+            )
             if valid and path.suffix.casefold() == ".jar" and item["entry"].get("expectedModIds"):
                 identity_warning = CurseForgeContentManager._expected_mod_identity_warning(instance, path, item["entry"])
                 if identity_warning:

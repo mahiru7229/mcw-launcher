@@ -309,3 +309,24 @@ def test_workspace_launch_active_lifecycle_and_cancel_signal(gui_app):
     assert page.launch_button.isEnabled() is True
 
 
+def test_workspace_cancel_button_clickable_even_when_busy(gui_app):
+    page = InstanceWorkspacePage()
+    page.show()
+    inst = make_instance("BusyLaunchPack")
+    page.set_instances([inst], "BusyLaunchPack")
+
+    page.set_launch_active(True)
+    page.set_busy(True)
+
+    assert page.interaction_locked is False
+    assert page.cancel_button.isVisible() is True
+    assert page.cancel_button.isEnabled() is True
+    assert page.instance_list.isEnabled() is False
+
+    cancelled = []
+    page.cancel_launch_requested.connect(lambda: cancelled.append(True))
+    page.cancel_button.click()
+    assert cancelled == [True]
+
+
+
