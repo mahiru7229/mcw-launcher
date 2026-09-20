@@ -241,6 +241,9 @@ class MinecraftExecutor:
             block_curseforge_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "curseforge")
             forge_preflight_policy = ManagedContentPolicy.resolve(settings, launcher_settings, "forge_preflight")
             launch_lock_token = getattr(run_lock, "token", None)
+            touch_lock = getattr(run_lock, "touch", None)
+            if callable(touch_lock):
+                touch_lock()
             PortableContentManager.ensure(instance)
             PortableContentManager.prefetch_referenced(instance, reporter)
             dependency_resolution = ModpackDependencyResolver.resolve(instance, reporter)
@@ -260,6 +263,8 @@ class MinecraftExecutor:
             ftb_warnings = FTBContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
             atlauncher_warnings = ATLauncherContentManager.ensure(instance, reporter, launch_lock_token=launch_lock_token)
             legacy_libloader_warnings = LegacyLibLoaderManager.ensure(instance, reporter)
+            if callable(touch_lock):
+                touch_lock()
 
             # Some legacy/provider metadata only becomes available after the
             # parent JAR is downloaded. Complete the graph to a fixed point so a

@@ -595,7 +595,17 @@ class CurseForgeBrowserDialog(QDialog):
             request = (project.project_id, file.file_id, self.allowed_release_types)
             QTimer.singleShot(0, lambda values=request: self.install_mod_requested.emit(*values))
             return
-        request = (project.project_id, file.file_id, self.instance_name_input.text().strip(), self.optional_checkbox.isChecked(), self.allowed_release_types, self.loader)
+        target_loader = self.loader
+        if self.project_type == "modpack":
+            if file.loaders:
+                first_supported = next((ldr for ldr in file.loaders if ldr in ModLoaderManager.MODDED_LOADERS), None)
+                if first_supported:
+                    target_loader = first_supported
+            elif project.loaders:
+                first_supported = next((ldr for ldr in project.loaders if ldr in ModLoaderManager.MODDED_LOADERS), None)
+                if first_supported:
+                    target_loader = first_supported
+        request = (project.project_id, file.file_id, self.instance_name_input.text().strip(), self.optional_checkbox.isChecked(), self.allowed_release_types, target_loader)
         QTimer.singleShot(0, lambda values=request: self.install_modpack_requested.emit(*values))
 
     def selected_file(self) -> CurseForgeFile | None:

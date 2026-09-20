@@ -2,6 +2,28 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.6.0-beta.5] - 2026-09-20
+
+### Added
+- Enhance CurseForge gateway compatibility with modern endpoint deployments (`https://mcw-curseforge-gateway-mavuika-iota.vercel.app/api/curseforge`).
+- Add flexible mod loader identifier and structure parsing in `CurseForgePackInstaller`:
+  - Support prefixed loader IDs (e.g. `1.20.1-47.3.0` -> `47.3.0`, `loader-0.15.11` -> `0.15.11`).
+  - Support list of dicts, list of strings, or single dict `modLoaders`/`modLoader` in modpack manifests.
+  - Expand loader alias mappings (`forge`, `minecraftforge`, `fabric`, `fabric-loader`, `quilt`, `quilt-loader`, `neoforge`, `neoforged`, `neo`).
+- Parse mod loaders and Minecraft versions from `sortableGameVersions` in `CurseForgeClient` for older modpacks (1.7.10, 1.12.2).
+- Automatically resolve target loader matching modpack file in `CurseForgeBrowserDialog`.
+- Add `InstanceRunLock.touch()` and periodic heartbeat touching in `FTBContentManager` during large modpack validation and downloads.
+
+### Fixed
+- Fix CurseForge 404 installer URL download failure caused by duplicated game version coordinate prefixes.
+- Fix FTB instance running status not reported to launcher:
+  - Prevent preparing run locks owned by the active launcher process from expiring and being pruned during long downloads/content validation.
+  - Auto-recreate missing lock files with state `running` in `_update_owned_lock` when the game process starts.
+  - Fix button state flicker in `MainWindow` by syncing running instance state before signaling launch completion.
+
+### Changed
+- Bump development version to `v1.6.0-beta.5` on branch `1.6`.
+
 ## [1.6.0-beta.4] - 2026-09-20
 
 ### Added
