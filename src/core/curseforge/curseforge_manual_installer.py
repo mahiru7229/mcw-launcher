@@ -100,6 +100,38 @@ class CurseForgeManualInstaller:
                 continue
 
             if source.suffix.casefold() == ".jar":
+                # Check if this jar is already installed in the instance
+                try:
+                    preferred_loader, _ = ModLoaderManager.normalize(instance.mod_loader)
+                    meta = ModManager.read_mod(source, preferred_loader=preferred_loader)
+                    existing_mods = ModManager.list_mods(instance)
+                    already_installed = any(
+                        m.file_name.casefold() == source.name.casefold()
+                        or (meta.mod_id and meta.mod_id != "unknown" and m.mod_id.casefold() == meta.mod_id.casefold())
+                        for m in existing_mods
+                    )
+                    if already_installed:
+                        matched_req = next((
+                            item for item in list(pending)
+                            if meta.mod_id and meta.mod_id != "unknown" and (
+                                meta.mod_id.casefold() in item.file_name.casefold()
+                                or meta.mod_id.casefold() in item.project_name.casefold()
+                            )
+                        ), None)
+                        if matched_req is not None:
+                            try:
+                                if matched_req.managed_kind == "pack":
+                                    _target, relative = CurseForgePackRegistry.managed_path(instance, matched_req.managed_path, source.name)
+                                    CurseForgeManualInstaller._save_pack_file(instance, matched_req, relative, "", source=source)
+                                else:
+                                    CurseForgeManualInstaller._save_mod_file(instance, matched_req, source.name, "", source=source)
+                            except Exception:
+                                pass
+                            imported.append(CurseForgeManualImportedFile(requirement=matched_req, installed_name=source.name))
+                            pending.remove(matched_req)
+                        continue
+                except Exception:
+                    pass
                 extras.append(source)
             else:
                 rejected.append(

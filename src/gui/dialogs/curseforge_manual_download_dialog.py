@@ -1,4 +1,5 @@
 import re
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, QUrl, Qt, Signal
@@ -12,6 +13,7 @@ from src.gui.window_sizing import resize_dialog_to_screen
 
 class CurseForgeManualDownloadDialog(QDialog):
     files_selected = Signal(object)
+    auto_files_selected = Signal(object)
     cancelled = Signal()
 
     def __init__(self, parent=None) -> None:
@@ -22,6 +24,8 @@ class CurseForgeManualDownloadDialog(QDialog):
         self._instance_name = ""
         self._provider_name = "CurseForge"
         self._import_busy = False
+        self._scan_start_time = time.time()
+        self.last_files_auto_detected = False
 
         self._downloads_timer = QTimer(self)
         self._downloads_timer.setInterval(1500)
@@ -90,6 +94,8 @@ class CurseForgeManualDownloadDialog(QDialog):
         self._provider_name = {"modrinth": "Modrinth", "curseforge": "CurseForge"}.get(provider, "MCWPack")
         self._installed.clear()
         self._scanned_files.clear()
+        self._scan_start_time = time.time()
+        self.last_files_auto_detected = False
         self.retranslate_dynamic()
 
     def mark_installed(self, requirement: object) -> None:
@@ -182,6 +188,7 @@ class CurseForgeManualDownloadDialog(QDialog):
     def _select_files(self) -> None:
         if self._import_busy:
             return
+        self.last_files_auto_detected = False
         if self.is_modpack_archive_mode:
             selected, _ = QFileDialog.getOpenFileName(
                 self,
@@ -208,21 +215,28 @@ class CurseForgeManualDownloadDialog(QDialog):
         if not downloads_dir.is_dir():
             return
 
+        threshold = (self._scan_start_time or time.time()) - 3.0
         allowed_exts = {".mrpack", ".zip"} if self.is_modpack_archive_mode else {".jar", ".zip"}
         candidates: list[Path] = []
         try:
             for entry in downloads_dir.iterdir():
                 if not entry.is_file():
                     continue
-                if entry.suffix.casefold() in {".crdownload", ".part", ".tmp", ".download"}:
+                if entry.suffix.casefold() in {".crdownload", ".part", ".tmp", ".download", ".aria2"}:
                     continue
                 if entry.suffix.casefold() not in allowed_exts:
                     continue
                 if entry in self._scanned_files:
                     continue
                 try:
-                    if entry.stat().st_size == 0:
+                    stat = entry.stat()
+                    if stat.st_mtime < threshold:
                         continue
+                    if stat.st_size == 0:
+                        continue
+                    # Ensure file is not write-locked by browser
+                    with entry.open("rb") as test_f:
+                        test_f.read(1)
                 except OSError:
                     continue
 
@@ -233,28 +247,31 @@ class CurseForgeManualDownloadDialog(QDialog):
             return
 
         if candidates and not self._import_busy:
+            self.last_files_auto_detected = True
+            self.auto_files_selected.emit(candidates)
             self.files_selected.emit(candidates)
 
     def _could_match_any_requirement(self, file_path: Path) -> bool:
         clean_stem = re.sub(r"\s*(?:\(\d+\)|_\d+|\s-\sCopy|\sCopy)$", "", file_path.stem, flags=re.IGNORECASE)
         clean_name_cf = (clean_stem + file_path.suffix).casefold()
         file_name_cf = file_path.name.casefold()
+        clean_stem_cf = clean_stem.casefold()
 
         for req in self.remaining_requirements:
             req_file_cf = str(getattr(req, "file_name", "")).casefold()
             req_proj_cf = str(getattr(req, "project_name", "")).casefold()
+            req_stem_cf = Path(req_file_cf).stem.casefold()
+
             if clean_name_cf == req_file_cf or file_name_cf == req_file_cf:
                 return True
-            req_prefix = re.split(r"[-_vV\d]", Path(req_file_cf).stem)[0].casefold()
-            src_prefix = re.split(r"[-_vV\d]", clean_stem)[0].casefold()
-            if req_prefix and src_prefix and len(req_prefix) >= 3 and req_prefix == src_prefix:
-                return True
-            if (len(clean_stem) >= 3 and clean_stem.casefold() in req_proj_cf) or (len(req_prefix) >= 3 and req_prefix in req_proj_cf):
+            if clean_stem_cf == req_stem_cf:
                 return True
 
-        if len(self.remaining_requirements) == 1:
-            only_req = self.remaining_requirements[0]
-            if Path(str(getattr(only_req, "file_name", ""))).suffix.casefold() == file_path.suffix.casefold():
+            req_prefix = re.split(r"[-_vV\d]", req_stem_cf)[0].casefold()
+            src_prefix = re.split(r"[-_vV\d]", clean_stem_cf)[0].casefold()
+            if req_prefix and src_prefix and len(req_prefix) >= 3 and req_prefix == src_prefix:
+                return True
+            if (len(clean_stem_cf) >= 3 and clean_stem_cf in req_proj_cf) or (len(req_prefix) >= 3 and req_prefix in req_proj_cf):
                 return True
 
         return False
@@ -274,6 +291,8 @@ class CurseForgeManualDownloadDialog(QDialog):
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
+        if not getattr(self, "_scan_start_time", 0):
+            self._scan_start_time = time.time()
         self._downloads_timer.start()
 
     def hideEvent(self, event) -> None:

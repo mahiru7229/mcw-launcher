@@ -197,6 +197,8 @@ class MainWindow(QMainWindow):
         self._modrinth_pending_modpack_install: ModrinthModpackManualDownloadRequired | None = None
         self._curseforge_manual_instance_name = ""
         self._curseforge_pending_modpack_install: CurseForgeModpackManualDownloadRequired | None = None
+        self._curseforge_manual_is_auto = False
+        self._modrinth_manual_is_auto = False
         self._manual_launch_provider = ""
         self._manual_launch_lock_token = ""
         self._portable_manual_request: object | None = None
@@ -1429,18 +1431,23 @@ class MainWindow(QMainWindow):
             self._modrinth_pending_modpack_install = None
         QMessageBox.information(self, tr("modrinth.modpack.install"), tr("modrinth.modpack.installed", name=selected_name))
 
-    def _install_manual_modrinth_files(self, sources: object) -> None:
+    def _install_manual_modrinth_files(self, sources: object, auto_detected: bool | None = None) -> None:
         paths = [Path(source) for source in sources] if isinstance(sources, (list, tuple)) else []
         if not paths:
             return
+        if auto_detected is None:
+            auto_detected = getattr(self.modrinth_manual_dialog, "last_files_auto_detected", False)
+        self._modrinth_manual_is_auto = bool(auto_detected)
         if self._modrinth_pending_modpack_install is not None:
             if len(paths) != 1:
-                QMessageBox.warning(self, tr("artifact.manual.modpack_archive_title", provider="Modrinth"), tr("artifact.manual.modpack_single_file", provider="Modrinth"))
+                if not auto_detected:
+                    QMessageBox.warning(self, tr("artifact.manual.modpack_archive_title", provider="Modrinth"), tr("artifact.manual.modpack_single_file", provider="Modrinth"))
                 return
             self.modrinth_controller.install_manual_modpack(self._modrinth_pending_modpack_install, paths[0])
             return
         if not self._modrinth_manual_instance_name:
-            QMessageBox.warning(self, tr("artifact.manual.title", provider="Modrinth"), tr("curseforge.mod.no_instance"))
+            if not auto_detected:
+                QMessageBox.warning(self, tr("artifact.manual.title", provider="Modrinth"), tr("curseforge.mod.no_instance"))
             return
         started = self.modrinth_controller.install_manual_files(
             self._modrinth_manual_instance_name,
@@ -1451,6 +1458,8 @@ class MainWindow(QMainWindow):
         self.modrinth_manual_dialog.set_import_busy(started)
 
     def _modrinth_manual_files_installed(self, instance_name: str, result: object) -> None:
+        is_auto = self._modrinth_manual_is_auto
+        self._modrinth_manual_is_auto = False
         imported = tuple(getattr(result, "imported", ()) or ())
         added_mods = tuple(getattr(result, "added_mods", ()) or ())
         rejected = tuple(getattr(result, "rejected", ()) or ())
@@ -1460,6 +1469,22 @@ class MainWindow(QMainWindow):
                 self.modrinth_manual_dialog.mark_installed(requirement)
         if self.mod_controller.current_instance is not None and self.mod_controller.current_instance.name == instance_name:
             self.mod_controller.refresh()
+
+        if self.modrinth_manual_dialog.remaining_count == 0 and (not rejected or is_auto):
+            self._resume_launch_after_manual_content("modrinth", instance_name, self.modrinth_manual_dialog)
+            return
+
+        if is_auto:
+            if rejected:
+                self.modrinth_controller.log_created.emit(
+                    f"Modrinth auto-detected files skipped: {len(rejected)} file(s)"
+                )
+            if imported:
+                self.modrinth_controller.log_created.emit(
+                    f"Modrinth auto-imported {len(imported)} file(s)"
+                )
+            return
+
         lines = []
         if imported:
             lines.append(tr("artifact.manual.batch_imported", provider="Modrinth", count=len(imported)))
@@ -1888,18 +1913,23 @@ class MainWindow(QMainWindow):
             launch_lock_token=self._manual_launch_lock_token or None,
         )
 
-    def _install_manual_curseforge_files(self, sources: object) -> None:
+    def _install_manual_curseforge_files(self, sources: object, auto_detected: bool | None = None) -> None:
         paths = [Path(source) for source in sources] if isinstance(sources, (list, tuple)) else []
         if not paths:
             return
+        if auto_detected is None:
+            auto_detected = getattr(self.curseforge_manual_dialog, "last_files_auto_detected", False)
+        self._curseforge_manual_is_auto = bool(auto_detected)
         if self._curseforge_pending_modpack_install is not None:
             if len(paths) != 1:
-                QMessageBox.warning(self, tr("curseforge.manual.modpack_archive_title"), tr("curseforge.manual.modpack_single_file"))
+                if not auto_detected:
+                    QMessageBox.warning(self, tr("curseforge.manual.modpack_archive_title"), tr("curseforge.manual.modpack_single_file"))
                 return
             self.curseforge_controller.install_manual_modpack(self._curseforge_pending_modpack_install, paths[0])
             return
         if not self._curseforge_manual_instance_name:
-            QMessageBox.warning(self, tr("curseforge.manual.title"), tr("curseforge.mod.no_instance"))
+            if not auto_detected:
+                QMessageBox.warning(self, tr("curseforge.manual.title"), tr("curseforge.mod.no_instance"))
             return
         started = self.curseforge_controller.install_manual_files(
             self._curseforge_manual_instance_name,
@@ -1921,6 +1951,8 @@ class MainWindow(QMainWindow):
         self._resume_launch_after_manual_content("curseforge", instance_name, self.curseforge_manual_dialog)
 
     def _curseforge_manual_files_installed(self, instance_name: str, result: object) -> None:
+        is_auto = self._curseforge_manual_is_auto
+        self._curseforge_manual_is_auto = False
         imported = tuple(getattr(result, "imported", ()) or ())
         added_mods = tuple(getattr(result, "added_mods", ()) or ())
         rejected = tuple(getattr(result, "rejected", ()) or ())
@@ -1931,8 +1963,19 @@ class MainWindow(QMainWindow):
         if self.mod_controller.current_instance is not None and self.mod_controller.current_instance.name == instance_name:
             self.mod_controller.refresh()
 
-        if self.curseforge_manual_dialog.remaining_count == 0 and not rejected:
+        if self.curseforge_manual_dialog.remaining_count == 0 and (not rejected or is_auto):
             self._resume_launch_after_manual_content("curseforge", instance_name, self.curseforge_manual_dialog)
+            return
+
+        if is_auto:
+            if rejected:
+                self.curseforge_controller.log_created.emit(
+                    f"CurseForge auto-detected files skipped: {len(rejected)} file(s)"
+                )
+            if imported:
+                self.curseforge_controller.log_created.emit(
+                    f"CurseForge auto-imported {len(imported)} file(s)"
+                )
             return
 
         lines: list[str] = []

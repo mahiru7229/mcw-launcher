@@ -71,4 +71,73 @@ def test_manual_dialog_scan_downloads_finds_matching_file(tmp_path, monkeypatch,
 
     assert len(emitted) == 1
     assert emitted[0] == [downloaded_file]
+    assert dialog.last_files_auto_detected is True
+
+
+def test_manual_dialog_scan_downloads_ignores_older_files(tmp_path, monkeypatch, gui_app):
+    import os
+    import time
+    dialog = CurseForgeManualDownloadDialog()
+    req = SimpleNamespace(provider="curseforge", project_id=1, file_id=2, managed_path="mods/example.jar", file_name="example.jar")
+
+    downloads_dir = tmp_path / "Downloads"
+    downloads_dir.mkdir()
+    old_file = downloads_dir / "example.jar"
+    old_file.write_bytes(b"old mod content")
+    # Set old timestamp: 1 hour ago
+    old_mtime = time.time() - 3600
+    os.utime(old_file, (old_mtime, old_mtime))
+
+    dialog.set_requirements([req])
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+
+    emitted: list[list] = []
+    dialog.files_selected.connect(emitted.append)
+
+    dialog._scan_downloads_folder()
+
+    assert len(emitted) == 0
+
+
+def test_manual_dialog_emits_auto_files_selected_signal(tmp_path, monkeypatch, gui_app):
+    dialog = CurseForgeManualDownloadDialog()
+    req = SimpleNamespace(provider="curseforge", project_id=1, file_id=2, managed_path="mods/example.jar", file_name="example.jar")
+    dialog.set_requirements([req])
+
+    downloads_dir = tmp_path / "Downloads"
+    downloads_dir.mkdir()
+    downloaded_file = downloads_dir / "example.jar"
+    downloaded_file.write_bytes(b"mod content")
+
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+
+    auto_emitted: list[list] = []
+    dialog.auto_files_selected.connect(auto_emitted.append)
+
+    dialog._scan_downloads_folder()
+
+    assert len(auto_emitted) == 1
+    assert auto_emitted[0] == [downloaded_file]
+    assert dialog.last_files_auto_detected is True
+
+
+def test_manual_dialog_does_not_match_unrelated_jar(tmp_path, monkeypatch, gui_app):
+    dialog = CurseForgeManualDownloadDialog()
+    req = SimpleNamespace(provider="curseforge", project_id=1, file_id=2, managed_path="mods/example.jar", file_name="example.jar")
+    dialog.set_requirements([req])
+
+    downloads_dir = tmp_path / "Downloads"
+    downloads_dir.mkdir()
+    unrelated_file = downloads_dir / "completely_unrelated.jar"
+    unrelated_file.write_bytes(b"unrelated")
+
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+
+    emitted: list[list] = []
+    dialog.files_selected.connect(emitted.append)
+
+    dialog._scan_downloads_folder()
+
+    assert len(emitted) == 0
+
 
