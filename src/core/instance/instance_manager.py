@@ -43,6 +43,10 @@ class InstanceManager:
         return name
 
     @staticmethod
+    def save(instance: Instance) -> None:
+        InstanceManager._save_instance_metadata(instance)
+
+    @staticmethod
     def _save_instance_metadata(instance: Instance) -> None:
         instance_dir = Path(instance.instance_dir)
         path = instance_dir / "instance.json"

@@ -176,3 +176,36 @@ def test_graphql_failure_falls_back_to_v1_pack_list(monkeypatch, tmp_path: Path)
     assert result.projects[0].name == "Example Pack"
     assert calls[:2] == [("POST", "/v2/graphql"), ("GET", "/v1/packs/full/public")]
     client.close()
+
+
+def test_loader_parsing_prioritizes_clean_version_over_raw_version() -> None:
+    manifest = {
+        "minecraft": "1.12.2",
+        "loader": {
+            "type": "forge",
+            "metadata": {
+                "minecraft": "1.12.2",
+                "version": "14.23.5.2858",
+                "rawVersion": "1.12.2-14.23.5.2858",
+            },
+        },
+    }
+    loader_name, loader_version = ATLauncherClient._loader(manifest)
+    assert loader_name == "forge"
+    assert loader_version == "14.23.5.2858"
+
+
+def test_loader_parsing_strips_prefixes_from_raw_version_fallback() -> None:
+    manifest = {
+        "minecraft": "1.12.2",
+        "loader": {
+            "type": "forge",
+            "metadata": {
+                "minecraft": "1.12.2",
+                "rawVersion": "1.12.2-14.23.5.2858",
+            },
+        },
+    }
+    loader_name, loader_version = ATLauncherClient._loader(manifest)
+    assert loader_name == "forge"
+    assert loader_version == "14.23.5.2858"

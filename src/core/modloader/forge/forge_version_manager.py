@@ -52,7 +52,7 @@ class ForgeVersionManager:
 
     @staticmethod
     def install(base_version: Version, forge_version: str, reporter: ProgressReporter | None = None, force_refresh: bool = False, preferred_java_path: str | Path | None = None) -> Version:
-        loader = str(forge_version).strip()
+        loader = ForgeMetadataClient._clean_version(base_version.id, forge_version)
         if not loader:
             raise RuntimeError("Select a Minecraft Forge version.")
         cache_path = Paths.forge_version_json(base_version.id, loader)
@@ -103,7 +103,7 @@ class ForgeVersionManager:
 
     @staticmethod
     def repair(base_version: Version, forge_version: str, reporter: ProgressReporter | None = None, preferred_java_path: str | Path | None = None) -> Version:
-        loader = str(forge_version).strip()
+        loader = ForgeMetadataClient._clean_version(base_version.id, forge_version)
         if not loader:
             raise RuntimeError("Select a Minecraft Forge version.")
         cache_path = Paths.forge_version_json(base_version.id, loader)

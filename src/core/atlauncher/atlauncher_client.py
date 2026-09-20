@@ -503,7 +503,7 @@ class ATLauncherClient:
         loader = manifest.get("loader") if isinstance(manifest.get("loader"), dict) else {}
         name = ATLauncherClient.normalize_loader(loader.get("type"))
         metadata = loader.get("metadata") if isinstance(loader.get("metadata"), dict) else {}
-        version = ATLauncherClient._text(metadata.get("loader") or metadata.get("rawVersion") or metadata.get("version") or loader.get("version"))
+        version = ATLauncherClient._text(metadata.get("version") or metadata.get("loader") or metadata.get("rawVersion") or loader.get("version"))
         if not loader:
             mods = manifest.get("mods") if isinstance(manifest.get("mods"), list) else ()
             for item in mods:
@@ -519,6 +519,11 @@ class ATLauncherClient:
             return name, "-1"
         if (metadata.get("recommended") or metadata.get("latest") or loader.get("choose")) and not version:
             version = ModLoaderManager.AUTO
+        if name and version.casefold().startswith(f"{name}-"):
+            version = version[len(name) + 1:].strip()
+        mc_ver = ATLauncherClient._text(metadata.get("minecraft") or manifest.get("minecraft"))
+        if mc_ver and version.startswith(f"{mc_ver}-"):
+            version = version[len(mc_ver) + 1:].strip()
         return name, version or ModLoaderManager.AUTO
 
     @staticmethod
