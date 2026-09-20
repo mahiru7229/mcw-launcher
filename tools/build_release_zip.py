@@ -150,7 +150,7 @@ def build_release_zip(
             "platform": platform_id,
             "executable": executable_file.name,
             "updater": updater_relative.as_posix(),
-            "files": sorted(set(managed_files)),
+            "files": sorted(set(managed_files) | {"mcw-update.json"}),
             "cleanup_paths": cleanup_paths,
         }
         (payload_root / "mcw-update.json").write_text(
