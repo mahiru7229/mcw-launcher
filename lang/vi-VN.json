@@ -2190,6 +2190,7 @@
     "tasks.indicator.active_single": "{message} ({percent}%)",
     "tasks.indicator.active_multiple": "Đang chạy {count} tác vụ ({percent}%)",
     "tasks.indicator.completed": "Đã hoàn thành các tác vụ",
+    "tasks.indicator.failed": "Tác vụ thất bại",
     "tasks.indicator.tooltip_title": "Tác vụ nền",
     "startup.open_recovery_tool": "Mở công cụ Cứu hộ",
     "workspace.playtime.never": "Chưa chơi",

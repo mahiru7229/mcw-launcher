@@ -214,6 +214,8 @@ class LaunchController(BaseController):
 
     def _on_progress(self, event: ProgressEvent) -> None:
         self.progress_received.emit(event)
+        if hasattr(self._task_runner, "task_progress") and self._task_runner.is_task_active(self.TASK_ID):
+            self._task_runner.task_progress.emit(self.TASK_ID, event)
         key = self._progress_log_key(event)
         with self._progress_log_lock:
             if key == self._last_progress_log_key:

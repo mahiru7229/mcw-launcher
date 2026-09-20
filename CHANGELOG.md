@@ -2,6 +2,40 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.6.0-beta.4] - 2026-09-20
+
+### Added
+- Redesign GlobalTaskIndicator with modern Modrinth-style 3-tier layout:
+  - Top row: Status icon, Stage Badge pill, bold task description.
+  - Middle row: 7px prominent progress bar with Modrinth green (`#00af5c`).
+  - Bottom row: Network speed, progress byte counts, and completion percentage.
+  - Red failure state with detailed error messaging.
+- Add reusable `ActiveTaskCard` with in-place data updates and completed card caching in `TaskDrawerPopover`.
+- Introduce ~30 FPS throttling for progress update events to eliminate GUI freezing during high-frequency downloads and file scanning.
+
+### Fixed
+- Eliminate modpack selection lag by removing automatic background scanning on instance selection in `MainWindow`.
+- Fix local GUI freeze when opening TaskDrawerPopover and transitioning between tasks by avoiding widget allocation/destruction thrashing.
+- Fix Modrinth loader compatibility check when a multi-loader mod depends on loader-specific projects (e.g. Quilted Fabric API on Fabric).
+- Fix Microsoft login cancellation hang by properly handling `task_cancelled` in `AccountController`.
+- Fix default Steve and Alex textures and support texture URLs from Mojang CDN.
+- Avoid duplicate progress dispatch in `MainWindow._on_launch_progress`.
+
+### Changed
+- Remove legacy compact progress bar from action panel in `InstanceWorkspacePage`.
+- Bump development version to `v1.6.0-beta.4` on branch `1.6`.
+
+## [1.6.0-beta.3] - 2026-09-17
+
+### Added
+- Dynamic Loader Library Discovery for Fabric, Quilt, Forge, and NeoForge loaders.
+- Global Task Drawer with background task execution and speed metrics.
+- Microsoft OAuth Device Code Flow with copy code and browser launch support.
+- Launch error notification dialog for Java runtime, mod incompatibilities, and early crashes.
+
+### Changed
+- Bump development version to `v1.6.0-beta.3` on branch `1.6`.
+
 ## [1.6.0-beta.2] - 2026-09-15
 
 ### Added

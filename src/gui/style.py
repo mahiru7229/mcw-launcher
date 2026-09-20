@@ -98,6 +98,12 @@ QLabel#ProgressMetricLabel {
     font-weight: 600;
 }
 
+QLabel#ProgressDetailLabel {
+    color: #f0f4ec;
+    font-size: 8.5pt;
+    font-weight: 500;
+}
+
 QListWidget#InstanceLibraryList {
     background: #20221f;
     color: #ffffff;

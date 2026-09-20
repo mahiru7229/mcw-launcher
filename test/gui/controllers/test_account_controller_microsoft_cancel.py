@@ -48,3 +48,19 @@ def test_cancel_microsoft_sets_cancel_event_and_does_not_emit_error(gui_app, mon
     assert errors == []
     assert statuses
     gui_app.processEvents()
+
+
+def test_task_cancelled_resets_microsoft_auth_state(gui_app, monkeypatch: pytest.MonkeyPatch) -> None:
+    runner = TaskRunner()
+    controller = AccountController(runner)
+    states = []
+
+    controller.microsoft_auth_state_changed.connect(lambda active, msg: states.append((active, msg)))
+    controller._microsoft_cancel_event.set()
+
+    runner.task_cancelled.emit(controller.MICROSOFT_TASK_ID)
+
+    assert not controller._microsoft_cancel_event.is_set()
+    assert states[-1][0] is False
+    gui_app.processEvents()
+

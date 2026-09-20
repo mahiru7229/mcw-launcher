@@ -91,3 +91,38 @@ def test_compact_progress_widget_active_lifecycle(app):
     widget.set_active(False)
     assert widget.isVisible() is False
     assert widget.progress_bar.value() == 0
+
+
+def test_compact_progress_widget_stage_and_detail(app):
+    widget = CompactProgressWidget()
+    event = ProgressEvent(
+        stage=ProgressStage.CHECKING_MODS,
+        message="Checking mod dependencies",
+        detail="spawnanimations-v1.11.1-mc1.17-1.21.9-mod.jar",
+        state=ProgressState.RUNNING,
+    )
+    widget.set_progress_event(event)
+
+    assert widget.stage_label.text() != ""
+    assert "spawnanimations" in widget.status_label.full_text()
+    assert widget.status_label.toolTip() == widget.status_label.full_text()
+
+
+def test_compact_progress_widget_full_metrics_details(app):
+    widget = CompactProgressWidget()
+    from src.models.progress.progress_unit import ProgressUnit
+    event = ProgressEvent(
+        stage=ProgressStage.DOWNLOADING_LIBRARIES,
+        message="Downloading libraries",
+        current=1024 * 1024 * 10,
+        total=1024 * 1024 * 20,
+        unit=ProgressUnit.BYTES,
+        bytes_per_second=1024 * 1024 * 3.5,
+    )
+    widget.set_progress_event(event)
+
+    assert "50%" in widget.download_label.text()
+    assert "10.0 MB / 20.0 MB" in widget.download_label.text()
+    assert "3.5 MB/s" in widget.speed_label.text()
+
+

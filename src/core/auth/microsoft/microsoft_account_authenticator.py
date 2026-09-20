@@ -17,6 +17,7 @@ from src.models.account.account import Account
 from src.models.account.account_source import AccountSource
 from src.models.auth.microsoft.device_code_response import DeviceCodeResponse
 from src.models.auth.microsoft.minecraft_profile import MinecraftProfile
+from src.core.auth.microsoft.oauth_callback_server import MicrosoftAuthorizationCancelledError
 
 
 class MicrosoftAccountAuthenticator:
@@ -31,10 +32,20 @@ class MicrosoftAccountAuthenticator:
         if not str(MicrosoftAuthConfig.CLIENT_ID).strip():
             raise RuntimeError("Microsoft authentication is enabled but no client_id is configured.")
         oauth_token = MicrosoftOAuth.authenticate(cancel_event=cancel_event, on_device_code=on_device_code)
+        if cancel_event is not None and cancel_event.is_set():
+            raise MicrosoftAuthorizationCancelledError("Microsoft authentication was cancelled.")
         xbox_token = XboxLiveAuthentication.authenticate(oauth_token.access_token)
+        if cancel_event is not None and cancel_event.is_set():
+            raise MicrosoftAuthorizationCancelledError("Microsoft authentication was cancelled.")
         xsts_token = XSTSAuthentication.authenticate(xbox_token)
+        if cancel_event is not None and cancel_event.is_set():
+            raise MicrosoftAuthorizationCancelledError("Microsoft authentication was cancelled.")
         minecraft_token = MinecraftServicesAuthentication.authenticate(xsts_token)
+        if cancel_event is not None and cancel_event.is_set():
+            raise MicrosoftAuthorizationCancelledError("Microsoft authentication was cancelled.")
         MinecraftProfileClient.verify_entitlement(minecraft_token.access_token)
+        if cancel_event is not None and cancel_event.is_set():
+            raise MicrosoftAuthorizationCancelledError("Microsoft authentication was cancelled.")
         profile = MinecraftProfileClient.get_profile(minecraft_token.access_token)
         account = Account(
             account_id=str(uuid4()),

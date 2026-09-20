@@ -37,6 +37,7 @@ class AccountController(BaseController):
         self._profile_sync_account_id = ""
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
+        self._task_runner.task_cancelled.connect(self._on_task_cancelled)
 
     def refresh(self) -> None:
         try:
@@ -90,9 +91,12 @@ class AccountController(BaseController):
 
     def cancel_microsoft(self) -> None:
         if not self._task_runner.is_task_active(self.MICROSOFT_TASK_ID):
+            self._microsoft_cancel_event.clear()
+            self.microsoft_auth_state_changed.emit(False, tr("account.microsoft.status_available"))
             return
         self._microsoft_cancel_event.set()
         self.microsoft_auth_state_changed.emit(True, tr("account.microsoft.cancelling"))
+        self._task_runner.cancel(self.MICROSOFT_TASK_ID)
 
     def audit_security(self) -> None:
         self._task_runner.run(
@@ -235,3 +239,11 @@ class AccountController(BaseController):
             return
 
         self._emit_error(tr("account.microsoft.title"), error)
+ 
+    @Slot(str)
+    def _on_task_cancelled(self, task_id: str) -> None:
+        if task_id == self.MICROSOFT_TASK_ID:
+            self._microsoft_cancel_event.clear()
+            self.microsoft_auth_state_changed.emit(False, tr("account.microsoft.status_available"))
+            self.status_changed.emit(tr("account.microsoft.cancelled"))
+            self.log_created.emit(tr("account.microsoft.cancelled"))

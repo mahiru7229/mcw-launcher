@@ -689,9 +689,9 @@ class MainWindow(QMainWindow):
         self.update_controller.progress_received.connect(self._on_progress)
         self.lan_hosting_controller.progress_received.connect(self._on_progress)
         self.lan_hosting_controller.prepared.connect(self._on_lan_hosting_prepared)
+        self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
         self.launch_controller.launch_finished.connect(self.launch_control.set_result)
         self.launch_controller.launch_finished.connect(self.instances_page.set_launch_finished)
-        self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
         self.launch_controller.launch_finished.connect(lambda _result: self.gui_settings_controller.set_game_running(True))
         self.launch_controller.launch_finished.connect(self._on_game_launched_discord)
         self.launch_controller.game_window_ready.connect(self._on_game_window_ready)
@@ -2370,8 +2370,6 @@ class MainWindow(QMainWindow):
             self.instances_page.select_instance(instance.name)
             self.instance_settings_page.select_instance(instance.name)
             self.instance_settings_controller.load(instance.name)
-            if (Path(instance.instance_dir) / ".mcw" / "modrinth-pack.json").is_file():
-                QTimer.singleShot(0, lambda name=instance.name: self.modpack_lifecycle_controller.scan(name))
 
     def _restore_selected_instance(self, instance_name: str) -> None:
         self._restoring_instance_selection = True
@@ -2952,6 +2950,16 @@ class MainWindow(QMainWindow):
 
         self.launch_control.set_progress_event(event)
         self.instances_page.set_progress_event(event)
+
+        task_id = str(getattr(self, "_progress_task_id", "") or "")
+        if (
+            task_id
+            and hasattr(self, "launch_controller")
+            and task_id != self.launch_controller.TASK_ID
+            and self.task_runner.is_task_active(task_id)
+        ):
+            if hasattr(self, "gui_context") and getattr(self.gui_context, "tasks", None) is not None:
+                self.gui_context.tasks.update_progress(task_id, event)
 
         message = tr(str(getattr(event, "message", "Working...")))
         self.home_page.set_status(message)

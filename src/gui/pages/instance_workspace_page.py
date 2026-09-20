@@ -362,6 +362,8 @@ class InstanceWorkspacePage(BasePage):
         badges_hbox.addStretch(1)
         self.action_panel.layout.addLayout(badges_hbox)
 
+        self.launch_progress = None
+
         # Tools Row 1: Instance Management & Files
         tools_row1 = QHBoxLayout()
         tools_row1.setSpacing(6)
@@ -394,12 +396,6 @@ class InstanceWorkspacePage(BasePage):
             tools_row2.addWidget(btn)
         tools_row2.addStretch(1)
         self.action_panel.layout.addLayout(tools_row2)
-
-        # Compact Progress Bar (shows download %, install %, network speed)
-        self.launch_progress = CompactProgressWidget(self.action_panel)
-        self.launch_progress.setVisible(False)
-        self.launch_progress.cancel_clicked.connect(self.cancel_launch_requested.emit)
-        self.action_panel.layout.addWidget(self.launch_progress)
 
         self.action_panel.layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         self.action_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
@@ -837,7 +833,8 @@ class InstanceWorkspacePage(BasePage):
 
         if instance is None:
             self.cancel_button.setVisible(False)
-            self.launch_progress.setVisible(False)
+            if self.launch_progress is not None:
+                self.launch_progress.setVisible(False)
             self.hub_stack.setCurrentIndex(0)
             self._last_animated_name = ""
             self.instance_icon.clear()
@@ -1089,11 +1086,13 @@ class InstanceWorkspacePage(BasePage):
         self._request_primary_action()
 
     def set_progress_event(self, event: object) -> None:
-        self.launch_progress.set_progress_event(event)
+        if self.launch_progress is not None:
+            self.launch_progress.set_progress_event(event)
 
     def set_launch_active(self, active: bool) -> None:
         self._launch_active = bool(active)
-        self.launch_progress.set_active(self._launch_active)
+        if self.launch_progress is not None:
+            self.launch_progress.set_active(self._launch_active)
         self._render_selected()
 
     def set_launch_paused(self) -> None:
@@ -1291,7 +1290,8 @@ class InstanceWorkspacePage(BasePage):
         self.export_button.setText(tr("workspace.action.export"))
         self.delete_button.setText(tr("workspace.action.delete"))
         self.cancel_button.setText(tr("launch.cancel_button"))
-        self.launch_progress.retranslate_dynamic()
+        if self.launch_progress is not None:
+            self.launch_progress.retranslate_dynamic()
         self.hub_tabs.setTabText(0, tr("workspace.tabs.worlds"))
         self.hub_tabs.setTabText(1, tr("workspace.tabs.screenshots"))
         self.hub_tabs.setTabText(2, tr("workspace.tabs.live_logs"))

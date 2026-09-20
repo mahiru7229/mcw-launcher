@@ -105,7 +105,7 @@ class MicrosoftOAuth:
                 response = httpx.post(
                     MicrosoftAuthConfig.TOKEN_URL,
                     data=data,
-                    timeout=30.0,
+                    timeout=10.0,
                 )
             except httpx.HTTPError:
                 continue

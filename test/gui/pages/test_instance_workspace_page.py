@@ -262,8 +262,7 @@ def test_workspace_expanded_action_panel_and_buttons(gui_app):
     assert page.quick_play_button.minimumHeight() == 40 or page.quick_play_button.maximumHeight() == 40
     assert page.cancel_button is not None
     assert page.cancel_button.isVisible() is False
-    assert page.launch_progress is not None
-    assert page.launch_progress.isVisible() is False
+    assert page.launch_progress is None
 
     for btn in (
         page.edit_button,
@@ -291,13 +290,11 @@ def test_workspace_launch_active_lifecycle_and_cancel_signal(gui_app):
 
     # Initially idle
     assert page.cancel_button.isVisible() is False
-    assert page.launch_progress.isVisible() is False
     assert page.launch_button.isEnabled() is True
 
     # When launch becomes active
     page.set_launch_active(True)
     assert page.cancel_button.isVisible() is True
-    assert page.launch_progress.isVisible() is True
     assert page.launch_button.isEnabled() is False
 
     # Emits cancel_launch_requested when cancel button clicked
@@ -309,7 +306,6 @@ def test_workspace_launch_active_lifecycle_and_cancel_signal(gui_app):
     # When launch finishes
     page.set_launch_active(False)
     assert page.cancel_button.isVisible() is False
-    assert page.launch_progress.isVisible() is False
     assert page.launch_button.isEnabled() is True
 
 

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, Qt
+from collections.abc import Callable
+import time
+
+from PySide6.QtCore import QPoint, QTimer, Qt
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -17,6 +20,102 @@ from mcw_core.api.language.language_manager import tr
 from src.gui.core.task_queue import TaskQueue, TaskQueueItem
 
 
+class ActiveTaskCard(QFrame):
+    """Reusable card widget representing an active task in the drawer.
+
+    Updates in-place without widget allocations to ensure high-performance rendering.
+    """
+
+    def __init__(self, task: TaskQueueItem, on_cancel: Callable[[str], None], parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("TaskItemCard")
+        self.task_id = task.task_id
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(5)
+
+        # Message and Cancel button row
+        top_row = QHBoxLayout()
+        top_row.setSpacing(6)
+        self.msg_label = QLabel()
+        self.msg_label.setStyleSheet("color: #e2e8f0; font-size: 11px; font-weight: bold;")
+        self.msg_label.setWordWrap(True)
+        top_row.addWidget(self.msg_label, 1)
+
+        self.cancel_button = QPushButton(tr("tasks.drawer.cancel"))
+        self.cancel_button.setObjectName("TaskDrawerCancelButton")
+        self.cancel_button.clicked.connect(lambda: on_cancel(self.task_id))
+        top_row.addWidget(self.cancel_button)
+        layout.addLayout(top_row)
+
+        # Progress bar and percentage row
+        prog_row = QHBoxLayout()
+        prog_row.setSpacing(6)
+        self.pbar = QProgressBar()
+        self.pbar.setObjectName("TaskDrawerItemProgress")
+        self.pbar.setFixedHeight(6)
+        self.pbar.setTextVisible(False)
+
+        self.pct_label = QLabel()
+        self.pct_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
+        self.pct_label.setFixedWidth(32)
+
+        prog_row.addWidget(self.pbar, 1)
+        prog_row.addWidget(self.pct_label)
+        layout.addLayout(prog_row)
+
+        # Detail row
+        self.detail_row = QHBoxLayout()
+        self.detail_row.setSpacing(6)
+        self.prog_text_label = QLabel()
+        self.prog_text_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
+        self.detail_row.addWidget(self.prog_text_label)
+        self.detail_row.addStretch(1)
+
+        self.speed_text_label = QLabel()
+        self.speed_text_label.setStyleSheet("color: #38bdf8; font-size: 10px; font-weight: bold;")
+        self.detail_row.addWidget(self.speed_text_label)
+        layout.addLayout(self.detail_row)
+
+        self.update_data(task)
+
+    def update_data(self, task: TaskQueueItem) -> None:
+        raw_msg = task.message or tr("progress.task.working")
+        msg = tr(str(raw_msg))
+        raw_detail = getattr(task, "detail", "")
+        detail = tr(str(raw_detail)) if raw_detail else ""
+        if detail and detail != msg and detail != raw_msg:
+            display_msg = f"{msg} — {detail}"
+        else:
+            display_msg = msg
+
+        if self.msg_label.text() != display_msg:
+            self.msg_label.setText(display_msg)
+
+        if task.percentage is not None:
+            self.pbar.setRange(0, 100)
+            val = max(0, min(100, int(task.percentage)))
+            self.pbar.setValue(val)
+            pct_str = f"{val}%"
+            if self.pct_label.text() != pct_str:
+                self.pct_label.setText(pct_str)
+        else:
+            self.pbar.setRange(0, 0)
+            if self.pct_label.text():
+                self.pct_label.setText("")
+
+        prog_text = task.progress_text or ""
+        if self.prog_text_label.text() != prog_text:
+            self.prog_text_label.setText(prog_text)
+        self.prog_text_label.setVisible(bool(prog_text))
+
+        speed_text = task.speed_text or ""
+        if self.speed_text_label.text() != speed_text:
+            self.speed_text_label.setText(speed_text)
+        self.speed_text_label.setVisible(bool(speed_text))
+
+
 class TaskDrawerPopover(QFrame):
     """Floating popover drawer showing active background tasks and recent completed history."""
 
@@ -26,6 +125,14 @@ class TaskDrawerPopover(QFrame):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
         self._queue: TaskQueue | None = None
+        self._active_cards: dict[str, ActiveTaskCard] = {}
+        self._rendered_completed_ids: list[str] = []
+        self._last_refresh_time: float = 0.0
+
+        self._throttle_timer = QTimer(self)
+        self._throttle_timer.setSingleShot(True)
+        self._throttle_timer.timeout.connect(self._on_throttle_timeout)
+
         self.setFixedWidth(380)
         self.setMinimumHeight(240)
         self.setMaximumHeight(500)
@@ -93,7 +200,7 @@ class TaskDrawerPopover(QFrame):
                 border-radius: 3px;
             }
             QProgressBar#TaskDrawerItemProgress::chunk {
-                background-color: #38bdf8;
+                background-color: #00af5c;
                 border-radius: 3px;
             }
         """)
@@ -185,104 +292,29 @@ class TaskDrawerPopover(QFrame):
         self._render_completed_tasks(completed)
 
     def _render_active_tasks(self, active_tasks: list[TaskQueueItem]) -> None:
-        # Clear existing active widgets
-        while self.active_container.count() > 0:
-            item = self.active_container.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
+        active_ids = {t.task_id for t in active_tasks}
+
+        # Remove cards that are no longer active
+        for task_id in list(self._active_cards.keys()):
+            if task_id not in active_ids:
+                card = self._active_cards.pop(task_id)
+                self.active_container.removeWidget(card)
+                card.deleteLater()
 
         if not active_tasks:
-            self.no_active_label = QLabel(tr("tasks.drawer.no_active"))
-            self.no_active_label.setObjectName("TaskDrawerMuted")
-            self.active_container.addWidget(self.no_active_label)
+            self.no_active_label.setVisible(True)
             return
 
+        self.no_active_label.setVisible(False)
+
+        # Update existing or add new cards
         for task in active_tasks:
-            card = self._create_active_task_card(task)
-            self.active_container.addWidget(card)
-
-    def _create_active_task_card(self, task: TaskQueueItem) -> QFrame:
-        card = QFrame()
-        card.setObjectName("TaskItemCard")
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(5)
-
-        # Message and Cancel button row
-        top_row = QHBoxLayout()
-        top_row.setSpacing(6)
-        msg_text = task.message or tr("progress.task.working")
-        msg_label = QLabel(msg_text)
-        msg_label.setStyleSheet("color: #e2e8f0; font-size: 11px; font-weight: bold;")
-        msg_label.setWordWrap(True)
-        top_row.addWidget(msg_label, 1)
-
-        cancel_button = QPushButton(tr("tasks.drawer.cancel"))
-        cancel_button.setObjectName("TaskDrawerCancelButton")
-        task_id = task.task_id
-        cancel_button.clicked.connect(lambda: self._cancel_task(task_id))
-        top_row.addWidget(cancel_button)
-        layout.addLayout(top_row)
-
-        # Progress bar and percentage row
-        prog_row = QHBoxLayout()
-        prog_row.setSpacing(6)
-        pbar = QProgressBar()
-        pbar.setObjectName("TaskDrawerItemProgress")
-        pbar.setFixedHeight(6)
-        pbar.setTextVisible(False)
-
-        pct_label = QLabel()
-        pct_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
-        pct_label.setFixedWidth(32)
-
-        if task.percentage is not None:
-            pbar.setRange(0, 100)
-            val = max(0, min(100, int(task.percentage)))
-            pbar.setValue(val)
-            pct_label.setText(f"{val}%")
-        else:
-            pbar.setRange(0, 0)
-            pct_label.setText("")
-
-        prog_row.addWidget(pbar, 1)
-        prog_row.addWidget(pct_label)
-        layout.addLayout(prog_row)
-
-        if task.speed_text or task.progress_text:
-            detail_row = QHBoxLayout()
-            detail_row.setSpacing(6)
-            if task.progress_text:
-                prog_text_label = QLabel(task.progress_text)
-                prog_text_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
-                detail_row.addWidget(prog_text_label)
-            detail_row.addStretch(1)
-            if task.speed_text:
-                speed_text_label = QLabel(task.speed_text)
-                speed_text_label.setStyleSheet("color: #38bdf8; font-size: 10px; font-weight: bold;")
-                detail_row.addWidget(speed_text_label)
-            layout.addLayout(detail_row)
-
-        return card
-
-    def _render_completed_tasks(self, completed_tasks: list[TaskQueueItem]) -> None:
-        # Clear existing completed widgets
-        while self.completed_container.count() > 0:
-            item = self.completed_container.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-
-        if not completed_tasks:
-            self.no_completed_label = QLabel(tr("tasks.drawer.no_completed"))
-            self.no_completed_label.setObjectName("TaskDrawerMuted")
-            self.completed_container.addWidget(self.no_completed_label)
-            return
-
-        for task in completed_tasks[:20]:  # limit to last 20 in drawer view
-            card = self._create_completed_task_card(task)
-            self.completed_container.addWidget(card)
+            if task.task_id in self._active_cards:
+                self._active_cards[task.task_id].update_data(task)
+            else:
+                card = ActiveTaskCard(task, on_cancel=self._cancel_task, parent=self.scroll_content)
+                self.active_container.addWidget(card)
+                self._active_cards[task.task_id] = card
 
     def _create_completed_task_card(self, task: TaskQueueItem) -> QFrame:
         card = QFrame()
@@ -313,9 +345,37 @@ class TaskDrawerPopover(QFrame):
         layout.addWidget(status_label)
         return card
 
+    def _render_completed_tasks(self, completed_tasks: list[TaskQueueItem]) -> None:
+        target_tasks = completed_tasks[:20]  # limit to last 20 in drawer view
+        target_ids = [t.task_id for t in target_tasks]
+
+        if target_ids == self._rendered_completed_ids:
+            return
+
+        self._rendered_completed_ids = target_ids
+
+        # Clear existing completed cards (keep no_completed_label intact)
+        for i in reversed(range(self.completed_container.count())):
+            item = self.completed_container.itemAt(i)
+            widget = item.widget()
+            if widget is not None and widget is not self.no_completed_label:
+                self.completed_container.removeWidget(widget)
+                widget.deleteLater()
+
+        if not target_tasks:
+            self.no_completed_label.setVisible(True)
+            return
+
+        self.no_completed_label.setVisible(False)
+
+        for task in target_tasks:
+            card = self._create_completed_task_card(task)
+            self.completed_container.addWidget(card)
+
     def _clear_history(self) -> None:
         if self._queue is not None:
             self._queue.clear_completed()
+        self._rendered_completed_ids = []
         self.refresh()
 
     def _cancel_task(self, task_id: str) -> None:
@@ -334,14 +394,38 @@ class TaskDrawerPopover(QFrame):
         self.show()
         self.raise_()
 
+    def hideEvent(self, event: object) -> None:
+        self._throttle_timer.stop()
+        super().hideEvent(event)
+
     def _on_queue_changed(self, _all_tasks: list[TaskQueueItem]) -> None:
         if self.isVisible():
+            self._throttle_timer.stop()
+            self._last_refresh_time = 0.0
             self.refresh()
 
-    def _on_task_updated(self, _item: TaskQueueItem) -> None:
-        if self.isVisible():
-            self.refresh()
+    def _on_task_updated(self, item: TaskQueueItem) -> None:
+        if not self.isVisible():
+            return
+        now = time.monotonic()
+        if now - self._last_refresh_time >= 0.033:
+            self._last_refresh_time = now
+            if item.task_id in self._active_cards:
+                self._active_cards[item.task_id].update_data(item)
+            elif self._queue:
+                self._render_active_tasks(self._queue.active_tasks())
+        elif not self._throttle_timer.isActive():
+            wait_ms = max(1, int((0.033 - (now - self._last_refresh_time)) * 1000))
+            self._throttle_timer.start(wait_ms)
+
+    def _on_throttle_timeout(self) -> None:
+        if not self.isVisible() or self._queue is None:
+            return
+        self._last_refresh_time = time.monotonic()
+        self._render_active_tasks(self._queue.active_tasks())
 
     def _on_task_completed(self, _item: TaskQueueItem) -> None:
         if self.isVisible():
+            self._throttle_timer.stop()
+            self._last_refresh_time = 0.0
             self.refresh()

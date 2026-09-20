@@ -38,6 +38,7 @@ class TaskQueueItem:
     task_id: str
     message: str
     stage: str = ""
+    detail: str = ""
     percentage: float | None = None
     status: str = "running"  # running, succeeded, failed, cancelled
     error: str | None = None
@@ -129,10 +130,41 @@ class TaskQueue(QObject):
     def _on_task_progress(self, task_id: str, event: Any) -> None:
         item = self._items.get(task_id)
         if item is None:
-            return
+            if self._runner is not None and hasattr(self._runner, "is_task_active") and not self._runner.is_task_active(task_id):
+                return
+            item = TaskQueueItem(
+                task_id=task_id,
+                message=str(getattr(event, "message", "") or task_id),
+                status="running",
+            )
+            self._items[task_id] = item
+            self._prune_history()
+            self.task_enqueued.emit(item)
+
+        event_state = getattr(event, "state", None)
+        if event_state is not None:
+            state_val = getattr(event_state, "value", str(event_state)).lower()
+            if state_val == "succeeded":
+                item.status = "succeeded"
+                item.percentage = 100.0
+                self.task_completed.emit(item)
+                self.queue_changed.emit(self.all_tasks())
+                return
+            elif state_val == "failed":
+                item.status = "failed"
+                item.error = str(getattr(event, "detail", "") or getattr(event, "message", "") or "Failed")
+                self.task_completed.emit(item)
+                self.queue_changed.emit(self.all_tasks())
+                return
+            elif state_val == "cancelled":
+                item.status = "cancelled"
+                self.task_completed.emit(item)
+                self.queue_changed.emit(self.all_tasks())
+                return
 
         percentage = getattr(event, "percentage", None)
         message = getattr(event, "message", "")
+        detail = getattr(event, "detail", "")
         stage = getattr(event, "stage", None)
         stage_name = getattr(stage, "value", str(stage)) if stage is not None else ""
         bytes_per_second = getattr(event, "bytes_per_second", None)
@@ -144,6 +176,8 @@ class TaskQueue(QObject):
             item.percentage = float(percentage)
         if message:
             item.message = str(message)
+        if detail:
+            item.detail = str(detail)
         if stage_name:
             item.stage = stage_name
         if bytes_per_second is not None:
@@ -162,7 +196,6 @@ class TaskQueue(QObject):
                 item.progress_text = f"{item.current_bytes}/{item.total_bytes}"
 
         self.task_updated.emit(item)
-        self.queue_changed.emit(self.all_tasks())
 
     def _on_task_succeeded(self, task_id: str, _result: Any) -> None:
         item = self._items.get(task_id)

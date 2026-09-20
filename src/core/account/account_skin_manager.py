@@ -110,6 +110,9 @@ class AccountSkinManager:
     def _validate_url(value: str) -> str:
         url = str(value or "").strip()
         parsed = urlparse(url)
+        if parsed.scheme.casefold() == "http" and parsed.netloc.casefold().endswith("textures.minecraft.net"):
+            url = parsed._replace(scheme="https").geturl()
+            parsed = urlparse(url)
         if parsed.scheme.casefold() != "https" or not parsed.netloc:
             raise ValueError("Minecraft skin URL must use HTTPS.")
         return url
