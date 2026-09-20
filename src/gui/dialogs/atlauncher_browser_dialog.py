@@ -294,7 +294,7 @@ class ATLauncherBrowserDialog(QDialog):
         self._selected_version = version
         loader = version.loader.title() if version.loader else tr("common.unknown")
         memory = f"{version.recommended_memory_mb} MiB" if version.recommended_memory_mb > 0 else tr("common.unknown")
-        blocked = bool(version.unsupported_actions) or any(file.download_type == "browser" for file in version.files)
+        blocked = bool(version.unsupported_actions) or any(file.download_type == "browser" for file in version.files if not file.server_only)
         status_key = "atlauncher.version.status_limited" if blocked else "atlauncher.version.status"
         self.detail_panel.set_status(tr(
             status_key,
@@ -326,7 +326,7 @@ class ATLauncherBrowserDialog(QDialog):
         self._busy = bool(busy)
         for widget in (self.search_button, self.refresh_button, self.clear_cache_button, self.results_table, self.version_combo, self.include_beta_checkbox, self.include_alpha_checkbox):
             widget.setEnabled(not self._busy)
-        blocked = bool(self._selected_version and (self._selected_version.unsupported_actions or any(file.download_type == "browser" for file in self._selected_version.files)))
+        blocked = bool(self._selected_version and (self._selected_version.unsupported_actions or any(file.download_type == "browser" for file in self._selected_version.files if not file.server_only)))
         self.install_button.setEnabled(not self._busy and self._selected_version is not None and not blocked)
         self.detail_panel.open_web_button.setEnabled(not self._busy and bool(self._selected_project and self._selected_project.website_url))
         self.previous_button.setEnabled(not self._busy and self._result is not None and self._result.index > 0)
