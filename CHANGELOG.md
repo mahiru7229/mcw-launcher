@@ -18,7 +18,7 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
 ## [1.6.0-beta.5] - 2026-09-20
 
 ### Added
-- Enhance CurseForge gateway compatibility with modern endpoint deployments (`https://mcw-curseforge-gateway-mavuika-iota.vercel.app/api/curseforge`).
+- Enhance CurseForge gateway compatibility with modern endpoint deployments.
 - Add flexible mod loader identifier and structure parsing in `CurseForgePackInstaller`:
   - Support prefixed loader IDs (e.g. `1.20.1-47.3.0` -> `47.3.0`, `loader-0.15.11` -> `0.15.11`).
   - Support list of dicts, list of strings, or single dict `modLoaders`/`modLoader` in modpack manifests.

@@ -19,6 +19,11 @@
 > [!NOTE]
 > `v1.6.0` là bản stable chính thức, chuyển đổi hoàn toàn về định dạng phân phối một tệp thực thi (`one-file`). Phiên bản này bao gồm cơ chế tự động dọn dẹp tàn dư onedir từ các bản beta cũ, vá triệt để các lỗi CurseForge, FTB và ATLauncher.
 
+> [!IMPORTANT]
+> **If you are looking for related components / Các dự án liên quan:**
+> 1. **Core**: [MCW Launcher Core · Download & Docs](https://mahiru7229.github.io/mcw_core/index.html) — Thư viện core headless độc lập, tài liệu API và bản tải wheel.
+> 2. **CurseForge Gateway**: [mahiru7229/mcw-curseforge-gateway](https://github.com/mahiru7229/mcw-curseforge-gateway) — Mã nguồn gateway để người dùng tự build/deploy riêng. Launcher không tích hợp sẵn endpoint gateway công khai do tác giả không có kinh phí duy trì server gánh lượng lớn request cho cộng đồng (link gateway cá nhân chỉ tạo dùng nội bộ nhóm nhỏ và dự án không có dự định mở API công khai cho ứng dụng).
+
 ## Tổng quan
 
 MCW Launcher tách mỗi cấu hình chơi thành một **instance** độc lập. Mỗi instance có phiên bản Minecraft, mod loader, mods, resource packs, shader packs, saves, Java, RAM và JVM arguments riêng. Thiết kế này giúp việc thử modpack, sửa lỗi hoặc sao lưu không ảnh hưởng đến các instance khác.
@@ -126,8 +131,10 @@ mcw-launcher/
 
 GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, không import trực tiếp `src.core`. Metadata tải về phải được kiểm tra identifier, đường dẫn và checksum trước khi ghi vào workspace. Xem [kiến trúc chi tiết](docs/ARCHITECTURE.md).
 
-## Tài liệu
+## Tài liệu & Dự án liên quan
 
+- [MCW Launcher Core · Download & Docs](https://mahiru7229.github.io/mcw_core/index.html)
+- [MCW CurseForge Gateway](https://github.com/mahiru7229/mcw-curseforge-gateway)
 - [Quickstart](docs/QUICKSTART.md)
 - [Kiểm thử trên Lubuntu](docs/LINUX_TESTING.md)
 - [Kiến trúc](docs/ARCHITECTURE.md)

@@ -145,8 +145,8 @@ def test_default_gateway_url_is_used_when_no_local_config(monkeypatch, tmp_path:
     clear_environment(monkeypatch)
     monkeypatch.setattr(CurseForgeConfigManager, "path", staticmethod(lambda: tmp_path / "private" / "curseforge_endpoints.json"))
     monkeypatch.setattr(CurseForgeConfigManager, "legacy_path", staticmethod(lambda: tmp_path / "curseforge.json"))
-    monkeypatch.setattr(CurseForgeConfigManager, "DEFAULT_GATEWAY_URLS", ("https://mcw-curseforge-gateway-mavuika-iota.vercel.app/api/curseforge",))
+    monkeypatch.setattr(CurseForgeConfigManager, "DEFAULT_GATEWAY_URLS", ("https://gateway.example.com/api/curseforge",))
 
-    assert CurseForgeConfigManager.gateway_urls() == ("https://mcw-curseforge-gateway-mavuika-iota.vercel.app/api/curseforge",)
+    assert CurseForgeConfigManager.gateway_urls() == ("https://gateway.example.com/api/curseforge",)
     assert CurseForgeConfigManager.is_configured() is True
-    assert CurseForgeConfigManager.gateway_url() == "https://mcw-curseforge-gateway-mavuika-iota.vercel.app/api/curseforge"
+    assert CurseForgeConfigManager.gateway_url() == "https://gateway.example.com/api/curseforge"
