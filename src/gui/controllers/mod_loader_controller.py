@@ -36,6 +36,19 @@ class ModLoaderController(BaseController):
     def load_neoforge_versions(self, game_version: str) -> None:
         self._load_versions("neoforge", game_version, NeoForgeMetadataClient.list_versions, "NeoForge")
 
+    def reload_loader_versions(self, loader: str, game_version: str) -> None:
+        loader_name = str(loader).strip().lower()
+        resolver_map = {
+            "fabric": (FabricMetaClient.list_loader_versions, "Fabric"),
+            "quilt": (QuiltMetaClient.list_loader_versions, "Quilt"),
+            "forge": (ForgeMetadataClient.list_versions, "Forge"),
+            "neoforge": (NeoForgeMetadataClient.list_versions, "NeoForge"),
+        }
+        if loader_name not in resolver_map:
+            return
+        resolver, title = resolver_map[loader_name]
+        self._load_versions(loader_name, game_version, lambda gv: resolver(gv, force_refresh=True), title)
+
     def _load_versions(self, loader: str, game_version: str, resolver, title: str) -> None:
         game_version = game_version.strip()
         if not game_version:

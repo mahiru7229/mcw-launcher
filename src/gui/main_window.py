@@ -404,6 +404,7 @@ class MainWindow(QMainWindow):
         self.instances_page.quilt_versions_requested.connect(self.mod_loader_controller.load_quilt_versions)
         self.instances_page.forge_versions_requested.connect(self.mod_loader_controller.load_forge_versions)
         self.instances_page.neoforge_versions_requested.connect(self.mod_loader_controller.load_neoforge_versions)
+        self.instances_page.reload_loader_requested.connect(self.mod_loader_controller.reload_loader_versions)
         self.instances_page.loader_change_requested.connect(self.instance_controller.change_loader)
         self.instances_page.repair_loader_requested.connect(self.instance_controller.repair_loader)
         self.instances_page.restore_forge_requested.connect(self.instance_controller.restore_previous_forge)

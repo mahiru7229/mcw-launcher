@@ -2,6 +2,19 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.6.1] - 2026-09-23
+
+### Added
+- Thêm nút tải lại (reload) danh sách phiên bản modloader trong hộp thoại Tạo Instance (`CreateInstanceDialog`), cho phép người dùng nạp lại danh sách mà không cần phải khởi động lại launcher khi gặp sự cố mạng.
+- Bổ sung hàm `HttpDownloader.get_with_retry` với cơ chế tự động thử lại tối thiểu 5 lần (`max_attempts=5`) và exponential backoff cho các yêu cầu API metadata của các modloader (Fabric, Quilt, Forge, NeoForge, OptiFine).
+- Tự động bỏ qua cache danh sách rỗng khi tải loader thất bại để người dùng có thể thử lại ngay lập tức.
+
+### Fixed
+- Fix Issue #32: `FileNotFoundError: [WinError 3] The system cannot find the path specified` during Minecraft 1.21.1 NeoForge instance creation on Windows environments with path length >= 260 characters (`MAX_PATH`).
+- Shorten staging publishing temporary file pattern in `SharedFileMaterializer` to `.tmp_<hex>.pub`, saving up to 90 path characters.
+- Add extended Windows path prefix (`\\?\`) support in `windows_path.py` (`copy_file`, `link_file`, `same_file`) with streaming chunk fallback for Win32 file copying.
+- Protect `NeoForgeVersionManager` and `ForgeVersionManager` against long file paths during caching, installer staging, and verification.
+
 ## [1.6.1-beta.1] - 2026-09-23
 
 ### Fixed

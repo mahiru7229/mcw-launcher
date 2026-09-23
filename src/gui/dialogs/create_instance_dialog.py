@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -37,6 +38,7 @@ class CreateInstanceDialog(QDialog):
     quilt_versions_requested = Signal(str)
     forge_versions_requested = Signal(str)
     neoforge_versions_requested = Signal(str)
+    reload_loader_requested = Signal(str, str)
     import_modpack_package_requested = Signal()
     browse_modrinth_requested = Signal()
     browse_curseforge_requested = Signal()
@@ -100,6 +102,16 @@ class CreateInstanceDialog(QDialog):
         self.loader_combo.addItem("Forge", "forge")
         self.loader_combo.addItem("NeoForge", "neoforge")
         self.loader_combo.currentIndexChanged.connect(self._selection_changed)
+        self.reload_loader_button = set_theme_icon(QPushButton(), "icon.action.refresh")
+        self.reload_loader_button.setToolTip(tr("workspace.create.reload_loader"))
+        self.reload_loader_button.clicked.connect(self._reload_selected_loader)
+
+        loader_row = QHBoxLayout()
+        loader_row.setContentsMargins(0, 0, 0, 0)
+        loader_row.setSpacing(6)
+        loader_row.addWidget(self.loader_combo, 1)
+        loader_row.addWidget(self.reload_loader_button)
+
         self.loader_version_combo = QComboBox()
         self.loader_version_combo.setEnabled(False)
         self.loader_version_combo.currentIndexChanged.connect(self._update_create_state)
@@ -112,7 +124,7 @@ class CreateInstanceDialog(QDialog):
         self.jvm_preset_label = QLabel()
         form.addRow(self.name_label, self.name_input)
         form.addRow(self.version_label, self.version_combo)
-        form.addRow(self.loader_label, self.loader_combo)
+        form.addRow(self.loader_label, loader_row)
         form.addRow(self.loader_version_label, self.loader_version_combo)
         form.addRow(self.jvm_preset_label, self.jvm_preset_combo)
         layout.addLayout(form)
@@ -272,6 +284,8 @@ class CreateInstanceDialog(QDialog):
         loader = self.selected_loader()
         game_version = self.version_combo.currentText().strip()
         self._sync_optifine_support(loader, game_version)
+        if hasattr(self, "reload_loader_button"):
+            self.reload_loader_button.setEnabled(loader in self.MODDED_LOADERS and bool(game_version))
         self.loader_version_combo.blockSignals(True)
         self.loader_version_combo.clear()
         self.loader_version_combo.blockSignals(False)
@@ -290,7 +304,7 @@ class CreateInstanceDialog(QDialog):
 
         key = (loader, game_version)
         cached = self._loader_versions.get(key)
-        if cached is not None:
+        if cached is not None and len(cached) > 0:
             self._render_loader_versions(loader, cached)
             return
 
@@ -308,6 +322,23 @@ class CreateInstanceDialog(QDialog):
         }.get(loader)
         if signal is not None:
             signal.emit(game_version)
+
+    def _reload_selected_loader(self) -> None:
+        loader = self.selected_loader()
+        game_version = self.version_combo.currentText().strip()
+        if loader not in self.MODDED_LOADERS or not game_version:
+            return
+        key = (loader, game_version)
+        self._loader_versions.pop(key, None)
+        self._pending_loader_requests.discard(key)
+        self.loader_version_combo.blockSignals(True)
+        self.loader_version_combo.clear()
+        self.loader_version_combo.blockSignals(False)
+        self.loader_version_combo.setEnabled(False)
+        self.loader_status.setText(tr("workspace.create.loader_version.loading", loader=loader_title(loader), version=game_version))
+        self._update_create_state()
+        self._pending_loader_requests.add(key)
+        self.reload_loader_requested.emit(loader, game_version)
 
     def _render_loader_versions(self, loader: str, versions: list[object]) -> None:
         entries = loader_version_entries(loader, versions, tr(" (stable)"))
@@ -503,5 +534,7 @@ class CreateInstanceDialog(QDialog):
         self.create_button.setText(tr("workspace.create.create_button"))
         if self.cancel_button is not None:
             self.cancel_button.setText(tr("common.cancel"))
+        if hasattr(self, "reload_loader_button"):
+            self.reload_loader_button.setToolTip(tr("workspace.create.reload_loader"))
         self._optifine_toggled(self.optifine_checkbox.isChecked())
         self._selection_changed()

@@ -1270,6 +1270,7 @@
     "workspace.create.name": "Name",
     "workspace.create.minecraft_version": "Minecraft version",
     "workspace.create.loader": "Mod loader",
+    "workspace.create.reload_loader": "Reload loader versions",
     "workspace.create.show_snapshots": "Show snapshots, old alpha, and old beta versions",
     "workspace.create.loader_hint": "MCW loads the exact versions published for the selected Minecraft version. Creation stays disabled when that loader has no compatible release.",
     "workspace.create.modpack_hint": "Browse a provider or import an existing MCW package. The new instance will appear in the library when installation starts.",

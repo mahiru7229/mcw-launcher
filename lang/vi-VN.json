@@ -1270,6 +1270,7 @@
     "workspace.create.name": "Tên",
     "workspace.create.minecraft_version": "Phiên bản Minecraft",
     "workspace.create.loader": "Mod loader",
+    "workspace.create.reload_loader": "Tải lại danh sách phiên bản loader",
     "workspace.create.show_snapshots": "Hiện snapshot, old alpha và old beta",
     "workspace.create.loader_hint": "MCW chỉ tải danh sách phiên bản loader được phát hành cho phiên bản Minecraft đã chọn. Nút tạo sẽ bị khóa nếu loader đó không có bản tương thích.",
     "workspace.create.modpack_hint": "Duyệt modpack từ provider hoặc nhập gói MCW có sẵn. Instance mới sẽ xuất hiện trong thư viện khi bắt đầu cài.",
