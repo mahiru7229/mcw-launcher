@@ -12,12 +12,12 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.6.0-blue" alt="v1.6.0">
+  <img src="https://img.shields.io/badge/version-v1.6.1-blue" alt="v1.6.1">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!NOTE]
-> `v1.6.0` là bản stable chính thức, chuyển đổi hoàn toàn về định dạng phân phối một tệp thực thi (`one-file`). Phiên bản này bao gồm cơ chế tự động dọn dẹp tàn dư onedir từ các bản beta cũ, vá triệt để các lỗi CurseForge, FTB và ATLauncher.
+> `v1.6.1` là bản stable chính thức, bổ sung nút làm mới danh sách modloader trong hộp thoại Tạo Instance, cơ chế thử lại tự động ít nhất 5 lần cho API metadata modloader, và khắc phục triệt để lỗi đường dẫn dài trên Windows (Fix Issue #32). Dạng phân phối một tệp thực thi (`one-file`) tiếp tục được duy trì trên cả Windows và Linux.
 
 > [!IMPORTANT]
 > **If you are looking for related components / Các dự án liên quan:**
@@ -40,7 +40,7 @@ Các nhóm tính năng chính:
 
 ## Trạng thái nền tảng
 
-| Nền tảng | Trạng thái v1.6.0 | Ghi chú |
+| Nền tảng | Trạng thái v1.6.1 | Ghi chú |
 | --- | --- | --- |
 | Windows 10/11 x64 | Đang hỗ trợ | Phân phối dạng tệp thực thi duy nhất (`MCW Launcher.exe`). |
 | Linux x64 | Đang hỗ trợ | Phân phối dạng tệp thực thi duy nhất (`mcw-launcher`). Automatic update và desktop opener đã được kiểm thử trên Lubuntu. |
@@ -142,6 +142,7 @@ GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, khô
 - [MCW Core API](docs/MCW_CORE_LIBRARY.md)
 - [Language packs](docs/LANGUAGE_PACKS.md)
 - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
+- [Release notes v1.6.1](docs/releases/v1.6.1.md)
 - [Release notes v1.6.0](docs/releases/v1.6.0.md)
 - [Release notes v1.6.0-beta.5](docs/releases/v1.6.0-beta.5.md)
 - [Release notes v1.6.0-beta.4](docs/releases/v1.6.0-beta.4.md)
