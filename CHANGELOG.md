@@ -2,6 +2,14 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.6.1-beta.1] - 2026-09-23
+
+### Fixed
+- Fix Issue #32: `FileNotFoundError: [WinError 3] The system cannot find the path specified` during Minecraft 1.21.1 NeoForge instance creation on Windows environments with path length >= 260 characters (`MAX_PATH`).
+- Shorten staging publishing temporary file pattern in `SharedFileMaterializer` to `.tmp_<hex>.pub`, saving up to 90 path characters.
+- Add extended Windows path prefix (`\\?\`) support in `windows_path.py` (`copy_file`, `link_file`, `same_file`) with streaming chunk fallback for Win32 file copying.
+- Protect `NeoForgeVersionManager` and `ForgeVersionManager` against long file paths during caching, installer staging, and verification.
+
 ## [1.6.0] - 2026-09-20
 
 ### Added
