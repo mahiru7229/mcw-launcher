@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSizePolicy,
+    QStyle,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -102,7 +103,9 @@ class CreateInstanceDialog(QDialog):
         self.loader_combo.addItem("Forge", "forge")
         self.loader_combo.addItem("NeoForge", "neoforge")
         self.loader_combo.currentIndexChanged.connect(self._selection_changed)
-        self.reload_loader_button = set_theme_icon(QPushButton(), "icon.action.refresh")
+        self.reload_loader_button = set_theme_icon(QPushButton(tr("common.refresh")), "icon.action.refresh")
+        if self.reload_loader_button.icon().isNull():
+            self.reload_loader_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
         self.reload_loader_button.setToolTip(tr("workspace.create.reload_loader"))
         self.reload_loader_button.clicked.connect(self._reload_selected_loader)
 
@@ -535,6 +538,9 @@ class CreateInstanceDialog(QDialog):
         if self.cancel_button is not None:
             self.cancel_button.setText(tr("common.cancel"))
         if hasattr(self, "reload_loader_button"):
+            self.reload_loader_button.setText(tr("common.refresh"))
+            if self.reload_loader_button.icon().isNull():
+                self.reload_loader_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
             self.reload_loader_button.setToolTip(tr("workspace.create.reload_loader"))
         self._optifine_toggled(self.optifine_checkbox.isChecked())
         self._selection_changed()

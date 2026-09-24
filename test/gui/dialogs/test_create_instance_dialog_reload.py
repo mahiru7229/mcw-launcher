@@ -27,6 +27,8 @@ def test_create_instance_dialog_reload_button_behavior(app) -> None:
     # Initial state: vanilla selected, reload button should be disabled
     assert dialog.selected_loader() == "vanilla"
     assert not dialog.reload_loader_button.isEnabled()
+    assert dialog.reload_loader_button.text() != ""
+    assert not dialog.reload_loader_button.icon().isNull()
 
     # Track emitted reload signals
     reload_signals = []
