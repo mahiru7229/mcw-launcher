@@ -7,6 +7,16 @@ import tempfile
 import traceback
 
 
+def _bootstrap_hotfixes() -> None:
+    try:
+        from src.config import VERSION_ID
+        from src.core.update.hotfix_manager import HotfixManager
+
+        HotfixManager.bootstrap_sys_path(current_base_version=VERSION_ID)
+    except Exception:
+        pass
+
+
 def _start_update_cleanup() -> None:
     from mcw_core.api.update.update_cleanup import UpdateCleanupWorker, consume_update_cleanup_arguments
 
@@ -120,6 +130,7 @@ def _launch_recovery_tool(executable: Path) -> None:
 
 
 def main() -> None:
+    _bootstrap_hotfixes()
     _start_update_cleanup()
 
     from src.gui.application import create_application
