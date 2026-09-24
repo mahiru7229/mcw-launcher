@@ -108,12 +108,14 @@ class CreateInstanceDialog(QDialog):
             self.reload_loader_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
         self.reload_loader_button.setToolTip(tr("workspace.create.reload_loader"))
         self.reload_loader_button.clicked.connect(self._reload_selected_loader)
+        self._update_reload_button_geometry()
 
         loader_row = QHBoxLayout()
         loader_row.setContentsMargins(0, 0, 0, 0)
         loader_row.setSpacing(6)
-        loader_row.addWidget(self.loader_combo, 1)
+        loader_row.addWidget(self.loader_combo)
         loader_row.addWidget(self.reload_loader_button)
+        loader_row.addStretch(1)
 
         self.loader_version_combo = QComboBox()
         self.loader_version_combo.setEnabled(False)
@@ -343,6 +345,19 @@ class CreateInstanceDialog(QDialog):
         self._pending_loader_requests.add(key)
         self.reload_loader_requested.emit(loader, game_version)
 
+    def _update_reload_button_geometry(self) -> None:
+        if not hasattr(self, "reload_loader_button"):
+            return
+        self.reload_loader_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        text = self.reload_loader_button.text()
+        fm = self.reload_loader_button.fontMetrics()
+        text_w = fm.horizontalAdvance(text) if text else 0
+        icon_w = self.reload_loader_button.iconSize().width() if not self.reload_loader_button.icon().isNull() else 16
+        padding = 20
+        total_w = text_w + icon_w + padding
+        self.reload_loader_button.setFixedWidth(max(70, total_w))
+        self.reload_loader_button.adjustSize()
+
     def _render_loader_versions(self, loader: str, versions: list[object]) -> None:
         entries = loader_version_entries(loader, versions, tr(" (stable)"))
         self.loader_version_combo.blockSignals(True)
@@ -542,5 +557,6 @@ class CreateInstanceDialog(QDialog):
             if self.reload_loader_button.icon().isNull():
                 self.reload_loader_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
             self.reload_loader_button.setToolTip(tr("workspace.create.reload_loader"))
+            self._update_reload_button_geometry()
         self._optifine_toggled(self.optifine_checkbox.isChecked())
         self._selection_changed()
