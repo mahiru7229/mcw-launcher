@@ -150,9 +150,25 @@ class HotfixManager:
         temp_path.write_text(json.dumps(asdict(state), indent=2), encoding="utf-8")
         temp_path.replace(self.state_file)
 
+    @staticmethod
+    def _matches_base_version(candidate_base: str, current_base: str) -> bool:
+        """Check if candidate base version matches current launcher base version.
+
+        Supports both exact string matching and 3-part major.minor.patch equivalence
+        (e.g., matching '1.7.0' against '1.7.0-alpha.1').
+        """
+        if str(candidate_base).strip() == str(current_base).strip():
+            return True
+        try:
+            cand_v = LauncherVersion.parse(candidate_base)
+            curr_v = LauncherVersion.parse(current_base)
+            return (cand_v.major, cand_v.minor, cand_v.patch) == (curr_v.major, curr_v.minor, curr_v.patch)
+        except ValueError:
+            return False
+
     def get_effective_version(self, base_version: str) -> str:
         state = self.load_state()
-        if state is not None and state.base_version == base_version:
+        if state is not None and self._matches_base_version(state.base_version, base_version):
             return state.target_version
         return base_version
 
@@ -161,7 +177,7 @@ class HotfixManager:
         state = self.load_state()
         if state is None:
             return False
-        if state.clean_on_upgrade and state.base_version != current_base_version:
+        if state.clean_on_upgrade and not self._matches_base_version(state.base_version, current_base_version):
             logger.info(
                 "Upgraded base version from %s to %s; purging obsolete hotfix %s",
                 state.base_version,
@@ -190,7 +206,7 @@ class HotfixManager:
         if state is None:
             return False
 
-        if current_base_version is not None and state.base_version != current_base_version:
+        if current_base_version is not None and not cls._matches_base_version(state.base_version, current_base_version):
             return False
 
         if not manager.live_dir.is_dir():
@@ -259,7 +275,7 @@ class HotfixManager:
         """Find the newest enabled hotfix applicable to the current base version."""
         if current_hotfix_id is None:
             state = self.load_state()
-            if state is not None and state.base_version == current_base_version:
+            if state is not None and self._matches_base_version(state.base_version, current_base_version):
                 current_hotfix_id = state.applied_hotfix_id
             else:
                 current_hotfix_id = 0
@@ -269,7 +285,7 @@ class HotfixManager:
             e
             for e in entries
             if e.enabled
-            and e.base_version == current_base_version
+            and self._matches_base_version(e.base_version, current_base_version)
             and e.hotfix_id > current_hotfix_id
         ]
         if not eligible:

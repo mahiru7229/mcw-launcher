@@ -300,3 +300,28 @@ def test_rollback(tmp_path: Path) -> None:
     assert not manager.live_dir.exists()
     assert not manager.state_file.exists()
     assert manager.get_effective_version("1.7.0") == "1.7.0"
+
+
+def test_prerelease_base_version_matching(tmp_path: Path) -> None:
+    manifest_data = {
+        "schema_version": 1,
+        "active_hotfixes": [
+            {
+                "base_version": "1.7.0",
+                "target_version": "1.7.0.1",
+                "hotfix_id": 1,
+                "enabled": True,
+                "download_url": "https://example.com/1.zip",
+                "sha256": "111",
+            },
+        ],
+    }
+
+    client = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=manifest_data)))
+    manager = HotfixManager(root_directory=tmp_path, client=client)
+
+    # A launcher running 1.7.0-alpha.1 should match base 1.7.0
+    best = manager.check_for_hotfix("1.7.0-alpha.1", current_hotfix_id=0)
+    assert best is not None
+    assert best.target_version == "1.7.0.1"
+
