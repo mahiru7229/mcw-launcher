@@ -325,3 +325,41 @@ def test_prerelease_base_version_matching(tmp_path: Path) -> None:
     assert best is not None
     assert best.target_version == "1.7.0.1"
 
+
+def test_meta_path_finder_submodule_interception(tmp_path: Path) -> None:
+    patch_code = b"FLAG_VALUE = 'patched_from_hotfix'\n"
+    zip_bytes, sha256 = _create_zip_bytes({"testpkg/subpkg/worker.py": patch_code})
+
+    entry = HotfixEntry(
+        base_version="1.7.0",
+        target_version="1.7.0.1",
+        hotfix_id=1,
+        release_tag="v1.7.0.1",
+        description="Patch worker",
+        enabled=True,
+        download_url="https://example.com/p.zip",
+        sha256=sha256,
+        size_bytes=len(zip_bytes),
+    )
+
+    client = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(200, content=zip_bytes)))
+    manager = HotfixManager(root_directory=tmp_path, client=client)
+    manager.apply_hotfix(entry)
+
+    # Clean any leftover sys.modules
+    for mod in list(sys.modules.keys()):
+        if mod.startswith("testpkg"):
+            del sys.modules[mod]
+
+    HotfixManager.bootstrap_sys_path(root_directory=tmp_path, current_base_version="1.7.0")
+
+    import testpkg.subpkg.worker as worker
+    assert getattr(worker, "FLAG_VALUE") == "patched_from_hotfix"
+    assert str(manager.live_dir.resolve()) in str(Path(worker.__file__).resolve())
+
+    # Rollback clears finder
+    assert manager.rollback() is True
+    from src.core.update.hotfix_manager import HotfixMetaPathFinder
+    assert not any(isinstance(f, HotfixMetaPathFinder) for f in sys.meta_path)
+
+

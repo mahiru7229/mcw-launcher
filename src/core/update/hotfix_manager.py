@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import hashlib
+import importlib.abc
+import importlib.machinery
+import importlib.util
 import json
 import logging
 import os
@@ -21,6 +24,35 @@ from src.core.update.versioning import LauncherVersion
 logger = logging.getLogger(__name__)
 
 DEFAULT_HOTFIX_MANIFEST_URL = "https://mcw-download.pages.dev/hotfixes/manifest.json"
+
+
+class HotfixMetaPathFinder(importlib.abc.MetaPathFinder):
+    """Custom meta-path finder that intercepts module imports for files present in hotfixes/live."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root.resolve()
+
+    def find_spec(
+        self,
+        fullname: str,
+        path: object = None,
+        target: object = None,
+    ) -> importlib.machinery.ModuleSpec | None:
+        if not self.root.is_dir():
+            return None
+        parts = fullname.split(".")
+        candidate = self.root.joinpath(*parts)
+        candidate_file = candidate.with_suffix(".py")
+        if candidate_file.is_file():
+            return importlib.util.spec_from_file_location(fullname, candidate_file)
+        init_file = candidate / "__init__.py"
+        if init_file.is_file():
+            return importlib.util.spec_from_file_location(
+                fullname,
+                init_file,
+                submodule_search_locations=[str(candidate)],
+            )
+        return None
 
 
 class HotfixError(Exception):
@@ -189,12 +221,23 @@ class HotfixManager:
         return False
 
     @classmethod
+    def _install_meta_path_finder(cls, live_dir: Path) -> None:
+        cls._remove_meta_path_finder()
+        sys.meta_path.insert(0, HotfixMetaPathFinder(live_dir))
+
+    @classmethod
+    def _remove_meta_path_finder(cls) -> None:
+        sys.meta_path[:] = [
+            f for f in sys.meta_path if not isinstance(f, HotfixMetaPathFinder)
+        ]
+
+    @classmethod
     def bootstrap_sys_path(
         cls,
         root_directory: Path | None = None,
         current_base_version: str | None = None,
     ) -> bool:
-        """Inject hotfixes/live directory to the front of sys.path if active.
+        """Inject hotfixes/live directory to the front of sys.path and sys.meta_path if active.
 
         Called at the earliest stage of launcher startup (before major module imports).
         """
@@ -215,8 +258,8 @@ class HotfixManager:
         live_str = str(manager.live_dir.resolve())
         if live_str not in sys.path:
             sys.path.insert(0, live_str)
-            logger.info("Hotfix %s injected into sys.path[0]: %s", state.target_version, live_str)
-            return True
+        cls._install_meta_path_finder(manager.live_dir)
+        logger.info("Hotfix %s injected into sys.path[0] and sys.meta_path: %s", state.target_version, live_str)
         return True
 
     # -------------------------------------------------------------------------
@@ -415,6 +458,11 @@ class HotfixManager:
             )
             self.save_state(state)
 
+            live_str = str(self.live_dir.resolve())
+            if live_str not in sys.path:
+                sys.path.insert(0, live_str)
+            self._install_meta_path_finder(self.live_dir)
+
             if progress_callback:
                 progress_callback(100, f"Hotfix {entry.target_version} successfully applied.")
 
@@ -427,6 +475,11 @@ class HotfixManager:
     def rollback(self) -> bool:
         """Roll back active hotfix, returning launcher to clean base state."""
         changed = False
+        self._remove_meta_path_finder()
+        live_str = str(self.live_dir.resolve())
+        while live_str in sys.path:
+            sys.path.remove(live_str)
+            changed = True
         if self.live_dir.is_dir():
             shutil.rmtree(self.live_dir, ignore_errors=True)
             changed = True
