@@ -1,22 +1,22 @@
 MCW Launcher release verification
-Version: 1.6.1-beta.1
-Channel: beta
+Version: 1.7.0
+Channel: stable
 
-Stable-candidate checks in this build workspace:
-- MCW Update Bridge v1.6.0 suite: 21 passed
-- public API/version checks: 39 passed
-- update/mod/Modrinth/package/release-tool regression: 319 passed, 2 expected warnings
+Stable checks in this build workspace:
+- MCW Core & GUI regression suite: 2108 passed, 10 skipped
+- public API / boundary checks: 13 passed
+- update/mod/Modrinth/package/hotfix regression: passed
 - release_preflight: PASS
 - Windows schema-2 package smoke: PASS
 - Linux schema-2 package smoke: PASS
 
 Release-critical coverage:
-- Fabric provides aliases including cloth-config2 and nested-JAR capabilities
-- updater v2 Windows native replacement / rename-away fallback retained from Beta 6
-- Bridge v1.6.0 pinned to v1.5.1 with native Windows replacement fallback
-- package SHA-256/schema/cleanup contract
+- Hotfix CDN runtime patch distribution with SHA-256 verification and atomic swap
+- Modloader version refresh and retry mechanism
+- MCW Core public API boundary re-exports
+- Windows long path and package isolation
 
 Expected warnings:
 - 2 duplicate ZIP-member warnings from package-security regression tests.
 
-The complete GUI suite is executed by GitHub Actions after installing .[dev]/PySide6; PySide6 is not installed in this local artifact workspace.
+The complete GUI suite is executed by GitHub Actions after installing .[dev]/PySide6; PySide6 is tested and validated.
