@@ -236,14 +236,19 @@ class HotfixManager:
         cls,
         root_directory: Path | None = None,
         current_base_version: str | None = None,
+        auto_sync: bool = False,
     ) -> bool:
         """Inject hotfixes/live directory to the front of sys.path and sys.meta_path if active.
 
         Called at the earliest stage of launcher startup (before major module imports).
+        If auto_sync is True and current_base_version is provided, attempts a fast fail-open
+        sync against the Cloudflare Edge CDN before bootstrapping.
         """
         manager = cls(root_directory=root_directory)
         if current_base_version is not None:
             manager.cleanup_on_upgrade(current_base_version)
+            if auto_sync:
+                manager.sync_active_hotfix(current_base_version)
 
         state = manager.load_state()
         if state is None:
@@ -337,6 +342,32 @@ class HotfixManager:
         # Sort descending by hotfix_id to select the latest patch
         eligible.sort(key=lambda e: e.hotfix_id, reverse=True)
         return eligible[0]
+
+    def sync_active_hotfix(
+        self,
+        current_base_version: str,
+        timeout: float = 3.0,
+    ) -> HotfixState | None:
+        """Check Cloudflare Edge CDN and automatically apply latest eligible hotfix if newer.
+
+        Designed to be fail-open: any network timeout or transport failure is logged,
+        allowing the launcher to proceed with existing state without crashing or freezing.
+        """
+        try:
+            current_state = self.load_state()
+            current_id = current_state.applied_hotfix_id if current_state else 0
+            eligible = self.check_for_hotfix(current_base_version, current_hotfix_id=current_id)
+            if eligible is not None:
+                logger.info(
+                    "Newer hotfix %s (ID %d) discovered on CDN. Downloading and applying...",
+                    eligible.target_version,
+                    eligible.hotfix_id,
+                )
+                return self.apply_hotfix(eligible)
+            return current_state
+        except Exception as exc:
+            logger.debug("Automatic hotfix sync skipped due to network/CDN condition: %s", exc)
+            return self.load_state()
 
     # -------------------------------------------------------------------------
     # Verification, Extraction & Application
