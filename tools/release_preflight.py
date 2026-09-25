@@ -30,6 +30,7 @@ IGNORED_DIRECTORIES = {
     "build",
     "cache",
     "dist",
+    "hotfixes",
     "instances",
     "logs",
     "pytest-of-root",

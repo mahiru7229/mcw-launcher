@@ -12,12 +12,12 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.7.0-blue" alt="v1.7.0">
+  <img src="https://img.shields.io/badge/version-v1.7.1-blue" alt="v1.7.1">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!NOTE]
-> `v1.7.0` là bản phát hành chính thức, ra mắt hệ thống Hotfix thông minh phân phối qua Cloudflare Edge CDN (Hồng Kông & Singapore), cơ chế vá nóng runtime bảo mật với mã băm SHA-256 (Fail-closed) và chống tấn công Zip Slip, hoàn thiện giao diện làm mới Modloader trong hộp thoại Tạo Instance, cùng khả năng tương thích cao trên Windows và Linux.
+> `v1.7.1` là bản phát hành chính thức, hoàn thiện hệ thống Hotfix tự động đồng bộ từ Cloudflare Edge CDN (Hồng Kông & Singapore), tích hợp bộ nạp động HotfixMetaPathFinder cho ứng dụng đóng gói, cùng giao diện nút Làm mới Modloader được thu nhỏ gọn gàng, vừa khít nội dung chữ.
 
 > [!IMPORTANT]
 > **If you are looking for related components / Các dự án liên quan:**
@@ -142,6 +142,7 @@ GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, khô
 - [MCW Core API](docs/MCW_CORE_LIBRARY.md)
 - [Language packs](docs/LANGUAGE_PACKS.md)
 - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
+- [Release notes v1.7.1](docs/releases/v1.7.1.md)
 - [Release notes v1.7.0](docs/releases/v1.7.0.md)
 - [Release notes v1.6.1](docs/releases/v1.6.1.md)
 - [Release notes v1.6.0](docs/releases/v1.6.0.md)
