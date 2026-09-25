@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 from mcw_core.api.config.launcher_settings_manager import LauncherSettingsManager
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.theme.theme_manager import theme_manager
-from src.gui.config import VERSION_ID
+from src.gui.config import VERSION_ID, get_display_version
 from src.gui.theme.accent_runtime import theme_accent_runtime
 from src.gui.widget.themed_progress_bar import ThemedProgressBar
 
@@ -53,7 +53,7 @@ class StartupSplash(QWidget):
         self.title_label = QLabel("MCW LAUNCHER")
         self.title_label.setObjectName("StartupTitle")
 
-        self.version_label = QLabel(VERSION_ID)
+        self.version_label = QLabel(get_display_version())
         self.version_label.setObjectName("StartupVersion")
 
         self.status_label = QLabel()
@@ -170,6 +170,7 @@ class StartupSplash(QWidget):
 
     def retranslate(self) -> None:
         self.eyebrow_label.setText(tr("startup.eyebrow"))
+        self.version_label.setText(get_display_version())
         self.status_label.setText(tr(self._message_key))
         self.detail_label.setText(tr(self._detail_key))
 

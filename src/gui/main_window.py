@@ -34,7 +34,7 @@ from mcw_core.api.update.automatic_update_installer import AutomaticUpdateInstal
 from src.gui.application import create_application
 from src.gui.animation.motion_runtime import MotionRuntime
 from src.gui.app_restart import start_restarted_process
-from src.gui.config import GITHUB_REPOSITORY, LAUNCHER_NAME, VERSION_ID
+from src.gui.config import GITHUB_REPOSITORY, LAUNCHER_NAME, VERSION_ID, get_display_version
 from src.gui.core import GuiContext, set_default_gui_context
 from src.gui.controllers.account_controller import AccountController
 from src.gui.controllers.curseforge_controller import CurseForgeController
@@ -113,7 +113,7 @@ class MainWindow(QMainWindow):
     def __init__(self, gpu_detection: GraphicsDetectionResult | None = None) -> None:
         super().__init__()
 
-        self.setWindowTitle(LAUNCHER_NAME)
+        self.setWindowTitle(f"MCW LAUNCHER {get_display_version()}")
         self._gpu_detection = gpu_detection or GraphicsDetectionResult(supported=False)
         self._display_profile = self._detect_display_profile()
         self.resize(self._display_profile.window_width, self._display_profile.window_height)
@@ -2616,7 +2616,7 @@ class MainWindow(QMainWindow):
 
     def _retranslate_ui(self) -> None:
         retranslate_widget_tree(self)
-        self.setWindowTitle(tr(LAUNCHER_NAME))
+        self.setWindowTitle(f"MCW LAUNCHER {get_display_version()}")
         self._update_page_navigation()
         self._update_connectivity_indicator(self._last_connectivity_online)
         self.task_indicator.retranslate_ui()
@@ -3053,7 +3053,7 @@ class MainWindow(QMainWindow):
 
     def _open_issue_report(self, *, initial_title: str = "", initial_what_happened: str = "") -> None:
         instance = self._selected_instance
-        context_parts = [f"MCW {VERSION_ID}"]
+        context_parts = [f"MCW {get_display_version()}"]
         if instance is not None:
             name = str(getattr(instance, "name", "") or "").strip()
             game_version = str(getattr(instance, "minecraft_version", "") or "").strip()
@@ -3096,7 +3096,7 @@ class MainWindow(QMainWindow):
         def task() -> Path:
             return DiagnosticsManager.write_bundle(
                 Path(path),
-                launcher_version=VERSION_ID,
+                launcher_version=get_display_version(),
                 settings=settings,
                 activity_log=activity,
                 task_timeline=timeline,
@@ -3120,8 +3120,8 @@ class MainWindow(QMainWindow):
         dialog = self._pending_issue_dialog
         if dialog is None:
             return
-        body = IssueReportBuilder.build_body(self._pending_issue_details, launcher_version=VERSION_ID, diagnostics_path=path)
-        url = IssueReportBuilder.github_new_issue_url(GITHUB_REPOSITORY, self._pending_issue_details, launcher_version=VERSION_ID, diagnostics_path=path)
+        body = IssueReportBuilder.build_body(self._pending_issue_details, launcher_version=get_display_version(), diagnostics_path=path)
+        url = IssueReportBuilder.github_new_issue_url(GITHUB_REPOSITORY, self._pending_issue_details, launcher_version=get_display_version(), diagnostics_path=path)
         dialog.show_guidance(path, body, url)
 
     def _on_diagnostics_task_failed(self, task_id: str, error: object) -> None:

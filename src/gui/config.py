@@ -32,3 +32,25 @@ def asset_path(*parts: str) -> Path:
 
 
 MAIN_LOGO_PATH = asset_path("images", "logo", "main_launcher_logo.png")
+
+
+def get_active_hotfix_version() -> str | None:
+    try:
+        from mcw_core.api.update.hotfix_manager import HotfixManager
+
+        manager = HotfixManager()
+        state = manager.load_state()
+        if state is not None and HotfixManager._matches_base_version(state.base_version, VERSION_ID):
+            return state.target_version
+    except Exception:
+        pass
+    return None
+
+
+def get_display_version(include_hotfix: bool = True) -> str:
+    if include_hotfix:
+        hotfix_ver = get_active_hotfix_version()
+        if hotfix_ver:
+            return f"{VERSION} (Hotfix {hotfix_ver})"
+    return VERSION
+

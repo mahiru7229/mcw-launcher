@@ -221,3 +221,61 @@ def test_apply_to_java_linux(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert GpuPreferenceManager.apply_to_java("/usr/bin/java", True) is True
     assert GpuPreferenceManager.apply_to_java("/usr/bin/java", False) is True
+
+
+def test_gpu_cache_read_write_and_force_refresh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cache_file = tmp_path / "gpu_cache.json"
+    call_count = 0
+
+    def fake_detect_windows():
+        nonlocal call_count
+        call_count += 1
+        from src.core.hardware.gpu_preference_manager import GraphicsAdapter, GraphicsDetectionResult
+
+        adapter = GraphicsAdapter(name=f"Mock GPU {call_count}", vendor="MockCorp", dedicated=True)
+        return GraphicsDetectionResult(supported=True, adapters=(adapter,))
+
+    monkeypatch.setattr(GpuPreferenceManager, "_is_windows", staticmethod(lambda: True))
+    monkeypatch.setattr(GpuPreferenceManager, "_detect_windows", fake_detect_windows)
+
+    # First call: no cache exists, detection is called
+    result1 = GpuPreferenceManager.detect(cache_path=cache_file)
+    assert call_count == 1
+    assert result1.adapters[0].name == "Mock GPU 1"
+    assert cache_file.is_file()
+
+    # Second call without force_refresh: returns cached result without running detection
+    result2 = GpuPreferenceManager.detect(cache_path=cache_file)
+    assert call_count == 1
+    assert result2.adapters[0].name == "Mock GPU 1"
+
+    # Third call with force_refresh=True: re-runs detection and updates cache
+    result3 = GpuPreferenceManager.detect(force_refresh=True, cache_path=cache_file)
+    assert call_count == 2
+    assert result3.adapters[0].name == "Mock GPU 2"
+
+
+def test_gpu_cache_handles_corrupt_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cache_file = tmp_path / "gpu_cache.json"
+    cache_file.write_text("invalid json content", encoding="utf-8")
+
+    monkeypatch.setattr(GpuPreferenceManager, "_is_windows", staticmethod(lambda: True))
+    monkeypatch.setattr(
+        GpuPreferenceManager,
+        "_detect_windows",
+        lambda: GpuPreferenceManager.GraphicsDetectionResult(supported=True, adapters=()) if hasattr(GpuPreferenceManager, "GraphicsDetectionResult") else SimpleNamespace(supported=True, adapters=(), error=""),
+    )
+
+    from src.core.hardware.gpu_preference_manager import GraphicsDetectionResult
+    monkeypatch.setattr(
+        GpuPreferenceManager,
+        "_detect_windows",
+        lambda: GraphicsDetectionResult(supported=True, adapters=()),
+    )
+
+    result = GpuPreferenceManager.detect(cache_path=cache_file)
+    assert result.supported is True
+    # Successfully recovered and rewrote valid cache
+    assert cache_file.is_file()
+    assert "version" in cache_file.read_text(encoding="utf-8")
+

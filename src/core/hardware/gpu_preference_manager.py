@@ -81,13 +81,122 @@ class GpuPreferenceManager:
         re.compile(r"\bintel(?:\(r\))?\s+arc(?:\(tm\))?\s+[ab]\d{3}\b", re.IGNORECASE),
     )
 
+    _cache_enabled: bool = True
+    _default_cache_path: Path | None = None
+
     @classmethod
-    def detect(cls) -> GraphicsDetectionResult:
+    def _should_use_default_cache(cls) -> bool:
+        if not cls._cache_enabled:
+            return False
+        if "pytest" in sys.modules:
+            return False
+        return True
+
+    @classmethod
+    def _get_cache_path(cls) -> Path | None:
+        if cls._default_cache_path is not None:
+            return cls._default_cache_path
+        try:
+            from mcw_core.api.fs.paths import Paths
+
+            cls._default_cache_path = Paths.CACHE_ROOT / "hardware" / "gpu_cache.json"
+            return cls._default_cache_path
+        except Exception:
+            return None
+
+    @classmethod
+    def _read_cache(cls, cache_path: Path | None = None) -> GraphicsDetectionResult | None:
+        target = cache_path if cache_path is not None else (cls._get_cache_path() if cls._should_use_default_cache() else None)
+        if target is None or not target.is_file():
+            return None
+        try:
+            data = json.loads(target.read_text(encoding="utf-8"))
+            if not isinstance(data, dict) or int(data.get("version", 0)) != 1:
+                return None
+            supported = bool(data.get("supported", False))
+            error = str(data.get("error", ""))
+            raw_adapters = data.get("adapters", [])
+            if not isinstance(raw_adapters, list):
+                return None
+            adapters: list[GraphicsAdapter] = []
+            for item in raw_adapters:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name", "")).strip()
+                if not name:
+                    continue
+                vendor = str(item.get("vendor", "")).strip()
+                adapter_ram = cls._non_negative_int(item.get("adapter_ram"))
+                pnp_device_id = str(item.get("pnp_device_id", "")).strip()
+                dedicated = bool(item.get("dedicated", False))
+                raw_env = item.get("env_vars", [])
+                env_vars: tuple[tuple[str, str], ...] = ()
+                if isinstance(raw_env, (list, tuple)):
+                    env_vars = tuple(
+                        (str(pair[0]), str(pair[1]))
+                        for pair in raw_env
+                        if isinstance(pair, (list, tuple)) and len(pair) == 2
+                    )
+                adapters.append(
+                    GraphicsAdapter(
+                        name=name,
+                        vendor=vendor,
+                        adapter_ram=adapter_ram,
+                        pnp_device_id=pnp_device_id,
+                        dedicated=dedicated,
+                        env_vars=env_vars,
+                    )
+                )
+            return GraphicsDetectionResult(supported=supported, adapters=tuple(adapters), error=error)
+        except Exception:
+            return None
+
+    @classmethod
+    def _write_cache(cls, result: GraphicsDetectionResult, cache_path: Path | None = None) -> None:
+        target = cache_path if cache_path is not None else (cls._get_cache_path() if cls._should_use_default_cache() else None)
+        if target is None:
+            return
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "version": 1,
+                "supported": result.supported,
+                "error": result.error,
+                "adapters": [
+                    {
+                        "name": adapter.name,
+                        "vendor": adapter.vendor,
+                        "adapter_ram": adapter.adapter_ram,
+                        "pnp_device_id": adapter.pnp_device_id,
+                        "dedicated": adapter.dedicated,
+                        "env_vars": [list(pair) for pair in adapter.env_vars],
+                    }
+                    for adapter in result.adapters
+                ],
+            }
+            tmp = target.with_suffix(f".tmp.{os.getpid()}")
+            tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            tmp.replace(target)
+        except Exception:
+            pass
+
+    @classmethod
+    def detect(cls, force_refresh: bool = False, cache_path: Path | None = None) -> GraphicsDetectionResult:
+        if not force_refresh:
+            cached = cls._read_cache(cache_path)
+            if cached is not None:
+                return cached
+
         if cls._is_windows():
-            return cls._detect_windows()
-        if cls._is_linux():
-            return cls._detect_linux()
-        return GraphicsDetectionResult(supported=False)
+            result = cls._detect_windows()
+        elif cls._is_linux():
+            result = cls._detect_linux()
+        else:
+            result = GraphicsDetectionResult(supported=False)
+
+        if result.supported and not result.error:
+            cls._write_cache(result, cache_path)
+        return result
 
     @classmethod
     def _detect_windows(cls) -> GraphicsDetectionResult:

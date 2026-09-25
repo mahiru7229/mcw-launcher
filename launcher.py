@@ -12,9 +12,26 @@ def _bootstrap_hotfixes() -> None:
         from src.config import VERSION_ID
         from mcw_core.api.update.hotfix_manager import HotfixManager
 
-        HotfixManager.bootstrap_sys_path(current_base_version=VERSION_ID, auto_sync=True)
+        HotfixManager.bootstrap_sys_path(current_base_version=VERSION_ID, auto_sync=False)
     except Exception:
         pass
+
+
+def _start_background_hotfix_sync() -> None:
+    import threading
+
+    def _worker() -> None:
+        try:
+            from src.config import VERSION_ID
+            from mcw_core.api.update.hotfix_manager import HotfixManager
+
+            manager = HotfixManager()
+            manager.sync_active_hotfix(current_base_version=VERSION_ID, timeout=5.0)
+        except Exception:
+            pass
+
+    sync_thread = threading.Thread(target=_worker, name="MCWHotfixSyncWorker", daemon=True)
+    sync_thread.start()
 
 
 def _start_update_cleanup() -> None:
@@ -143,6 +160,7 @@ def main() -> None:
     splash.show()
     splash.update_progress(2, "startup.starting")
     startup_stage_key = "startup.starting"
+    _start_background_hotfix_sync()
 
     try:
         from mcw_core.api.bootstrap import initialize_application

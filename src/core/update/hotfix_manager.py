@@ -271,10 +271,11 @@ class HotfixManager:
     # Manifest & Discovery
     # -------------------------------------------------------------------------
 
-    def fetch_manifest(self, manifest_url: str | None = None) -> list[HotfixEntry]:
+    def fetch_manifest(self, manifest_url: str | None = None, timeout: float | None = None) -> list[HotfixEntry]:
         url = manifest_url or self.manifest_url
         try:
-            response = self.client.get(url)
+            req_timeout = timeout if timeout is not None else 10.0
+            response = self.client.get(url, timeout=req_timeout)
             response.raise_for_status()
             payload = response.json()
         except httpx.HTTPError as exc:
@@ -319,6 +320,7 @@ class HotfixManager:
         current_base_version: str,
         current_hotfix_id: int | None = None,
         manifest_url: str | None = None,
+        timeout: float | None = None,
     ) -> HotfixEntry | None:
         """Find the newest enabled hotfix applicable to the current base version."""
         if current_hotfix_id is None:
@@ -328,7 +330,7 @@ class HotfixManager:
             else:
                 current_hotfix_id = 0
 
-        entries = self.fetch_manifest(manifest_url)
+        entries = self.fetch_manifest(manifest_url, timeout=timeout)
         eligible = [
             e
             for e in entries
@@ -356,7 +358,7 @@ class HotfixManager:
         try:
             current_state = self.load_state()
             current_id = current_state.applied_hotfix_id if current_state else 0
-            eligible = self.check_for_hotfix(current_base_version, current_hotfix_id=current_id)
+            eligible = self.check_for_hotfix(current_base_version, current_hotfix_id=current_id, timeout=timeout)
             if eligible is not None:
                 logger.info(
                     "Newer hotfix %s (ID %d) discovered on CDN. Downloading and applying...",

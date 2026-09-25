@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QGridLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from mcw_core.api.language.language_manager import tr
-from src.gui.config import VERSION
+from src.gui.config import VERSION, get_display_version
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
 from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap
@@ -34,12 +34,12 @@ class HomePage(BasePage):
         hero_title = QLabel("MCW LAUNCHER")
         hero_title.setObjectName("PageTitle")
         hero_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hero_version = QLabel(VERSION)
-        hero_version.setObjectName("MutedLabel")
-        hero_version.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.hero_version = QLabel(get_display_version())
+        self.hero_version.setObjectName("MutedLabel")
+        self.hero_version.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hero_layout.addWidget(logo)
         hero_layout.addWidget(hero_title)
-        hero_layout.addWidget(hero_version)
+        hero_layout.addWidget(self.hero_version)
         hero.layout.addLayout(hero_layout)
         self.root_layout.addWidget(hero)
 
@@ -115,6 +115,7 @@ class HomePage(BasePage):
         self.last_status.setText(tr(message))
 
     def retranslate_dynamic(self) -> None:
+        self.hero_version.setText(get_display_version())
         self.set_account(self._account)
         self.set_instance(self._instance)
         if self._manifest_count is None:

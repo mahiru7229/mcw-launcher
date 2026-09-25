@@ -15,7 +15,7 @@ from mcw_core.api.language.language_manager import language_manager, tr
 from mcw_core.api.theme.theme_authoring import ThemeAuthoringError, ThemeAuthoringService
 from mcw_core.api.theme.theme_manager import theme_manager
 from mcw_core.api.theme.theme_palette import contrast_ratio, normalize_hex_color
-from src.gui.config import NAVIGATION_ITEMS, VERSION
+from src.gui.config import NAVIGATION_ITEMS, VERSION, get_active_hotfix_version, get_display_version
 from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
 from src.gui.dialogs.protected_value_reveal_dialog import confirm_reveal_protected_values
 from src.gui.dialogs.theme_issues_dialog import ThemeIssuesDialog
@@ -245,8 +245,11 @@ class LauncherSettingsPage(BasePage):
         self.gpu_status_label = QLabel(tr("gpu.preference.detecting"))
         self.gpu_status_label.setObjectName("MutedLabel")
         self.gpu_status_label.setWordWrap(True)
+        self.redetect_gpu_button = set_theme_icon(QPushButton(tr("gpu.preference.redetect", "Redetect GPUs")), "icon.action.refresh")
+        self.redetect_gpu_button.clicked.connect(self._handle_redetect_gpu)
         self.gpu_card.layout.addWidget(self.prefer_dedicated_gpu)
         self.gpu_card.layout.addWidget(self.gpu_status_label)
+        self.gpu_card.layout.addWidget(self.redetect_gpu_button)
         runtime_section.add_card(self.gpu_card)
 
         self.discord_rpc_card = CardWidget(tr("discord_rpc.launcher.title"), tr("discord_rpc.launcher.description"))
@@ -321,8 +324,11 @@ class LauncherSettingsPage(BasePage):
         storage_section.add_card(self.storage_cleanup_card, span=2)
 
         update_card = CardWidget("Launcher updates", "Stable updates are used by default. Join the tester program only when you want to receive experimental builds.")
-        self.current_version_label = QLabel(tr("launcher_settings.update.current_version", version=VERSION))
+        self.current_version_label = QLabel(tr("launcher_settings.update.current_version", version=get_display_version()))
         self.current_version_label.setObjectName("ValueLabel")
+        self.hotfix_status_label = QLabel()
+        self.hotfix_status_label.setObjectName("MutedLabel")
+        self._refresh_hotfix_status_label()
         self.auto_check_updates = QCheckBox("Automatically check for updates when the launcher starts")
         self.join_tester_program = QCheckBox("Join tester program and receive experimental updates")
         self.tester_warning_label = QLabel("Experimental updates may contain unfinished features, bugs, crashes, or compatibility issues. Back up important instances and worlds before joining.")
@@ -336,6 +342,7 @@ class LauncherSettingsPage(BasePage):
         self.check_updates_button = set_theme_icon(QPushButton("Check for updates"), "icon.action.update")
         self.check_updates_button.clicked.connect(self.check_updates_requested.emit)
         update_card.layout.addWidget(self.current_version_label)
+        update_card.layout.addWidget(self.hotfix_status_label)
         update_card.layout.addWidget(self.auto_check_updates)
         update_card.layout.addWidget(self.join_tester_program)
         update_card.layout.addWidget(self.tester_warning_label)
@@ -572,6 +579,22 @@ class LauncherSettingsPage(BasePage):
             self.gpu_status_label.setText(tr("gpu.preference.detected", adapters=names))
         else:
             self.gpu_status_label.setText(tr("gpu.preference.not_detected"))
+
+    def _handle_redetect_gpu(self) -> None:
+        try:
+            from mcw_core.api.hardware.gpu_preference_manager import GpuPreferenceManager
+
+            refreshed = GpuPreferenceManager.detect(force_refresh=True)
+            self.set_gpu_detection(refreshed)
+        except Exception as exc:
+            self.gpu_status_label.setText(f"GPU Redetection failed: {exc}")
+
+    def _refresh_hotfix_status_label(self) -> None:
+        hotfix_ver = get_active_hotfix_version()
+        if hotfix_ver:
+            self.hotfix_status_label.setText(tr("launcher_settings.update.hotfix_active", f"Active Hotfix: v{hotfix_ver} (Applied)", hotfix=hotfix_ver))
+        else:
+            self.hotfix_status_label.setText(tr("launcher_settings.update.hotfix_none", "Active Hotfix: None (Base release)"))
 
     def set_java_installations(self, installations: list) -> None:
         self._java_installations = list(installations)
@@ -991,7 +1014,8 @@ class LauncherSettingsPage(BasePage):
         if self.first_run_card.subtitle_label is not None:
             self.first_run_card.subtitle_label.setText(tr("launcher_settings.first_run.detail"))
         self.first_run_setup_button.setText(tr("launcher_settings.first_run.button"))
-        self.current_version_label.setText(tr("launcher_settings.update.current_version", version=VERSION))
+        self.current_version_label.setText(tr("launcher_settings.update.current_version", version=get_display_version()))
+        self._refresh_hotfix_status_label()
         if self.storage_cleanup_card.title_label is not None:
             self.storage_cleanup_card.title_label.setText(tr("storage.legacy.title"))
         if self.storage_cleanup_card.subtitle_label is not None:
@@ -1018,6 +1042,7 @@ class LauncherSettingsPage(BasePage):
         if self.gpu_card.subtitle_label is not None:
             self.gpu_card.subtitle_label.setText(tr("gpu.preference.detail"))
         self.prefer_dedicated_gpu.setText(tr("gpu.preference.toggle"))
+        self.redetect_gpu_button.setText(tr("gpu.preference.redetect", "Redetect GPUs"))
         self._update_gpu_status()
         if self.discord_rpc_card.title_label is not None:
             self.discord_rpc_card.title_label.setText(tr("discord_rpc.launcher.title"))
