@@ -243,10 +243,73 @@ def test_linux_graceful_and_force_close_use_term_then_kill(monkeypatch: pytest.M
     assert (111, signal.SIGKILL) in calls
 
 
-def test_stable_bridge_is_pinned_to_v151() -> None:
-    assert bridge.BRIDGE_VERSION == "1.6.0"
-    assert bridge.TARGET_TAG == "v1.5.1"
-    assert bridge.TARGET_VERSION == "1.5.1"
+def test_bridge_defaults_to_latest() -> None:
+    assert bridge.BRIDGE_VERSION == "1.7.1"
+    assert bridge.TARGET_TAG == "latest"
+    assert bridge.TARGET_VERSION == "latest"
+    assert bridge.normalize_tag("latest") == "latest"
+    assert bridge.normalize_tag("stable") == "latest"
+
+
+def test_release_api_url() -> None:
+    assert bridge.release_api_url("owner/repo", "latest") == "https://api.github.com/repos/owner/repo/releases/latest"
+    assert bridge.release_api_url("owner/repo", "v1.7.1") == "https://api.github.com/repos/owner/repo/releases/tags/v1.7.1"
+    assert bridge.release_api_url("owner/repo", "1.7.1") == "https://api.github.com/repos/owner/repo/releases/tags/v1.7.1"
+
+
+def test_fetch_target_release_specific_tag(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = {"tag_name": "v1.7.0", "assets": []}
+    monkeypatch.setattr(bridge, "github_json", lambda url: payload)
+    data, tag = bridge.fetch_target_release("owner/repo", "v1.7.0", "windows-x64")
+    assert data == payload
+    assert tag == "v1.7.0"
+
+
+def test_fetch_target_release_latest_primary(monkeypatch: pytest.MonkeyPatch) -> None:
+    archive = "MCW-Launcher-v1.7.1-windows-x64.zip"
+    payload = {
+        "tag_name": "v1.7.1",
+        "assets": [
+            {"name": archive, "browser_download_url": "https://example.invalid/package", "size": 1234},
+            {"name": archive + ".sha256", "browser_download_url": "https://example.invalid/checksum", "size": 100},
+        ],
+    }
+    monkeypatch.setattr(bridge, "github_json", lambda url: payload)
+    data, tag = bridge.fetch_target_release("owner/repo", "latest", "windows-x64")
+    assert data == payload
+    assert tag == "v1.7.1"
+
+
+def test_fetch_target_release_latest_fallback_when_latest_has_no_assets(monkeypatch: pytest.MonkeyPatch) -> None:
+    latest_payload = {"tag_name": "v1.7.1", "assets": []}
+    archive_170 = "MCW-Launcher-v1.7.0-windows-x64.zip"
+    releases_list = [
+        {"tag_name": "v1.7.1", "assets": [], "draft": False, "prerelease": False},
+        {
+            "tag_name": "v1.7.0",
+            "assets": [
+                {"name": archive_170, "browser_download_url": "https://example.invalid/package", "size": 1234},
+                {"name": archive_170 + ".sha256", "browser_download_url": "https://example.invalid/checksum", "size": 100},
+            ],
+            "draft": False,
+            "prerelease": False,
+        },
+    ]
+
+    def fake_json(url: str):
+        if "releases/latest" in url:
+            return latest_payload
+        raise bridge.BridgeError(f"Unexpected URL: {url}")
+
+    def fake_json_list(url: str):
+        return releases_list
+
+    monkeypatch.setattr(bridge, "github_json", fake_json)
+    monkeypatch.setattr(bridge, "github_json_list", fake_json_list)
+
+    data, tag = bridge.fetch_target_release("owner/repo", "latest", "windows-x64")
+    assert tag == "v1.7.0"
+    assert data["tag_name"] == "v1.7.0"
 
 
 def test_windows_launcher_replace_uses_rename_away_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

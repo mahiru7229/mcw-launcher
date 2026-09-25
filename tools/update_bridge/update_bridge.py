@@ -30,10 +30,10 @@ import uuid
 import zipfile
 
 
-BRIDGE_VERSION = "1.6.0"
+BRIDGE_VERSION = "1.7.1"
 REPOSITORY = "mahiru7229/mcw-launcher"
-TARGET_TAG = "v1.5.1"
-TARGET_VERSION = TARGET_TAG.removeprefix("v")
+TARGET_TAG = "latest"
+TARGET_VERSION = "latest"
 
 
 class BridgeError(RuntimeError):
@@ -194,6 +194,8 @@ def normalize_tag(tag: str) -> str:
     value = str(tag).strip()
     if not value:
         raise BridgeError("The target release tag is empty.")
+    if value.casefold() in {"latest", "stable"}:
+        return "latest"
     return value if value.startswith("v") else f"v{value}"
 
 
@@ -233,9 +235,45 @@ def github_json(url: str) -> dict:
     return payload
 
 
+def github_json_list(url: str) -> list[dict]:
+    request = Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT})
+    try:
+        with urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        raise BridgeError(f"GitHub returned HTTP {error.code} while reading releases.") from error
+    except (URLError, TimeoutError, UnicodeError, json.JSONDecodeError) as error:
+        raise BridgeError(f"Could not read GitHub releases metadata: {error}") from error
+    if not isinstance(payload, list):
+        raise BridgeError("GitHub returned an invalid releases list response.")
+    return [item for item in payload if isinstance(item, dict)]
+
+
 def select_release_package(payload: dict, target_tag: str, platform_id: str | None = None) -> ReleasePackage:
     contract = platform_contract(platform_id)
-    expected_version = normalize_tag(target_tag).removeprefix("v")
+    tag = normalize_tag(target_tag)
+    if tag == "latest":
+        resolved = str(payload.get("tag_name") or "").strip()
+        if resolved:
+            tag = normalize_tag(resolved)
+        else:
+            raw_assets = payload.get("assets") if isinstance(payload.get("assets"), list) else []
+            for item in raw_assets:
+                if isinstance(item, dict):
+                    name = str(item.get("name") or "")
+                    m = re.match(rf"^MCW-Launcher-v([0-9a-zA-Z\.\-]+)-{contract.platform_id}\.zip$", name, re.IGNORECASE)
+                    if m:
+                        tag = normalize_tag(m.group(1))
+                        break
+            if tag == "latest":
+                for item in raw_assets:
+                    if isinstance(item, dict):
+                        name = str(item.get("name") or "")
+                        m = re.match(r"^MCW-Launcher-v([0-9a-zA-Z\.\-]+)-", name, re.IGNORECASE)
+                        if m:
+                            tag = normalize_tag(m.group(1))
+                            break
+    expected_version = tag.removeprefix("v")
     expected_archive = f"MCW-Launcher-v{expected_version}-{contract.platform_id}.zip"
     assets = payload.get("assets")
     if not isinstance(assets, list):
@@ -256,7 +294,7 @@ def select_release_package(payload: dict, target_tag: str, platform_id: str | No
 
     archive = parsed.get(expected_archive)
     if archive is None:
-        candidates = [asset for asset in parsed.values() if asset.name.lower().endswith(f"-{contract.platform_id}.zip") and expected_version in asset.name]
+        candidates = [asset for asset in parsed.values() if asset.name.lower().endswith(f"-{contract.platform_id}.zip") and (expected_version in asset.name or tag == "latest")]
         if len(candidates) == 1:
             archive = candidates[0]
     if archive is None:
@@ -709,7 +747,62 @@ def install_package(content_directory: Path, install_directory: Path, managed_fi
 
 
 def release_api_url(repository: str, target_tag: str) -> str:
-    return f"https://api.github.com/repos/{repository}/releases/tags/{normalize_tag(target_tag)}"
+    tag = normalize_tag(target_tag)
+    if tag == "latest":
+        return f"https://api.github.com/repos/{repository}/releases/latest"
+    return f"https://api.github.com/repos/{repository}/releases/tags/{tag}"
+
+
+def fetch_target_release(
+    repository: str = REPOSITORY,
+    target_tag: str = TARGET_TAG,
+    platform_id: str | None = None,
+) -> tuple[dict, str]:
+    contract = platform_contract(platform_id)
+    tag = normalize_tag(target_tag)
+
+    if tag != "latest":
+        payload = github_json(release_api_url(repository, tag))
+        resolved_tag = str(payload.get("tag_name") or tag).strip()
+        return payload, resolved_tag
+
+    # 1. Try /releases/latest endpoint
+    latest_error: Exception | None = None
+    try:
+        latest_payload = github_json(release_api_url(repository, "latest"))
+        resolved_tag = str(latest_payload.get("tag_name") or "").strip()
+        if resolved_tag:
+            try:
+                select_release_package(latest_payload, resolved_tag, contract.platform_id)
+                return latest_payload, resolved_tag
+            except BridgeError:
+                # Target release exists but missing package assets (e.g. CI still compiling)
+                pass
+    except Exception as err:
+        latest_error = err
+
+    # 2. Try scanning recent releases for the latest stable release with platform package
+    try:
+        recent_releases = github_json_list(f"https://api.github.com/repos/{repository}/releases?per_page=10")
+        for item in recent_releases:
+            if item.get("draft") or item.get("prerelease"):
+                continue
+            cand_tag = str(item.get("tag_name") or "").strip()
+            if not cand_tag:
+                continue
+            try:
+                select_release_package(item, cand_tag, contract.platform_id)
+                return item, cand_tag
+            except BridgeError:
+                continue
+    except Exception:
+        pass
+
+    if latest_error:
+        raise BridgeError(f"Could not fetch latest release metadata: {latest_error}") from latest_error
+    payload = github_json(release_api_url(repository, "latest"))
+    resolved_tag = str(payload.get("tag_name") or "latest").strip()
+    return payload, resolved_tag
 
 
 def bridge_update(
@@ -724,11 +817,14 @@ def bridge_update(
     install = validate_install_directory(install_directory, contract.platform_id)
     logger = BridgeLogger(install, status)
     logger(f"MCW Update Bridge {BRIDGE_VERSION} started")
-    logger(f"Target: {target_tag}")
+    tag_desc = "latest release" if normalize_tag(target_tag) == "latest" else target_tag
+    logger(f"Target: {tag_desc}")
     logger(f"Platform: {contract.display_name}")
     logger(f"Install directory: {install}")
-    payload = github_json(release_api_url(repository, target_tag))
-    package = select_release_package(payload, target_tag, contract.platform_id)
+    logger("Fetching release metadata from GitHub...")
+    payload, resolved_tag = fetch_target_release(repository, target_tag, contract.platform_id)
+    logger(f"Resolved release: {resolved_tag}")
+    package = select_release_package(payload, resolved_tag, contract.platform_id)
     logger(f"Selected release asset: {package.archive.name}")
 
     with tempfile.TemporaryDirectory(prefix="mcw-update-bridge-") as temporary:
@@ -746,9 +842,9 @@ def bridge_update(
 
         extract_root = temporary_root / "extracted"
         content = safe_extract_archive(archive_path, extract_root)
-        managed = validate_package_manifest(content, target_tag, contract.platform_id)
+        managed = validate_package_manifest(content, resolved_tag, contract.platform_id)
         logger(f"Package manifest verified ({len(managed)} managed files)")
-        backup = install_package(content, install, managed, logger, target_tag=target_tag, platform_id=contract.platform_id)
+        backup = install_package(content, install, managed, logger, target_tag=resolved_tag, platform_id=contract.platform_id)
 
     launcher = install / contract.launcher_name
     try:
@@ -966,17 +1062,36 @@ def force_terminate_processes(pids: Iterable[int]) -> None:
 
 
 class BridgeWindow:
-    def __init__(self, root: tk.Tk, initial_directory: Path | None = None) -> None:
+    def __init__(self, root: tk.Tk, initial_directory: Path | None = None, target_tag: str = TARGET_TAG) -> None:
         self.root = root
         self.root.title("MCW Launcher Update Bridge")
-        self.root.geometry("640x410")
-        self.root.minsize(600, 380)
+        self.root.geometry("640x430")
+        self.root.minsize(600, 390)
         self.contract = platform_contract()
+        self.target_tag = target_tag
+        self.resolved_tag: str | None = None
         self.install_var = tk.StringVar(value=str(initial_directory or auto_detect_install_directory(self.contract.platform_id) or ""))
-        self.status_var = tk.StringVar(value=f"Recovery bridge for MCW Launcher 1.5.0 → {TARGET_TAG}")
+        tag_desc = "latest release" if normalize_tag(self.target_tag) == "latest" else self.target_tag
+        self.status_var = tk.StringVar(value=f"Universal recovery & update bridge → {tag_desc}")
         self.progress_var = tk.DoubleVar(value=0.0)
         self.running = False
         self._build_ui()
+        if normalize_tag(self.target_tag) == "latest":
+            self._query_latest_in_background()
+
+    def _query_latest_in_background(self) -> None:
+        def fetch() -> None:
+            try:
+                _, resolved = fetch_target_release(REPOSITORY, "latest", self.contract.platform_id)
+                self.resolved_tag = resolved
+                def update_ui() -> None:
+                    if not self.running:
+                        self.status_var.set(f"Latest release found: {resolved}")
+                        self.start_button.configure(text=f"Update to {resolved}")
+                self.root.after(0, update_ui)
+            except Exception:
+                pass
+        threading.Thread(target=fetch, daemon=True).start()
 
     def _build_ui(self) -> None:
         outer = ttk.Frame(self.root, padding=18)
@@ -985,8 +1100,8 @@ class BridgeWindow:
         ttk.Label(
             outer,
             text=(
-                "One-time recovery tool for installations stuck on the 1.5.0 updater. "
-                f"It installs {TARGET_TAG} using the release ZIP and SHA-256 checksum."
+                "Universal recovery and update tool for MCW Launcher installations. "
+                "It automatically downloads and installs the latest stable release using verified release ZIPs and SHA-256 checksums."
             ),
             wraplength=590,
         ).pack(anchor="w", pady=(6, 16))
@@ -1010,7 +1125,8 @@ class BridgeWindow:
 
         buttons = ttk.Frame(outer)
         buttons.pack(fill="x")
-        self.start_button = ttk.Button(buttons, text=f"Update to {TARGET_TAG}", command=self._start)
+        btn_text = "Update to Latest Release" if normalize_tag(self.target_tag) == "latest" else f"Update to {self.target_tag}"
+        self.start_button = ttk.Button(buttons, text=btn_text, command=self._start)
         self.start_button.pack(side="right")
         ttk.Button(buttons, text="Exit", command=self.root.destroy).pack(side="right", padx=(0, 8))
 
@@ -1083,7 +1199,13 @@ class BridgeWindow:
 
         def worker() -> None:
             try:
-                backup = bridge_update(install, status=self._append_log, progress=self._set_progress, platform_id=self.contract.platform_id)
+                backup = bridge_update(
+                    install,
+                    target_tag=self.target_tag,
+                    status=self._append_log,
+                    progress=self._set_progress,
+                    platform_id=self.contract.platform_id,
+                )
             except Exception as error:
                 self.root.after(0, lambda: self._finish_error(error))
             else:
@@ -1102,10 +1224,11 @@ class BridgeWindow:
     def _finish_success(self, backup: Path) -> None:
         self._set_running(False)
         self.progress_var.set(100)
-        self.status_var.set(f"Updated to {TARGET_TAG}")
+        tag_desc = self.resolved_tag or (self.target_tag if normalize_tag(self.target_tag) != "latest" else "latest release")
+        self.status_var.set(f"Updated successfully to {tag_desc}")
         messagebox.showinfo(
             "MCW Launcher updated",
-            f"MCW Launcher was updated to {TARGET_TAG}.\n\nA recovery backup was kept at:\n{backup}",
+            f"MCW Launcher was updated to {tag_desc}.\n\nA recovery backup was kept at:\n{backup}",
         )
 
 
@@ -1144,7 +1267,8 @@ def cli_main(args: argparse.Namespace) -> int:
 def terminal_main(args: argparse.Namespace) -> int:
     contract = platform_contract()
     print(f"MCW Update Bridge {BRIDGE_VERSION} — {contract.display_name}")
-    print(f"Recovery/update bridge → {args.tag}")
+    tag_desc = "latest release" if normalize_tag(args.tag) == "latest" else args.tag
+    print(f"Universal recovery & update bridge → {tag_desc}")
     detected = auto_detect_install_directory(contract.platform_id)
     prompt = f"Launcher folder [{detected}]: " if detected else "Launcher folder: "
     entered = input(prompt).strip()
@@ -1182,7 +1306,7 @@ def main() -> int:
     if tk is None:
         return terminal_main(args)
     root = tk.Tk()
-    BridgeWindow(root)
+    BridgeWindow(root, target_tag=args.tag)
     root.mainloop()
     return 0
 
