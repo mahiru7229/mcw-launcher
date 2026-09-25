@@ -40,12 +40,12 @@ Các nhóm tính năng chính:
 
 ## Trạng thái nền tảng
 
-| Nền tảng | Trạng thái v1.6.1 | Ghi chú |
+| Nền tảng | Trạng thái v1.7.1 | Ghi chú |
 | --- | --- | --- |
 | Windows 10/11 x64 | Đang hỗ trợ | Phân phối dạng tệp thực thi duy nhất (`MCW Launcher.exe`). |
 | Linux x64 | Đang hỗ trợ | Phân phối dạng tệp thực thi duy nhất (`mcw-launcher`). Automatic update và desktop opener đã được kiểm thử trên Lubuntu. |
 | Linux ARM64 | Nền tảng ban đầu | Nhận diện và metadata Java đúng; chưa có cam kết launch game. |
-| macOS | Chưa hỗ trợ | Chưa nằm trong phạm vi v1.6. |
+| macOS | Chưa hỗ trợ | Chưa nằm trong phạm vi v1.7. |
 
 ## Yêu cầu
 
@@ -110,7 +110,7 @@ Build Windows hiện tại:
 .\build_release.ps1
 ```
 
-GitHub Release Actions chỉ build ZIP native Windows/Linux sau khi test cả hai nền tảng đạt. v1.6.0 không cung cấp AppImage hoặc `.deb`; updater Linux hoạt động với ZIP `linux-x64` đặt trong thư mục người dùng có quyền ghi.
+GitHub Release Actions chỉ build ZIP native Windows/Linux sau khi test cả hai nền tảng đạt. MCW Launcher không cung cấp AppImage hoặc `.deb`; updater Linux hoạt động với ZIP `linux-x64` đặt trong thư mục người dùng có quyền ghi.
 
 ## Kiến trúc repository
 
@@ -140,14 +140,15 @@ GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, khô
 - [Kiến trúc](docs/ARCHITECTURE.md)
 - [Instance system](docs/INSTANCE_SYSTEM.md)
 - [MCW Core API](docs/MCW_CORE_LIBRARY.md)
+- [Hệ thống Hotfix CDN](docs/HOTFIX_SYSTEM.md)
+- [Cứu hộ Update Bridge](docs/UPDATE_BRIDGE_RECOVERY.md)
 - [Language packs](docs/LANGUAGE_PACKS.md)
 - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
 - [Release notes v1.7.1](docs/releases/v1.7.1.md)
+- [Release notes Update Bridge v1.7.1](docs/releases/update-bridge-v1.7.1.md)
 - [Release notes v1.7.0](docs/releases/v1.7.0.md)
 - [Release notes v1.6.1](docs/releases/v1.6.1.md)
 - [Release notes v1.6.0](docs/releases/v1.6.0.md)
-- [Release notes v1.6.0-beta.5](docs/releases/v1.6.0-beta.5.md)
-- [Release notes v1.6.0-beta.4](docs/releases/v1.6.0-beta.4.md)
 - [Changelog](CHANGELOG.md)
 
 ## Đóng góp và bảo mật

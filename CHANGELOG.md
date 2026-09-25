@@ -2,6 +2,24 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.7.1] - 2026-09-25
+
+### Added
+- Tự động kiểm tra và đồng bộ bản vá nóng (Hotfix) từ Cloudflare Edge CDN khi khởi động launcher (`HotfixManager.bootstrap_sys_path(auto_sync=True)`).
+- Tích hợp bộ nạp động `HotfixMetaPathFinder` cho các bản build thực thi đóng gói (PyInstaller Frozen), đảm bảo các bản vá nóng ghi đè module an toàn mà không cần cập nhật toàn bộ file nhị phân.
+- Tinh chỉnh giao diện nút Làm Mới (Refresh) Modloader với chính sách co giãn ôm sát nội dung (`_update_reload_button_geometry`) và đệm lề phải (`addStretch(1)`).
+- Nâng cấp **MCW Update Bridge 1.7.1**:
+  - Tự động phát hiện và cập nhật lên bản phát hành mới nhất (`latest`).
+  - Hỗ trợ cơ chế Fallback thông minh khi release mới đang trong quá trình build assets.
+  - Cập nhật giao diện Tkinter GUI và workflow GitHub Actions hỗ trợ mục tiêu `latest`.
+
+## [1.7.0] - 2026-09-24
+
+### Added
+- Hệ thống Hotfix Engine động tích hợp Cloudflare Edge CDN (`mcw-download.pages.dev`).
+- Hỗ trợ định dạng phiên bản vá lỗi 4 số: `1.7.x.y` (ví dụ `1.7.0.1`, `1.7.0.2`).
+- Cơ chế khôi phục trạng thái bản vá và chuyển đổi nguyên tử (Atomic Directory Swap).
+
 ## [1.6.1] - 2026-09-23
 
 ### Added
