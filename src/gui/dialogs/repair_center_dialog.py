@@ -21,7 +21,7 @@ from mcw_core.api.language.language_manager import tr
 from mcw_core.api.repair.repair_service import RepairService
 from src.gui.widget.themed_progress_bar import ThemedProgressBar
 from src.gui.window_sizing import resize_dialog_to_screen
-from src.models.repair.repair_models import RepairComponent, RepairMode, RepairPlan, RepairReport, RepairStatus
+from mcw_core.api.models.repair.repair_models import RepairComponent, RepairMode, RepairPlan, RepairReport, RepairStatus
 
 
 class RepairCenterDialog(QDialog):

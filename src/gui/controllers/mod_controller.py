@@ -15,9 +15,9 @@ from mcw_core.api.modrinth.modrinth_registry import ModrinthRegistry
 from mcw_core.api.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
-from src.models.instance.instance import Instance
-from src.models.mod.mod_issue import ModHealthReport
-from src.models.modrinth.update import ModrinthModUpdateReport
+from mcw_core.api.models.instance.instance import Instance
+from mcw_core.api.models.mod.mod_issue import ModHealthReport
+from mcw_core.api.models.modrinth.update import ModrinthModUpdateReport
 
 
 class ModController(BaseController):

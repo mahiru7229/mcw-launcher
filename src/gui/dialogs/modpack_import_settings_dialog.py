@@ -20,7 +20,7 @@ from mcw_core.api.java.jvm_presets import JvmPresetId, detect_preset, get_preset
 from mcw_core.api.language.language_manager import tr
 from src.gui.dialogs.instance_settings_editor_dialog import InstanceSettingsEditorDialog
 from src.gui.window_sizing import resize_dialog_to_screen
-from src.models.package.provider_modpack_preview import ProviderModpackPreview
+from mcw_core.api.models.package.provider_modpack_preview import ProviderModpackPreview
 
 
 class ModpackImportSettingsDialog(QDialog):

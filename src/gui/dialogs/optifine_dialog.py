@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 from mcw_core.api.language.language_manager import tr
 from src.gui.window_sizing import resize_dialog_to_screen
 from src.gui.widget.scrollable_page import scrollable_page
-from src.models.optifine.optifine_models import OptiFineVersion
+from mcw_core.api.models.optifine.optifine_models import OptiFineVersion
 
 
 class OptiFineDialog(QDialog):

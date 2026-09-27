@@ -15,9 +15,9 @@ from src.gui.media.safe_rich_text import sanitize_html
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.content_project_detail import ContentProjectDetailPanel
 from src.gui.window_sizing import resize_dialog_to_screen
-from src.models.ftb.cache import FTBCacheInfo
-from src.models.ftb.project import FTBProject, FTBSearchResult
-from src.models.ftb.version import FTBVersion, FTBVersionSummary
+from mcw_core.api.models.ftb.cache import FTBCacheInfo
+from mcw_core.api.models.ftb.project import FTBProject, FTBSearchResult
+from mcw_core.api.models.ftb.version import FTBVersion, FTBVersionSummary
 
 
 class FTBBrowserDialog(QDialog):

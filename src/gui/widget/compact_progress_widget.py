@@ -9,10 +9,10 @@ from mcw_core.api.language.language_manager import tr
 from src.gui.presenters.progress_presenter import ProgressPresenter
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.themed_progress_bar import ThemedProgressBar
-from src.models.progress.progress_state import ProgressState
+from mcw_core.api.models.progress.progress_state import ProgressState
 
 if TYPE_CHECKING:
-    from src.models.progress.progress_event import ProgressEvent
+    from mcw_core.api.models.progress.progress_event import ProgressEvent
 
 
 from src.gui.widget.elided_label import ElidedLabel

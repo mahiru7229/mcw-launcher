@@ -17,10 +17,10 @@ from src.gui.media.safe_rich_text import safe_external_url, sanitize_html
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.content_project_detail import ContentProjectDetailPanel
 from src.gui.window_sizing import resize_dialog_to_screen
-from src.models.curseforge.cache import CurseForgeCacheInfo
-from src.models.curseforge.file import CurseForgeFile
-from src.models.curseforge.project import CurseForgeProject, CurseForgeSearchResult
-from src.models.instance.instance import Instance
+from mcw_core.api.models.curseforge.cache import CurseForgeCacheInfo
+from mcw_core.api.models.curseforge.file import CurseForgeFile
+from mcw_core.api.models.curseforge.project import CurseForgeProject, CurseForgeSearchResult
+from mcw_core.api.models.instance.instance import Instance
 
 
 class CurseForgeBrowserDialog(QDialog):

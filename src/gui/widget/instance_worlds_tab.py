@@ -23,8 +23,8 @@ from mcw_core.api.minecraft.world_manager import WorldManager
 from src.gui.formatters.time_formatter import format_last_played
 from src.gui.platform_open import open_local_path
 from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap
-from src.models.instance.instance import Instance
-from src.models.world.world_info import WorldInfo
+from mcw_core.api.models.instance.instance import Instance
+from mcw_core.api.models.world.world_info import WorldInfo
 
 
 def _format_size(size_bytes: int) -> str:

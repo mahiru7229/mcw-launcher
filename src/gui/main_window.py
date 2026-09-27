@@ -103,10 +103,10 @@ from src.gui.widget.launch_control_widget import LaunchControlWidget
 from src.gui.widget.right_panel_widget import RightPanelWidget
 from src.gui.widget.sidebar_widget import SidebarWidget
 from src.gui.widget.toast_notification import ToastManager
-from src.models.progress.progress_event import ProgressEvent
-from src.models.progress.progress_state import ProgressState
-from src.models.progress.progress_stage import ProgressStage
-from src.models.update.update_info import PreparedUpdate, UpdateInfo
+from mcw_core.api.models.progress.progress_event import ProgressEvent
+from mcw_core.api.models.progress.progress_state import ProgressState
+from mcw_core.api.models.progress.progress_stage import ProgressStage
+from mcw_core.api.models.update.update_info import PreparedUpdate, UpdateInfo
 
 
 class MainWindow(QMainWindow):

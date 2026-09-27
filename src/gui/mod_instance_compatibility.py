@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from typing import Protocol
 
 from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
-from src.models.instance.instance import Instance
+from mcw_core.api.models.instance.instance import Instance
 
 
 class CompatibleModVersion(Protocol):

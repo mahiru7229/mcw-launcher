@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.models.progress.progress_stage import ProgressStage
+from mcw_core.api.models.progress.progress_stage import ProgressStage
 
 
 @dataclass(frozen=True, slots=True)

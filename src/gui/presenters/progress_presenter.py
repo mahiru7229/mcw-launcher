@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from mcw_core.api.language.language_manager import tr
-from src.models.progress.progress_state import ProgressState
+from mcw_core.api.models.progress.progress_state import ProgressState
 
 
 @dataclass(frozen=True, slots=True)

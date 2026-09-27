@@ -15,9 +15,9 @@ from src.gui.media.safe_rich_text import sanitize_html
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.content_project_detail import ContentProjectDetailPanel
 from src.gui.window_sizing import resize_dialog_to_screen
-from src.models.atlauncher.cache import ATLauncherCacheInfo
-from src.models.atlauncher.pack import ATLauncherPack, ATLauncherSearchResult
-from src.models.atlauncher.version import ATLauncherVersion, ATLauncherVersionSummary
+from mcw_core.api.models.atlauncher.cache import ATLauncherCacheInfo
+from mcw_core.api.models.atlauncher.pack import ATLauncherPack, ATLauncherSearchResult
+from mcw_core.api.models.atlauncher.version import ATLauncherVersion, ATLauncherVersionSummary
 
 
 class ATLauncherBrowserDialog(QDialog):

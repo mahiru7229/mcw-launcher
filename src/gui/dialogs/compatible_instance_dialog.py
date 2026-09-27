@@ -9,7 +9,7 @@ from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from src.gui.dialogs.create_compatible_instance_dialog import CreateCompatibleInstanceDialog
 from src.gui.mod_instance_compatibility import CompatibleModVersion, compatible_instances, normalize_supported_loader
 from src.gui.window_sizing import resize_dialog_to_screen
-from src.models.instance.instance import Instance
+from mcw_core.api.models.instance.instance import Instance
 
 
 class CompatibleInstanceDialog(QDialog):

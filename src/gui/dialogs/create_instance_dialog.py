@@ -29,7 +29,7 @@ from src.gui.loader_version_options import loader_title, loader_version_entries
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.scrollable_page import scrollable_page
 from src.gui.window_sizing import resize_dialog_to_screen
-from src.models.optifine.optifine_models import OptiFineVersion
+from mcw_core.api.models.optifine.optifine_models import OptiFineVersion
 
 
 class CreateInstanceDialog(QDialog):

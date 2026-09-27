@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 from mcw_core.api.language.language_manager import tr
 from src.gui.platform_open import open_local_path
 from src.gui.theme.runtime import set_theme_icon
-from src.models.instance.instance import Instance
+from mcw_core.api.models.instance.instance import Instance
 
 
 def _format_size(size_bytes: int) -> str:

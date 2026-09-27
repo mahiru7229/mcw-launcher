@@ -10,9 +10,9 @@ from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, 
 from mcw_core.api.instance.instance_manager import InstanceManager
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
-from src.models.instance.instance import Instance
-from src.models.modrinth.project import ModrinthProject, ModrinthSearchResult
-from src.models.modrinth.version import ModrinthVersion
+from mcw_core.api.models.instance.instance import Instance
+from mcw_core.api.models.modrinth.project import ModrinthProject, ModrinthSearchResult
+from mcw_core.api.models.modrinth.version import ModrinthVersion
 from src.gui.media.remote_image_cache import RemoteImageCache
 from src.gui.media.safe_rich_text import safe_external_url
 from src.gui.theme.runtime import set_theme_icon

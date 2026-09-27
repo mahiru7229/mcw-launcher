@@ -22,8 +22,8 @@ from mcw_core.api.language.language_manager import tr
 from mcw_core.api.minecraft.screenshot_manager import ScreenshotManager
 from src.gui.platform_open import open_local_path
 from src.gui.theme.runtime import set_theme_icon
-from src.models.instance.instance import Instance
-from src.models.screenshot.screenshot_info import ScreenshotInfo
+from mcw_core.api.models.instance.instance import Instance
+from mcw_core.api.models.screenshot.screenshot_info import ScreenshotInfo
 
 
 class ScreenshotViewerDialog(QDialog):

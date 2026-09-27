@@ -17,6 +17,7 @@ def test_incomplete_source_reports_all_missing_dependencies(tmp_path: Path) -> N
 
     message = str(captured.value)
     assert "installation is incomplete" in message
-    assert "src/core/lan/lan_agent_manager.py" in message
-    assert "src/core/curseforge/curseforge_errors.py" in message
+    assert "mcw_core/api/lan/lan_agent_manager.py" in message
+    assert "mcw_core/api/curseforge/curseforge_errors.py" in message
+    assert "mcw_core/rpc/dispatcher.py" in message
     assert "runtime/mcw-lan-agent.jar" in message

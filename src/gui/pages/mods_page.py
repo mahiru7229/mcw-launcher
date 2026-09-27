@@ -16,11 +16,11 @@ from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
 from src.gui.widget.content_project_detail import ContentProjectDetailPanel
-from src.models.curseforge.cache import CurseForgeCacheInfo
-from src.models.curseforge.file import CurseForgeFile
-from src.models.curseforge.project import CurseForgeProject, CurseForgeSearchResult
-from src.models.modrinth.project import ModrinthProject, ModrinthSearchResult
-from src.models.modrinth.version import ModrinthVersion
+from mcw_core.api.models.curseforge.cache import CurseForgeCacheInfo
+from mcw_core.api.models.curseforge.file import CurseForgeFile
+from mcw_core.api.models.curseforge.project import CurseForgeProject, CurseForgeSearchResult
+from mcw_core.api.models.modrinth.project import ModrinthProject, ModrinthSearchResult
+from mcw_core.api.models.modrinth.version import ModrinthVersion
 
 
 class ModsPage(BasePage):

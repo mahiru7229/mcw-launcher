@@ -22,7 +22,7 @@ from mcw_core.api.diagnostics.mclogs_client import McLogsClient
 from mcw_core.api.language.language_manager import tr
 from src.gui.platform_open import open_local_path
 from src.gui.theme.runtime import set_theme_icon
-from src.models.instance.instance import Instance
+from mcw_core.api.models.instance.instance import Instance
 
 
 class InstanceLiveLogsTab(QWidget):

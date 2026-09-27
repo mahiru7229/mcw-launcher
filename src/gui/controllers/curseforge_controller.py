@@ -15,8 +15,8 @@ from mcw_core.api.instance.instance_manager import InstanceManager
 from mcw_core.api.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
-from src.models.curseforge.cache import CurseForgeFileListResult
-from src.models.curseforge.manual_download import CurseForgeManualDownload
+from mcw_core.api.models.curseforge.cache import CurseForgeFileListResult
+from mcw_core.api.models.curseforge.manual_download import CurseForgeManualDownload
 
 
 class CurseForgeController(BaseController):

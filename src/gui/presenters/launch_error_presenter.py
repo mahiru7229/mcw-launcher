@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.instance.errors import InstanceAlreadyRunningError
-from src.models.mod.dependency_resolution import RequiredModDependenciesMissing
+from mcw_core.api.models.mod.dependency_resolution import RequiredModDependenciesMissing
 
 
 @dataclass(frozen=True, slots=True)

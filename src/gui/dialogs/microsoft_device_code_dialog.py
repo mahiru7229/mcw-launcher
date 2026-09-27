@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 from mcw_core.api.language.language_manager import tr
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.window_sizing import resize_dialog_to_screen
-from src.models.auth.microsoft.device_code_response import DeviceCodeResponse
+from mcw_core.api.models.auth.microsoft.device_code_response import DeviceCodeResponse
 
 
 class MicrosoftDeviceCodeDialog(QDialog):

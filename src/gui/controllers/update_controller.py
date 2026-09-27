@@ -12,7 +12,7 @@ from mcw_core.api.update.update_manager import UpdateManager
 from src.gui.config import GITHUB_REPOSITORY, UPDATE_CHANNEL, VERSION_ID
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskConflictPolicy, TaskRunner
-from src.models.update.update_info import UpdateInfo
+from mcw_core.api.models.update.update_info import UpdateInfo
 
 
 class UpdateController(BaseController):

@@ -9,7 +9,7 @@ from mcw_core.api.language.language_manager import tr
 from mcw_core.api.content.installed_content_library import InstalledContentLibraryManager
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
-from src.models.instance.instance import Instance
+from mcw_core.api.models.instance.instance import Instance
 
 
 class ContentLibraryController(BaseController):

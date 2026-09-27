@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QDialogButtonBox, Q
 
 from mcw_core.api.language.language_manager import tr
 from src.gui.window_sizing import resize_dialog_to_screen
-from src.models.package.modpack_export import ModpackExportOptions
+from mcw_core.api.models.package.modpack_export import ModpackExportOptions
 
 
 class ModpackExportDialog(QDialog):

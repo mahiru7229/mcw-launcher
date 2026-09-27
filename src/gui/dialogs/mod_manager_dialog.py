@@ -13,10 +13,10 @@ from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.platform_open import open_local_path
 from src.gui.window_sizing import resize_dialog_to_screen
-from src.models.instance.instance import Instance
-from src.models.mod.mod_info import ModInfo
-from src.models.mod.mod_issue import ModHealthReport, ModIssue
-from src.models.modrinth.update import ModrinthModUpdateEntry, ModrinthModUpdateReport
+from mcw_core.api.models.instance.instance import Instance
+from mcw_core.api.models.mod.mod_info import ModInfo
+from mcw_core.api.models.mod.mod_issue import ModHealthReport, ModIssue
+from mcw_core.api.models.modrinth.update import ModrinthModUpdateEntry, ModrinthModUpdateReport
 
 
 class ModManagerDialog(QDialog):
