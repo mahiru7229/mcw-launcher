@@ -6,22 +6,22 @@
 
 <p align="center">
   <strong>Minecraft launcher mã nguồn mở theo hướng instance-first.</strong><br>
-  Quản lý game, mod loader, nội dung và runtime Java của từng instance trong một giao diện PySide6 thống nhất.
+  Quản lý game, mod loader, nội dung và runtime Java của từng instance với kiến trúc tách biệt 100% giữa MCW Core và giao diện GUI.
 </p>
 
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.7.1-blue" alt="v1.7.1">
+  <img src="https://img.shields.io/badge/version-v1.8.0-blue" alt="v1.8.0">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!NOTE]
-> `v1.7.1` là bản phát hành chính thức, hoàn thiện hệ thống Hotfix tự động đồng bộ từ Cloudflare Edge CDN (Hồng Kông & Singapore), tích hợp bộ nạp động HotfixMetaPathFinder cho ứng dụng đóng gói, cùng giao diện nút Làm mới Modloader được thu nhỏ gọn gàng, vừa khít nội dung chữ.
+> `v1.8.0` là bản phát hành cột mốc **tách biệt 100% giữa MCW Core Engine (`mcw_core`) và tầng Giao diện (`src/gui`)**: bổ sung giao thức chuẩn **JSON-RPC 2.0** đa kênh (`mcw_core.rpc` — hỗ trợ Direct, Stdio Sidecar `--stdio` và Local HTTP + SSE `--http`), mở rộng `mcw_core/api/` & `mcw_core/api/models/` để GUI hoàn toàn không phụ thuộc vào `src.core` hay `src.models`, đồng thời tích hợp sẵn toàn bộ các cải tiến từ Hotfix `v1.7.1.1` (Hardware GPU Caching & hiển thị phiên bản Hotfix trực quan).
 
 > [!IMPORTANT]
 > **If you are looking for related components / Các dự án liên quan:**
-> 1. **Core**: [MCW Launcher Core · Download & Docs](https://mahiru7229.github.io/mcw_core/index.html) — Thư viện core headless độc lập, tài liệu API và bản tải wheel.
+> 1. **Core**: [MCW Launcher Core · Download & Docs](https://mahiru7229.github.io/mcw_core/index.html) — Thư viện core headless độc lập (`mcw_core-1.8.0-py3-none-any.whl`), máy chủ JSON-RPC 2.0 và tài liệu API.
 > 2. **CurseForge Gateway**: [mahiru7229/mcw-curseforge-gateway](https://github.com/mahiru7229/mcw-curseforge-gateway) — Mã nguồn gateway để người dùng tự build/deploy riêng. Launcher không tích hợp sẵn endpoint gateway công khai do tác giả không có kinh phí duy trì server gánh lượng lớn request cho cộng đồng (link gateway cá nhân chỉ tạo dùng nội bộ nhóm nhỏ và dự án không có dự định mở API công khai cho ứng dụng).
 
 ## Tổng quan
@@ -30,22 +30,22 @@ MCW Launcher tách mỗi cấu hình chơi thành một **instance** độc lậ
 
 Các nhóm tính năng chính:
 
+- **Tách biệt 100% Core & GUI (`mcw_core.rpc` & `mcw_core.api`)**: Giao tiếp chuẩn hóa qua JSON-RPC 2.0 (In-process Direct, Stdio Sidecar Process `--stdio`, hoặc Local HTTP + SSE `--http` trên `127.0.0.1`), sẵn sàng cho cả GUI PySide6 hiện tại lẫn GUI đa ngôn ngữ (Tauri v2 / TypeScript + React / C#).
 - Quản lý nhiều instance Vanilla, Fabric, Quilt, Forge và NeoForge.
 - Tìm và cài nội dung từ Modrinth; tích hợp CurseForge qua gateway do người dùng cấu hình.
 - Nhập modpack từ Modrinth, CurseForge, FTB và ATLauncher.
 - Tự động chọn/provision Java phù hợp, kiểm tra checksum và hỗ trợ repair.
 - Tài khoản Microsoft và chế độ offline; access token ngắn hạn chỉ giữ trong bộ nhớ.
-- Backup, diagnostics, theme/language pack, cập nhật launcher và chơi LAN.
-- API `mcw_core` nằm cùng repository để GUI dùng qua một biên public ổn định.
+- Backup, diagnostics, theme/language pack, cập nhật launcher, hệ thống Hotfix CDN tự động và chơi LAN.
 
 ## Trạng thái nền tảng
 
-| Nền tảng | Trạng thái v1.7.1 | Ghi chú |
+| Nền tảng | Trạng thái v1.8.0 | Ghi chú |
 | --- | --- | --- |
 | Windows 10/11 x64 | Đang hỗ trợ | Phân phối dạng tệp thực thi duy nhất (`MCW Launcher.exe`). |
 | Linux x64 | Đang hỗ trợ | Phân phối dạng tệp thực thi duy nhất (`mcw-launcher`). Automatic update và desktop opener đã được kiểm thử trên Lubuntu. |
 | Linux ARM64 | Nền tảng ban đầu | Nhận diện và metadata Java đúng; chưa có cam kết launch game. |
-| macOS | Chưa hỗ trợ | Chưa nằm trong phạm vi v1.7. |
+| macOS | Chưa hỗ trợ | Chưa nằm trong phạm vi v1.8. |
 
 ## Yêu cầu
 
@@ -82,7 +82,12 @@ python -m pip install -e '.[dev,build]'
 python launcher.py
 ```
 
-Một số bản phân phối Linux cần cài thêm thư viện hệ thống cho Qt/xcb. Tên package khác nhau theo distro; hãy xem lỗi plugin Qt của môi trường đang dùng trước khi cài thêm.
+Chạy riêng MCW Core ở chế độ JSON-RPC 2.0 Sidecar hoặc HTTP Server:
+
+```bash
+python -m mcw_core.rpc.cli --stdio
+python -m mcw_core.rpc.cli --http --host 127.0.0.1 --port 45180
+```
 
 ## Phát triển
 
@@ -118,18 +123,18 @@ GitHub Release Actions chỉ build ZIP native Windows/Linux sau khi test cả ha
 mcw-launcher/
 ├── launcher.py          # entry point và startup lifecycle
 ├── updater.py           # updater v2 entry point
-├── mcw_core/            # public facade/API dùng bởi GUI và consumer headless
-├── src/core/            # implementation nghiệp vụ
-├── src/gui/             # giao diện PySide6
-├── src/models/          # model/domain objects
-├── test/                # test suite
+├── mcw_core/            # public facade, mcw_core.api.*, mcw_core.api.models.* và mcw_core.rpc (JSON-RPC 2.0)
+├── src/core/            # implementation nghiệp vụ nội bộ của Core
+├── src/gui/             # giao diện PySide6 (giao tiếp 100% qua mcw_core, không import src.core/src.models)
+├── src/models/          # model/domain objects nội bộ
+├── test/                # test suite & AST boundary verification
 ├── assets/ lang/ themes/
 ├── runtime/             # MCW LAN Agent
 ├── tools/               # preflight, build và validation tools
 └── docs/                # tài liệu kỹ thuật
 ```
 
-GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, không import trực tiếp `src.core`. Metadata tải về phải được kiểm tra identifier, đường dẫn và checksum trước khi ghi vào workspace. Xem [kiến trúc chi tiết](docs/ARCHITECTURE.md).
+GUI chỉ gọi nghiệp vụ qua `mcw_core.rpc`, `mcw_core.api.*`, `mcw_core.api.models.*` hoặc public facade, **tuyệt đối không import trực tiếp `src.core` hay `src.models`**. Quy tắc ranh giới này được kiểm tra tự động bằng AST trong `test/test_v18_gui_core_decoupling.py` và `tools/release_preflight.py`. Xem [kiến trúc chi tiết](docs/ARCHITECTURE.md).
 
 ## Tài liệu & Dự án liên quan
 
@@ -139,11 +144,12 @@ GUI chỉ nên gọi nghiệp vụ qua `mcw_core.api` hoặc public facade, khô
 - [Kiểm thử trên Lubuntu](docs/LINUX_TESTING.md)
 - [Kiến trúc](docs/ARCHITECTURE.md)
 - [Instance system](docs/INSTANCE_SYSTEM.md)
-- [MCW Core API](docs/MCW_CORE_LIBRARY.md)
+- [MCW Core API & JSON-RPC 2.0](docs/MCW_CORE_LIBRARY.md)
 - [Hệ thống Hotfix CDN](docs/HOTFIX_SYSTEM.md)
 - [Cứu hộ Update Bridge](docs/UPDATE_BRIDGE_RECOVERY.md)
 - [Language packs](docs/LANGUAGE_PACKS.md)
 - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
+- [Release notes v1.8.0](docs/releases/v1.8.0.md)
 - [Release notes v1.7.1](docs/releases/v1.7.1.md)
 - [Release notes Update Bridge v1.7.1](docs/releases/update-bridge-v1.7.1.md)
 - [Release notes v1.7.0](docs/releases/v1.7.0.md)
