@@ -382,7 +382,7 @@ def audit_gui_core_boundary(project_root: Path) -> list[str]:
     gui_root = project_root / "src" / "gui"
     if not gui_root.is_dir():
         return ["Missing GUI source directory: src/gui"]
-    direct_import = re.compile(r"^\s*(?:from\s+src\.core(?:\.|\s)|import\s+src\.core(?:\.|\s|$))")
+    direct_import = re.compile(r"^\s*(?:from\s+src\.(?:core|models)(?:\.|\s)|import\s+src\.(?:core|models)(?:\.|\s|$))")
     for path in sorted(gui_root.rglob("*.py")):
         try:
             lines = path.read_text(encoding="utf-8").splitlines()
@@ -391,7 +391,7 @@ def audit_gui_core_boundary(project_root: Path) -> list[str]:
             continue
         for line_number, line in enumerate(lines, start=1):
             if direct_import.match(line):
-                errors.append(f"{path.relative_to(project_root)}:{line_number}: GUI must not import src.core directly")
+                errors.append(f"{path.relative_to(project_root)}:{line_number}: GUI must not import src.core or src.models directly")
     return errors
 
 def audit_version_metadata(project_root: Path) -> list[str]:

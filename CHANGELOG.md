@@ -2,6 +2,18 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.0] - 2026-09-30
+
+### Added
+- **Tách biệt 100% Core & GUI (`mcw_core.rpc`)**:
+  - Bổ sung giao thức **JSON-RPC 2.0** đa kênh (`CoreRpcDispatcher`, `CoreRpcClient`, `GuiCoreRpcBridge`) phục vụ giao tiếp độc lập giữa GUI và `mcw-launcher-core`.
+  - Hỗ trợ chế độ **Stdio Sidecar Process** (`mcw-core-rpc --stdio`) và **Local HTTP + Server-Sent Events (SSE) Daemon** (`mcw-core-rpc --http` trên `127.0.0.1`).
+  - Mở rộng `mcw_core/api/` và `mcw_core/api/models/` bao phủ toàn bộ models và services; loại bỏ 100% câu lệnh import trực tiếp `src.core.*` và `src.models.*` khỏi `src/gui/` và `launcher.py`.
+- **Tích hợp chính thức toàn bộ cải tiến từ bản vá nóng `v1.7.1.1`**:
+  - Tăng tốc khởi động ứng dụng nhờ cơ chế **Hardware GPU Caching** trong `GpuPreferenceManager`.
+  - Chuyển tiến trình đồng bộ Hotfix sang luồng nền không chặn khởi động (`_start_background_hotfix_sync`).
+  - Hiển thị trực quan phiên bản Hotfix đang kích hoạt trên màn hình `StartupSplash`, `HomePage`, `LauncherSettingsPage`, và `MainWindow`.
+
 ## [1.7.1] - 2026-09-25
 
 ### Added
