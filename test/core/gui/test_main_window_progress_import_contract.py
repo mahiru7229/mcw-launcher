@@ -21,7 +21,12 @@ def test_main_window_imports_every_progress_symbol_it_uses() -> None:
         if not isinstance(node, ast.ImportFrom):
             continue
         module = str(node.module or "")
-        if not module.startswith("src.models.progress."):
+        if not (
+            module.startswith("src.models.progress.")
+            or module.startswith("mcw_core.api.models.progress.")
+            or module == "mcw_core.models"
+            or module == "mcw_core"
+        ):
             continue
         imported.update(alias.asname or alias.name for alias in node.names)
 
