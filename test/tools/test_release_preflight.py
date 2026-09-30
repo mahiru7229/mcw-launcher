@@ -148,4 +148,5 @@ def test_gui_core_boundary_rejects_direct_src_core_import(tmp_path: Path) -> Non
     (gui / "bad.py").write_text("from src.core.foo import Bar\n", encoding="utf-8")
 
     errors = [error.replace("\\", "/") for error in audit_gui_core_boundary(tmp_path)]
-    assert errors == ["src/gui/bad.py:1: GUI must not import src.core directly"]
+    assert errors == ["src/gui/bad.py:1: GUI must not import src.core or src.models directly"]
+
