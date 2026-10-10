@@ -19,4 +19,21 @@ def gui_app():
 
     application = existing or QApplication([])
     yield application
+    for widget in list(application.topLevelWidgets()):
+        widget.hide()
+        widget.deleteLater()
     application.processEvents()
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_test_widgets():
+    yield
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance()
+    if app is not None:
+        for widget in list(app.topLevelWidgets()):
+            widget.hide()
+            widget.deleteLater()
+        app.processEvents()
+
