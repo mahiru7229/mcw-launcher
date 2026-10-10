@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCW Launcher - Studio Dịch Thuật</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+  <div id="app">
+    <!-- Top Header -->
+    <header class="top-nav">
+      <div class="nav-left">
+        <div class="brand">
+          <div class="brand-logo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m5 8 6 6"></path>
+              <path d="m4 14 6-6 2-3"></path>
+              <path d="M2 5h12"></path>
+              <path d="M7 2h1"></path>
+              <path d="m22 22-5-10-5 10"></path>
+              <path d="M14 18h6"></path>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <span class="brand-title">MCW Translation Studio</span>
+            <span class="brand-badge">Launcher v1.8.0</span>
+          </div>
+        </div>
+
+        <div class="locale-selector-wrapper">
+          <label for="languageSelect" class="selector-label">Ngôn ngữ đích:</label>
+          <select id="languageSelect" class="locale-select">
+            <option value="vi-VN" selected>Đang tải danh sách ngôn ngữ...</option>
+          </select>
+          <button id="btnNewLanguage" class="btn-icon" title="Tạo ngôn ngữ mới (+)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="nav-center">
+        <div class="progress-container" title="Tiến độ dịch thuật">
+          <div class="progress-info">
+            <span id="progressText">0 / 0 (0%)</span>
+          </div>
+          <div class="progress-track">
+            <div id="progressBar" class="progress-fill" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-right">
+        <button id="btnAudit" class="btn btn-secondary" title="Kiểm tra hợp lệ trước khi đóng gói">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <polyline points="9 12 11 14 15 10"></polyline>
+          </svg>
+          <span>Kiểm tra QA</span>
+        </button>
+
+        <button id="btnCsvModal" class="btn btn-secondary" title="Nhập / Xuất Excel CSV">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>CSV / Excel</span>
+        </button>
+
+        <button id="btnFindReplace" class="btn btn-secondary" title="Tìm và thay thế hàng loạt">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <span>Tìm & Thay thế</span>
+        </button>
+
+        <button id="btnShortcuts" class="btn-icon" title="Phím tắt nhanh">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
+
+        <button id="btnToggleTheme" class="btn-icon" title="Đổi giao diện Sáng / Tối">
+          <svg id="themeIconDark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+          <svg id="themeIconLight" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+
+        <button id="btnSaveAll" class="btn btn-primary" title="Lưu thay đổi vào file JSON (Ctrl+S)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+            <polyline points="7 3 7 8 15 8"></polyline>
+          </svg>
+          <span>Lưu File</span>
+          <span id="unsavedBadge" class="badge-count" style="display:none;">0</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="main-layout">
+      <!-- Left Sidebar: Explorer & Filter -->
+      <aside class="sidebar">
+        <!-- Search Box -->
+        <div class="search-section">
+          <div class="search-input-wrapper">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="searchInput" placeholder="Tìm key, tiếng Anh hoặc tiếng Việt... (Ctrl+F)" autocomplete="off">
+            <button id="btnClearSearch" class="btn-clear-search" style="display:none;" title="Xóa tìm kiếm">✕</button>
+          </div>
+        </div>
+
+        <!-- Filter Status Pills -->
+        <div class="filter-pills">
+          <button class="filter-pill active" data-filter="all">Tất cả <span class="pill-count" id="countAll">0</span></button>
+          <button class="filter-pill" data-filter="untranslated">Chưa dịch <span class="pill-count" id="countUntranslated">0</span></button>
+          <button class="filter-pill" data-filter="placeholder_mismatch">Lỗi biến <span class="pill-count" id="countMismatches">0</span></button>
+          <button class="filter-pill" data-filter="identical">Giống Anh <span class="pill-count" id="countIdentical">0</span></button>
+          <button class="filter-pill" data-filter="unsaved">Chưa lưu <span class="pill-count" id="countUnsaved">0</span></button>
+        </div>
+
+        <!-- Namespace Selector -->
+        <div class="namespace-section">
+          <div class="namespace-header">
+            <span class="section-label">Module / Phân nhóm:</span>
+            <button id="btnResetNamespace" class="btn-link" style="display:none;">Xem tất cả</button>
+          </div>
+          <select id="namespaceSelect" class="namespace-dropdown">
+            <option value="all">Tất cả module (2,294)</option>
+          </select>
+        </div>
+
+        <!-- Items Counter Header -->
+        <div class="list-meta-header">
+          <span id="filteredCountLabel">Hiển thị 0 chuỗi</span>
+          <div class="list-actions">
+            <button id="btnNextUntranslated" class="btn-link" title="Đến chuỗi chưa dịch kế tiếp">⏩ Chưa dịch</button>
+          </div>
+        </div>
+
+        <!-- Strings List (Virtualized) -->
+        <div id="stringListContainer" class="string-list-container">
+          <!-- Dynamically populated -->
+        </div>
+      </aside>
+
+      <!-- Right Panel: Translation Editor Workspace -->
+      <section class="workbench">
+        <div id="workbenchEmpty" class="workbench-empty" style="display: none;">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <h3>Không tìm thấy chuỗi nào</h3>
+          <p>Thử điều chỉnh lại bộ lọc hoặc từ khóa tìm kiếm bên trái.</p>
+        </div>
+
+        <div id="workbenchContent" class="workbench-content">
+          <!-- Active String Header -->
+          <div class="item-header">
+            <div class="item-breadcrumbs">
+              <span id="itemNamespaceBadge" class="badge badge-namespace">namespace</span>
+              <span id="itemIndexLabel" class="item-index">#1 / 2,294</span>
+            </div>
+            <div class="key-display-box">
+              <code id="itemKeyDisplay" class="key-code">app.name</code>
+              <button id="btnCopyKey" class="btn-icon-small" title="Sao chép tên Key">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Copy key</span>
+              </button>
+            </div>
+            <div class="item-status-wrapper">
+              <span id="itemStatusBadge" class="badge badge-status">Đã dịch</span>
+            </div>
+          </div>
+
+          <!-- Source Box (English Reference) -->
+          <div class="card source-card">
+            <div class="card-header">
+              <div class="card-header-left">
+                <span class="flag-icon">🇺🇸</span>
+                <span class="card-title">Tiếng Anh gốc (en-US)</span>
+              </div>
+              <div class="card-header-right">
+                <button id="btnCopySource" class="btn-text-action" title="Sao chép toàn bộ tiếng Anh">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <span>Chép nguyên văn</span>
+                </button>
+                <a id="linkGoogleTranslate" href="#" target="_blank" class="btn-text-action" title="Mở trên Google Dịch">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
+                  <span>Mở Google Dịch</span>
+                </a>
+              </div>
+            </div>
+            <div id="sourceTextDisplay" class="source-text-view">
+              <!-- Rendered source text with highlighted tokens -->
+            </div>
+          </div>
+
+          <!-- Target Translation Box -->
+          <div class="card target-card">
+            <div class="card-header">
+              <div class="card-header-left">
+                <span class="flag-icon" id="targetFlagIcon">🇻🇳</span>
+                <span class="card-title" id="targetCardTitle">Bản dịch (Tiếng Việt)</span>
+              </div>
+              <div class="card-header-right">
+                <span id="charCountDisplay" class="char-count">0 ký tự | 0 từ</span>
+                <button id="btnClearTarget" class="btn-text-action danger" title="Xóa nội dung bản dịch">Xóa</button>
+              </div>
+            </div>
+
+            <!-- Placeholder Injection Bar -->
+            <div id="placeholderBar" class="placeholder-bar" style="display: none;">
+              <span class="placeholder-label">Bấm để chèn biến:</span>
+              <div id="placeholderChips" class="placeholder-chips">
+                <!-- Dynamically generated placeholder chips -->
+              </div>
+            </div>
+
+            <!-- Target Textarea -->
+            <div class="editor-textarea-wrapper">
+              <textarea id="targetTextarea" placeholder="Nhập bản dịch tại đây... (Nhấn Ctrl+Enter để xác nhận và chuyển tiếp)" rows="6"></textarea>
+            </div>
+
+            <!-- Real-time QA Validation message -->
+            <div id="validationAlert" class="validation-alert" style="display:none;">
+              <span id="validationIcon" class="val-icon">⚠️</span>
+              <span id="validationMessage" class="val-text">Cảnh báo biến placeholder không khớp!</span>
+            </div>
+          </div>
+
+          <!-- Bottom Action Bar -->
+          <div class="workbench-footer">
+            <div class="footer-left">
+              <button id="btnPrev" class="btn btn-secondary" title="Chuỗi trước (Alt + Mũi tên lên)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
+                <span>Trước (Alt+↑)</span>
+              </button>
+              <button id="btnNext" class="btn btn-secondary" title="Chuỗi sau (Alt + Mũi tên xuống)">
+                <span>Sau (Alt+↓)</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+            </div>
+
+            <div class="footer-right">
+              <button id="btnApplyAndNext" class="btn btn-primary" title="Xác nhận và chuyển sang chuỗi kế tiếp (Ctrl+Enter)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Xác nhận & Chuyển tiếp (Ctrl+Enter)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modal: Tạo Ngôn Ngữ Mới -->
+    <div id="modalNewLanguage" class="modal-backdrop" style="display: none;">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3>Tạo Gói Ngôn Ngữ Mới</h3>
+          <button class="btn-close-modal" data-close="modalNewLanguage">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">Tạo một gói ngôn ngữ mới theo tiêu chuẩn MCW Launcher. Toàn bộ 2,294 key sẽ được khởi tạo tự động.</p>
+          <div class="form-group">
+            <label for="newLocaleCode">Mã Locale (VD: <code>ja-JP</code>, <code>zh-CN</code>, <code>fr-FR</code>):</label>
+            <input type="text" id="newLocaleCode" placeholder="vd: ja-JP" class="form-control" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="newLocaleName">Tên hiển thị (VD: <code>日本語 - 日本</code>, <code>Français</code>):</label>
+            <input type="text" id="newLocaleName" placeholder="vd: 日本語 - 日本" class="form-control" autocomplete="off">
+          </div>
+          <div class="form-checkbox">
+            <input type="checkbox" id="copySourceCheckbox" checked>
+            <label for="copySourceCheckbox">Sao chép tiếng Anh làm văn bản mẫu ban đầu (khuyên dùng để giữ cấu trúc placeholder)</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close="modalNewLanguage">Hủy</button>
+          <button id="btnSubmitNewLanguage" class="btn btn-primary">Tạo gói ngôn ngữ</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Kiểm Tra QA Preflight Audit -->
+    <div id="modalAudit" class="modal-backdrop" style="display: none;">
+      <div class="modal-dialog modal-large">
+        <div class="modal-header">
+          <h3>Kiểm Tra Chất Lượng (QA Preflight Audit)</h3>
+          <button class="btn-close-modal" data-close="modalAudit">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="auditSummaryBox" class="audit-summary-box">
+            <div class="audit-status-badge success" id="auditStatusBadge">ĐẠT CHUẨN</div>
+            <div class="audit-stats-grid" id="auditStatsGrid">
+              <!-- Dynamically rendered stats -->
+            </div>
+          </div>
+          <div class="audit-details-section">
+            <h4>Chi tiết lỗi & Cảnh báo:</h4>
+            <div id="auditIssuesList" class="audit-issues-list">
+              <p class="empty-hint">Không có lỗi nào!</p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close="modalAudit">Đóng</button>
+          <button id="btnReAudit" class="btn btn-primary">Kiểm tra lại</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Tìm & Thay Thế -->
+    <div id="modalFindReplace" class="modal-backdrop" style="display: none;">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3>Tìm & Thay Thế Hàng Loạt</h3>
+          <button class="btn-close-modal" data-close="modalFindReplace">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="findTextInput">Cụm từ cần tìm:</label>
+            <input type="text" id="findTextInput" placeholder="Nhập từ cần tìm trong bản dịch..." class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="replaceTextInput">Thay thế bằng:</label>
+            <input type="text" id="replaceTextInput" placeholder="Nhập từ mới thay thế..." class="form-control">
+          </div>
+          <div class="form-checkbox">
+            <input type="checkbox" id="matchCaseCheckbox">
+            <label for="matchCaseCheckbox">Phân biệt chữ hoa / chữ thường (Match case)</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close="modalFindReplace">Hủy</button>
+          <button id="btnExecuteReplace" class="btn btn-primary">Thay thế tất cả</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Nhập / Xuất CSV -->
+    <div id="modalCsv" class="modal-backdrop" style="display: none;">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3>Nhập / Xuất File Excel (CSV)</h3>
+          <button class="btn-close-modal" data-close="modalCsv">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="csv-action-card">
+            <h4>1. Xuất file CSV (Tải về cho biên dịch viên)</h4>
+            <p>Xuất toàn bộ 2,294 chuỗi với định dạng UTF-8 BOM, tương thích hoàn hảo với Microsoft Excel và Google Sheets.</p>
+            <button id="btnDownloadCsv" class="btn btn-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Tải file CSV về máy</span>
+            </button>
+          </div>
+          <hr class="modal-divider">
+          <div class="csv-action-card">
+            <h4>2. Nhập file CSV (Sau khi đã dịch trên Excel)</h4>
+            <p>Chọn file CSV đã dịch xong để cập nhật vào ứng dụng:</p>
+            <input type="file" id="csvFileInput" accept=".csv" class="form-control-file">
+            <button id="btnUploadCsv" class="btn btn-secondary" style="margin-top: 10px;">
+              <span>Nhập bản dịch từ file</span>
+            </button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close="modalCsv">Đóng</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Bảng Phím Tắt -->
+    <div id="modalShortcuts" class="modal-backdrop" style="display: none;">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3>Bảng Phím Tắt Tiện Dụng</h3>
+          <button class="btn-close-modal" data-close="modalShortcuts">✕</button>
+        </div>
+        <div class="modal-body">
+          <table class="shortcuts-table">
+            <tr>
+              <td><kbd>Ctrl</kbd> + <kbd>Enter</kbd></td>
+              <td>Xác nhận chuỗi hiện tại và nhảy sang chuỗi tiếp theo</td>
+            </tr>
+            <tr>
+              <td><kbd>Ctrl</kbd> + <kbd>S</kbd></td>
+              <td>Lưu toàn bộ thay đổi vào file JSON (kèm sao lưu tự động)</td>
+            </tr>
+            <tr>
+              <td><kbd>Alt</kbd> + <kbd>↓</kbd></td>
+              <td>Chuyển sang chuỗi tiếp theo trong danh sách</td>
+            </tr>
+            <tr>
+              <td><kbd>Alt</kbd> + <kbd>↑</kbd></td>
+              <td>Quay lại chuỗi phía trước trong danh sách</td>
+            </tr>
+            <tr>
+              <td><kbd>Ctrl</kbd> + <kbd>F</kbd></td>
+              <td>Focus ngay vào ô tìm kiếm nhanh</td>
+            </tr>
+            <tr>
+              <td><kbd>Esc</kbd></td>
+              <td>Đóng bất kỳ cửa sổ popup / modal đang mở</td>
+            </tr>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" data-close="modalShortcuts">Đã hiểu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
