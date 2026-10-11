@@ -2,6 +2,13 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.0.1] - 2026-10-11
+
+### Fixed
+- **Bản vá nóng (Hotfix)** sửa lỗi nạp metadata Forge mods:
+  - Khắc phục lỗi `RequiredModDependenciesMissing` khi khởi động các instance Forge (như *Roguelike Adventures and Dungeons 2*) do các mod phổ biến (*The Twilight Forest*, *Hwyla*, *Feywild*, *Sledgehammer*, *Wall-Jump!*) chứa chuỗi định dạng nhiều dòng không chuẩn trong file `META-INF/mods.toml`.
+  - Bổ sung cơ chế phân tích cú pháp khoan dung (`_normalize_lenient_toml` / `mods.toml (tolerant)`) tự động xử lý ký tự xuống dòng (`\n`) và ký tự thoát chưa chuẩn hóa trong các chuỗi cơ bản, đồng bộ với hành vi nạp mod của Java NightConfig trên Forge.
+
 ## [1.8.0] - 2026-09-30
 
 ### Added
