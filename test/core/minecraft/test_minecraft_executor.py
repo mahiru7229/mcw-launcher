@@ -1345,3 +1345,60 @@ def test_complete_managed_dependencies_reuses_initial_resolution_when_no_downloa
     assert result is initial
     assert modrinth_warnings == ("m",)
     assert curseforge_warnings == ("c",)
+
+
+def test_run_bypasses_unresolved_modpack_dependencies_when_forge_policy_allows(monkeypatch: pytest.MonkeyPatch):
+    pipeline = patch_pipeline(monkeypatch)
+    settings = SimpleNamespace(
+        forge_preflight_failure_policy="allow",
+        modrinth_failure_policy="inherit",
+        curseforge_failure_policy="inherit",
+    )
+    monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
+    unresolved_res = DependencyResolutionResult(unresolved=("Dependency 'twilightforest' has 3 blocking requirements",))
+    monkeypatch.setattr(ModpackDependencyResolver, "resolve", lambda instance, reporter=None: unresolved_res)
+    monkeypatch.setattr(ForgePreflightManager, "validate_runtime_files", lambda instance, version: ())
+
+    result = MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object())
+
+    assert result["minecraftVersion"] == pipeline["version"].id
+    assert any("twilightforest" in warning for warning in result.get("warnings", ()))
+
+
+def test_run_blocks_on_unresolved_modpack_dependencies_when_forge_policy_blocks(monkeypatch: pytest.MonkeyPatch):
+    patch_pipeline(monkeypatch)
+    from src.models.mod.dependency_resolution import RequiredModDependenciesMissing
+    from src.models.mod.mod_issue import ModIssue
+    settings = SimpleNamespace(
+        forge_preflight_failure_policy="block",
+        modrinth_failure_policy="inherit",
+        curseforge_failure_policy="inherit",
+    )
+    monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
+    unresolved_res = DependencyResolutionResult(unresolved=("Dependency 'twilightforest' missing",))
+    monkeypatch.setattr(ModpackDependencyResolver, "resolve", lambda instance, reporter=None: unresolved_res)
+    monkeypatch.setattr(
+        ModpackDependencyResolver,
+        "raise_for_required_dependencies",
+        lambda instance, unresolved: (_ for _ in ()).throw(RequiredModDependenciesMissing(instance.name, (ModIssue("error", "dep", "missing"),)))
+    )
+
+    with pytest.raises(RequiredModDependenciesMissing):
+        MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object())
+
+
+def test_run_bypasses_forge_runtime_verification_when_policy_allows(monkeypatch: pytest.MonkeyPatch):
+    pipeline = patch_pipeline(monkeypatch)
+    settings = SimpleNamespace(
+        forge_preflight_failure_policy="allow",
+        modrinth_failure_policy="inherit",
+        curseforge_failure_policy="inherit",
+    )
+    monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
+    monkeypatch.setattr(ForgePreflightManager, "validate_runtime_files", lambda instance, version: ("Missing required library: test.jar",))
+
+    result = MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object())
+
+    assert result["minecraftVersion"] == pipeline["version"].id
+    assert any("test.jar" in warning for warning in result.get("warnings", ()))
+

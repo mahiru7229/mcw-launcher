@@ -240,6 +240,15 @@ class MinecraftExecutor:
             block_modrinth_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "modrinth")
             block_curseforge_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "curseforge")
             forge_preflight_policy = ManagedContentPolicy.resolve(settings, launcher_settings, "forge_preflight")
+            if (
+                forge_preflight_policy == ManagedContentPolicy.ALLOW
+                or allow_compatibility_issues_once
+                or getattr(settings, "allow_launch_on_forge_preflight_failure", False)
+                or launcher_settings.get("allow_launch_on_forge_preflight_failure", False)
+            ):
+                forge_preflight_policy = ManagedContentPolicy.ALLOW
+                block_modrinth_failure = False
+                block_curseforge_failure = False
             launch_lock_token = getattr(run_lock, "token", None)
             touch_lock = getattr(run_lock, "touch", None)
             if callable(touch_lock):
@@ -282,7 +291,8 @@ class MinecraftExecutor:
                 refresh_after_initial_ensure=refresh_dependencies_after_download,
                 on_manual_content_required=on_manual_content_required,
             )
-            ModpackDependencyResolver.raise_for_required_dependencies(instance, dependency_resolution_after_download.unresolved)
+            if forge_preflight_policy != ManagedContentPolicy.ALLOW and not allow_compatibility_issues_once:
+                ModpackDependencyResolver.raise_for_required_dependencies(instance, dependency_resolution_after_download.unresolved)
             PortableContentManager.finalize_disabled(instance)
 
             download_pause_controller.raise_if_requested()
@@ -327,7 +337,7 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             forge_runtime_issues = ForgePreflightManager.validate_runtime_files(instance, version)
-            if forge_runtime_issues:
+            if forge_runtime_issues and forge_preflight_policy != ManagedContentPolicy.ALLOW and not allow_compatibility_issues_once:
                 details = "\n".join(f"- {issue}" for issue in forge_runtime_issues)
                 raise RuntimeError(f"Forge runtime verification failed:\n{details}")
 
@@ -421,7 +431,8 @@ class MinecraftExecutor:
                 if issue.code not in {"forge-installation", "neoforge-installation"}
                 and (forge_preflight_policy == ManagedContentPolicy.ALLOW or allow_compatibility_issues_once)
             )
-            forge_warnings = tuple(issue.message for issue in forge_preflight.warnings) + bypassed_compatibility
+            runtime_warnings = tuple(f"Forge runtime verification: {issue}" for issue in forge_runtime_issues) if (forge_preflight_policy == ManagedContentPolicy.ALLOW or allow_compatibility_issues_once) else ()
+            forge_warnings = tuple(issue.message for issue in forge_preflight.warnings) + bypassed_compatibility + runtime_warnings
             # Only surface the final dependency state. The first pass may
             # temporarily fail before pack files are hydrated, while the second
             # pass can resolve the same dependency successfully after download.
