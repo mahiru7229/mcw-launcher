@@ -141,3 +141,25 @@ def test_manual_dialog_does_not_match_unrelated_jar(tmp_path, monkeypatch, gui_a
     assert len(emitted) == 0
 
 
+def test_manual_dialog_open_all_button_visibility_and_action(monkeypatch, gui_app):
+    dialog = CurseForgeManualDownloadDialog()
+    req1 = SimpleNamespace(provider="curseforge", project_id=1, file_id=10, managed_path="mods/a.jar", file_name="a.jar", project_url="https://www.curseforge.com/minecraft/mc-mods/a")
+    req2 = SimpleNamespace(provider="curseforge", project_id=2, file_id=20, managed_path="mods/b.jar", file_name="b.jar", project_url="https://www.curseforge.com/minecraft/mc-mods/b")
+
+    dialog.set_requirements([req1])
+    assert dialog.open_all_button.isHidden() is True
+
+    dialog.set_requirements([req1, req2])
+    assert dialog.open_all_button.isHidden() is False
+    assert dialog.open_all_button.isEnabled() is True
+
+    opened_urls: list[str] = []
+    monkeypatch.setattr("PySide6.QtGui.QDesktopServices.openUrl", lambda url: opened_urls.append(url.toString()))
+
+    dialog._open_all_pages()
+    assert len(opened_urls) == 2
+    assert "https://www.curseforge.com/minecraft/mc-mods/a/download/10" in opened_urls
+    assert "https://www.curseforge.com/minecraft/mc-mods/b/download/20" in opened_urls
+
+
+

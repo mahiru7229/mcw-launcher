@@ -61,6 +61,7 @@ class CurseForgeManualDownloadDialog(QDialog):
 
         actions = QHBoxLayout()
         self.open_page_button = QPushButton()
+        self.open_all_button = QPushButton()
         self.add_files_button = QPushButton()
         self.auto_detect_checkbox = QCheckBox()
         self.auto_detect_checkbox.setChecked(True)
@@ -69,11 +70,13 @@ class CurseForgeManualDownloadDialog(QDialog):
         self.close_button = QPushButton()
 
         self.open_page_button.clicked.connect(self._open_page)
+        self.open_all_button.clicked.connect(self._open_all_pages)
         self.add_files_button.clicked.connect(self._select_files)
         self.cancel_button.clicked.connect(self._on_cancel_clicked)
         self.close_button.clicked.connect(self._on_close_clicked)
 
         actions.addWidget(self.open_page_button)
+        actions.addWidget(self.open_all_button)
         actions.addWidget(self.add_files_button)
         actions.addWidget(self.auto_detect_checkbox)
         actions.addStretch()
@@ -163,6 +166,9 @@ class CurseForgeManualDownloadDialog(QDialog):
     def _update_actions(self) -> None:
         requirement = self._selected_requirement()
         self.open_page_button.setEnabled(requirement is not None and bool(self._best_url(requirement)))
+        can_open_all = len(self.remaining_requirements) > 1 and not self._import_busy
+        self.open_all_button.setEnabled(can_open_all)
+        self.open_all_button.setVisible(len(self._requirements) > 1)
         self.add_files_button.setEnabled(self.remaining_count > 0 and not self._import_busy)
 
     def _open_page(self) -> None:
@@ -170,6 +176,14 @@ class CurseForgeManualDownloadDialog(QDialog):
         if requirement is not None:
             url = self._best_url(requirement)
             if url:
+                QDesktopServices.openUrl(QUrl(url))
+
+    def _open_all_pages(self) -> None:
+        opened: set[str] = set()
+        for requirement in self.remaining_requirements:
+            url = self._best_url(requirement)
+            if url and url not in opened:
+                opened.add(url)
                 QDesktopServices.openUrl(QUrl(url))
 
     @staticmethod
@@ -324,6 +338,7 @@ class CurseForgeManualDownloadDialog(QDialog):
             tr("curseforge.manual.column.status"),
         ])
         self.open_page_button.setText(tr("artifact.manual.open_link"))
+        self.open_all_button.setText(tr("artifact.manual.open_all_links"))
         self.add_files_button.setText(tr("artifact.manual.add_modpack_file") if self.is_modpack_archive_mode else tr("artifact.manual.add_files"))
         self.auto_detect_checkbox.setText(tr("artifact.manual.auto_detect"))
         self.cancel_button.setText(tr("artifact.manual.cancel_launch"))

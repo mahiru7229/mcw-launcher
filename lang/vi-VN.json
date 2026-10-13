@@ -1211,6 +1211,7 @@
     "artifact.manual.summary_instance": "Còn {count} file cần thêm vào '{instance}'. Hãy tải từ {provider} rồi chọn cùng lúc tất cả file đã tải.",
     "artifact.manual.modpack_archive_summary": "Hãy tải file modpack {provider} gốc, rồi chọn file tại đây để tiếp tục tạo instance '{instance}'.",
     "artifact.manual.open_link": "Mở liên kết tải",
+    "artifact.manual.open_all_links": "Mở tất cả liên kết tải",
     "artifact.manual.add_files": "Thêm các file đã tải",
     "artifact.manual.add_files_title": "Thêm các file {provider} đã tải",
     "artifact.manual.add_modpack_file": "Chọn modpack đã tải",

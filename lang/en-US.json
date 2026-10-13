@@ -1211,6 +1211,7 @@
     "artifact.manual.summary_instance": "{count} file(s) still need to be added to '{instance}'. Download them from {provider}, then select all downloaded files at once.",
     "artifact.manual.modpack_archive_summary": "Download the original {provider} modpack archive, then select it here to continue creating '{instance}'.",
     "artifact.manual.open_link": "Open download link",
+    "artifact.manual.open_all_links": "Open all download links",
     "artifact.manual.add_files": "Add downloaded files",
     "artifact.manual.add_files_title": "Add downloaded {provider} files",
     "artifact.manual.add_modpack_file": "Select downloaded modpack",
