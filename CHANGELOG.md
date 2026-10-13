@@ -2,6 +2,28 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.1] - 2026-10-14
+
+### Added
+- **Thanh cuộn ngang cho không gian quản lý phiên bản (Instance Hub)**:
+  - Bọc bảng điều khiển Instance Hub vào `QScrollArea` với chính sách tự động hiển thị thanh cuộn khi không gian chiều ngang bị giới hạn.
+  - Đảm bảo hiển thị đầy đủ toàn bộ nút công cụ (như nút "Xóa") và các tab chi tiết (Mods, Nhật ký, Ảnh chụp, Thế giới) ở mọi độ phân giải màn hình hoặc cửa sổ hẹp (~1024x600).
+  - Tích hợp style đồng bộ cho `QScrollBar:horizontal` tương ứng với dark theme và accent runtime của launcher.
+
+### Fixed
+- **Bỏ thuộc tính luôn nổi lên trên (`WindowStaysOnTopHint`) của màn hình Loading/Splash**:
+  - Loại bỏ cờ `WindowStaysOnTopHint` khỏi `StartupSplash`, giúp màn hình loading không còn che khuất các cửa sổ ứng dụng khác của hệ điều hành Windows khi người dùng thao tác đa nhiệm trong lúc launcher khởi động.
+- **Điều hướng tải trực tiếp trang chờ đếm ngược CurseForge (`/download/{file_id}`)**:
+  - Tự động dẫn thẳng tới trang đếm ngược chính thức của CurseForge để tải đúng file jar của modpack thay vì trang chủ mod.
+  - Tích hợp tra cứu slug dự phòng qua `cflookup.com` khi không có API key.
+  - Thêm nút "Mở tất cả liên kết tải" (`open_all_button`) và tự động nạp mod từ thư mục `~/Downloads`.
+- **Khử trùng lặp thư viện Maven (Deduplicate Maven Libraries) trên Classpath**:
+  - Khắc phục triệt để lỗi xung đột Log4j và lwjgl, giúp các phiên bản Forge cũ (như 1.16.5) khởi động trơn tru.
+
+### Changed
+- **Khởi chạy trực tiếp theo cơ chế Prism Launcher**:
+  - Không chặn kiểm tra trước khi quét phụ thuộc mod, giao quyền xử lý trực tiếp cho ModLoader trong JVM.
+
 ## [1.8.1-beta.3] - 2026-10-14
 
 ### Fixed
