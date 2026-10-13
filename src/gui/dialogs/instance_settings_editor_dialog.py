@@ -63,7 +63,6 @@ class InstanceSettingsEditorDialog(QDialog):
                 lan_connection_provider=str(self.lan_connection_provider.currentData() or "manual"),
                 modrinth_failure_policy=str(self.modrinth_failure_policy.currentData() or ManagedContentPolicy.INHERIT),
                 curseforge_failure_policy=str(self.curseforge_failure_policy.currentData() or ManagedContentPolicy.INHERIT),
-                forge_preflight_failure_policy=str(self.forge_preflight_failure_policy.currentData() or ManagedContentPolicy.INHERIT),
                 width=self.window_width.value(),
                 height=self.window_height.value(),
                 fullscreen=self.fullscreen.isChecked(),
@@ -205,10 +204,8 @@ class InstanceSettingsEditorDialog(QDialog):
         managed_form = QFormLayout(managed_group)
         self.modrinth_failure_policy = self._failure_policy_combo()
         self.curseforge_failure_policy = self._failure_policy_combo()
-        self.forge_preflight_failure_policy = self._failure_policy_combo()
         managed_form.addRow(tr("instance_defaults.policy.modrinth"), self.modrinth_failure_policy)
         managed_form.addRow(tr("instance_defaults.policy.curseforge"), self.curseforge_failure_policy)
-        managed_form.addRow(tr("instance_defaults.policy.forge"), self.forge_preflight_failure_policy)
         layout.addWidget(managed_group)
         layout.addStretch(1)
         return scrollable_page(tab, object_name="InstancePolicySettingsScrollArea")
@@ -283,7 +280,6 @@ class InstanceSettingsEditorDialog(QDialog):
         self._set_combo(self.lan_connection_provider, settings.lan_connection_provider)
         self._set_combo(self.modrinth_failure_policy, settings.modrinth_failure_policy)
         self._set_combo(self.curseforge_failure_policy, settings.curseforge_failure_policy)
-        self._set_combo(self.forge_preflight_failure_policy, settings.forge_preflight_failure_policy)
         self.jvm_arguments.setPlainText("\n".join(settings.jvm_arguments))
         self._sync_jvm_preset_from_text()
         self.game_arguments.setPlainText("\n".join(settings.game_arguments))

@@ -128,22 +128,6 @@ class ModpackDependencyResolver:
     def raise_for_required_dependencies(instance: Instance, unresolved: tuple[str, ...] | list[str] = ()) -> None:
         if not ModpackDependencyResolver._is_managed_modpack(instance):
             return
-        try:
-            from src.core.instance.settings_manager import SettingsManager
-            from src.core.config.launcher_settings_manager import LauncherSettingsManager
-            from src.core.config.managed_content_policy import ManagedContentPolicy
-
-            settings = SettingsManager.load(instance)
-            launcher_settings = LauncherSettingsManager().load()
-            policy = ManagedContentPolicy.resolve(settings, launcher_settings, "forge_preflight")
-            if (
-                policy == ManagedContentPolicy.ALLOW
-                or getattr(settings, "allow_launch_on_forge_preflight_failure", False)
-                or launcher_settings.get("allow_launch_on_forge_preflight_failure", False)
-            ):
-                return
-        except Exception:
-            pass
         issues = list(ModpackDependencyResolver.blocking_issues(instance))
         issues.extend(
             ModIssue(severity="error", code="dependency-unresolved", message=str(message), mod_ids=())

@@ -285,21 +285,6 @@ class LauncherSettingsPage(BasePage):
         runtime_section.add_card(self.instance_defaults_card)
         self._update_instance_defaults_summary()
 
-        self.forge_preflight_card = CardWidget(
-            tr("forge_preflight.launcher.title"),
-            tr("forge_preflight.launcher.detail"),
-        )
-        self.forge_preflight_policy_label = QLabel(tr("forge_preflight.launcher.policy_label"))
-        self.forge_preflight_policy_combo = QComboBox()
-        self._reload_forge_preflight_policies()
-        self.forge_preflight_warning_label = QLabel(tr("forge_preflight.warning"))
-        self.forge_preflight_warning_label.setObjectName("MutedLabel")
-        self.forge_preflight_warning_label.setWordWrap(True)
-        self.forge_preflight_card.layout.addWidget(self.forge_preflight_policy_label)
-        self.forge_preflight_card.layout.addWidget(self.forge_preflight_policy_combo)
-        self.forge_preflight_card.layout.addWidget(self.forge_preflight_warning_label)
-        runtime_section.add_card(self.forge_preflight_card)
-
         self.storage_cleanup_card = CardWidget(tr("storage.legacy.title"), tr("storage.legacy.detail"))
         self.notify_legacy_cache_cleanup = QCheckBox(tr("storage.legacy.notify"))
         self.unused_version_retention_label = QLabel(tr("storage.legacy.jar_retention.label"))
@@ -539,7 +524,6 @@ class LauncherSettingsPage(BasePage):
         self.modrinth_include_alpha.toggled.connect(self._refresh_dirty_state)
         self.block_modrinth_failure.toggled.connect(self._refresh_dirty_state)
         self.block_curseforge_failure.toggled.connect(self._refresh_dirty_state)
-        self.forge_preflight_policy_combo.currentIndexChanged.connect(self._refresh_dirty_state)
         for field in self.curseforge_gateway_inputs:
             field.textChanged.connect(self._refresh_dirty_state)
         self.auto_check_updates.toggled.connect(self._refresh_dirty_state)
@@ -741,19 +725,8 @@ class LauncherSettingsPage(BasePage):
         value = str(self.motion_mode_combo.currentData() or "full").strip().lower()
         return value if value in {"full", "reduced", "off"} else "full"
 
-    def _reload_forge_preflight_policies(self) -> None:
-        current = self.forge_preflight_policy_combo.currentData() if hasattr(self, "forge_preflight_policy_combo") else ManagedContentPolicy.ASK
-        self.forge_preflight_policy_combo.blockSignals(True)
-        self.forge_preflight_policy_combo.clear()
-        self.forge_preflight_policy_combo.addItem(tr("forge_preflight.policy.ask"), ManagedContentPolicy.ASK)
-        self.forge_preflight_policy_combo.addItem(tr("forge_preflight.policy.block"), ManagedContentPolicy.BLOCK)
-        self.forge_preflight_policy_combo.addItem(tr("forge_preflight.policy.allow"), ManagedContentPolicy.ALLOW)
-        index = self.forge_preflight_policy_combo.findData(ManagedContentPolicy.normalize_global(current))
-        self.forge_preflight_policy_combo.setCurrentIndex(max(0, index))
-        self.forge_preflight_policy_combo.blockSignals(False)
-
     def current_forge_preflight_policy(self) -> str:
-        return ManagedContentPolicy.normalize_global(self.forge_preflight_policy_combo.currentData())
+        return ManagedContentPolicy.ALLOW
 
     def _reload_accent_modes(self) -> None:
         current = self.accent_mode_combo.currentData() if hasattr(self, "accent_mode_combo") else "theme"
@@ -943,8 +916,6 @@ class LauncherSettingsPage(BasePage):
             "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
             "block_launch_on_modrinth_failure": self.block_modrinth_failure.isChecked(),
             "block_launch_on_curseforge_failure": self.block_curseforge_failure.isChecked(),
-            "forge_preflight_failure_policy": self.current_forge_preflight_policy(),
-            "allow_launch_on_forge_preflight_failure": self.current_forge_preflight_policy() == ManagedContentPolicy.ALLOW,
             "curseforge_gateway_urls": [field.text().strip() for field in self.curseforge_gateway_inputs],
             "download_limit_mbps": self.download_limit_mbps.value() if self.limit_download_speed.isChecked() else 0.0,
             "download_performance_mode": str(self.download_performance_mode.currentData() or "automatic"),
@@ -1062,13 +1033,6 @@ class LauncherSettingsPage(BasePage):
         self.show_content_descriptions.setText(tr("content.settings.show_descriptions"))
         self.block_modrinth_failure.setText(tr("managed_content.modrinth.block"))
         self.block_curseforge_failure.setText(tr("managed_content.curseforge.block"))
-        if self.forge_preflight_card.title_label is not None:
-            self.forge_preflight_card.title_label.setText(tr("forge_preflight.launcher.title"))
-        if self.forge_preflight_card.subtitle_label is not None:
-            self.forge_preflight_card.subtitle_label.setText(tr("forge_preflight.launcher.detail"))
-        self.forge_preflight_policy_label.setText(tr("forge_preflight.launcher.policy_label"))
-        self._reload_forge_preflight_policies()
-        self.forge_preflight_warning_label.setText(tr("forge_preflight.warning"))
         if self.instance_defaults_card.title_label is not None:
             self.instance_defaults_card.title_label.setText(tr("instance_defaults.launcher.title"))
         if self.instance_defaults_card.subtitle_label is not None:
@@ -1132,7 +1096,6 @@ class LauncherSettingsPage(BasePage):
             self.modrinth_include_alpha,
             self.block_modrinth_failure,
             self.block_curseforge_failure,
-            self.forge_preflight_policy_combo,
             self.limit_download_speed,
             self.download_limit_mbps,
             self.download_performance_mode,
@@ -1165,11 +1128,6 @@ class LauncherSettingsPage(BasePage):
         self.modrinth_include_alpha.setChecked(bool(settings.get("modrinth_include_alpha", False)))
         self.block_modrinth_failure.setChecked(bool(settings.get("block_launch_on_modrinth_failure", True)))
         self.block_curseforge_failure.setChecked(bool(settings.get("block_launch_on_curseforge_failure", True)))
-        forge_policy = settings.get("forge_preflight_failure_policy")
-        if forge_policy is None:
-            forge_policy = ManagedContentPolicy.ALLOW if bool(settings.get("allow_launch_on_forge_preflight_failure", False)) else ManagedContentPolicy.ASK
-        forge_index = self.forge_preflight_policy_combo.findData(ManagedContentPolicy.normalize_global(forge_policy))
-        self.forge_preflight_policy_combo.setCurrentIndex(max(0, forge_index))
         gateway_urls = list(settings.get("curseforge_gateway_urls", ()) or ())[:5]
         gateway_urls.extend([""] * (5 - len(gateway_urls)))
         for field, value in zip(self.curseforge_gateway_inputs, gateway_urls):

@@ -6,6 +6,7 @@ import ast
 from pathlib import Path
 
 from mcw_core.rpc import CoreRpcClient, CoreRpcDispatcher, HttpRpcServer
+from src.config import VERSION, VERSION_ID
 from src.gui.core.rpc_bridge import GuiCoreRpcBridge
 
 
@@ -40,7 +41,7 @@ def test_gui_core_rpc_bridge_direct_and_http_modes(tmp_path: Path) -> None:
     try:
         ping = bridge.ping()
         assert ping["pong"] is True
-        assert ping["version_id"] == "1.8.0"
+        assert ping["version_id"] == VERSION_ID
 
         created = bridge.call(
             "instances.create",
@@ -60,7 +61,7 @@ def test_gui_core_rpc_bridge_direct_and_http_modes(tmp_path: Path) -> None:
     try:
         ping_http = http_bridge.ping()
         assert ping_http["ok"] is True
-        assert ping_http["version"] == "v1.8.0"
+        assert ping_http["version"] == VERSION
     finally:
         http_bridge.close()
         server.stop()
@@ -72,6 +73,6 @@ def test_stdio_sidecar_subprocess_rpc_v18(tmp_path: Path) -> None:
     try:
         pong = client.call("system.ping")
         assert pong["pong"] is True
-        assert pong["version_id"] == "1.8.0"
+        assert pong["version_id"] == VERSION_ID
     finally:
         client.close()

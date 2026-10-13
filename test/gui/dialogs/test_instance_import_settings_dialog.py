@@ -54,7 +54,6 @@ def test_settings_editor_round_trips_every_instance_setting(gui_app) -> None:
         "lan_connection_provider": "e4mc",
         "modrinth_failure_policy": "allow",
         "curseforge_failure_policy": "block",
-        "forge_preflight_failure_policy": "allow",
     })
 
     dialog = InstanceSettingsEditorDialog(source, total_memory_mb=8192)

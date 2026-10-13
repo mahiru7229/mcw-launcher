@@ -39,6 +39,7 @@ from src.core.modrinth.modrinth_errors import ModrinthManagedFilesRequired
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.core.modrinth.modrinth_registry import ModrinthRegistry
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
+from src.core.network.artifact_download_service import ArtifactDownloadError
 from src.core.network.download_pause import DownloadCancelledError, download_pause_controller
 from src.core.progress.progress_reporter import ProgressReporter
 from src.core.package.portable_content_manager import PortableContentManager
@@ -240,14 +241,7 @@ class MinecraftExecutor:
             launcher_settings = LauncherSettingsManager().load()
             block_modrinth_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "modrinth")
             block_curseforge_failure = ManagedContentPolicy.blocks_launch(settings, launcher_settings, "curseforge")
-            forge_preflight_policy = ManagedContentPolicy.resolve(settings, launcher_settings, "forge_preflight")
-            if (
-                forge_preflight_policy == ManagedContentPolicy.ALLOW
-                or allow_compatibility_issues_once
-                or getattr(settings, "allow_launch_on_forge_preflight_failure", False)
-                or launcher_settings.get("allow_launch_on_forge_preflight_failure", False)
-            ):
-                forge_preflight_policy = ManagedContentPolicy.ALLOW
+            if allow_compatibility_issues_once:
                 block_modrinth_failure = False
                 block_curseforge_failure = False
             launch_lock_token = getattr(run_lock, "token", None)
@@ -296,16 +290,13 @@ class MinecraftExecutor:
                     refresh_after_initial_ensure=refresh_dependencies_after_download,
                     on_manual_content_required=on_manual_content_required,
                 )
-                if forge_preflight_policy != ManagedContentPolicy.ALLOW and not allow_compatibility_issues_once:
-                    ModpackDependencyResolver.raise_for_required_dependencies(instance, dependency_resolution_after_download.unresolved)
                 PortableContentManager.finalize_disabled(instance)
+            except (ArtifactDownloadError, DownloadCancelledError):
+                raise
             except Exception as modpack_check_error:
-                if forge_preflight_policy == ManagedContentPolicy.ALLOW or allow_compatibility_issues_once:
-                    dependency_resolution_after_download = DependencyResolutionResult(
-                        warnings=(str(modpack_check_error),)
-                    )
-                else:
-                    raise
+                dependency_resolution_after_download = DependencyResolutionResult(
+                    warnings=(str(modpack_check_error),)
+                )
 
             download_pause_controller.raise_if_requested()
             VersionManifestManager.get()
@@ -321,24 +312,8 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             forge_preflight = ForgePreflightManager.scan(instance, version, verify_files=False)
-            # Loader/runtime installation failures are never bypassable.
+            # Loader/runtime installation failures (missing loader files) are checked.
             ForgePreflightManager.raise_for_errors(forge_preflight, False)
-            compatibility_errors = tuple(
-                issue for issue in getattr(forge_preflight, "errors", ())
-                if issue.code not in {"forge-installation", "neoforge-installation"}
-            )
-            if compatibility_errors:
-                if forge_preflight_policy == ManagedContentPolicy.BLOCK:
-                    ForgePreflightManager.raise_for_errors(forge_preflight, True)
-                if forge_preflight_policy == ManagedContentPolicy.ASK and not allow_compatibility_issues_once:
-                    confirmation = CompatibilityConfirmationRequired(instance.name, forge_preflight)
-                    if on_compatibility_confirmation is None:
-                        raise confirmation
-                    if not bool(on_compatibility_confirmation(confirmation)):
-                        raise DownloadCancelledError("Launch cancelled after the compatibility warning.")
-                    # Resume this exact launch attempt. The hydrated dependency
-                    # graph, loader profile and preflight report stay valid.
-                    allow_compatibility_issues_once = True
 
             reporter.status(stage=ProgressStage.DOWNLOADING_CLIENT, message="Checking Minecraft client...")
             MinecraftExecutor._load_client(version, reporter, verification_cache)
@@ -349,9 +324,6 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             forge_runtime_issues = ForgePreflightManager.validate_runtime_files(instance, version)
-            if forge_runtime_issues and forge_preflight_policy != ManagedContentPolicy.ALLOW and not allow_compatibility_issues_once:
-                details = "\n".join(f"- {issue}" for issue in forge_runtime_issues)
-                raise RuntimeError(f"Forge runtime verification failed:\n{details}")
 
             reporter.status(stage=ProgressStage.DOWNLOADING_ASSETS, message="Checking Minecraft assets...")
             MinecraftExecutor._load_with_fast_verification(AssetManager.load, version, reporter, verification_cache)
@@ -441,9 +413,8 @@ class MinecraftExecutor:
             bypassed_compatibility = tuple(
                 issue.message for issue in getattr(forge_preflight, "errors", ())
                 if issue.code not in {"forge-installation", "neoforge-installation"}
-                and (forge_preflight_policy == ManagedContentPolicy.ALLOW or allow_compatibility_issues_once)
             )
-            runtime_warnings = tuple(f"Forge runtime verification: {issue}" for issue in forge_runtime_issues) if (forge_preflight_policy == ManagedContentPolicy.ALLOW or allow_compatibility_issues_once) else ()
+            runtime_warnings = tuple(f"Forge runtime verification: {issue}" for issue in forge_runtime_issues)
             forge_warnings = tuple(issue.message for issue in forge_preflight.warnings) + bypassed_compatibility + runtime_warnings
             # Only surface the final dependency state. The first pass may
             # temporarily fail before pack files are hydrated, while the second
