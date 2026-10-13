@@ -8,6 +8,8 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
+from PySide6.QtCore import Qt
+
 from mcw_core.api.language.language_manager import language_manager
 from src.gui.pages.instance_workspace_page import InstanceWorkspacePage
 
@@ -327,6 +329,28 @@ def test_workspace_cancel_button_clickable_even_when_busy(gui_app):
     page.cancel_launch_requested.connect(lambda: cancelled.append(True))
     page.cancel_button.click()
     assert cancelled == [True]
+
+
+def test_workspace_hub_horizontal_scroll(gui_app):
+    page = InstanceWorkspacePage()
+    assert page.hub_scroll.widget() is page.hub_widget
+    assert page.hub_stack.widget(1) is page.hub_scroll
+    assert page.hub_scroll.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded
+
+    inst1 = make_instance("PackOne")
+    inst2 = make_instance("PackTwo")
+    page.set_instances([inst1, inst2], "PackOne")
+    page.resize(700, 600)
+    page.show()
+    gui_app.processEvents()
+
+    assert page.hub_scroll.horizontalScrollBar().maximum() > 0
+
+    page.hub_scroll.horizontalScrollBar().setValue(50)
+    assert page.hub_scroll.horizontalScrollBar().value() == 50
+
+    page._select_name("PackTwo", emit=True)
+    assert page.hub_scroll.horizontalScrollBar().value() == 0
 
 
 

@@ -18,7 +18,7 @@ class StartupSplash(QWidget):
     MINIMUM_VISIBLE_MS = 450
 
     def __init__(self) -> None:
-        super().__init__(None, Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
+        super().__init__(None, Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setObjectName("StartupSplash")
         self.setFixedSize(520, 278)

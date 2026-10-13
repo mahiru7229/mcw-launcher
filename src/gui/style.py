@@ -483,6 +483,21 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0;
 }
 
+QScrollBar:horizontal {
+    background: #1b1d1a;
+    height: 14px;
+    border-top: 2px solid #10110f;
+}
+
+QScrollBar::handle:horizontal {
+    background: #51564c;
+    min-width: 28px;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0;
+}
+
 QTableWidget, QPlainTextEdit {
     background: #20221f;
     color: #ffffff;

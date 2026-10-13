@@ -422,7 +422,15 @@ class InstanceWorkspacePage(BasePage):
         # Animation state on hub_widget
         self._hub_anim: QPropertyAnimation | None = None
 
-        self.hub_stack.addWidget(self.hub_widget)
+        self.hub_scroll = QScrollArea()
+        self.hub_scroll.setObjectName("InstanceHubScroll")
+        self.hub_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.hub_scroll.setWidgetResizable(True)
+        self.hub_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.hub_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.hub_scroll.setWidget(self.hub_widget)
+
+        self.hub_stack.addWidget(self.hub_scroll)
         self.splitter.addWidget(self.hub_stack)
 
         self.splitter.setStretchFactor(0, 0)
@@ -861,6 +869,7 @@ class InstanceWorkspacePage(BasePage):
         self.hub_stack.setCurrentIndex(1)
         if self._selected_name != self._last_animated_name:
             self._last_animated_name = self._selected_name
+            self.hub_scroll.horizontalScrollBar().setValue(0)
             if self._hub_anim is not None:
                 self._hub_anim.stop()
                 self._hub_anim = None

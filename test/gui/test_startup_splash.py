@@ -7,6 +7,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
+from PySide6.QtCore import Qt
 from src.gui.startup_splash import StartupSplash
 
 
@@ -28,4 +29,10 @@ def test_startup_splash_clamps_progress_and_can_show_failure(gui_app):
 
     splash.show_error()
     assert "could not start" in splash.status_label.text().casefold()
+    splash.close()
+
+
+def test_startup_splash_does_not_stay_on_top(gui_app):
+    splash = StartupSplash()
+    assert not bool(splash.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
     splash.close()
