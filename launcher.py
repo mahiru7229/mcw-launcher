@@ -10,7 +10,7 @@ import traceback
 def _bootstrap_hotfixes() -> None:
     try:
         from src.config import VERSION_ID
-        from mcw_core.api.update.hotfix_manager import HotfixManager
+        from src.core.update.hotfix_manager import HotfixManager
 
         HotfixManager.bootstrap_sys_path(current_base_version=VERSION_ID, auto_sync=False)
     except Exception:

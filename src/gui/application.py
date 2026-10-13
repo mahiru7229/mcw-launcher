@@ -14,6 +14,64 @@ from src.gui.input_guard import install_combo_box_wheel_guard
 from src.gui.widget.adaptive_combo_box import install_adaptive_combo_boxes
 
 
+def _reload_hotfixed_core_modules() -> None:
+    """Ensure any modules in hotfixes/live that were pre-loaded during bootstrap are refreshed."""
+    try:
+        import importlib
+        import logging
+
+        logger = logging.getLogger("mcw_core.hotfix_bootstrap")
+
+        if getattr(sys, "frozen", False):
+            project_root = Path(sys.executable).resolve().parent
+        else:
+            project_root = Path(__file__).resolve().parents[2]
+
+        live_dir = project_root / "hotfixes" / "live"
+        if not live_dir.is_dir():
+            return
+
+        reloaded = []
+        for py_file in live_dir.rglob("*.py"):
+            rel_path = py_file.relative_to(live_dir)
+            parts = list(rel_path.parts)
+            if parts[-1].endswith(".py"):
+                parts[-1] = parts[-1][:-3]
+            if parts[-1] == "__init__":
+                parts.pop()
+            mod_name = ".".join(parts)
+            if mod_name in sys.modules and mod_name != "src.gui.application":
+                del sys.modules[mod_name]
+                try:
+                    importlib.import_module(mod_name)
+                    reloaded.append(mod_name)
+                except Exception as exc:
+                    logger.debug("Failed to reimport hotfix module %s: %s", mod_name, exc)
+
+        if "mcw_core.facade" in sys.modules:
+            try:
+                import mcw_core.facade
+
+                importlib.reload(mcw_core.facade)
+            except Exception as exc:
+                logger.debug("Failed to reload mcw_core.facade: %s", exc)
+        if "mcw_core" in sys.modules:
+            try:
+                import mcw_core
+
+                importlib.reload(mcw_core)
+            except Exception as exc:
+                logger.debug("Failed to reload mcw_core: %s", exc)
+
+        if reloaded:
+            logger.info("Successfully reloaded %d hotfix modules from live: %s", len(reloaded), reloaded)
+    except Exception:
+        pass
+
+
+_reload_hotfixed_core_modules()
+
+
 def _application_icon_path() -> Path:
     if getattr(sys, "frozen", False):
         root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
