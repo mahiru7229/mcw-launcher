@@ -2,6 +2,22 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.1-beta.2] - 2026-10-14
+
+### Fixed
+- **Khử trùng lặp thư viện Maven (Deduplicate Maven Libraries) trên Classpath**:
+  - Khắc phục triệt để lỗi xung đột thư viện Log4j (`NoSuchMethodError` / rác log `%minecraftFormatting` và `%tEx}`) khi khởi động các bản Forge như 1.16.5.
+  - Tự động thay thế các thư viện nguyên bản của Mojang bằng các phiên bản mới hơn do Mod Loader khai báo (ví dụ `log4j-core 2.15.0`, `lwjgl 3.2.2`, `jopt-simple 5.0.4`), giữ nguyên vị trí trên classpath.
+  - Giúp game và ModLoader (FML) khởi động ổn định, ghi đầy đủ crash report và hiển thị cửa sổ GUI cảnh báo mod lỗi thay vì làm sập ngang tiến trình Java.
+
+## [1.8.1-beta.1] - 2026-10-13
+
+### Changed
+- **Khởi chạy trực tiếp theo cơ chế Prism Launcher (Không chặn kiểm tra trước)**:
+  - Loại bỏ hoàn toàn các rào cản chặn khởi động khi quét phụ thuộc mod (`RequiredModDependenciesMissing`), chuyển sang cảnh báo phi chặn và nhường toàn quyền kiểm tra cho ModLoader trong JVM.
+  - Nâng cấp schema cấu hình lên `SCHEMA_VERSION = 20`, loại bỏ tùy chọn chính sách thất bại preflight khỏi Settings và Instance config.
+  - Tích hợp chính thức các cải tiến từ bản vá nóng `1.8.0.x`.
+
 ## [1.8.0.2] - 2026-10-11
 
 ### Fixed
