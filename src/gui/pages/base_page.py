@@ -54,7 +54,7 @@ class BasePage(QScrollArea):
         super().__init__()
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setWidgetResizable(True)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         page = QWidget()
         page.setObjectName("PageViewport")

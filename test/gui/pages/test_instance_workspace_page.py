@@ -333,9 +333,9 @@ def test_workspace_cancel_button_clickable_even_when_busy(gui_app):
 
 def test_workspace_hub_horizontal_scroll(gui_app):
     page = InstanceWorkspacePage()
-    assert page.hub_scroll.widget() is page.hub_widget
-    assert page.hub_stack.widget(1) is page.hub_scroll
-    assert page.hub_scroll.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded
+    assert page.hub_stack.widget(1) is page.hub_widget
+    assert page.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded
+    assert page.verticalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded
 
     inst1 = make_instance("PackOne")
     inst2 = make_instance("PackTwo")
@@ -344,13 +344,13 @@ def test_workspace_hub_horizontal_scroll(gui_app):
     page.show()
     gui_app.processEvents()
 
-    assert page.hub_scroll.horizontalScrollBar().maximum() > 0
+    assert page.horizontalScrollBar().maximum() > 0
 
-    page.hub_scroll.horizontalScrollBar().setValue(50)
-    assert page.hub_scroll.horizontalScrollBar().value() == 50
+    page.horizontalScrollBar().setValue(50)
+    assert page.horizontalScrollBar().value() == 50
 
     page._select_name("PackTwo", emit=True)
-    assert page.hub_scroll.horizontalScrollBar().value() == 0
+    assert page.horizontalScrollBar().value() == 0
 
 
 
