@@ -2,6 +2,15 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.1-beta.3] - 2026-10-14
+
+### Fixed
+- **Điều hướng tải trực tiếp trang chờ đếm ngược CurseForge (`/download/{file_id}`)**:
+  - Khắc phục triệt để lỗi người dùng bị điều hướng đến trang tìm kiếm hoặc trang chủ mod rồi bấm nhầm nút Download tải về phiên bản mới nhất (1.20/1.21) gây crash Forge loader (`javafml:40` / `javafml:61`) trên các phiên bản modpack cũ (như 1.16.5).
+  - Tích hợp bộ phân giải slug tự động qua `cflookup.com/{project_id}` cho các modpack chỉ khai báo ID số mà không có CurseForge Gateway API key, tự động chuyển đổi sang đường dẫn chính tắc của mod.
+  - Tự động tạo URL trang chờ đếm ngược trực tiếp (`https://www.curseforge.com/minecraft/{category}/{slug}/download/{file_id}`) để trình duyệt tự động bắt đầu tải file jar chính xác sau 5 giây mà không cần thao tác thủ công.
+  - Bổ sung nút **"Mở tất cả liên kết tải"** (`open_all_button`) trong hộp thoại tải thủ công khi có nhiều mod cần nạp, kết hợp tính năng tự động nhận diện file trong `~/Downloads` để tự động import và kiểm tra mã băm SHA-1.
+
 ## [1.8.1-beta.2] - 2026-10-14
 
 ### Fixed

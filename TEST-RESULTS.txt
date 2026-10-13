@@ -1,9 +1,9 @@
 MCW Launcher release verification
-Version: 1.8.1-beta.2
+Version: 1.8.1-beta.3
 Channel: beta
 
 Stable checks in this build workspace:
-- MCW Core & GUI regression suite: 2125 passed, 10 skipped
+- MCW Core & GUI regression suite: 2128 passed, 10 skipped
 - 100% Core & GUI AST boundary & JSON-RPC 2.0 checks (direct, HTTP/SSE, Stdio Sidecar): passed
 - update/mod/Modrinth/package/hotfix regression (including v1.7.1.1 GPU cache & UI hotfix display): passed
 - release_preflight: PASS
