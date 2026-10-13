@@ -23,7 +23,7 @@
 > **If you are looking for related components / Các dự án liên quan:**
 > 1. **Core**: [MCW Launcher Core · Download & Docs](https://mahiru7229.github.io/mcw_core/index.html) — Thư viện core headless độc lập (`mcw_core-1.8.0-py3-none-any.whl`), máy chủ JSON-RPC 2.0 và tài liệu API.
 > 2. **CurseForge Gateway**: [mahiru7229/mcw-curseforge-gateway](https://github.com/mahiru7229/mcw-curseforge-gateway) — Mã nguồn gateway để người dùng tự build/deploy riêng. Launcher không tích hợp sẵn endpoint gateway công khai do tác giả không có kinh phí duy trì server gánh lượng lớn request cho cộng đồng (link gateway cá nhân chỉ tạo dùng nội bộ nhóm nhỏ và dự án không có dự định mở API công khai cho ứng dụng).
-
+> 3. Mình có sử dụng repo của [Prism Launcher](https://github.com/PrismLauncher/PrismLauncher) để thao khảm cách sửa lỗi cho launcher của mình. (I have used [Prism Launcher](https://github.com/PrismLauncher/PrismLauncher)'s repo as a tip to fix some issues in this launcher.)
 ## Tổng quan
 
 MCW Launcher tách mỗi cấu hình chơi thành một **instance** độc lập. Mỗi instance có phiên bản Minecraft, mod loader, mods, resource packs, shader packs, saves, Java, RAM và JVM arguments riêng. Thiết kế này giúp việc thử modpack, sửa lỗi hoặc sao lưu không ảnh hưởng đến các instance khác.
@@ -150,11 +150,7 @@ GUI chỉ gọi nghiệp vụ qua `mcw_core.rpc`, `mcw_core.api.*`, `mcw_core.ap
 - [Language packs](docs/LANGUAGE_PACKS.md)
 - [Theme authoring](docs/THEME_CREATION_GUIDE.md)
 - [Release notes v1.8.0](docs/releases/v1.8.0.md)
-- [Release notes v1.7.1](docs/releases/v1.7.1.md)
 - [Release notes Update Bridge v1.7.1](docs/releases/update-bridge-v1.7.1.md)
-- [Release notes v1.7.0](docs/releases/v1.7.0.md)
-- [Release notes v1.6.1](docs/releases/v1.6.1.md)
-- [Release notes v1.6.0](docs/releases/v1.6.0.md)
 - [Changelog](CHANGELOG.md)
 
 ## Đóng góp và bảo mật
