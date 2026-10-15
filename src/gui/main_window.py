@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QCloseEvent, QGuiApplication, QScreen
 from PySide6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QStackedWidget, QVBoxLayout, QWidget
 
@@ -107,6 +107,10 @@ from mcw_core.api.models.progress.progress_event import ProgressEvent
 from mcw_core.api.models.progress.progress_state import ProgressState
 from mcw_core.api.models.progress.progress_stage import ProgressStage
 from mcw_core.api.models.update.update_info import PreparedUpdate, UpdateInfo
+
+
+class _HotfixBridge(QObject):
+    hotfix_applied = Signal(object)
 
 
 class MainWindow(QMainWindow):
@@ -219,6 +223,7 @@ class MainWindow(QMainWindow):
         self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(self._startup_settings.get("theme", "mcw-default")), bool(self._startup_settings.get("show_static_text", False)), str(self._startup_settings.get("accent_mode", "theme")), str(self._startup_settings.get("accent_color", "#8ed35b")), str(self._startup_settings.get("text_color_mode", "theme")), str(self._startup_settings.get("text_color", "#f4f4f4")))
         self.motion_runtime.apply(self._startup_settings.get("motion_mode", "full"))
         self._initialize_data()
+        self._setup_hotfix_listener()
 
     @staticmethod
     def _primary_screen() -> QScreen | None:
@@ -2600,19 +2605,50 @@ class MainWindow(QMainWindow):
         self._dismissed_restart_locale = locale
         self.toast_manager.show(tr("language.restart.saved_for_later"), "warning", tr("language.restart.title"))
 
-    def _restart_for_language_change(self) -> None:
+    def _restart_launcher(self, failure_title: str | None = None, failure_message: str | None = None) -> bool:
         if not self._confirm_all_unsaved_settings():
-            return
+            return False
         if self.gui_settings_controller.current.get("remember_window_size", True):
             self.gui_settings_controller.save_geometry(self.saveGeometry())
         if not start_restarted_process():
-            QMessageBox.critical(self, tr("language.restart.title"), tr("language.restart.failed"))
-            return
+            title = failure_title or tr("restart.failed_title", "Restart failed")
+            msg = failure_message or tr("restart.failed_message", "Could not restart launcher.")
+            QMessageBox.critical(self, title, msg)
+            return False
         self.launch_controller.cancel()
         self.task_runner.begin_shutdown()
         application = QGuiApplication.instance()
         if application is not None:
             application.quit()
+        return True
+
+    def _restart_for_language_change(self) -> None:
+        self._restart_launcher(tr("language.restart.title"), tr("language.restart.failed"))
+
+    def _setup_hotfix_listener(self) -> None:
+        try:
+            from mcw_core.api.update.hotfix_manager import HotfixManager
+
+            self._hotfix_bridge = _HotfixBridge(self)
+            self._hotfix_bridge.hotfix_applied.connect(self._on_hotfix_applied)
+            self._hotfix_callback = lambda state: self._hotfix_bridge.hotfix_applied.emit(state)
+            HotfixManager.register_apply_callback(self._hotfix_callback)
+        except Exception:
+            pass
+
+    def _on_hotfix_applied(self, state: object) -> None:
+        target_version = getattr(state, "target_version", "")
+        self.toast_manager.show(
+            tr(
+                "hotfix.applied_restart_prompt",
+                f"Hotfix v{target_version} applied. Please restart launcher to take full effect.",
+                version=target_version,
+            ),
+            "info",
+            tr("hotfix.update_title", "Hotfix Update"),
+        )
+        if hasattr(self, "launcher_settings_page"):
+            self.launcher_settings_page._refresh_hotfix_status_label()
 
     def _retranslate_ui(self) -> None:
         retranslate_widget_tree(self)
@@ -3465,6 +3501,13 @@ class MainWindow(QMainWindow):
         self.launch_controller.cancel()
         self.task_runner.begin_shutdown()
         self.discord_rpc_service.shutdown()
+        try:
+            if hasattr(self, "_hotfix_callback"):
+                from mcw_core.api.update.hotfix_manager import HotfixManager
+
+                HotfixManager.unregister_apply_callback(self._hotfix_callback)
+        except Exception:
+            pass
         super().closeEvent(event)
 
 

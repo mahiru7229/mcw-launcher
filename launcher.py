@@ -12,7 +12,18 @@ def _bootstrap_hotfixes() -> None:
         from src.config import VERSION_ID
         from mcw_core.api.update.hotfix_manager import HotfixManager
 
-        HotfixManager.bootstrap_sys_path(current_base_version=VERSION_ID, auto_sync=False)
+        manager = HotfixManager()
+        state = manager.load_state()
+        is_first_run_or_missing = (
+            state is None
+            or not manager.live_dir.is_dir()
+            or not HotfixManager._matches_base_version(state.base_version, VERSION_ID)
+        )
+        HotfixManager.bootstrap_sys_path(
+            current_base_version=VERSION_ID,
+            auto_sync=is_first_run_or_missing,
+            sync_timeout=2.0,
+        )
     except Exception:
         pass
 

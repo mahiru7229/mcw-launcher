@@ -2,6 +2,18 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.2-beta.1] - 2026-10-15
+
+### Fixed
+- **Hỗ trợ MCW LAN Agent cho các phiên bản Minecraft thấp hơn (xuống tới 1.14+)**:
+  - Mở rộng phạm vi hỗ trợ của `LanAgentTargetResolver` từ 1.17+ xuống 1.14.0+ (hỗ trợ đầy đủ Minecraft 1.14, 1.15, 1.16.5,...).
+  - Tự động nhận diện và gán bytecode target cho Forge SRG (`func_71229_d`), Fabric Intermediary (`method_3864`/`method_3782`) và Mojang Official Mappings (`d`).
+  - Khắc phục triệt để lỗi người chơi kết nối qua mạng LAN (IP:Port) bị ngắt kết nối với lỗi `"Invalid session"` khi host bật chế độ Offline LAN.
+- **Tự động đồng bộ và nạp Hotfix ngay khi launcher khởi động lần đầu**:
+  - Tinh chỉnh `_bootstrap_hotfixes()` tự động kích hoạt chế độ đồng bộ nhanh fail-open (`auto_sync=True`, timeout 2.0s) khi phát hiện launcher mới tải về hoặc chưa có hotfix cục bộ trước khi nạp các module giao diện vào bộ nhớ RAM.
+  - Tự động dọn dẹp và thu hồi các module cũ trong `sys.modules` (`_evict_cached_hotfix_modules`) ngay sau khi áp dụng bản vá nóng.
+  - Tích hợp thông báo Toast nhắc nhở người dùng khởi động lại launcher khi có bản vá nóng mới được nạp ngầm trong phiên làm việc.
+
 ## [1.8.1] - 2026-10-14
 
 ### Added
