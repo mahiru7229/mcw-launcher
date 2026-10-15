@@ -2,7 +2,7 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
-## [1.8.2-beta.1] - 2026-10-15
+## [1.8.2] - 2026-10-15
 
 ### Fixed
 - **Hỗ trợ MCW LAN Agent cho các phiên bản Minecraft thấp hơn (xuống tới 1.14+)**:

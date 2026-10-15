@@ -12,12 +12,12 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.8.2--beta.1-blue" alt="v1.8.2-beta.1">
+  <img src="https://img.shields.io/badge/version-v1.8.2-blue" alt="v1.8.2">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!NOTE]
-> **Phiên bản mới nhất (v1.8.2-beta.1)**:
+> **Phiên bản mới nhất (v1.8.2)**:
 > - **Mở rộng hỗ trợ MCW LAN Agent xuống Minecraft 1.14+**: Tự động nhận diện bytecode target Forge SRG (`func_71229_d`), Fabric Intermediary (`method_3864`/`method_3782`), và Mojang Official Mappings (`d`), khắc phục triệt để lỗi `"Invalid session"` khi người chơi kết nối qua IP/Port vào world host LAN chế độ offline.
 > - **Tự động đồng bộ và nạp Hotfix khi khởi động**: Cơ chế pre-bootstrap auto-sync nhanh (fail-open 2.0s) nạp các bản vá nóng trước khi import module UI, tự động thu hồi module cũ trong RAM (`sys.modules`) và hiển thị Toast nhắc khởi động lại.
 > - **Tài khoản Offline gán model Steve / Alex cục bộ**: Tự động xác định biến thể Steve (`classic`) hoặc Alex (`slim`) theo thuật toán băm UUID chuẩn của Minecraft Java (`DefaultPlayerSkin`), hoàn toàn không truy vấn skin ngoài Internet.
@@ -45,7 +45,7 @@
 
 ## Hỗ trợ nền tảng
 
-| Nền tảng | Trạng thái (v1.8.2-beta.1) | Ghi chú |
+| Nền tảng | Trạng thái (v1.8.2) | Ghi chú |
 | --- | --- | --- |
 | **Windows 10/11 x64** | Hỗ trợ chính thức | Bản build portable một file thực thi duy nhất (`MCW Launcher.exe`). |
 | **Linux x64** | Hỗ trợ chính thức | Bản build portable một file thực thi (`mcw-launcher`). Đã kiểm thử trên Lubuntu/Ubuntu. |

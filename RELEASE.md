@@ -1,6 +1,6 @@
-# MCW Launcher v1.8.2-beta.1
+# MCW Launcher v1.8.2
 
-Bản phát hành thử nghiệm **MCW Launcher v1.8.2-beta.1** tập trung khắc phục lỗi kết nối mạng LAN offline trên các phiên bản Minecraft cũ, cơ chế nạp hotfix tự động khi khởi động lần đầu, chuẩn hóa skin cho tài khoản offline và hiển thị đúng múi giờ địa phương cho dữ liệu thời gian chơi.
+Bản phát hành chính thức **MCW Launcher v1.8.2** tập trung giải quyết triệt để vấn đề kết nối mạng LAN offline trên các phiên bản Minecraft cũ, cơ chế nạp hotfix tự động khi khởi động lần đầu, chuẩn hóa skin cho tài khoản offline và hiển thị đúng múi giờ địa phương cho dữ liệu thời gian chơi.
 
 ---
 
@@ -31,7 +31,7 @@ Bản phát hành thử nghiệm **MCW Launcher v1.8.2-beta.1** tập trung kh�
 
 ## Thông tin kiểm thử & Xác thực (Verification)
 
-- **Release Preflight**: Đạt chuẩn 100% cho `v1.8.2-beta.1` (`python -m tools.release_preflight`).
+- **Release Preflight**: Đạt chuẩn 100% cho `v1.8.2` (`python -m tools.release_preflight`).
 - **Kiểm thử GUI & Core**: Vượt qua 351/351 tests giao diện và kiểm thử hồi quy.
 - **MCW Core Library**: Vượt qua 1,724/1,724 tests trong bộ mã nguồn `mcw-launcher-core`.
-- **Gói Wheel**: `mcw_core-1.8.2b1-py3-none-any.whl` đã được đóng gói sẵn trong thư mục `dist/`.
+- **Gói Wheel**: `mcw_core-1.8.2-py3-none-any.whl` đã được đóng gói sẵn trong thư mục `dist/`.
