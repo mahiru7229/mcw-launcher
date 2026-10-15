@@ -46,6 +46,13 @@ def test_format_last_played() -> None:
     assert "5" in five_days_result
 
 
+def test_format_last_played_converts_to_local_timezone() -> None:
+    now_utc = datetime.now(timezone.utc)
+    expected_local_time = now_utc.astimezone().strftime("%H:%M")
+    result = format_last_played(now_utc.isoformat())
+    assert expected_local_time in result
+
+
 def test_instance_playtime_persistence(temporary_paths: Path) -> None:
     instance_dir = temporary_paths / "PlaytimeTest"
     instance = Instance(

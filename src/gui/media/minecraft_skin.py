@@ -71,5 +71,13 @@ def account_skin_face_icon(account: object | None, size: int = 32) -> QIcon:
         if not icon.isNull():
             return icon
 
-    variant = str(getattr(account, "skin_variant", "classic") or "classic")
+    variant = str(getattr(account, "skin_variant", "") or "").strip()
+    if not variant or variant not in ("classic", "slim", "alex"):
+        player_uuid = str(getattr(account, "uuid", "") or "").strip()
+        if player_uuid:
+            from mcw_core.api.auth.offline_auth import OfflineAuthentication
+            variant = OfflineAuthentication.default_skin_variant(player_uuid)
+        else:
+            variant = "classic"
     return default_skin_face_icon(variant, size)
+

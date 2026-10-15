@@ -169,18 +169,8 @@ class AccountController(BaseController):
                 blocking=False,
             )
         elif account_type == "offline":
-            if AccountSkinManager.cached_texture(account) is not None:
-                return
-            if self._task_runner.is_task_active(self.PROFILE_SYNC_TASK_ID):
-                return
             self._profile_sync_attempted.add(account_id)
-            self._profile_sync_account_id = account_id
-            self._task_runner.run(
-                self.PROFILE_SYNC_TASK_ID,
-                lambda: AccountSkinManager.cache_offline_account(account),
-                tr("account.skin.loading"),
-                blocking=False,
-            )
+            return
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:

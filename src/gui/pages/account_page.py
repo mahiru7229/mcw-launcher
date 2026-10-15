@@ -194,7 +194,14 @@ class AccountPage(BasePage):
         if texture is not None:
             face = minecraft_skin_face_pixmap(texture, 48)
         if face.isNull():
-            variant = str(getattr(account, "skin_variant", "classic") or "classic")
+            variant = str(getattr(account, "skin_variant", "") or "").strip()
+            if not variant or variant not in ("classic", "slim", "alex"):
+                player_uuid = str(getattr(account, "uuid", "") or "").strip()
+                if player_uuid:
+                    from mcw_core.api.auth.offline_auth import OfflineAuthentication
+                    variant = OfflineAuthentication.default_skin_variant(player_uuid)
+                else:
+                    variant = "classic"
             face = default_skin_face_pixmap(variant, 48)
         if not face.isNull():
             self.skin_preview.setPixmap(face)

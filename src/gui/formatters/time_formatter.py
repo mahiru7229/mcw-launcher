@@ -26,7 +26,7 @@ def format_playtime(seconds: int) -> str:
 
 
 def format_last_played(iso_timestamp: str) -> str:
-    """Format an ISO 8601 timestamp of last played date into a friendly localized string."""
+    """Format an ISO 8601 timestamp of last played date into a friendly localized string in local timezone."""
     if not iso_timestamp or not iso_timestamp.strip():
         return tr("workspace.last_played.never")
 
@@ -35,14 +35,17 @@ def format_last_played(iso_timestamp: str) -> str:
     except (ValueError, TypeError):
         return str(iso_timestamp)
 
-    now = datetime.now(dt.tzinfo or timezone.utc)
-    delta_days = (now.date() - dt.date()).days
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    local_dt = dt.astimezone()
+    now = datetime.now().astimezone()
+    delta_days = (now.date() - local_dt.date()).days
 
-    time_str = dt.strftime("%H:%M")
-    if delta_days == 0:
+    time_str = local_dt.strftime("%H:%M")
+    if delta_days <= 0:
         return tr("workspace.last_played.today", time=time_str)
     if delta_days == 1:
         return tr("workspace.last_played.yesterday", time=time_str)
     if 2 <= delta_days <= 7:
         return tr("workspace.last_played.days_ago", count=delta_days)
-    return dt.strftime("%Y-%m-%d")
+    return local_dt.strftime("%Y-%m-%d")
