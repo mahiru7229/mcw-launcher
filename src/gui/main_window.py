@@ -2611,8 +2611,8 @@ class MainWindow(QMainWindow):
         if self.gui_settings_controller.current.get("remember_window_size", True):
             self.gui_settings_controller.save_geometry(self.saveGeometry())
         if not start_restarted_process():
-            title = failure_title or tr("restart.failed_title", "Restart failed")
-            msg = failure_message or tr("restart.failed_message", "Could not restart launcher.")
+            title = failure_title or tr("language.restart.title")
+            msg = failure_message or tr("language.restart.failed")
             QMessageBox.critical(self, title, msg)
             return False
         self.launch_controller.cancel()
