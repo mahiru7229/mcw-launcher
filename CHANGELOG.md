@@ -13,6 +13,11 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
   - Tinh chỉnh `_bootstrap_hotfixes()` tự động kích hoạt chế độ đồng bộ nhanh fail-open (`auto_sync=True`, timeout 2.0s) khi phát hiện launcher mới tải về hoặc chưa có hotfix cục bộ trước khi nạp các module giao diện vào bộ nhớ RAM.
   - Tự động dọn dẹp và thu hồi các module cũ trong `sys.modules` (`_evict_cached_hotfix_modules`) ngay sau khi áp dụng bản vá nóng.
   - Tích hợp thông báo Toast nhắc nhở người dùng khởi động lại launcher khi có bản vá nóng mới được nạp ngầm trong phiên làm việc.
+- **Tài khoản Offline chỉ gán skin Steve / Alex cục bộ, không tìm kiếm skin online**:
+  - Khi tạo tài khoản offline, tự động xác định biến thể Steve (`classic`) hoặc Alex (`slim`) theo thuật toán băm UUID chuẩn của Minecraft Java (`DefaultPlayerSkin`).
+  - Vô hiệu hóa việc truy vấn skin online từ Minotar/Mojang đối với tài khoản offline, kể cả khi tên tài khoản trùng với tên tài khoản bản quyền.
+- **Chuyển đổi thời gian lần cuối chơi (`last_played`) sang múi giờ hệ thống (Local Timezone)**:
+  - Hàm `format_last_played` chuyển đổi timestamp UTC đã lưu sang múi giờ địa phương bằng `astimezone()`, đảm bảo hiển thị đúng giờ và ngày tháng thực tế theo múi giờ của người dùng (ví dụ UTC+7).
 
 ## [1.8.1] - 2026-10-14
 
