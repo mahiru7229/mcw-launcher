@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import threading
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -26,6 +26,9 @@ from mcw_core.api.models.instance.instance import Instance
 
 
 class InstanceLiveLogsTab(QWidget):
+    _mclogs_uploaded = Signal(str)
+    _mclogs_failed = Signal(str)
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._instance: Instance | None = None
@@ -36,6 +39,8 @@ class InstanceLiveLogsTab(QWidget):
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(1000)
         self._poll_timer.timeout.connect(self._poll_log)
+        self._mclogs_uploaded.connect(self._on_mclogs_success)
+        self._mclogs_failed.connect(self._on_mclogs_error)
 
         self._build_ui()
 
@@ -227,10 +232,9 @@ class InstanceLiveLogsTab(QWidget):
             try:
                 result = McLogsClient.upload(text)
                 url = str(result.get("url") or "")
-                QTimer.singleShot(0, lambda: self._on_mclogs_success(url))
+                self._mclogs_uploaded.emit(url)
             except Exception as err:
-                msg = str(err)
-                QTimer.singleShot(0, lambda: self._on_mclogs_error(msg))
+                self._mclogs_failed.emit(str(err))
 
         threading.Thread(target=run_upload, daemon=True).start()
 

@@ -62,6 +62,21 @@ def test_core_rpc_http_server_and_client(tmp_path: Path) -> None:
         hotfix = client.call("system.hotfix_status")
         assert "cdn_label" in hotfix
         client.close()
+
+        import urllib.error
+        import urllib.request
+
+        evil_req = urllib.request.Request(
+            f"{base_url}/rpc",
+            data=b'{"jsonrpc":"2.0","id":1,"method":"system.ping","params":{}}',
+            headers={"Content-Type": "application/json", "Origin": "https://evil.example.com"},
+            method="POST",
+        )
+        try:
+            urllib.request.urlopen(evil_req, timeout=5.0)
+            raise AssertionError("Expected HTTP 403 for untrusted Origin")
+        except urllib.error.HTTPError as err:
+            assert err.code == 403
     finally:
         server.stop()
 

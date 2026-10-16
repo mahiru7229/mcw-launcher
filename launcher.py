@@ -179,6 +179,10 @@ def main() -> None:
         from mcw_core.api.hardware.gpu_preference_manager import GpuPreferenceManager, GraphicsDetectionResult
         import threading
 
+        gpu_lock = threading.Lock()
+        async_gpu_result: list[GraphicsDetectionResult | None] = [None]
+        window_ref: list[object] = [None]
+
         def detect_graphics(progress_callback):
             progress_callback(91, "startup.detecting_graphics")
             cached = GpuPreferenceManager._read_cache()
@@ -187,7 +191,12 @@ def main() -> None:
 
             def _async_gpu():
                 try:
-                    GpuPreferenceManager.detect()
+                    detected = GpuPreferenceManager.detect()
+                    with gpu_lock:
+                        async_gpu_result[0] = detected
+                        target_window = window_ref[0]
+                    if target_window is not None and hasattr(target_window, "_hotfix_bridge"):
+                        target_window._hotfix_bridge.gpu_detected.emit(detected)
                 except Exception:
                     pass
 
@@ -231,7 +240,15 @@ def main() -> None:
         # above is isolated so a locked database cannot freeze the splash forever.
         from src.gui.main_window import MainWindow
 
+        with gpu_lock:
+            if async_gpu_result[0] is not None:
+                gpu_detection = async_gpu_result[0]
         window = MainWindow(gpu_detection)
+        with gpu_lock:
+            window_ref[0] = window
+            if async_gpu_result[0] is not None and async_gpu_result[0] is not gpu_detection:
+                gpu_detection = async_gpu_result[0]
+                window.set_gpu_detection(gpu_detection)
         startup_stage_key = "startup.finalizing"
         splash.update_progress(99, startup_stage_key)
         window.show()
@@ -245,11 +262,11 @@ def main() -> None:
         from src.gui.dialogs.first_run_setup_dialog import FirstRunSetupDialog
 
         if FirstRunSetupDialog.should_show(settings):
-            setup_dialog = FirstRunSetupDialog(settings, gpu_detection, first_run_recommendation, window)
+            setup_dialog = FirstRunSetupDialog(settings, window._gpu_detection, first_run_recommendation, window)
             if setup_dialog.exec() == QDialog.DialogCode.Accepted:
                 LauncherSettingsManager().save(setup_dialog.selected_settings())
                 window.gui_settings_controller.load()
-                window.launcher_settings_page.set_gpu_detection(gpu_detection)
+                window.launcher_settings_page.set_gpu_detection(window._gpu_detection)
     except Exception as error:
         from PySide6.QtWidgets import QMessageBox
         from mcw_core.api.language.language_manager import tr
@@ -260,6 +277,8 @@ def main() -> None:
         splash.show_error()
         splash.raise_()
         splash.activateWindow()
+        path_text = str(error_path) if error_path is not None else tr("startup.error_log_unavailable")
+        stage_text = tr(startup_stage_key)
         msg_box = QMessageBox(splash)
         msg_box.setIcon(QMessageBox.Icon.Critical)
         msg_box.setWindowTitle(tr("startup.failed_title"))

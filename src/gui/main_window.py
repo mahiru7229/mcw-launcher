@@ -112,6 +112,9 @@ from mcw_core.api.models.update.update_info import PreparedUpdate, UpdateInfo
 
 class _HotfixBridge(QObject):
     hotfix_applied = Signal(object)
+    hotfix_available = Signal(object)
+    hotfix_failed = Signal(str, str)
+    gpu_detected = Signal(object)
 
 
 class MainWindow(QMainWindow):
@@ -2907,12 +2910,20 @@ class MainWindow(QMainWindow):
     def _restart_for_language_change(self) -> None:
         self._restart_launcher(tr("language.restart.title"), tr("language.restart.failed"))
 
+    def set_gpu_detection(self, gpu_detection: GraphicsDetectionResult) -> None:
+        self._gpu_detection = gpu_detection
+        if hasattr(self, "launcher_settings_page"):
+            self.launcher_settings_page.set_gpu_detection(gpu_detection)
+
     def _setup_hotfix_listener(self) -> None:
+        self._hotfix_bridge = _HotfixBridge(self)
+        self._hotfix_bridge.hotfix_applied.connect(self._on_hotfix_applied)
+        self._hotfix_bridge.hotfix_available.connect(self._prompt_hotfix_install)
+        self._hotfix_bridge.hotfix_failed.connect(self._on_hotfix_failed)
+        self._hotfix_bridge.gpu_detected.connect(self.set_gpu_detection)
         try:
             from mcw_core.api.update.hotfix_manager import HotfixManager
 
-            self._hotfix_bridge = _HotfixBridge(self)
-            self._hotfix_bridge.hotfix_applied.connect(self._on_hotfix_applied)
             self._hotfix_callback = lambda state: self._hotfix_bridge.hotfix_applied.emit(state)
             HotfixManager.register_apply_callback(self._hotfix_callback)
         except Exception:
@@ -2946,8 +2957,8 @@ class MainWindow(QMainWindow):
                 from mcw_core.api.update.hotfix_manager import HotfixManager
                 manager = HotfixManager()
                 entry = manager.check_for_hotfix(VERSION_ID, timeout=4.0)
-                if entry is not None:
-                    QTimer.singleShot(0, lambda: self._prompt_hotfix_install(entry))
+                if entry is not None and hasattr(self, "_hotfix_bridge"):
+                    self._hotfix_bridge.hotfix_available.emit(entry)
             except Exception:
                 pass
 
@@ -2978,7 +2989,8 @@ class MainWindow(QMainWindow):
                 manager.apply_hotfix(entry)
             except Exception as exc:
                 err_msg = str(exc)
-                QTimer.singleShot(0, lambda: self._on_hotfix_failed(version, err_msg))
+                if hasattr(self, "_hotfix_bridge"):
+                    self._hotfix_bridge.hotfix_failed.emit(version, err_msg)
 
         threading.Thread(target=_worker, daemon=True, name="hotfix-apply").start()
 

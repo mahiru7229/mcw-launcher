@@ -59,17 +59,41 @@ class HttpRpcServer:
             def log_message(self, format: str, *args: Any) -> None:
                 return  # Silent headless operation
 
+            def _is_trusted_origin(self) -> bool:
+                origin = str(self.headers.get("Origin", "") or "").strip().casefold()
+                if not origin:
+                    return True
+                return (
+                    origin in {"null", "tauri://localhost", "https://tauri.localhost", "http://tauri.localhost"}
+                    or origin.startswith("http://127.0.0.1:")
+                    or origin == "http://127.0.0.1"
+                    or origin.startswith("http://localhost:")
+                    or origin == "http://localhost"
+                )
+
             def _send_cors_headers(self) -> None:
-                self.send_header("Access-Control-Allow-Origin", "*")
+                origin = str(self.headers.get("Origin", "") or "").strip()
+                if origin and self._is_trusted_origin():
+                    self.send_header("Access-Control-Allow-Origin", origin)
+                elif not origin:
+                    self.send_header("Access-Control-Allow-Origin", "http://127.0.0.1")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
                 self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
             def do_OPTIONS(self) -> None:
+                if not self._is_trusted_origin():
+                    self.send_response(403)
+                    self.end_headers()
+                    return
                 self.send_response(204)
                 self._send_cors_headers()
                 self.end_headers()
 
             def do_GET(self) -> None:
+                if not self._is_trusted_origin():
+                    self.send_response(403)
+                    self.end_headers()
+                    return
                 if self.path == "/health":
                     body = json.dumps(
                         {
@@ -100,7 +124,12 @@ class HttpRpcServer:
                         server_ref._sse_queues.append(q)
                     try:
                         while True:
-                            msg = q.get(timeout=5.0)
+                            try:
+                                msg = q.get(timeout=5.0)
+                            except queue.Empty:
+                                self.wfile.write(b": keepalive\n\n")
+                                self.wfile.flush()
+                                continue
                             if msg == "__CLOSE__":
                                 break
                             self.wfile.write(f"data: {msg}\n\n".encode("utf-8"))
@@ -117,6 +146,10 @@ class HttpRpcServer:
                 self.end_headers()
 
             def do_POST(self) -> None:
+                if not self._is_trusted_origin():
+                    self.send_response(403)
+                    self.end_headers()
+                    return
                 if self.path != "/rpc":
                     self.send_response(404)
                     self.end_headers()
