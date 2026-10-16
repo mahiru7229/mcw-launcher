@@ -12,17 +12,17 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.8.2-blue" alt="v1.8.2">
+  <img src="https://img.shields.io/badge/version-v1.8.3--beta.1-orange" alt="v1.8.3-beta.1">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!NOTE]
-> **Phiên bản mới nhất (v1.8.2)**:
-> - **Mở rộng hỗ trợ MCW LAN Agent xuống Minecraft 1.14+**: Tự động nhận diện bytecode target Forge SRG (`func_71229_d`), Fabric Intermediary (`method_3864`/`method_3782`), và Mojang Official Mappings (`d`), khắc phục triệt để lỗi `"Invalid session"` khi người chơi kết nối qua IP/Port vào world host LAN chế độ offline.
-> - **Tự động đồng bộ và nạp Hotfix khi khởi động**: Cơ chế pre-bootstrap auto-sync nhanh (fail-open 2.0s) nạp các bản vá nóng trước khi import module UI, tự động thu hồi module cũ trong RAM (`sys.modules`) và hiển thị Toast nhắc khởi động lại.
-> - **Tài khoản Offline gán model Steve / Alex cục bộ**: Tự động xác định biến thể Steve (`classic`) hoặc Alex (`slim`) theo thuật toán băm UUID chuẩn của Minecraft Java (`DefaultPlayerSkin`), hoàn toàn không truy vấn skin ngoài Internet.
-> - **Múi giờ hệ thống cho thời gian lần cuối chơi**: Chuyển đổi timestamp UTC sang múi giờ địa phương (như UTC+7) giúp hiển thị chính xác ngày giờ người dùng chơi game.
-> - **Kiến trúc tách biệt Core & GUI 100%**: Giao thức chuẩn JSON-RPC 2.0 đa kênh (`mcw_core.rpc` — Direct, Stdio Sidecar `--stdio`, Local HTTP + SSE `--http`).
+> **Phiên bản mới nhất (v1.8.3-beta.1)**:
+> - **Tối ưu hóa thời gian khởi động lạnh (Cold launch time)**: Rút ngắn thời gian khởi động từ ~18.2 giây xuống còn ~1.61 giây (tăng tốc hơn 11 lần) nhờ cơ chế Lazy-loading 17 hộp thoại chức năng (`QDialog`), nạp trước stylesheet tầng C++ và phát hiện card đồ họa bất đồng bộ.
+> - **Dịch thuật & Theme hoàn chỉnh cho hộp thoại nạp động**: Áp dụng helper `_finalize_lazy_dialog` tự động dịch ngôn ngữ và áp dụng theme assets ngay lần đầu hiển thị, khử trùng lặp Theme và language reload lúc khởi động.
+> - **Chặn khởi tạo ngầm hộp thoại khi duyệt mod**: Thao tác tìm kiếm, xem chi tiết mod trên `ModsPage` và kiểm tra cập nhật modpack không còn kích hoạt dựng ngầm các modal dialog.
+> - **Đồng bộ luồng tín hiệu Qt Signals**: Thay thế hoàn toàn `QTimer.singleShot` từ worker thread sang Qt Signals chuẩn luồng (`_mclogs_uploaded`, `hotfix_available`, `hotfix_failed`, `gpu_detected`), sửa lỗi `NameError` tại hộp thoại sự cố khởi động.
+> - **SSE Keepalive & Phòng vệ bảo mật Origin cho HTTP RPC**: Tích hợp heartbeat `: keepalive\n\n` chống ngắt kết nối sau 5 giây và bộ lọc `_is_trusted_origin()` trả về HTTP 403 cho các nguồn lạ.
 
 > [!IMPORTANT]
 > **Dự án liên quan & Nguồn tham khảo:**

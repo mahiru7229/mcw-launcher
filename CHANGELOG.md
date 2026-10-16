@@ -2,6 +2,29 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.3-beta.1] - 2026-10-16
+
+### Added
+- **Cơ chế Lazy-loading 17 hộp thoại chức năng (`QDialog`)**:
+  - Chuyển đổi toàn bộ 17 modal dialog (quản lý mod, trình duyệt Modrinth/CurseForge/FTB/ATLauncher, content packs, repair center, v.v.) sang nạp động theo yêu cầu (on-demand).
+  - Tự động hoàn thiện dịch thuật và gán asset (`_finalize_lazy_dialog`) khi hộp thoại được mở lần đầu.
+  - Bổ sung helper `_allowed_modrinth_version_types()` đọc kênh phát hành trực tiếp từ cấu hình mà không cần khởi tạo `ModrinthBrowserDialog`.
+
+### Performance
+- **Tối ưu hóa mạnh mẽ thời gian khởi động lạnh (Cold launch time)**:
+  - Rút ngắn thời gian khởi động launcher từ ~18.2 giây xuống còn ~1.61 giây (tăng tốc hơn 11 lần).
+  - Trì hoãn việc kiểm tra bản vá Hotfix về background thread sau khi giao diện đã nạp xong kèm hộp thoại xác nhận.
+  - Nạp trước stylesheet cơ sở trên `QApplication` ở tầng C++ và nhận diện card đồ họa (GPU) bất đồng bộ.
+  - Loại bỏ các bước nạp trùng lặp Theme và reload từ điển ngôn ngữ trong quá trình khởi tạo ứng dụng.
+
+### Fixed
+- **An toàn luồng Qt Signals và bảo mật RPC**:
+  - Thay thế các lệnh gọi `QTimer.singleShot` từ background worker thread sang cơ chế Qt Signals chuẩn luồng (`_mclogs_uploaded`, `hotfix_available`, `hotfix_failed`, `gpu_detected`).
+  - Khắc phục lỗi `NameError` tại hộp thoại báo sự cố khởi động của launcher.
+  - Tích hợp heartbeat `: keepalive\n\n` cho endpoint `/events` của máy chủ HTTP RPC chống ngắt kết nối sau 5 giây.
+  - Tăng cường bảo vệ RPC cục bộ bằng bộ lọc Origin `_is_trusted_origin()`, từ chối các kết nối lạ bằng HTTP 403.
+  - Chặn việc tra cứu thông tin mod trên `ModsPage` kích hoạt khởi tạo ngầm các modal dialog.
+
 ## [1.8.2] - 2026-10-15
 
 ### Fixed
