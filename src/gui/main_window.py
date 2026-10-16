@@ -222,9 +222,6 @@ class MainWindow(QMainWindow):
         retranslate_widget_tree(self)
         self._connect_signals()
         self.launch_control.set_motion_runtime(self.motion_runtime)
-
-        self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(self._startup_settings.get("theme", "mcw-default")), bool(self._startup_settings.get("show_static_text", False)), str(self._startup_settings.get("accent_mode", "theme")), str(self._startup_settings.get("accent_color", "#8ed35b")), str(self._startup_settings.get("text_color_mode", "theme")), str(self._startup_settings.get("text_color", "#f4f4f4")))
-        self.motion_runtime.apply(self._startup_settings.get("motion_mode", "full"))
         self._initialize_data()
         self._setup_hotfix_listener()
 
@@ -373,6 +370,14 @@ class MainWindow(QMainWindow):
     def mod_manager_dialog(self, value: ModManagerDialog | None) -> None:
         self._mod_manager_dialog = value
 
+    def _finalize_lazy_dialog(self, dialog: QDialog) -> QDialog:
+        retranslate_widget_tree(dialog)
+        retranslate_dynamic = getattr(dialog, "retranslate_dynamic", None)
+        if callable(retranslate_dynamic):
+            retranslate_dynamic()
+        self.theme_runtime.apply_assets(dialog)
+        return dialog
+
     def _setup_mod_manager_dialog(self, dialog: ModManagerDialog) -> ModManagerDialog:
         dialog.refresh_requested.connect(self.mod_controller.refresh)
         dialog.add_requested.connect(self.mod_controller.add)
@@ -390,7 +395,7 @@ class MainWindow(QMainWindow):
         dialog.curseforge_button.setVisible(bool(settings.get("curseforge_gateway_urls", ())))
         if hasattr(self, "mod_controller") and self.mod_controller.current_instance is not None:
             dialog.set_instance(self.mod_controller.current_instance)
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def modrinth_mod_dialog(self) -> ModrinthBrowserDialog:
@@ -411,7 +416,7 @@ class MainWindow(QMainWindow):
         settings = getattr(self, "_cached_gui_settings", {})
         dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
         dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def modrinth_modpack_dialog(self) -> ModrinthBrowserDialog:
@@ -432,7 +437,18 @@ class MainWindow(QMainWindow):
         settings = getattr(self, "_cached_gui_settings", {})
         dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
         dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
+
+    def _allowed_modrinth_version_types(self) -> tuple[str, ...]:
+        if self._modrinth_modpack_dialog is not None:
+            return self._modrinth_modpack_dialog.allowed_version_types
+        settings = getattr(self, "_cached_gui_settings", None) or getattr(self, "_startup_settings", {})
+        values = ["release"]
+        if settings.get("modrinth_include_beta", False):
+            values.append("beta")
+        if settings.get("modrinth_include_alpha", False):
+            values.append("alpha")
+        return tuple(values)
 
     @property
     def modrinth_manual_dialog(self) -> CurseForgeManualDownloadDialog:
@@ -447,7 +463,7 @@ class MainWindow(QMainWindow):
     def _setup_modrinth_manual_dialog(self, dialog: CurseForgeManualDownloadDialog) -> CurseForgeManualDownloadDialog:
         dialog.files_selected.connect(self._install_manual_modrinth_files)
         dialog.cancelled.connect(self._on_manual_download_dialog_cancelled)
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def curseforge_mod_dialog(self) -> CurseForgeBrowserDialog:
@@ -471,7 +487,7 @@ class MainWindow(QMainWindow):
         settings = getattr(self, "_cached_gui_settings", {})
         dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
         dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def curseforge_modpack_dialog(self) -> CurseForgeBrowserDialog:
@@ -495,7 +511,7 @@ class MainWindow(QMainWindow):
         settings = getattr(self, "_cached_gui_settings", {})
         dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
         dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def curseforge_manual_dialog(self) -> CurseForgeManualDownloadDialog:
@@ -510,7 +526,7 @@ class MainWindow(QMainWindow):
     def _setup_curseforge_manual_dialog(self, dialog: CurseForgeManualDownloadDialog) -> CurseForgeManualDownloadDialog:
         dialog.files_selected.connect(self._install_manual_curseforge_files)
         dialog.cancelled.connect(self._on_manual_download_dialog_cancelled)
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def portable_manual_dialog(self) -> CurseForgeManualDownloadDialog:
@@ -525,7 +541,7 @@ class MainWindow(QMainWindow):
     def _setup_portable_manual_dialog(self, dialog: CurseForgeManualDownloadDialog) -> CurseForgeManualDownloadDialog:
         dialog.files_selected.connect(self._install_portable_manual_files)
         dialog.cancelled.connect(self._on_manual_download_dialog_cancelled)
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def content_pack_manager_dialog(self) -> ContentPackManagerDialog:
@@ -544,7 +560,7 @@ class MainWindow(QMainWindow):
         dialog.toggle_requested.connect(self._toggle_content_pack)
         dialog.remove_requested.connect(self._remove_content_pack)
         dialog.open_folder_requested.connect(self._open_content_pack_folder)
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def content_library_dialog(self) -> ContentLibraryDialog:
@@ -567,7 +583,7 @@ class MainWindow(QMainWindow):
         dialog.open_manager_requested.connect(self._open_content_library_manager)
         if hasattr(self, "content_library_controller") and self.content_library_controller.current_instance is not None:
             dialog.set_instance(self.content_library_controller.current_instance)
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def resource_pack_browser_dialog(self) -> ContentPackBrowserDialog:
@@ -589,7 +605,7 @@ class MainWindow(QMainWindow):
         settings = getattr(self, "_cached_gui_settings", {})
         dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
         dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def shader_pack_browser_dialog(self) -> ContentPackBrowserDialog:
@@ -611,7 +627,7 @@ class MainWindow(QMainWindow):
         settings = getattr(self, "_cached_gui_settings", {})
         dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
         dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def ftb_modpack_dialog(self) -> FTBBrowserDialog:
@@ -635,7 +651,7 @@ class MainWindow(QMainWindow):
         settings = getattr(self, "_cached_gui_settings", {})
         dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
         dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def atlauncher_modpack_dialog(self) -> ATLauncherBrowserDialog:
@@ -659,7 +675,7 @@ class MainWindow(QMainWindow):
         settings = getattr(self, "_cached_gui_settings", {})
         dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
         dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def optifine_dialog(self) -> OptiFineDialog:
@@ -676,7 +692,7 @@ class MainWindow(QMainWindow):
         dialog.install_requested.connect(self.optifine_controller.install)
         dialog.repair_requested.connect(self.optifine_controller.repair)
         dialog.uninstall_requested.connect(self.optifine_controller.uninstall)
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def repair_center_dialog(self) -> RepairCenterDialog:
@@ -691,7 +707,7 @@ class MainWindow(QMainWindow):
     def _setup_repair_center_dialog(self, dialog: RepairCenterDialog) -> RepairCenterDialog:
         dialog.scan_requested.connect(self.instance_controller.scan_repair_center)
         dialog.repair_requested.connect(self.instance_controller.execute_repair_plan)
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     @property
     def microsoft_device_code_dialog(self) -> MicrosoftDeviceCodeDialog:
@@ -705,7 +721,7 @@ class MainWindow(QMainWindow):
 
     def _setup_microsoft_device_code_dialog(self, dialog: MicrosoftDeviceCodeDialog) -> MicrosoftDeviceCodeDialog:
         dialog.cancel_requested.connect(self.account_controller.cancel_microsoft)
-        return dialog
+        return self._finalize_lazy_dialog(dialog)
 
     def _connect_signals(self) -> None:
         self.sidebar.page_requested.connect(self.show_page)
@@ -785,8 +801,8 @@ class MainWindow(QMainWindow):
         self.instances_page.reset_icon_requested.connect(self.instance_controller.reset_icon)
         self.instances_page.scan_modpack_requested.connect(self.modpack_lifecycle_controller.scan)
         self.instances_page.repair_modpack_requested.connect(self.modpack_lifecycle_controller.repair)
-        self.instances_page.check_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.check_update(name, self.modrinth_modpack_dialog.allowed_version_types, force_refresh=True))
-        self.instances_page.apply_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.preview_update(name, self.modrinth_modpack_dialog.allowed_version_types))
+        self.instances_page.check_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.check_update(name, self._allowed_modrinth_version_types(), force_refresh=True))
+        self.instances_page.apply_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.preview_update(name, self._allowed_modrinth_version_types()))
 
         self.mods_page.search_requested.connect(self.mod_catalog_controller.search)
         self.mods_page.versions_requested.connect(self.mod_catalog_controller.load_versions)
@@ -1639,27 +1655,31 @@ class MainWindow(QMainWindow):
             self._show_error(title, tr("mods.instance_create.install_start_failed", name=instance_name))
 
     def _set_modrinth_results(self, project_type: str, loader: str, result: object) -> None:
-        dialog = self.modrinth_mod_dialog if project_type == "mod" else self.modrinth_modpack_dialog
-        dialog.set_search_result(result, loader)
+        dialog = self._modrinth_mod_dialog if project_type == "mod" else self._modrinth_modpack_dialog
+        if dialog is not None:
+            dialog.set_search_result(result, loader)
 
     def _set_modrinth_search_error(self, project_type: str, loader: str, message: str) -> None:
-        dialog = self.modrinth_mod_dialog if project_type == "mod" else self.modrinth_modpack_dialog
-        dialog.set_search_error(loader, message)
+        dialog = self._modrinth_mod_dialog if project_type == "mod" else self._modrinth_modpack_dialog
+        if dialog is not None:
+            dialog.set_search_error(loader, message)
 
     def _set_modrinth_versions(self, project_type: str, project_id: str, loader: str, versions: list) -> None:
-        dialog = self.modrinth_mod_dialog if project_type == "mod" else self.modrinth_modpack_dialog
-        dialog.set_versions(project_id, versions, loader)
+        dialog = self._modrinth_mod_dialog if project_type == "mod" else self._modrinth_modpack_dialog
+        if dialog is not None:
+            dialog.set_versions(project_id, versions, loader)
 
     def _set_modrinth_project_details(self, project_type: str, project_id: str, loader: str, project: object) -> None:
-        dialog = self.modrinth_mod_dialog if project_type == "mod" else self.modrinth_modpack_dialog
-        dialog.set_project_details(project_type, project_id, loader, project)
+        dialog = self._modrinth_mod_dialog if project_type == "mod" else self._modrinth_modpack_dialog
+        if dialog is not None:
+            dialog.set_project_details(project_type, project_id, loader, project)
         if project_type == "mod":
             self.mods_page.set_modrinth_project_details(project_id, loader, project)
 
     def _modrinth_mod_installed(self, result: object) -> None:
         self.mod_controller.refresh()
-        if self.mod_manager_dialog.isVisible():
-            self.mod_controller.check_updates(self.mod_manager_dialog.allowed_version_types, force_refresh=False)
+        if self._mod_manager_dialog is not None and self._mod_manager_dialog.isVisible():
+            self.mod_controller.check_updates(self._mod_manager_dialog.allowed_version_types, force_refresh=False)
         count = len(getattr(result, "installed_files", ()) or ())
         warnings = tuple(getattr(result, "warnings", ()) or ())
         message = tr("modrinth.mod.installed", count=count)
@@ -2123,22 +2143,26 @@ class MainWindow(QMainWindow):
         )
 
     def _set_curseforge_results(self, project_type: str, loader: str, result: object) -> None:
-        dialog = self.curseforge_mod_dialog if project_type == "mod" else self.curseforge_modpack_dialog
-        dialog.set_search_result(result, loader)
+        dialog = self._curseforge_mod_dialog if project_type == "mod" else self._curseforge_modpack_dialog
+        if dialog is not None:
+            dialog.set_search_result(result, loader)
 
     def _set_curseforge_files(self, project_type: str, project_id: int, loader: str, files: list) -> None:
-        dialog = self.curseforge_mod_dialog if project_type == "mod" else self.curseforge_modpack_dialog
-        dialog.set_files(project_id, files, loader)
+        dialog = self._curseforge_mod_dialog if project_type == "mod" else self._curseforge_modpack_dialog
+        if dialog is not None:
+            dialog.set_files(project_id, files, loader)
 
     def _set_curseforge_project_details(self, project_type: str, project_id: int, loader: str, project: object) -> None:
-        dialog = self.curseforge_mod_dialog if project_type == "mod" else self.curseforge_modpack_dialog
-        dialog.set_project_details(project_type, project_id, loader, project)
+        dialog = self._curseforge_mod_dialog if project_type == "mod" else self._curseforge_modpack_dialog
+        if dialog is not None:
+            dialog.set_project_details(project_type, project_id, loader, project)
         if project_type == "mod":
             self.mods_page.set_curseforge_project_details(project_id, loader, project)
 
     def _set_curseforge_cache_info(self, project_type: str, info: object) -> None:
-        dialog = self.curseforge_mod_dialog if project_type == "mod" else self.curseforge_modpack_dialog
-        dialog.set_cache_info(info)
+        dialog = self._curseforge_mod_dialog if project_type == "mod" else self._curseforge_modpack_dialog
+        if dialog is not None:
+            dialog.set_cache_info(info)
 
     def _curseforge_mod_installed(self, result: object) -> None:
         self.mod_controller.refresh()
@@ -2480,7 +2504,7 @@ class MainWindow(QMainWindow):
         if answer == QMessageBox.StandardButton.Yes:
             self.modpack_lifecycle_controller.update(
                 str(getattr(plan, "instance_name", "")),
-                self.modrinth_modpack_dialog.allowed_version_types,
+                self._allowed_modrinth_version_types(),
                 target_version_id=str(getattr(plan, "target_version_id", "")),
             )
 
@@ -2705,7 +2729,8 @@ class MainWindow(QMainWindow):
         self._initial_gui_applied = True
         self._cached_gui_settings = dict(settings)
         requested_locale = str(settings.get("language", "en-US"))
-        language_manager.reload()
+        if not initial or language_manager.current_language != self._session_locale:
+            language_manager.reload()
         # Language changes are committed to settings but applied only after a
         # clean process restart. Keeping the active session locale unchanged
         # prevents a partially translated widget tree and mixed-language dialogs.
@@ -3030,6 +3055,7 @@ class MainWindow(QMainWindow):
             self._mod_manager_dialog,
             self._modrinth_mod_dialog,
             self._modrinth_modpack_dialog,
+            self._modrinth_manual_dialog,
             self._curseforge_mod_dialog,
             self._curseforge_modpack_dialog,
             self._ftb_modpack_dialog,
@@ -3040,9 +3066,12 @@ class MainWindow(QMainWindow):
             self._shader_pack_browser_dialog,
             self._curseforge_manual_dialog,
             self._portable_manual_dialog,
+            self._optifine_dialog,
             self._repair_center_dialog,
+            self._microsoft_device_code_dialog,
         ):
             if dialog is not None:
+                retranslate_widget_tree(dialog)
                 retranslate_dynamic = getattr(dialog, "retranslate_dynamic", None)
                 if callable(retranslate_dynamic):
                     retranslate_dynamic()

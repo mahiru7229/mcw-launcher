@@ -232,7 +232,14 @@ def main() -> None:
         from src.gui.theme.runtime import ThemeRuntime
 
         early_theme_runtime = ThemeRuntime()
-        early_theme_runtime.manager.select(str(appearance_settings.get("theme", "mcw-default")))
+        selected_theme = early_theme_runtime.manager.select(str(appearance_settings.get("theme", "mcw-default")))
+        early_theme_runtime.accent_runtime.configure(
+            selected_theme,
+            str(appearance_settings.get("accent_mode", "theme")),
+            str(appearance_settings.get("accent_color", "#8ed35b")),
+            str(appearance_settings.get("text_color_mode", "theme")),
+            str(appearance_settings.get("text_color", "#f4f4f4")),
+        )
         early_stylesheet = early_theme_runtime.build_stylesheet(APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE)
         app.setStyleSheet(early_stylesheet)
 

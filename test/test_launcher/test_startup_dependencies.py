@@ -112,3 +112,103 @@ def test_launcher_startup_failure_formats_stage_and_error_log_without_name_error
     assert "Simulated startup failure" in captured_messages[0]
     assert "startup-error.log" in captured_messages[0]
 
+
+def test_lazy_dialogs_finalization_and_translation(monkeypatch: pytest.MonkeyPatch) -> None:
+    from PySide6.QtWidgets import QApplication
+    from src.gui.display_profile import select_display_profile
+    from src.gui.main_window import MainWindow
+
+    _app = QApplication.instance() or QApplication(["test"])
+    monkeypatch.setattr(MainWindow, "_initialize_data", lambda self: None)
+    monkeypatch.setattr(MainWindow, "_detect_display_profile", lambda self: select_display_profile(1920, 1080))
+
+    window = MainWindow()
+
+    assert window._repair_center_dialog is None
+    assert window._mod_manager_dialog is None
+
+    calls: list[object] = []
+    original_finalize = window._finalize_lazy_dialog
+
+    def tracking_finalize(dialog):
+        calls.append(dialog)
+        return original_finalize(dialog)
+
+    monkeypatch.setattr(window, "_finalize_lazy_dialog", tracking_finalize)
+
+    dialog = window.repair_center_dialog
+    assert dialog is not None
+    assert window._repair_center_dialog is dialog
+    assert dialog in calls
+
+
+def test_mods_page_project_details_does_not_instantiate_dialogs(monkeypatch: pytest.MonkeyPatch) -> None:
+    from PySide6.QtWidgets import QApplication
+    from src.gui.display_profile import select_display_profile
+    from src.gui.main_window import MainWindow
+
+    _app = QApplication.instance() or QApplication(["test"])
+    monkeypatch.setattr(MainWindow, "_initialize_data", lambda self: None)
+    monkeypatch.setattr(MainWindow, "_detect_display_profile", lambda self: select_display_profile(1920, 1080))
+
+    window = MainWindow()
+    assert window._modrinth_mod_dialog is None
+    assert window._curseforge_mod_dialog is None
+
+    modrinth_details: list[tuple] = []
+    curseforge_details: list[tuple] = []
+    monkeypatch.setattr(window.mods_page, "set_modrinth_project_details", lambda *args: modrinth_details.append(args))
+    monkeypatch.setattr(window.mods_page, "set_curseforge_project_details", lambda *args: curseforge_details.append(args))
+
+    window._set_modrinth_project_details("mod", "proj-1", "fabric", {"id": "proj-1"})
+    window._set_curseforge_project_details("mod", 123, "fabric", {"id": 123})
+
+    assert len(modrinth_details) == 1
+    assert len(curseforge_details) == 1
+    assert window._modrinth_mod_dialog is None
+    assert window._curseforge_mod_dialog is None
+
+
+def test_modrinth_mod_installed_does_not_instantiate_mod_manager_dialog(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+    from PySide6.QtWidgets import QApplication, QMessageBox
+    from src.gui.display_profile import select_display_profile
+    from src.gui.main_window import MainWindow
+
+    _app = QApplication.instance() or QApplication(["test"])
+    monkeypatch.setattr(MainWindow, "_initialize_data", lambda self: None)
+    monkeypatch.setattr(MainWindow, "_detect_display_profile", lambda self: select_display_profile(1920, 1080))
+    monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: None)
+
+    window = MainWindow()
+    monkeypatch.setattr(window.mod_controller, "refresh", lambda: None)
+    assert window._mod_manager_dialog is None
+
+    fake_result = SimpleNamespace(installed_files=[], warnings=[], manual_downloads=[])
+    window._modrinth_mod_installed(fake_result)
+
+    assert window._mod_manager_dialog is None
+
+
+def test_allowed_modrinth_version_types_without_instantiating_dialog(monkeypatch: pytest.MonkeyPatch) -> None:
+    from PySide6.QtWidgets import QApplication
+    from src.gui.display_profile import select_display_profile
+    from src.gui.main_window import MainWindow
+
+    _app = QApplication.instance() or QApplication(["test"])
+    monkeypatch.setattr(MainWindow, "_initialize_data", lambda self: None)
+    monkeypatch.setattr(MainWindow, "_detect_display_profile", lambda self: select_display_profile(1920, 1080))
+
+    window = MainWindow()
+    assert window._modrinth_modpack_dialog is None
+
+    window._cached_gui_settings = {"modrinth_include_beta": True, "modrinth_include_alpha": False}
+    types = window._allowed_modrinth_version_types()
+    assert types == ("release", "beta")
+    assert window._modrinth_modpack_dialog is None
+
+    window._cached_gui_settings = {"modrinth_include_beta": True, "modrinth_include_alpha": True}
+    assert window._allowed_modrinth_version_types() == ("release", "beta", "alpha")
+    assert window._modrinth_modpack_dialog is None
+
+
