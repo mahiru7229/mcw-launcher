@@ -3,6 +3,7 @@ from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QScrollArea, QVBoxLay
 
 from src.gui.widget.card_widget import CardWidget
 from src.gui.widget.settings_section import SettingsSection
+from src.gui.widget.wheel_guard import prevent_wheel_value_changes
 
 
 class _BusyPageOverlay(QWidget):
@@ -93,6 +94,12 @@ class BasePage(QScrollArea):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._sync_busy_overlay_geometry()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if not getattr(self, "_wheel_guard_installed", False):
+            self._wheel_guard_installed = True
+            prevent_wheel_value_changes(self)
 
     def _sync_busy_overlay_geometry(self) -> None:
         if hasattr(self, "_busy_overlay"):

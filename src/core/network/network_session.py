@@ -5,6 +5,9 @@ from threading import RLock
 import httpx
 
 from src.config import MODRINTH_USER_AGENT
+from src.core.network.dns_resolver import prefer_ipv4_dns
+
+prefer_ipv4_dns()
 
 
 DEFAULT_MAX_CONCURRENT_DOWNLOADS = 8

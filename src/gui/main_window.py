@@ -8,7 +8,19 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QCloseEvent, QGuiApplication, QScreen
-from PySide6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mcw_core import CompatibilityConfirmationRequired
 from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
@@ -748,8 +760,12 @@ class MainWindow(QMainWindow):
         self.account_page.security_audit_requested.connect(self.account_controller.audit_security)
         self.account_page.security_reprotect_requested.connect(self.account_controller.reprotect_security)
         self.account_controller.microsoft_device_code_received.connect(self._show_microsoft_device_code_dialog)
-        self.account_controller.accounts_changed.connect(lambda *_: self._microsoft_device_code_dialog.accept() if self._microsoft_device_code_dialog is not None and self._microsoft_device_code_dialog.isVisible() else None)
-        self.account_controller.microsoft_auth_state_changed.connect(lambda active, _: self._microsoft_device_code_dialog.close() if self._microsoft_device_code_dialog is not None and not active and self._microsoft_device_code_dialog.isVisible() else None)
+        self.account_controller.accounts_changed.connect(lambda *_: self._close_microsoft_device_code_dialog(accepted=True))
+        self.account_controller.microsoft_auth_state_changed.connect(
+            lambda active, msg: self._close_microsoft_device_code_dialog(accepted=False)
+            if not active or msg == tr("account.microsoft.cancelling")
+            else None
+        )
 
         self.instances_page.refresh_requested.connect(self.instance_controller.refresh)
         self.instances_page.launch_requested.connect(self._request_launch)
@@ -1055,10 +1071,27 @@ class MainWindow(QMainWindow):
             )
 
     def _show_microsoft_device_code_dialog(self, response: object) -> None:
-        self.microsoft_device_code_dialog.set_data(response)
-        self.microsoft_device_code_dialog.show()
-        self.microsoft_device_code_dialog.raise_()
-        self.microsoft_device_code_dialog.activateWindow()
+        dialog = self.microsoft_device_code_dialog
+        active_modal = QApplication.activeModalWidget()
+        target_parent = active_modal if (active_modal is not None and active_modal is not dialog) else self
+        if dialog.parent() is not target_parent:
+            dialog.setParent(target_parent, Qt.WindowType.Dialog)
+        dialog.set_data(response)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _close_microsoft_device_code_dialog(self, *, accepted: bool = False) -> None:
+        dialog = self._microsoft_device_code_dialog
+        if dialog is None:
+            return
+        if dialog.isVisible():
+            if accepted:
+                dialog.accept()
+            else:
+                dialog.close()
+        if dialog.parent() is not self:
+            dialog.setParent(self, Qt.WindowType.Dialog)
 
     def _initialize_data(self) -> None:
         settings = dict(self._startup_settings)
@@ -2864,7 +2897,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 recommendation = FirstRunRecommendationService.fallback()
             manager = LauncherSettingsManager()
-            dialog = FirstRunSetupDialog(manager.load(), self._gpu_detection, recommendation, self)
+            dialog = FirstRunSetupDialog(manager.load(), self._gpu_detection, recommendation, self, account_controller=self.account_controller)
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 self._retranslate_ui()
                 self.toast_manager.show(tr("launcher_settings.first_run.cancelled"), "warning", tr("launcher_settings.first_run.title"))
@@ -2872,6 +2905,7 @@ class MainWindow(QMainWindow):
             manager.save(dialog.selected_settings())
             self.gui_settings_controller.load()
             self.launcher_settings_page.set_gpu_detection(self._gpu_detection)
+            self.account_controller.refresh()
             self.toast_manager.show(tr("launcher_settings.first_run.completed"), "success", tr("launcher_settings.first_run.title"))
         except Exception as error:
             QMessageBox.warning(self, tr("launcher_settings.first_run.title"), tr("launcher_settings.first_run.failed", error=error))

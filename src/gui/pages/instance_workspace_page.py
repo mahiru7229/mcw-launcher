@@ -122,6 +122,7 @@ class InstanceWorkspacePage(BasePage):
         self._busy = False
         self._last_animated_name = ""
         self._launch_active = False
+        self._hub_loaded_instance_key: tuple[str, str] | None = None
 
         self.advanced_page = InstancesPage()
         self.advanced_dialog = AdvancedInstanceManagerDialog(self.advanced_page, self)
@@ -415,6 +416,7 @@ class InstanceWorkspacePage(BasePage):
         self.hub_tabs.addTab(self.logs_tab, self._get_theme_icon("icon.action.logs"), tr("workspace.tabs.live_logs"))
         self.hub_tabs.addTab(self.mods_tab, self._get_theme_icon("icon.action.mods"), tr("workspace.tabs.mods"))
 
+        self.hub_tabs.currentChanged.connect(self._on_hub_tab_changed)
         self.worlds_tab.quick_play_requested.connect(self._request_quick_play_world)
 
         hub_layout.addWidget(self.hub_tabs, 1)
@@ -796,6 +798,13 @@ class InstanceWorkspacePage(BasePage):
     def _on_hub_anim_finished(self) -> None:
         pass
 
+    def _on_hub_tab_changed(self, index: int) -> None:
+        current_widget = self.hub_tabs.widget(index)
+        if getattr(current_widget, "_needs_reload", False):
+            setattr(current_widget, "_needs_reload", False)
+            if hasattr(current_widget, "reload"):
+                current_widget.reload()
+
     def _render_selected(self) -> None:
         instance = self._instances.get(self.current_instance_name())
         enabled = instance is not None and not self._busy
@@ -852,10 +861,12 @@ class InstanceWorkspacePage(BasePage):
             self.manage_content_library_button.setEnabled(False)
             self.quick_play_button.setEnabled(False)
             self.management_dialog.set_instance(None)
-            self.worlds_tab.set_instance(None)
-            self.screenshots_tab.set_instance(None)
-            self.logs_tab.set_instance(None)
-            self.mods_tab.set_instance(None)
+            if self._hub_loaded_instance_key is not None:
+                self._hub_loaded_instance_key = None
+                self.worlds_tab.set_instance(None)
+                self.screenshots_tab.set_instance(None)
+                self.logs_tab.set_instance(None)
+                self.mods_tab.set_instance(None)
             return
 
         self.hub_stack.setCurrentIndex(1)
@@ -924,10 +935,14 @@ class InstanceWorkspacePage(BasePage):
         self.manage_content_library_button.setEnabled(enabled)
         self.management_dialog.set_instance(instance)
 
-        self.worlds_tab.set_instance(instance)
-        self.screenshots_tab.set_instance(instance)
-        self.logs_tab.set_instance(instance)
-        self.mods_tab.set_instance(instance)
+        instance_key = (str(getattr(instance, "instance_id", "") or ""), str(getattr(instance, "instance_dir", "") or ""))
+        if instance_key != self._hub_loaded_instance_key:
+            self._hub_loaded_instance_key = instance_key
+            self.worlds_tab.set_instance(instance)
+            current_tab = self.hub_tabs.currentWidget()
+            self.screenshots_tab.set_instance(instance, lazy=(current_tab is not self.screenshots_tab))
+            self.logs_tab.set_instance(instance, lazy=(current_tab is not self.logs_tab))
+            self.mods_tab.set_instance(instance, lazy=(current_tab is not self.mods_tab))
 
         latest_world = self.worlds_tab.latest_world
         if latest_world is not None:

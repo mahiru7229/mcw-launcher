@@ -21,7 +21,7 @@ FULL_HD_PROFILE = DisplayProfile(
     window_height=900,
     minimum_width=1280,
     minimum_height=720,
-    sidebar_width=220,
+    sidebar_width=248,
     right_panel_width=400,
     compact=False,
 )
@@ -32,7 +32,7 @@ HD_PROFILE = DisplayProfile(
     window_height=720,
     minimum_width=1120,
     minimum_height=640,
-    sidebar_width=188,
+    sidebar_width=210,
     right_panel_width=330,
     compact=True,
 )
@@ -55,7 +55,7 @@ def select_display_profile(screen_width: int, screen_height: int) -> DisplayProf
         window_height=safe_height,
         minimum_width=min(960, safe_width),
         minimum_height=min(600, safe_height),
-        sidebar_width=min(176, max(150, safe_width // 7)),
+        sidebar_width=min(196, max(170, safe_width // 6)),
         right_panel_width=min(310, max(260, safe_width // 4)),
         compact=True,
     )

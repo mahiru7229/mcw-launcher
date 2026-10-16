@@ -6,7 +6,7 @@ def test_full_hd_screen_uses_1600_by_900_profile() -> None:
 
     assert profile.name == "full-hd"
     assert (profile.window_width, profile.window_height) == (1600, 900)
-    assert (profile.sidebar_width, profile.right_panel_width) == (220, 400)
+    assert (profile.sidebar_width, profile.right_panel_width) == (248, 400)
     assert profile.compact is False
 
 
@@ -15,7 +15,7 @@ def test_1366_by_768_screen_uses_1280_by_720_compact_profile() -> None:
 
     assert profile.name == "hd"
     assert (profile.window_width, profile.window_height) == (1280, 720)
-    assert (profile.sidebar_width, profile.right_panel_width) == (188, 330)
+    assert (profile.sidebar_width, profile.right_panel_width) == (210, 330)
     assert profile.compact is True
 
 

@@ -103,8 +103,9 @@ class InstanceService:
         return InstanceHealthManager.scan(loaded)
 
     @staticmethod
-    def list_health() -> list[InstanceHealthReport]:
-        return InstanceHealthManager.list(InstanceManager.list_instances())
+    def list_health(instances: list[Instance] | None = None) -> list[InstanceHealthReport]:
+        target = instances if instances is not None else InstanceManager.list_instances()
+        return InstanceHealthManager.list(target)
 
     @staticmethod
     def set_icon(name: str, source_path: Path) -> Instance:

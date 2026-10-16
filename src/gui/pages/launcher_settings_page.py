@@ -27,6 +27,7 @@ from src.gui.widget.card_widget import CardWidget
 from src.gui.widget.settings_section import SettingsSection
 from src.gui.widget.themed_animated_label import ThemedAnimatedLabel
 from src.gui.widget.themed_progress_bar import ThemedProgressBar
+from src.gui.widget.wheel_guard import prevent_wheel_value_changes
 
 
 class LauncherSettingsPage(BasePage):
@@ -504,6 +505,7 @@ class LauncherSettingsPage(BasePage):
         self.root_layout.addWidget(self.save_button)
         self.root_layout.addWidget(reset_button)
         self.root_layout.addStretch()
+        prevent_wheel_value_changes(self)
 
     def _connect_dirty_tracking(self) -> None:
         self.start_page_combo.currentIndexChanged.connect(self._refresh_dirty_state)

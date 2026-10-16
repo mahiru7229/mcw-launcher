@@ -32,7 +32,7 @@ class MicrosoftDeviceCodeDialog(QDialog):
         self._build_ui()
 
     def _build_ui(self) -> None:
-        resize_dialog_to_screen(self, 480, 360, 420, 320)
+        resize_dialog_to_screen(self, 500, 390, 440, 350)
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 24, 24, 24)
         root.setSpacing(14)
@@ -73,7 +73,8 @@ class MicrosoftDeviceCodeDialog(QDialog):
             "icon.action.copy",
         )
         self.copy_button.setObjectName("PrimaryButton")
-        self.copy_button.setFixedHeight(36)
+        self.copy_button.setFixedHeight(44)
+        self.copy_button.setStyleSheet("QPushButton { padding: 4px 14px; font-size: 12pt; }")
         self.copy_button.clicked.connect(self._copy_code)
         actions_layout.addWidget(self.copy_button)
 
@@ -81,7 +82,8 @@ class MicrosoftDeviceCodeDialog(QDialog):
             QPushButton(tr("account.microsoft.device_code.open_link", "Open Link")),
             "icon.action.open",
         )
-        self.open_link_button.setFixedHeight(36)
+        self.open_link_button.setFixedHeight(44)
+        self.open_link_button.setStyleSheet("QPushButton { padding: 4px 14px; font-size: 12pt; }")
         self.open_link_button.clicked.connect(self._open_link)
         actions_layout.addWidget(self.open_link_button)
 
@@ -109,6 +111,7 @@ class MicrosoftDeviceCodeDialog(QDialog):
         bottom_layout.addStretch()
         self.cancel_button = QPushButton(tr("account.microsoft.cancel", "Cancel"))
         self.cancel_button.setObjectName("DangerButton")
+        self.cancel_button.setFixedHeight(38)
         self.cancel_button.clicked.connect(self._on_cancel)
         bottom_layout.addWidget(self.cancel_button)
         root.addLayout(bottom_layout)
@@ -125,10 +128,23 @@ class MicrosoftDeviceCodeDialog(QDialog):
             clipboard.setText(self._user_code)
 
         # Auto-open browser
+        self._open_browser_url()
+
+    def _open_browser_url(self) -> bool:
+        if not self._url:
+            return False
+        opened = False
         try:
-            QDesktopServices.openUrl(QUrl(self._url))
+            opened = bool(QDesktopServices.openUrl(QUrl(self._url)))
         except Exception:
-            pass
+            opened = False
+        if not opened:
+            try:
+                import webbrowser
+                opened = bool(webbrowser.open(self._url))
+            except Exception:
+                opened = False
+        return opened
 
     def _copy_code(self) -> None:
         clipboard = QGuiApplication.clipboard()
@@ -141,10 +157,7 @@ class MicrosoftDeviceCodeDialog(QDialog):
         self.copy_button.setText(tr("account.microsoft.device_code.copy", "Copy Code"))
 
     def _open_link(self) -> None:
-        try:
-            QDesktopServices.openUrl(QUrl(self._url))
-        except Exception:
-            pass
+        self._open_browser_url()
 
     def _on_cancel(self) -> None:
         self.cancel_requested.emit()

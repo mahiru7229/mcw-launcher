@@ -183,9 +183,9 @@ QFrame#InsetPanel {
 
 QLabel#BrandLabel {
     color: #ffffff;
-    font-size: 25px;
+    font-size: 22px;
     font-weight: 900;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
 }
 
 QLabel#VersionLabel, QLabel#MutedLabel {
@@ -381,6 +381,10 @@ QLineEdit, QComboBox, QSpinBox, QTextEdit {
     selection-background-color: #688f4d;
 }
 
+QSpinBox, QDoubleSpinBox {
+    padding-left: 10px;
+}
+
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QTextEdit:focus {
     border-color: #83b75f;
 }
@@ -554,7 +558,8 @@ QToolTip {
 }
 
 QFrame#Sidebar[compactLayout="true"] QLabel#BrandLabel {
-    font-size: 20px;
+    font-size: 18px;
+    letter-spacing: 0.5px;
 }
 
 QPushButton#NavButton[compactLayout="true"] {

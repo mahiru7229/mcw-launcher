@@ -4,8 +4,12 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QLayout, QScrollArea, QWidget
 
 
+from src.gui.widget.wheel_guard import prevent_wheel_value_changes
+
+
 def scrollable_page(content: QWidget, *, object_name: str = "") -> QScrollArea:
     """Keep a page at its natural minimum size and scroll when space is tight."""
+    prevent_wheel_value_changes(content)
     layout = content.layout()
     if isinstance(layout, QLayout):
         layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)

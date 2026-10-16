@@ -11,6 +11,7 @@ from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
 from src.gui.widget.settings_section import SettingsSection
+from src.gui.widget.wheel_guard import prevent_wheel_value_changes
 
 
 class InstanceSettingsPage(BasePage):
@@ -226,6 +227,7 @@ class InstanceSettingsPage(BasePage):
         self.save_button.clicked.connect(self.request_save)
         self.root_layout.addWidget(self.save_button)
         self.root_layout.addStretch()
+        prevent_wheel_value_changes(self)
 
     @property
     def physical_memory_mb(self) -> int:

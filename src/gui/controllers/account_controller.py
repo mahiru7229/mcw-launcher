@@ -89,6 +89,10 @@ class AccountController(BaseController):
     def _on_microsoft_device_code(self, response: object) -> None:
         self.microsoft_device_code_received.emit(response)
 
+    @property
+    def is_microsoft_auth_active(self) -> bool:
+        return self._task_runner.is_task_active(self.MICROSOFT_TASK_ID)
+
     def cancel_microsoft(self) -> None:
         if not self._task_runner.is_task_active(self.MICROSOFT_TASK_ID):
             self._microsoft_cancel_event.clear()

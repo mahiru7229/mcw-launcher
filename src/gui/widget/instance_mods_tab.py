@@ -38,6 +38,7 @@ class InstanceModsTab(QWidget):
         super().__init__(parent)
         self._instance: Instance | None = None
         self._mod_files: list[Path] = []
+        self._needs_reload = False
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -112,11 +113,21 @@ class InstanceModsTab(QWidget):
         self.empty_label.setVisible(False)
         root.addWidget(self.empty_label)
 
-    def set_instance(self, instance: Instance | None) -> None:
+    def set_instance(self, instance: Instance | None, lazy: bool = False) -> None:
         self._instance = instance
+        if lazy and instance is not None:
+            self._needs_reload = True
+            return
+        self._needs_reload = False
         self.reload()
 
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if getattr(self, "_needs_reload", False):
+            self.reload()
+
     def reload(self) -> None:
+        self._needs_reload = False
         self.table.setRowCount(0)
         self._mod_files.clear()
 

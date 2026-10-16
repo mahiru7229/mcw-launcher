@@ -35,6 +35,7 @@ class InstanceLiveLogsTab(QWidget):
         self._log_path: Path | None = None
         self._last_read_offset = 0
         self._all_lines: list[str] = []
+        self._needs_reload = False
 
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(1000)
@@ -105,29 +106,63 @@ class InstanceLiveLogsTab(QWidget):
         self.empty_label.setVisible(False)
         root.addWidget(self.empty_label)
 
-    def set_instance(self, instance: Instance | None) -> None:
-        self._instance = instance
-        self._all_lines.clear()
-        self._last_read_offset = 0
-        self.log_text.clear()
-
+    def set_instance(self, instance: Instance | None, lazy: bool = False) -> None:
         if instance is None:
+            self._instance = None
             self._log_path = None
             self._poll_timer.stop()
+            self._all_lines.clear()
+            self._last_read_offset = 0
+            self.log_text.clear()
             self.empty_label.setVisible(True)
+            self._needs_reload = False
             return
 
-        instance_dir = Path(instance.instance_dir)
-        # Check standard latest.log location
-        self._log_path = instance_dir / "logs" / "latest.log"
-        self._poll_log()
-        self._poll_timer.start()
+        current_dir = str(getattr(self._instance, "instance_dir", "") or "") if self._instance is not None else ""
+        new_dir = str(getattr(instance, "instance_dir", "") or "")
+        self._instance = instance
+        self._log_path = Path(new_dir) / "logs" / "latest.log"
+
+        if current_dir != new_dir:
+            self._all_lines.clear()
+            self._last_read_offset = 0
+            self.log_text.clear()
+
+        if lazy:
+            self._needs_reload = True
+            self._poll_timer.stop()
+            return
+
+        self._needs_reload = False
+        if self.isVisible():
+            self._poll_log()
+            if not self._poll_timer.isActive():
+                self._poll_timer.start()
+        else:
+            self._poll_timer.stop()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if getattr(self, "_needs_reload", False):
+            self.reload()
+        elif self._log_path is not None:
+            self._poll_log()
+            if not self._poll_timer.isActive():
+                self._poll_timer.start()
+
+    def hideEvent(self, event) -> None:
+        super().hideEvent(event)
+        self._poll_timer.stop()
 
     def reload(self) -> None:
+        self._needs_reload = False
         self._last_read_offset = 0
         self._all_lines.clear()
         self.log_text.clear()
-        self._poll_log()
+        if self._log_path is not None:
+            self._poll_log()
+            if self.isVisible() and not self._poll_timer.isActive():
+                self._poll_timer.start()
 
     def _poll_log(self) -> None:
         if self._log_path is None or not self._log_path.is_file():

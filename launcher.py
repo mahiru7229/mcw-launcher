@@ -269,11 +269,18 @@ def main() -> None:
         from src.gui.dialogs.first_run_setup_dialog import FirstRunSetupDialog
 
         if FirstRunSetupDialog.should_show(settings):
-            setup_dialog = FirstRunSetupDialog(settings, window._gpu_detection, first_run_recommendation, window)
+            setup_dialog = FirstRunSetupDialog(
+                settings,
+                window._gpu_detection,
+                first_run_recommendation,
+                window,
+                account_controller=window.account_controller,
+            )
             if setup_dialog.exec() == QDialog.DialogCode.Accepted:
                 LauncherSettingsManager().save(setup_dialog.selected_settings())
                 window.gui_settings_controller.load()
                 window.launcher_settings_page.set_gpu_detection(window._gpu_detection)
+                window.account_controller.refresh()
     except Exception as error:
         from PySide6.QtWidgets import QMessageBox
         from mcw_core.api.language.language_manager import tr

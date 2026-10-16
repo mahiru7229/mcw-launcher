@@ -81,7 +81,7 @@ class InstanceController(BaseController):
         self._selected_name = preferred
         self.instances_changed.emit(instances, preferred)
         try:
-            health_reports = self._core.instances.list_health()
+            health_reports = self._core.instances.list_health(instances)
         except Exception as error:
             health_reports = []
             self.log_created.emit(f"Instance health scan failed: {type(error).__name__}: {error}")

@@ -30,6 +30,7 @@ from mcw_core.api.language.language_manager import tr
 from mcw_core.api.system.memory import MemoryAllocationPolicy, SystemMemory
 from src.gui.window_sizing import resize_dialog_to_screen
 from src.gui.widget.scrollable_page import scrollable_page
+from src.gui.widget.wheel_guard import prevent_wheel_value_changes
 from mcw_core.api.models.instance.settings import InstanceSettings
 
 
@@ -110,6 +111,7 @@ class InstanceSettingsEditorDialog(QDialog):
         self.save_button.clicked.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         root.addWidget(self.buttons)
+        prevent_wheel_value_changes(self)
 
     def _runtime_tab(self) -> QWidget:
         tab = QWidget()

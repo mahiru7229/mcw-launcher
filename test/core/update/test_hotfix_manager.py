@@ -32,6 +32,16 @@ def _create_zip_bytes(file_entries: dict[str, bytes]) -> tuple[bytes, str]:
     return raw_bytes, sha256
 
 
+@pytest.fixture(autouse=True)
+def clean_hotfix_sys_state():
+    sys_path_orig = list(sys.path)
+    meta_path_orig = list(sys.meta_path)
+    yield
+    sys.path[:] = sys_path_orig
+    sys.meta_path[:] = meta_path_orig
+    HotfixManager._remove_meta_path_finder()
+
+
 def test_hotfix_entry_version_parsing() -> None:
     entry = HotfixEntry(
         base_version="1.7.0",

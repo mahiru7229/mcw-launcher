@@ -15,6 +15,9 @@ from src.core.auth.microsoft.pkce import PKCE
 from src.models.auth.microsoft.oauth_session import OAuthSession
 from src.core.security.sensitive_data_redactor import SensitiveDataRedactor
 from src.core.system.platform_info import PlatformInfo
+from src.core.network.dns_resolver import prefer_ipv4_dns
+
+prefer_ipv4_dns()
 
 
 class MicrosoftOAuth:
@@ -25,7 +28,14 @@ class MicrosoftOAuth:
         cancel_event: Event | None = None,
         on_device_code: Callable[[DeviceCodeResponse], None] | None = None,
     ) -> MicrosoftOAuthToken:
-        device_resp = MicrosoftOAuth.request_device_code()
+        if cancel_event is not None and cancel_event.is_set():
+            raise MicrosoftAuthorizationCancelledError("Microsoft authentication was cancelled.")
+
+        device_resp = MicrosoftOAuth.request_device_code(cancel_event=cancel_event)
+
+        if cancel_event is not None and cancel_event.is_set():
+            raise MicrosoftAuthorizationCancelledError("Microsoft authentication was cancelled.")
+
         if on_device_code is not None:
             on_device_code(device_resp)
         else:
@@ -42,7 +52,9 @@ class MicrosoftOAuth:
         )
 
     @staticmethod
-    def request_device_code() -> DeviceCodeResponse:
+    def request_device_code(cancel_event: Event | None = None) -> DeviceCodeResponse:
+        if cancel_event is not None and cancel_event.is_set():
+            raise MicrosoftAuthorizationCancelledError("Microsoft authentication was cancelled.")
         data = {
             "client_id": MicrosoftAuthConfig.CLIENT_ID,
             "scope": " ".join(MicrosoftAuthConfig.SCOPES),
@@ -62,7 +74,12 @@ class MicrosoftOAuth:
             error_code = SensitiveDataRedactor.redact_text(error_data.get("error", "unknown_error"))
             raise RuntimeError(f"Microsoft device code request failed: {error_code}") from error
         except httpx.HTTPError as e:
+            if cancel_event is not None and cancel_event.is_set():
+                raise MicrosoftAuthorizationCancelledError("Microsoft authentication was cancelled.") from e
             raise RuntimeError("Could not connect to Microsoft OAuth.") from e
+
+        if cancel_event is not None and cancel_event.is_set():
+            raise MicrosoftAuthorizationCancelledError("Microsoft authentication was cancelled.")
 
         return DeviceCodeResponse.from_dict(response.json())
 
@@ -108,6 +125,8 @@ class MicrosoftOAuth:
                     timeout=10.0,
                 )
             except httpx.HTTPError:
+                if cancel_event is not None and cancel_event.is_set():
+                    raise MicrosoftAuthorizationCancelledError("Microsoft authentication was cancelled.")
                 continue
 
             if response.status_code == 200:
