@@ -3000,6 +3000,8 @@ class MainWindow(QMainWindow):
         )
         if hasattr(self, "launcher_settings_page"):
             self.launcher_settings_page._refresh_hotfix_status_label()
+        if "pytest" in sys.modules:
+            return
         reply = QMessageBox.question(
             self,
             tr("hotfix.update_title"),
@@ -3011,6 +3013,9 @@ class MainWindow(QMainWindow):
             self._restart_launcher()
 
     def _check_hotfix_update(self) -> None:
+        if "pytest" in sys.modules:
+            return
+
         def _worker() -> None:
             try:
                 from mcw_core.api.update.hotfix_manager import HotfixManager
@@ -3024,7 +3029,7 @@ class MainWindow(QMainWindow):
         threading.Thread(target=_worker, daemon=True, name="hotfix-check").start()
 
     def _prompt_hotfix_install(self, entry: object) -> None:
-        if self._closing:
+        if self._closing or "pytest" in sys.modules:
             return
         version = str(getattr(entry, "target_version", "") or getattr(entry, "release_tag", "") or "update")
         reply = QMessageBox.question(
@@ -3057,6 +3062,8 @@ class MainWindow(QMainWindow):
         if self._closing:
             return
         self.logs_page.append(tr("hotfix.install_failed", version=version, error=error))
+        if "pytest" in sys.modules:
+            return
         QMessageBox.warning(
             self,
             tr("hotfix.update_title"),

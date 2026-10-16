@@ -36,9 +36,12 @@ def _create_zip_bytes(file_entries: dict[str, bytes]) -> tuple[bytes, str]:
 def clean_hotfix_sys_state():
     sys_path_orig = list(sys.path)
     meta_path_orig = list(sys.meta_path)
+    callbacks_orig = list(HotfixManager._on_applied_callbacks)
+    HotfixManager._on_applied_callbacks.clear()
     yield
     sys.path[:] = sys_path_orig
     sys.meta_path[:] = meta_path_orig
+    HotfixManager._on_applied_callbacks[:] = callbacks_orig
     HotfixManager._remove_meta_path_finder()
 
 
@@ -181,23 +184,27 @@ def test_apply_hotfix_success_and_sys_path_injection(tmp_path: Path) -> None:
     client = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(200, content=zip_bytes)))
     manager = HotfixManager(root_directory=tmp_path, client=client)
 
-    state = manager.apply_hotfix(entry)
-    assert state.target_version == "1.7.0.1"
-    assert state.applied_hotfix_id == 1
+    try:
+        state = manager.apply_hotfix(entry)
+        assert state.target_version == "1.7.0.1"
+        assert state.applied_hotfix_id == 1
 
-    # Verify extracted file exists in live/
-    live_patch_file = manager.live_dir / "test_patch_mod.py"
-    assert live_patch_file.is_file()
-    assert live_patch_file.read_bytes() == patch_code
+        # Verify extracted file exists in live/
+        live_patch_file = manager.live_dir / "test_patch_mod.py"
+        assert live_patch_file.is_file()
+        assert live_patch_file.read_bytes() == patch_code
 
-    # Effective version
-    assert manager.get_effective_version("1.7.0") == "1.7.0.1"
-    assert manager.get_effective_version("1.7.1") == "1.7.1"
+        # Effective version
+        assert manager.get_effective_version("1.7.0") == "1.7.0.1"
+        assert manager.get_effective_version("1.7.1") == "1.7.1"
 
-    # Test bootstrap sys.path injection
-    injected = HotfixManager.bootstrap_sys_path(root_directory=tmp_path, current_base_version="1.7.0")
-    assert injected is True
-    assert str(manager.live_dir.resolve()) == sys.path[0]
+        # Test bootstrap sys.path injection
+        injected = HotfixManager.bootstrap_sys_path(root_directory=tmp_path, current_base_version="1.7.0")
+        assert injected is True
+        assert str(manager.live_dir.resolve()) == sys.path[0]
+    finally:
+        manager.rollback()
+
 
 
 def test_apply_hotfix_checksum_failure(tmp_path: Path) -> None:
