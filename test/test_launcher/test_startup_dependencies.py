@@ -212,3 +212,28 @@ def test_allowed_modrinth_version_types_without_instantiating_dialog(monkeypatch
     assert window._modrinth_modpack_dialog is None
 
 
+def test_apply_gui_settings_initial_and_subsequent_calls_use_current_locale(monkeypatch: pytest.MonkeyPatch) -> None:
+    from PySide6.QtWidgets import QApplication
+    from mcw_core.api.language.language_manager import language_manager
+    from src.gui.display_profile import select_display_profile
+    from src.gui.main_window import MainWindow
+
+    _app = QApplication.instance() or QApplication(["test"])
+    monkeypatch.setattr(MainWindow, "_initialize_data", lambda self: None)
+    monkeypatch.setattr(MainWindow, "_detect_display_profile", lambda self: select_display_profile(1920, 1080))
+
+    window = MainWindow()
+    monkeypatch.setattr(window.launcher_settings_page, "reload_languages", lambda: None)
+    language_manager.set_language(window._session_locale, notify=False)
+    assert language_manager.current_locale == window._session_locale
+
+    reload_calls: list[int] = []
+    original_reload = language_manager.reload
+    monkeypatch.setattr(language_manager, "reload", lambda: (reload_calls.append(1), original_reload())[1])
+
+    assert window._initial_gui_applied is False
+    window._apply_gui_settings(dict(window._startup_settings))
+    assert window._initial_gui_applied is True
+    assert len(reload_calls) == 0
+    window._apply_gui_settings(dict(window._startup_settings))
+    assert len(reload_calls) == 1

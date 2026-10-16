@@ -2729,7 +2729,7 @@ class MainWindow(QMainWindow):
         self._initial_gui_applied = True
         self._cached_gui_settings = dict(settings)
         requested_locale = str(settings.get("language", "en-US"))
-        if not initial or language_manager.current_language != self._session_locale:
+        if not initial or language_manager.current_locale != self._session_locale:
             language_manager.reload()
         # Language changes are committed to settings but applied only after a
         # clean process restart. Keeping the active session locale unchanged
