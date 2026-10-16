@@ -1,48 +1,53 @@
-# MCW Launcher v1.8.3-beta.1
+# MCW Launcher v1.8.3-beta.2
 
-Bản thử nghiệm **MCW Launcher v1.8.3-beta.1** mang đến bước nhảy vọt về hiệu năng khởi động ứng dụng, hoàn thiện cơ chế lazy-loading cho toàn bộ các hộp thoại chức năng và tăng cường độ ổn định, bảo mật cho hệ thống Qt Signal và JSON-RPC.
+Bản thử nghiệm **MCW Launcher v1.8.3-beta.2** mang đến tính năng thiết lập tài khoản ngay từ First Run Setup, triệt tiêu hoàn toàn hiện tượng giật đơ giao diện (UI Freezing) trên Instance Workspace, bổ sung bộ lọc chống đổi giá trị khi lăn chuột (Wheel Guard), tối ưu hóa I/O đĩa và khắc phục sự cố kết nối tài khoản Microsoft trên mạng dual-stack.
 
 ---
 
 ## Điểm nổi bật trong bản phát hành (Highlights)
 
-### 1. Tối ưu hóa vượt bậc tốc độ khởi động lạnh (Cold Boot Optimization)
-- **Tăng tốc hơn 11 lần**: Rút ngắn thời gian khởi động launcher từ ~18.2 giây xuống còn **~1.61 giây**.
-- **Cơ chế Lazy-load 17 hộp thoại (`QDialog`)**:
-  - Chuyển đổi toàn bộ 17 hộp thoại chức năng (Quản lý mod, trình duyệt Modrinth/CurseForge/FTB/ATLauncher, thư viện nội dung, trung tâm sửa chữa, v.v.) sang nạp động theo yêu cầu (on-demand).
-  - Loại bỏ hoàn toàn tình trạng khởi tạo đồng loạt 17 cây widget nặng nề trong RAM ngay khi vừa bật ứng dụng.
-- **Trì hoãn kiểm tra Hotfix về nền (Deferred Hotfix Check)**:
-  - Tách luồng kiểm tra bản vá CDN Cloudflare ra khỏi giai đoạn hiển thị Splash.
-  - Sau khi giao diện chính hiển thị xong, launcher mới âm thầm kiểm tra trên luồng phụ và hiện thông báo xác nhận nếu có bản vá mới.
-- **Nạp sớm Stylesheet & Nhận diện GPU bất đồng bộ**:
-  - Gắn stylesheet cơ sở lên `QApplication` trước khi dựng widget, cho phép Qt áp dụng style trực tiếp ở tầng C++.
-  - Nhận diện card đồ họa chạy bất đồng bộ trong background thread có cơ chế khóa luồng `gpu_lock`.
+### 1. Quản lý tài khoản trong First Run Setup & Mặc định Java Auto
+- **Tạo tài khoản Offline và đăng nhập Microsoft ngay từ Setup**:
+  - Tích hợp thêm bước thiết lập tài khoản vào hộp thoại `FirstRunSetupDialog`.
+  - Hỗ trợ tạo tài khoản Offline trực tiếp hoặc kích hoạt luồng đăng nhập Microsoft Device Code ngay trong wizard khởi chạy đầu tiên.
+  - Tự động hủy tác vụ đăng nhập Microsoft an toàn khi đóng, bỏ qua hoặc hủy hộp thoại.
+- **Mặc định lựa chọn Java luôn là `Auto`**:
+  - Java selector trong First Run Setup luôn ưu tiên mục `Auto` (dù máy đã có sẵn các bản cài Java) trừ khi người dùng chủ động chỉ định.
 
-### 2. Dịch thuật & Theme hoàn chỉnh cho các hộp thoại nạp động
-- **Tự động dịch và gán asset khi mở dialog lần đầu (`_finalize_lazy_dialog`)**:
-  - Đảm bảo toàn bộ văn bản và theme asset (icon, svg) của hộp thoại được dịch chuẩn xác theo ngôn ngữ người dùng lựa chọn ngay khi hiển thị lần đầu.
-- **Đồng bộ hóa toàn diện khi đổi ngôn ngữ (`_retranslate_ui`)**:
-  - Bổ sung các dialog còn thiếu (`_modrinth_manual_dialog`, `_optifine_dialog`, `_microsoft_device_code_dialog`) vào chu trình cập nhật ngôn ngữ.
-- **Chặn khởi tạo ngầm hộp thoại khi thao tác trên ModsPage**:
-  - Khi xem chi tiết hoặc tìm kiếm mod trên `ModsPage`, dữ liệu được cập nhật trực tiếp mà không kích hoạt tạo ngầm các hộp thoại modal.
-- **Đọc kênh phát hành trực tiếp từ cấu hình**:
-  - Helper `_allowed_modrinth_version_types()` đọc cấu hình kênh phát hành trực tiếp mà không cần khởi tạo `ModrinthBrowserDialog`.
-- **Khử trùng lặp khởi tạo Theme và Reload ngôn ngữ**:
-  - Loại bỏ các lệnh gọi lặp `ThemeRuntime.apply` và `language_manager.reload()` trong giai đoạn khởi tạo ban đầu.
+### 2. Triệt tiêu hoàn toàn hiện tượng đơ giao diện (UI Freezing) trên Instance Workspace
+- **Loại bỏ quét đĩa thừa khi cập nhật giao diện**:
+  - Ghi nhận `_hub_loaded_instance_key` trong `InstanceWorkspacePage`: khi giao diện cập nhật tiến trình chạy, trạng thái bận hay báo cáo sức khỏe, launcher không còn quét lại toàn bộ dữ liệu 4 tab (`saves/`, `screenshots/`, `latest.log`, `mods/*.jar`) ngay trên GUI thread.
+- **Cơ chế Lazy-loading cho các Hub Tab**:
+  - 3 tab nặng (`Screenshots`, `Live Logs`, `Mods`) được nạp lười: chỉ thực hiện đọc đĩa khi người chơi thực sự bấm chuyển sang tab đó.
+- **Tối ưu hóa tài nguyên Live Logs**:
+  - Quản lý `_poll_timer` của `InstanceLiveLogsTab` theo chu kỳ hiển thị (`showEvent` / `hideEvent`): timer đọc file log ngầm tự động tạm dừng khi chuyển sang tab khác, giảm tải CPU và disk I/O.
 
-### 3. Đồng bộ Qt Signal an toàn luồng & Tăng cường an toàn RPC
-- **Cơ chế Qt Signals chuẩn luồng**:
-  - Thay thế các lệnh gọi `QTimer.singleShot` từ background worker thread sang các Qt Signal chuyên biệt (`_mclogs_uploaded`, `_mclogs_failed`, `hotfix_available`, `hotfix_failed`, `gpu_detected`).
-- **Khắc phục lỗi hiển thị hộp thoại sự cố khởi động**:
-  - Định nghĩa đầy đủ `path_text` và `stage_text`, loại bỏ lỗi `NameError` khi launcher gặp sự cố ngoài ý muốn.
-- **SSE Keepalive & Phòng vệ bảo mật Origin cho HTTP RPC**:
-  - Bổ sung heartbeat keepalive (`: keepalive\n\n`) cho endpoint `/events`, khắc phục hiện tượng ngắt kết nối client sau 5 giây không có sự kiện.
-  - Bổ sung bộ lọc `_is_trusted_origin()` chặn các website lạ truy cập trái phép vào RPC cục bộ (trả về HTTP 403).
+### 3. Giảm 50% I/O đĩa khi làm mới danh sách Instance
+- **Khử trùng lặp nạp `instance.json`**:
+  - Mở rộng `InstanceService.list_health(instances=None)` cho phép truyền danh sách instance đã đọc sẵn.
+  - `InstanceController.refresh` tái sử dụng dữ liệu từ `list()`, loại bỏ hoàn toàn lần đọc đĩa thứ hai của `list_health()`.
+
+### 4. Bảo vệ thao tác cuộn chuột (Wheel Guard)
+- **Tích hợp `WheelBlockFilter`**:
+  - Ngăn chặn hiện tượng người dùng lăn chuột để cuộn trang Settings / Instance Settings nhưng vô tình làm thay đổi giá trị của các `QSpinBox`, `QComboBox`, `QSlider`.
+  - Khởi tạo lười và bảo vệ an toàn vòng đời `QCoreApplication`.
+
+### 5. Khắc phục kết nối Microsoft OAuth & Tinh chỉnh UI
+- **Khắc phục lỗi Device Code Dialog**:
+  - Tự động gán modal parent chính xác theo cửa sổ đang kích hoạt (First Run Setup hoặc MainWindow), khắc phục lỗi `NameError`.
+  - Đảm bảo luôn khôi phục `parent` về `MainWindow` khi kết thúc hoặc hủy phiên đăng nhập.
+- **Ưu tiên phân giải IPv4 (`prefer_ipv4_dns`)**:
+  - Khắc phục lỗi timeout kết nối Microsoft trên các nhà mạng dual-stack IPv4/IPv6 tại Việt Nam (khi định tuyến IPv6 bị rớt gói đến máy chủ Microsoft/Azure Anycast).
+- **Căn chỉnh giao diện**:
+  - Nâng chiều cao hiển thị nút Copy, thụt lề số thứ tự không bị sát lề trái, hiển thị đầy đủ tiêu đề "MCW Launcher".
+- **Cô lập test suite Hotfix**:
+  - Bổ sung fixture dọn dẹp `sys.path` và `sys.meta_path` sau mỗi test trong `test_hotfix_manager.py`.
 
 ---
 
 ## Thông tin kiểm thử & Xác thực (Verification)
 
-- **Release Preflight**: Đạt chuẩn 100% cho `v1.8.3-beta.1` (`python -m tools.release_preflight`).
-- **Kiểm thử GUI & Core**: Vượt qua toàn bộ 2,145 tests hồi quy và hệ thống (`2145 passed, 10 skipped`).
-- **Kiểm thử giao diện (GUI Tests)**: Vượt qua toàn bộ 293/293 GUI tests.
+- **Release Preflight**: Đạt chuẩn 100% cho `v1.8.3-beta.2` (`python -m tools.release_preflight`).
+- **Kiểm thử toàn bộ hệ thống**: Vượt qua toàn bộ 2,172 tests (`2162 passed, 10 skipped`).
+- **Kiểm thử giao diện (GUI Tests)**: Vượt qua toàn bộ 295/295 GUI tests.
+- **Ngôn ngữ**: Đầy đủ 2,310 khóa dịch ngữ đồng bộ giữa tiếng Anh (`en-US`) và tiếng Việt (`vi-VN`).

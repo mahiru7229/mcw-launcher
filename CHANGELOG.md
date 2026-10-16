@@ -2,6 +2,32 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.3-beta.2] - 2026-10-17
+
+### Added
+- **Quản lý tài khoản trong First Run Setup**:
+  - Hỗ trợ tạo tài khoản Offline và đăng nhập tài khoản Microsoft trực tiếp từ hộp thoại thiết lập ban đầu (`FirstRunSetupDialog`).
+  - Đặt giá trị mặc định cho tùy chọn Java luôn là `Auto` (`first_run.java.auto`), bất kể trên hệ thống đã phát hiện bao nhiêu phiên bản Java.
+  - Ngắt kết nối và tự động hủy tác vụ đăng nhập Microsoft an toàn khi đóng, bỏ qua hoặc hủy hộp thoại.
+- **Bảo vệ thao tác lăn chuột (Wheel Guard)**:
+  - Bổ sung `WheelBlockFilter` ngăn chặn việc vô tình thay đổi giá trị của các `QSpinBox`, `QComboBox`, `QSlider` khi cuộn trang cài đặt.
+
+### Performance
+- **Triệt tiêu hiện tượng đơ giao diện (UI Freezing) trên Instance Workspace**:
+  - Caching `_hub_loaded_instance_key` trong `InstanceWorkspacePage`, không còn quét lại ổ đĩa cả 4 tab mỗi khi cập nhật tiến trình hoặc trạng thái instance.
+  - Cơ chế Lazy-loading cho tab Screenshots, Live Logs, và Mods: chỉ quét ổ đĩa khi người dùng chủ động chuyển tab.
+  - Quản lý `_poll_timer` của `InstanceLiveLogsTab` theo sự kiện ẩn/hiện (`hideEvent` / `showEvent`), ngừng đọc file nền khi ở tab khác.
+- **Tối ưu hóa thao tác đọc đĩa `instance.json`**:
+  - `InstanceService.list_health(instances=None)` và `InstanceController.refresh` tái sử dụng danh sách `instances` đã nạp, loại bỏ đọc lặp `instance.json`.
+
+### Fixed
+- **Cải thiện trải nghiệm Microsoft OAuth & Điều chỉnh giao diện**:
+  - Khắc phục lỗi `NameError` khi mở `MicrosoftDeviceCodeDialog` và xử lý đúng modal parent khi mở từ các hộp thoại con.
+  - Luôn khôi phục parent của `MicrosoftDeviceCodeDialog` về `MainWindow` khi kết thúc hoặc hủy phiên đăng nhập.
+  - Căn chỉnh giao diện: tăng chiều cao nút Copy, thụt lề số thứ tự danh sách và hiển thị trọn vẹn tiêu đề ứng dụng.
+  - Hỗ trợ ưu tiên phân giải IPv4 (`prefer_ipv4_dns`) trong `NetworkSession` để khắc phục lỗi timeout kết nối Microsoft trên mạng dual-stack IPv6.
+  - Khôi phục `sys.path` và `sys.meta_path` sau mỗi test trong `test_hotfix_manager.py` đảm bảo tính cô lập của test suite.
+
 ## [1.8.3-beta.1] - 2026-10-16
 
 ### Added
