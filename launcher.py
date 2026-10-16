@@ -12,37 +12,12 @@ def _bootstrap_hotfixes() -> None:
         from src.config import VERSION_ID
         from mcw_core.api.update.hotfix_manager import HotfixManager
 
-        manager = HotfixManager()
-        state = manager.load_state()
-        is_first_run_or_missing = (
-            state is None
-            or not manager.live_dir.is_dir()
-            or not HotfixManager._matches_base_version(state.base_version, VERSION_ID)
-        )
         HotfixManager.bootstrap_sys_path(
             current_base_version=VERSION_ID,
-            auto_sync=is_first_run_or_missing,
-            sync_timeout=2.0,
+            auto_sync=False,
         )
     except Exception:
         pass
-
-
-def _start_background_hotfix_sync() -> None:
-    import threading
-
-    def _worker() -> None:
-        try:
-            from src.config import VERSION_ID
-            from mcw_core.api.update.hotfix_manager import HotfixManager
-
-            manager = HotfixManager()
-            manager.sync_active_hotfix(current_base_version=VERSION_ID, timeout=5.0)
-        except Exception:
-            pass
-
-    sync_thread = threading.Thread(target=_worker, name="MCWHotfixSyncWorker", daemon=True)
-    sync_thread.start()
 
 
 def _start_update_cleanup() -> None:
@@ -173,7 +148,6 @@ def main() -> None:
     splash.show()
     splash.update_progress(2, "startup.starting")
     startup_stage_key = "startup.starting"
-    _start_background_hotfix_sync()
 
     try:
         from mcw_core.api.bootstrap import initialize_application
@@ -202,11 +176,23 @@ def main() -> None:
         language_manager.set_language(settings.get("gui", {}).get("language", "en-US"), notify=False)
         splash.retranslate()
 
-        from mcw_core.api.hardware.gpu_preference_manager import GpuPreferenceManager
+        from mcw_core.api.hardware.gpu_preference_manager import GpuPreferenceManager, GraphicsDetectionResult
+        import threading
 
         def detect_graphics(progress_callback):
             progress_callback(91, "startup.detecting_graphics")
-            return GpuPreferenceManager.detect()
+            cached = GpuPreferenceManager._read_cache()
+            if cached is not None:
+                return cached
+
+            def _async_gpu():
+                try:
+                    GpuPreferenceManager.detect()
+                except Exception:
+                    pass
+
+            threading.Thread(target=_async_gpu, name="MCWAsyncGpuDetector", daemon=True).start()
+            return GraphicsDetectionResult(supported=False)
 
         gpu_detection = run_startup_task(detect_graphics, update_startup_progress, app.processEvents, timeout_seconds=12.0)
 
@@ -228,6 +214,18 @@ def main() -> None:
         splash.update_progress(93, startup_stage_key)
 
         _validate_startup_dependencies()
+
+        # Pre-apply base stylesheet on QApplication before constructing heavy widgets.
+        # This allows Qt to style widgets as they are created in C++, eliminating
+        # a multi-second whole-tree stylesheet recalculation pass.
+        from src.gui.style import APP_STYLE
+        from src.gui.widget.launch_control_style import LAUNCH_CONTROL_STYLE
+        from src.gui.theme.runtime import ThemeRuntime
+
+        early_theme_runtime = ThemeRuntime()
+        early_theme_runtime.manager.select(str(appearance_settings.get("theme", "mcw-default")))
+        early_stylesheet = early_theme_runtime.build_stylesheet(APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE)
+        app.setStyleSheet(early_stylesheet)
 
         # Import and construct Qt widgets only on the GUI thread. Persistent I/O
         # above is isolated so a locked database cannot freeze the splash forever.

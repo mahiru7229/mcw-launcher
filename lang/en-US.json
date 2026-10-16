@@ -2302,6 +2302,10 @@
     "account.microsoft.device_code.open_link": "Open Link",
     "hotfix.update_title": "Hotfix Update",
     "hotfix.applied_restart_prompt": "Hotfix v{version} applied. Please restart launcher to take full effect.",
+    "hotfix.checking": "Checking for hotfixes...",
+    "hotfix.available_prompt": "A new hotfix (v{version}) is available. Would you like to install it now?",
+    "hotfix.installing": "Downloading and applying hotfix v{version}...",
+    "hotfix.install_failed": "Failed to apply hotfix v{version}: {error}",
     "restart.failed_title": "Restart failed",
     "restart.failed_message": "Could not restart launcher."
   },

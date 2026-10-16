@@ -3,6 +3,7 @@ from __future__ import annotations
 """Main application window for MCW Launcher."""
 
 import sys
+import threading
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
@@ -153,13 +154,12 @@ class MainWindow(QMainWindow):
         self._legacy_storage_notice_shown = False
         self._legacy_storage_notice = None
         self._legacy_cleanup_dialog = None
+        self._initial_gui_applied = False
         self._last_connectivity_online: bool | None = None
         self._last_launch_was_quick_play: bool = False
         self._minimized_for_game: bool = False
         self.theme_runtime = ThemeRuntime()
         self.motion_runtime = MotionRuntime(parent=self)
-        language_manager.reload()
-        language_manager.set_language(self._session_locale, notify=False)
         self.launch_controller = LaunchController(self.task_runner)
         self.lan_hosting_controller = LanHostingController(self.task_runner)
         self.update_controller = UpdateController(self.task_runner, channel=self._startup_settings.get("update_channel", "stable"))
@@ -322,23 +322,23 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.set_gpu_detection(self._gpu_detection)
         self.logs_page = LogsPage()
         self.about_page = AboutPage()
-        self.mod_manager_dialog = ModManagerDialog(self)
-        self.modrinth_mod_dialog = ModrinthBrowserDialog("mod", self)
-        self.modrinth_modpack_dialog = ModrinthBrowserDialog("modpack", self)
-        self.modrinth_manual_dialog = CurseForgeManualDownloadDialog(self)
-        self.curseforge_mod_dialog = CurseForgeBrowserDialog("mod", self)
-        self.curseforge_modpack_dialog = CurseForgeBrowserDialog("modpack", self)
-        self.content_pack_manager_dialog = ContentPackManagerDialog(self)
-        self.content_library_dialog = ContentLibraryDialog(self)
-        self.resource_pack_browser_dialog = ContentPackBrowserDialog(ContentPackManager.RESOURCE_PACK, self)
-        self.shader_pack_browser_dialog = ContentPackBrowserDialog(ContentPackManager.SHADER_PACK, self)
-        self.ftb_modpack_dialog = FTBBrowserDialog(self)
-        self.atlauncher_modpack_dialog = ATLauncherBrowserDialog(self)
-        self.optifine_dialog = OptiFineDialog(self)
-        self.curseforge_manual_dialog = CurseForgeManualDownloadDialog(self)
-        self.portable_manual_dialog = CurseForgeManualDownloadDialog(self)
-        self.repair_center_dialog = RepairCenterDialog(self)
-        self.microsoft_device_code_dialog = MicrosoftDeviceCodeDialog(self)
+        self._mod_manager_dialog: ModManagerDialog | None = None
+        self._modrinth_mod_dialog: ModrinthBrowserDialog | None = None
+        self._modrinth_modpack_dialog: ModrinthBrowserDialog | None = None
+        self._modrinth_manual_dialog: CurseForgeManualDownloadDialog | None = None
+        self._curseforge_mod_dialog: CurseForgeBrowserDialog | None = None
+        self._curseforge_modpack_dialog: CurseForgeBrowserDialog | None = None
+        self._content_pack_manager_dialog: ContentPackManagerDialog | None = None
+        self._content_library_dialog: ContentLibraryDialog | None = None
+        self._resource_pack_browser_dialog: ContentPackBrowserDialog | None = None
+        self._shader_pack_browser_dialog: ContentPackBrowserDialog | None = None
+        self._ftb_modpack_dialog: FTBBrowserDialog | None = None
+        self._atlauncher_modpack_dialog: ATLauncherBrowserDialog | None = None
+        self._optifine_dialog: OptiFineDialog | None = None
+        self._curseforge_manual_dialog: CurseForgeManualDownloadDialog | None = None
+        self._portable_manual_dialog: CurseForgeManualDownloadDialog | None = None
+        self._repair_center_dialog: RepairCenterDialog | None = None
+        self._microsoft_device_code_dialog: MicrosoftDeviceCodeDialog | None = None
 
         self.pages = {
             "home": self.home_page,
@@ -359,6 +359,350 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(center, 1)
         self.right_panel.setVisible(False)
         root_layout.addWidget(self.right_panel)
+
+    @property
+    def mod_manager_dialog(self) -> ModManagerDialog:
+        if self._mod_manager_dialog is None:
+            self._mod_manager_dialog = self._setup_mod_manager_dialog(ModManagerDialog(self))
+        return self._mod_manager_dialog
+
+    @mod_manager_dialog.setter
+    def mod_manager_dialog(self, value: ModManagerDialog | None) -> None:
+        self._mod_manager_dialog = value
+
+    def _setup_mod_manager_dialog(self, dialog: ModManagerDialog) -> ModManagerDialog:
+        dialog.refresh_requested.connect(self.mod_controller.refresh)
+        dialog.add_requested.connect(self.mod_controller.add)
+        dialog.remove_requested.connect(self.mod_controller.remove)
+        dialog.enabled_requested.connect(self.mod_controller.set_enabled)
+        dialog.modrinth_requested.connect(self._open_modrinth_mod_browser)
+        dialog.curseforge_requested.connect(self._open_curseforge_mod_browser)
+        dialog.check_updates_requested.connect(self.mod_controller.check_updates)
+        dialog.update_projects_requested.connect(self.mod_controller.update_projects)
+        dialog.update_all_requested.connect(self.mod_controller.update_all)
+        dialog.lock_requested.connect(self.mod_controller.set_locked)
+        dialog.analyze_requested.connect(self.mod_controller.analyze)
+        settings = getattr(self, "_cached_gui_settings", {})
+        dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
+        dialog.curseforge_button.setVisible(bool(settings.get("curseforge_gateway_urls", ())))
+        if hasattr(self, "mod_controller") and self.mod_controller.current_instance is not None:
+            dialog.set_instance(self.mod_controller.current_instance)
+        return dialog
+
+    @property
+    def modrinth_mod_dialog(self) -> ModrinthBrowserDialog:
+        if self._modrinth_mod_dialog is None:
+            self._modrinth_mod_dialog = self._setup_modrinth_mod_dialog(ModrinthBrowserDialog("mod", self))
+        return self._modrinth_mod_dialog
+
+    @modrinth_mod_dialog.setter
+    def modrinth_mod_dialog(self, value: ModrinthBrowserDialog | None) -> None:
+        self._modrinth_mod_dialog = value
+
+    def _setup_modrinth_mod_dialog(self, dialog: ModrinthBrowserDialog) -> ModrinthBrowserDialog:
+        dialog.search_requested.connect(self._search_modrinth_mods)
+        dialog.versions_requested.connect(self.modrinth_controller.load_versions)
+        dialog.project_details_requested.connect(self.modrinth_controller.load_project_details)
+        dialog.install_mod_requested.connect(self._install_modrinth_mod)
+        dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
+        settings = getattr(self, "_cached_gui_settings", {})
+        dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
+        dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
+        return dialog
+
+    @property
+    def modrinth_modpack_dialog(self) -> ModrinthBrowserDialog:
+        if self._modrinth_modpack_dialog is None:
+            self._modrinth_modpack_dialog = self._setup_modrinth_modpack_dialog(ModrinthBrowserDialog("modpack", self))
+        return self._modrinth_modpack_dialog
+
+    @modrinth_modpack_dialog.setter
+    def modrinth_modpack_dialog(self, value: ModrinthBrowserDialog | None) -> None:
+        self._modrinth_modpack_dialog = value
+
+    def _setup_modrinth_modpack_dialog(self, dialog: ModrinthBrowserDialog) -> ModrinthBrowserDialog:
+        dialog.search_requested.connect(self._search_modrinth_modpacks)
+        dialog.versions_requested.connect(self.modrinth_controller.load_versions)
+        dialog.project_details_requested.connect(self.modrinth_controller.load_project_details)
+        dialog.install_modpack_requested.connect(self._install_modrinth_modpack)
+        dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
+        settings = getattr(self, "_cached_gui_settings", {})
+        dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
+        dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
+        return dialog
+
+    @property
+    def modrinth_manual_dialog(self) -> CurseForgeManualDownloadDialog:
+        if self._modrinth_manual_dialog is None:
+            self._modrinth_manual_dialog = self._setup_modrinth_manual_dialog(CurseForgeManualDownloadDialog(self))
+        return self._modrinth_manual_dialog
+
+    @modrinth_manual_dialog.setter
+    def modrinth_manual_dialog(self, value: CurseForgeManualDownloadDialog | None) -> None:
+        self._modrinth_manual_dialog = value
+
+    def _setup_modrinth_manual_dialog(self, dialog: CurseForgeManualDownloadDialog) -> CurseForgeManualDownloadDialog:
+        dialog.files_selected.connect(self._install_manual_modrinth_files)
+        dialog.cancelled.connect(self._on_manual_download_dialog_cancelled)
+        return dialog
+
+    @property
+    def curseforge_mod_dialog(self) -> CurseForgeBrowserDialog:
+        if self._curseforge_mod_dialog is None:
+            self._curseforge_mod_dialog = self._setup_curseforge_mod_dialog(CurseForgeBrowserDialog("mod", self))
+        return self._curseforge_mod_dialog
+
+    @curseforge_mod_dialog.setter
+    def curseforge_mod_dialog(self, value: CurseForgeBrowserDialog | None) -> None:
+        self._curseforge_mod_dialog = value
+
+    def _setup_curseforge_mod_dialog(self, dialog: CurseForgeBrowserDialog) -> CurseForgeBrowserDialog:
+        dialog.search_requested.connect(self._search_curseforge_mods)
+        dialog.refresh_requested.connect(self._refresh_curseforge_mods)
+        dialog.files_requested.connect(lambda project_type, project_id, game_version, loader, channels: self.curseforge_controller.load_files(project_type, project_id, game_version, loader, tuple(channels), force_refresh=False, manual_refresh=False))
+        dialog.project_details_requested.connect(self.curseforge_controller.load_project_details)
+        dialog.files_refresh_requested.connect(lambda project_type, project_id, game_version, loader, channels: self.curseforge_controller.load_files(project_type, project_id, game_version, loader, tuple(channels), force_refresh=True, manual_refresh=False))
+        dialog.clear_cache_requested.connect(self.curseforge_controller.clear_api_cache)
+        dialog.install_mod_requested.connect(self._install_curseforge_mod)
+        dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
+        settings = getattr(self, "_cached_gui_settings", {})
+        dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
+        dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
+        return dialog
+
+    @property
+    def curseforge_modpack_dialog(self) -> CurseForgeBrowserDialog:
+        if self._curseforge_modpack_dialog is None:
+            self._curseforge_modpack_dialog = self._setup_curseforge_modpack_dialog(CurseForgeBrowserDialog("modpack", self))
+        return self._curseforge_modpack_dialog
+
+    @curseforge_modpack_dialog.setter
+    def curseforge_modpack_dialog(self, value: CurseForgeBrowserDialog | None) -> None:
+        self._curseforge_modpack_dialog = value
+
+    def _setup_curseforge_modpack_dialog(self, dialog: CurseForgeBrowserDialog) -> CurseForgeBrowserDialog:
+        dialog.search_requested.connect(self._search_curseforge_modpacks)
+        dialog.refresh_requested.connect(self._refresh_curseforge_modpacks)
+        dialog.files_requested.connect(lambda project_type, project_id, game_version, loader, channels: self.curseforge_controller.load_files(project_type, project_id, game_version, loader, tuple(channels), force_refresh=False, manual_refresh=False))
+        dialog.project_details_requested.connect(self.curseforge_controller.load_project_details)
+        dialog.files_refresh_requested.connect(lambda project_type, project_id, game_version, loader, channels: self.curseforge_controller.load_files(project_type, project_id, game_version, loader, tuple(channels), force_refresh=True, manual_refresh=False))
+        dialog.clear_cache_requested.connect(self.curseforge_controller.clear_api_cache)
+        dialog.install_modpack_requested.connect(self._install_curseforge_modpack)
+        dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
+        settings = getattr(self, "_cached_gui_settings", {})
+        dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
+        dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
+        return dialog
+
+    @property
+    def curseforge_manual_dialog(self) -> CurseForgeManualDownloadDialog:
+        if self._curseforge_manual_dialog is None:
+            self._curseforge_manual_dialog = self._setup_curseforge_manual_dialog(CurseForgeManualDownloadDialog(self))
+        return self._curseforge_manual_dialog
+
+    @curseforge_manual_dialog.setter
+    def curseforge_manual_dialog(self, value: CurseForgeManualDownloadDialog | None) -> None:
+        self._curseforge_manual_dialog = value
+
+    def _setup_curseforge_manual_dialog(self, dialog: CurseForgeManualDownloadDialog) -> CurseForgeManualDownloadDialog:
+        dialog.files_selected.connect(self._install_manual_curseforge_files)
+        dialog.cancelled.connect(self._on_manual_download_dialog_cancelled)
+        return dialog
+
+    @property
+    def portable_manual_dialog(self) -> CurseForgeManualDownloadDialog:
+        if self._portable_manual_dialog is None:
+            self._portable_manual_dialog = self._setup_portable_manual_dialog(CurseForgeManualDownloadDialog(self))
+        return self._portable_manual_dialog
+
+    @portable_manual_dialog.setter
+    def portable_manual_dialog(self, value: CurseForgeManualDownloadDialog | None) -> None:
+        self._portable_manual_dialog = value
+
+    def _setup_portable_manual_dialog(self, dialog: CurseForgeManualDownloadDialog) -> CurseForgeManualDownloadDialog:
+        dialog.files_selected.connect(self._install_portable_manual_files)
+        dialog.cancelled.connect(self._on_manual_download_dialog_cancelled)
+        return dialog
+
+    @property
+    def content_pack_manager_dialog(self) -> ContentPackManagerDialog:
+        if self._content_pack_manager_dialog is None:
+            self._content_pack_manager_dialog = self._setup_content_pack_manager_dialog(ContentPackManagerDialog(self))
+        return self._content_pack_manager_dialog
+
+    @content_pack_manager_dialog.setter
+    def content_pack_manager_dialog(self, value: ContentPackManagerDialog | None) -> None:
+        self._content_pack_manager_dialog = value
+
+    def _setup_content_pack_manager_dialog(self, dialog: ContentPackManagerDialog) -> ContentPackManagerDialog:
+        dialog.browse_requested.connect(self._open_content_pack_browser)
+        dialog.import_requested.connect(self._import_content_pack)
+        dialog.refresh_requested.connect(self._refresh_content_pack_entries)
+        dialog.toggle_requested.connect(self._toggle_content_pack)
+        dialog.remove_requested.connect(self._remove_content_pack)
+        dialog.open_folder_requested.connect(self._open_content_pack_folder)
+        return dialog
+
+    @property
+    def content_library_dialog(self) -> ContentLibraryDialog:
+        if self._content_library_dialog is None:
+            self._content_library_dialog = self._setup_content_library_dialog(ContentLibraryDialog(self))
+        return self._content_library_dialog
+
+    @content_library_dialog.setter
+    def content_library_dialog(self, value: ContentLibraryDialog | None) -> None:
+        self._content_library_dialog = value
+
+    def _setup_content_library_dialog(self, dialog: ContentLibraryDialog) -> ContentLibraryDialog:
+        dialog.refresh_requested.connect(self.content_library_controller.refresh)
+        dialog.enabled_requested.connect(self.content_library_controller.set_enabled)
+        dialog.remove_requested.connect(self.content_library_controller.remove)
+        dialog.pin_requested.connect(self.content_library_controller.set_pinned)
+        dialog.ignore_update_requested.connect(self.content_library_controller.set_ignored_update)
+        dialog.import_requested.connect(self.content_library_controller.import_local)
+        dialog.open_folder_requested.connect(self._open_content_library_folder)
+        dialog.open_manager_requested.connect(self._open_content_library_manager)
+        if hasattr(self, "content_library_controller") and self.content_library_controller.current_instance is not None:
+            dialog.set_instance(self.content_library_controller.current_instance)
+        return dialog
+
+    @property
+    def resource_pack_browser_dialog(self) -> ContentPackBrowserDialog:
+        if self._resource_pack_browser_dialog is None:
+            self._resource_pack_browser_dialog = self._setup_resource_pack_browser_dialog(ContentPackBrowserDialog(ContentPackManager.RESOURCE_PACK, self))
+        return self._resource_pack_browser_dialog
+
+    @resource_pack_browser_dialog.setter
+    def resource_pack_browser_dialog(self, value: ContentPackBrowserDialog | None) -> None:
+        self._resource_pack_browser_dialog = value
+
+    def _setup_resource_pack_browser_dialog(self, dialog: ContentPackBrowserDialog) -> ContentPackBrowserDialog:
+        dialog.search_requested.connect(self.content_pack_controller.search)
+        dialog.versions_requested.connect(self.content_pack_controller.load_versions)
+        dialog.project_details_requested.connect(self.content_pack_controller.load_project_details)
+        dialog.install_modrinth_requested.connect(self.content_pack_controller.install_modrinth)
+        dialog.install_curseforge_requested.connect(self._install_curseforge_content_pack)
+        dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
+        settings = getattr(self, "_cached_gui_settings", {})
+        dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
+        dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
+        return dialog
+
+    @property
+    def shader_pack_browser_dialog(self) -> ContentPackBrowserDialog:
+        if self._shader_pack_browser_dialog is None:
+            self._shader_pack_browser_dialog = self._setup_shader_pack_browser_dialog(ContentPackBrowserDialog(ContentPackManager.SHADER_PACK, self))
+        return self._shader_pack_browser_dialog
+
+    @shader_pack_browser_dialog.setter
+    def shader_pack_browser_dialog(self, value: ContentPackBrowserDialog | None) -> None:
+        self._shader_pack_browser_dialog = value
+
+    def _setup_shader_pack_browser_dialog(self, dialog: ContentPackBrowserDialog) -> ContentPackBrowserDialog:
+        dialog.search_requested.connect(self.content_pack_controller.search)
+        dialog.versions_requested.connect(self.content_pack_controller.load_versions)
+        dialog.project_details_requested.connect(self.content_pack_controller.load_project_details)
+        dialog.install_modrinth_requested.connect(self.content_pack_controller.install_modrinth)
+        dialog.install_curseforge_requested.connect(self._install_curseforge_content_pack)
+        dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
+        settings = getattr(self, "_cached_gui_settings", {})
+        dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
+        dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
+        return dialog
+
+    @property
+    def ftb_modpack_dialog(self) -> FTBBrowserDialog:
+        if self._ftb_modpack_dialog is None:
+            self._ftb_modpack_dialog = self._setup_ftb_modpack_dialog(FTBBrowserDialog(self))
+        return self._ftb_modpack_dialog
+
+    @ftb_modpack_dialog.setter
+    def ftb_modpack_dialog(self, value: FTBBrowserDialog | None) -> None:
+        self._ftb_modpack_dialog = value
+
+    def _setup_ftb_modpack_dialog(self, dialog: FTBBrowserDialog) -> FTBBrowserDialog:
+        dialog.search_requested.connect(self.ftb_controller.search)
+        dialog.refresh_requested.connect(lambda query, sort, index: self.ftb_controller.search(query, sort, index, force_refresh=True))
+        dialog.project_details_requested.connect(self.ftb_controller.load_project_details)
+        dialog.versions_requested.connect(self.ftb_controller.load_versions)
+        dialog.version_details_requested.connect(self.ftb_controller.load_version_details)
+        dialog.clear_cache_requested.connect(self.ftb_controller.clear_api_cache)
+        dialog.install_modpack_requested.connect(self._install_ftb_modpack)
+        dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
+        settings = getattr(self, "_cached_gui_settings", {})
+        dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
+        dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
+        return dialog
+
+    @property
+    def atlauncher_modpack_dialog(self) -> ATLauncherBrowserDialog:
+        if self._atlauncher_modpack_dialog is None:
+            self._atlauncher_modpack_dialog = self._setup_atlauncher_modpack_dialog(ATLauncherBrowserDialog(self))
+        return self._atlauncher_modpack_dialog
+
+    @atlauncher_modpack_dialog.setter
+    def atlauncher_modpack_dialog(self, value: ATLauncherBrowserDialog | None) -> None:
+        self._atlauncher_modpack_dialog = value
+
+    def _setup_atlauncher_modpack_dialog(self, dialog: ATLauncherBrowserDialog) -> ATLauncherBrowserDialog:
+        dialog.search_requested.connect(self.atlauncher_controller.search)
+        dialog.refresh_requested.connect(lambda query, sort, index: self.atlauncher_controller.search(query, sort, index, force_refresh=True))
+        dialog.project_details_requested.connect(self.atlauncher_controller.load_project_details)
+        dialog.versions_requested.connect(self.atlauncher_controller.load_versions)
+        dialog.version_details_requested.connect(self.atlauncher_controller.load_version_details)
+        dialog.clear_cache_requested.connect(self.atlauncher_controller.clear_api_cache)
+        dialog.install_modpack_requested.connect(self._install_atlauncher_modpack)
+        dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
+        settings = getattr(self, "_cached_gui_settings", {})
+        dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
+        dialog.set_show_project_descriptions(bool(settings.get("show_content_descriptions", False)))
+        return dialog
+
+    @property
+    def optifine_dialog(self) -> OptiFineDialog:
+        if self._optifine_dialog is None:
+            self._optifine_dialog = self._setup_optifine_dialog(OptiFineDialog(self))
+        return self._optifine_dialog
+
+    @optifine_dialog.setter
+    def optifine_dialog(self, value: OptiFineDialog | None) -> None:
+        self._optifine_dialog = value
+
+    def _setup_optifine_dialog(self, dialog: OptiFineDialog) -> OptiFineDialog:
+        dialog.state_requested.connect(self.optifine_controller.load_state)
+        dialog.install_requested.connect(self.optifine_controller.install)
+        dialog.repair_requested.connect(self.optifine_controller.repair)
+        dialog.uninstall_requested.connect(self.optifine_controller.uninstall)
+        return dialog
+
+    @property
+    def repair_center_dialog(self) -> RepairCenterDialog:
+        if self._repair_center_dialog is None:
+            self._repair_center_dialog = self._setup_repair_center_dialog(RepairCenterDialog(self))
+        return self._repair_center_dialog
+
+    @repair_center_dialog.setter
+    def repair_center_dialog(self, value: RepairCenterDialog | None) -> None:
+        self._repair_center_dialog = value
+
+    def _setup_repair_center_dialog(self, dialog: RepairCenterDialog) -> RepairCenterDialog:
+        dialog.scan_requested.connect(self.instance_controller.scan_repair_center)
+        dialog.repair_requested.connect(self.instance_controller.execute_repair_plan)
+        return dialog
+
+    @property
+    def microsoft_device_code_dialog(self) -> MicrosoftDeviceCodeDialog:
+        if self._microsoft_device_code_dialog is None:
+            self._microsoft_device_code_dialog = self._setup_microsoft_device_code_dialog(MicrosoftDeviceCodeDialog(self))
+        return self._microsoft_device_code_dialog
+
+    @microsoft_device_code_dialog.setter
+    def microsoft_device_code_dialog(self, value: MicrosoftDeviceCodeDialog | None) -> None:
+        self._microsoft_device_code_dialog = value
+
+    def _setup_microsoft_device_code_dialog(self, dialog: MicrosoftDeviceCodeDialog) -> MicrosoftDeviceCodeDialog:
+        dialog.cancel_requested.connect(self.account_controller.cancel_microsoft)
+        return dialog
 
     def _connect_signals(self) -> None:
         self.sidebar.page_requested.connect(self.show_page)
@@ -384,10 +728,9 @@ class MainWindow(QMainWindow):
         self.account_page.refresh_requested.connect(self.account_controller.refresh)
         self.account_page.security_audit_requested.connect(self.account_controller.audit_security)
         self.account_page.security_reprotect_requested.connect(self.account_controller.reprotect_security)
-        self.microsoft_device_code_dialog.cancel_requested.connect(self.account_controller.cancel_microsoft)
         self.account_controller.microsoft_device_code_received.connect(self._show_microsoft_device_code_dialog)
-        self.account_controller.accounts_changed.connect(lambda *_: self.microsoft_device_code_dialog.accept() if self.microsoft_device_code_dialog.isVisible() else None)
-        self.account_controller.microsoft_auth_state_changed.connect(lambda active, _: self.microsoft_device_code_dialog.close() if not active and self.microsoft_device_code_dialog.isVisible() else None)
+        self.account_controller.accounts_changed.connect(lambda *_: self._microsoft_device_code_dialog.accept() if self._microsoft_device_code_dialog is not None and self._microsoft_device_code_dialog.isVisible() else None)
+        self.account_controller.microsoft_auth_state_changed.connect(lambda active, _: self._microsoft_device_code_dialog.close() if self._microsoft_device_code_dialog is not None and not active and self._microsoft_device_code_dialog.isVisible() else None)
 
         self.instances_page.refresh_requested.connect(self.instance_controller.refresh)
         self.instances_page.launch_requested.connect(self._request_launch)
@@ -416,8 +759,6 @@ class MainWindow(QMainWindow):
         self.instances_page.open_forge_logs_requested.connect(self._open_forge_logs)
         self.instances_page.export_forge_diagnostics_requested.connect(self._export_forge_diagnostics)
         self.instances_page.repair_instance_requested.connect(self._open_repair_center)
-        self.repair_center_dialog.scan_requested.connect(self.instance_controller.scan_repair_center)
-        self.repair_center_dialog.repair_requested.connect(self.instance_controller.execute_repair_plan)
         self.instances_page.manage_mods_requested.connect(self._open_mod_manager)
         self.instances_page.manage_content_packs_requested.connect(self._open_content_pack_manager)
         self.instances_page.manage_content_library_requested.connect(self._open_content_library)
@@ -544,43 +885,14 @@ class MainWindow(QMainWindow):
         self.storage_controller.cleanup_completed.connect(self._on_legacy_storage_cleanup_completed)
         self.gui_settings_controller.settings_changed.connect(self._apply_gui_settings)
 
-        self.mod_manager_dialog.refresh_requested.connect(self.mod_controller.refresh)
-        self.mod_manager_dialog.add_requested.connect(self.mod_controller.add)
-        self.mod_manager_dialog.remove_requested.connect(self.mod_controller.remove)
-        self.mod_manager_dialog.enabled_requested.connect(self.mod_controller.set_enabled)
-        self.mod_manager_dialog.modrinth_requested.connect(self._open_modrinth_mod_browser)
-        self.mod_manager_dialog.curseforge_requested.connect(self._open_curseforge_mod_browser)
-        self.mod_manager_dialog.check_updates_requested.connect(self.mod_controller.check_updates)
-        self.mod_manager_dialog.update_projects_requested.connect(self.mod_controller.update_projects)
-        self.mod_manager_dialog.update_all_requested.connect(self.mod_controller.update_all)
-        self.mod_manager_dialog.lock_requested.connect(self.mod_controller.set_locked)
-        self.mod_manager_dialog.analyze_requested.connect(self.mod_controller.analyze)
-        self.mod_controller.instance_changed.connect(self.mod_manager_dialog.set_instance)
-        self.mod_controller.mods_changed.connect(self.mod_manager_dialog.set_mods)
-        self.mod_controller.updates_changed.connect(self.mod_manager_dialog.set_update_report)
-        self.mod_controller.health_changed.connect(self.mod_manager_dialog.set_health_report)
+        self.mod_controller.instance_changed.connect(lambda inst: self._mod_manager_dialog.set_instance(inst) if self._mod_manager_dialog is not None else None)
+        self.mod_controller.mods_changed.connect(lambda mods: self._mod_manager_dialog.set_mods(mods) if self._mod_manager_dialog is not None else None)
+        self.mod_controller.updates_changed.connect(lambda rep: self._mod_manager_dialog.set_update_report(rep) if self._mod_manager_dialog is not None else None)
+        self.mod_controller.health_changed.connect(lambda rep: self._mod_manager_dialog.set_health_report(rep) if self._mod_manager_dialog is not None else None)
 
-        self.content_library_dialog.refresh_requested.connect(self.content_library_controller.refresh)
-        self.content_library_dialog.enabled_requested.connect(self.content_library_controller.set_enabled)
-        self.content_library_dialog.remove_requested.connect(self.content_library_controller.remove)
-        self.content_library_dialog.pin_requested.connect(self.content_library_controller.set_pinned)
-        self.content_library_dialog.ignore_update_requested.connect(self.content_library_controller.set_ignored_update)
-        self.content_library_dialog.import_requested.connect(self.content_library_controller.import_local)
-        self.content_library_dialog.open_folder_requested.connect(self._open_content_library_folder)
-        self.content_library_dialog.open_manager_requested.connect(self._open_content_library_manager)
-        self.content_library_controller.instance_changed.connect(self.content_library_dialog.set_instance)
-        self.content_library_controller.library_changed.connect(self.content_library_dialog.set_library)
+        self.content_library_controller.instance_changed.connect(lambda inst: self._content_library_dialog.set_instance(inst) if self._content_library_dialog is not None else None)
+        self.content_library_controller.library_changed.connect(lambda lib: self._content_library_dialog.set_library(lib) if self._content_library_dialog is not None else None)
 
-        self.modrinth_mod_dialog.search_requested.connect(self._search_modrinth_mods)
-        self.modrinth_modpack_dialog.search_requested.connect(self._search_modrinth_modpacks)
-        self.modrinth_mod_dialog.versions_requested.connect(self.modrinth_controller.load_versions)
-        self.modrinth_modpack_dialog.versions_requested.connect(self.modrinth_controller.load_versions)
-        self.modrinth_mod_dialog.project_details_requested.connect(self.modrinth_controller.load_project_details)
-        self.modrinth_modpack_dialog.project_details_requested.connect(self.modrinth_controller.load_project_details)
-        self.modrinth_mod_dialog.install_mod_requested.connect(self._install_modrinth_mod)
-        self.modrinth_modpack_dialog.install_modpack_requested.connect(self._install_modrinth_modpack)
-        self.modrinth_mod_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
-        self.modrinth_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.modrinth_controller.search_results_changed.connect(self._set_modrinth_results)
         self.modrinth_controller.search_failed.connect(self._set_modrinth_search_error)
         self.modrinth_controller.versions_changed.connect(self._set_modrinth_versions)
@@ -589,31 +901,11 @@ class MainWindow(QMainWindow):
         self.modrinth_controller.manual_files_installed.connect(self._modrinth_manual_files_installed)
         self.modrinth_controller.modpack_installed.connect(self._modrinth_modpack_installed)
         self.modrinth_controller.modpack_manual_download_required.connect(self._modrinth_modpack_manual_download_required)
-        self.modrinth_manual_dialog.files_selected.connect(self._install_manual_modrinth_files)
-        self.modrinth_manual_dialog.cancelled.connect(self._on_manual_download_dialog_cancelled)
         self.launch_controller.portable_manual_download_required.connect(self._portable_manual_download_required)
         self.launch_controller.compatibility_confirmation_required.connect(self._confirm_compatibility_launch)
         self.launch_controller.manual_content_required.connect(self._on_launch_manual_content_required)
-        self.portable_manual_dialog.files_selected.connect(self._install_portable_manual_files)
-        self.portable_manual_dialog.cancelled.connect(self._on_manual_download_dialog_cancelled)
         self.instance_controller.portable_manual_files_installed.connect(self._portable_manual_files_installed)
 
-        self.curseforge_mod_dialog.search_requested.connect(self._search_curseforge_mods)
-        self.curseforge_modpack_dialog.search_requested.connect(self._search_curseforge_modpacks)
-        self.curseforge_mod_dialog.refresh_requested.connect(self._refresh_curseforge_mods)
-        self.curseforge_modpack_dialog.refresh_requested.connect(self._refresh_curseforge_modpacks)
-        self.curseforge_mod_dialog.files_requested.connect(self.curseforge_controller.load_files)
-        self.curseforge_modpack_dialog.files_requested.connect(self.curseforge_controller.load_files)
-        self.curseforge_mod_dialog.project_details_requested.connect(self.curseforge_controller.load_project_details)
-        self.curseforge_modpack_dialog.project_details_requested.connect(self.curseforge_controller.load_project_details)
-        self.curseforge_mod_dialog.files_refresh_requested.connect(lambda project_type, project_id, game_version, loader, channels: self.curseforge_controller.load_files(project_type, project_id, game_version, loader, tuple(channels), force_refresh=True, manual_refresh=False))
-        self.curseforge_modpack_dialog.files_refresh_requested.connect(lambda project_type, project_id, game_version, loader, channels: self.curseforge_controller.load_files(project_type, project_id, game_version, loader, tuple(channels), force_refresh=True, manual_refresh=False))
-        self.curseforge_mod_dialog.clear_cache_requested.connect(self.curseforge_controller.clear_api_cache)
-        self.curseforge_modpack_dialog.clear_cache_requested.connect(self.curseforge_controller.clear_api_cache)
-        self.curseforge_mod_dialog.install_mod_requested.connect(self._install_curseforge_mod)
-        self.curseforge_modpack_dialog.install_modpack_requested.connect(self._install_curseforge_modpack)
-        self.curseforge_mod_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
-        self.curseforge_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.curseforge_controller.search_results_changed.connect(self._set_curseforge_results)
         self.curseforge_controller.files_changed.connect(self._set_curseforge_files)
         self.curseforge_controller.project_details_changed.connect(self._set_curseforge_project_details)
@@ -629,63 +921,27 @@ class MainWindow(QMainWindow):
         self.curseforge_controller.modpack_installed.connect(self._curseforge_modpack_installed)
         self.curseforge_controller.modpack_manual_download_required.connect(self._curseforge_modpack_manual_download_required)
 
-        self.ftb_modpack_dialog.search_requested.connect(self.ftb_controller.search)
-        self.ftb_modpack_dialog.refresh_requested.connect(lambda query, sort, index: self.ftb_controller.search(query, sort, index, force_refresh=True))
-        self.ftb_modpack_dialog.project_details_requested.connect(self.ftb_controller.load_project_details)
-        self.ftb_modpack_dialog.versions_requested.connect(self.ftb_controller.load_versions)
-        self.ftb_modpack_dialog.version_details_requested.connect(self.ftb_controller.load_version_details)
-        self.ftb_modpack_dialog.clear_cache_requested.connect(self.ftb_controller.clear_api_cache)
-        self.ftb_modpack_dialog.install_modpack_requested.connect(self._install_ftb_modpack)
-        self.ftb_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
-        self.ftb_controller.search_results_changed.connect(self.ftb_modpack_dialog.set_search_result)
-        self.ftb_controller.project_details_changed.connect(self.ftb_modpack_dialog.set_project_details)
-        self.ftb_controller.versions_changed.connect(self.ftb_modpack_dialog.set_versions)
-        self.ftb_controller.version_details_changed.connect(self.ftb_modpack_dialog.set_version_details)
-        self.ftb_controller.cache_cleared.connect(lambda info: (self.ftb_modpack_dialog.set_cache_info(info), QMessageBox.information(self, tr("ftb.modpack.title"), tr("ftb.cache.cleared"))))
+        self.ftb_controller.search_results_changed.connect(lambda res: self._ftb_modpack_dialog.set_search_result(res) if self._ftb_modpack_dialog is not None else None)
+        self.ftb_controller.project_details_changed.connect(lambda det: self._ftb_modpack_dialog.set_project_details(det) if self._ftb_modpack_dialog is not None else None)
+        self.ftb_controller.versions_changed.connect(lambda ver: self._ftb_modpack_dialog.set_versions(ver) if self._ftb_modpack_dialog is not None else None)
+        self.ftb_controller.version_details_changed.connect(lambda vdet: self._ftb_modpack_dialog.set_version_details(vdet) if self._ftb_modpack_dialog is not None else None)
+        self.ftb_controller.cache_cleared.connect(lambda info: (self._ftb_modpack_dialog.set_cache_info(info) if self._ftb_modpack_dialog is not None else None, QMessageBox.information(self, tr("ftb.modpack.title"), tr("ftb.cache.cleared"))))
         self.ftb_controller.modpack_installed.connect(self._ftb_modpack_installed)
 
-        self.atlauncher_modpack_dialog.search_requested.connect(self.atlauncher_controller.search)
-        self.atlauncher_modpack_dialog.refresh_requested.connect(lambda query, sort, index: self.atlauncher_controller.search(query, sort, index, force_refresh=True))
-        self.atlauncher_modpack_dialog.project_details_requested.connect(self.atlauncher_controller.load_project_details)
-        self.atlauncher_modpack_dialog.versions_requested.connect(self.atlauncher_controller.load_versions)
-        self.atlauncher_modpack_dialog.version_details_requested.connect(self.atlauncher_controller.load_version_details)
-        self.atlauncher_modpack_dialog.clear_cache_requested.connect(self.atlauncher_controller.clear_api_cache)
-        self.atlauncher_modpack_dialog.install_modpack_requested.connect(self._install_atlauncher_modpack)
-        self.atlauncher_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
-        self.atlauncher_controller.search_results_changed.connect(self.atlauncher_modpack_dialog.set_search_result)
-        self.atlauncher_controller.project_details_changed.connect(self.atlauncher_modpack_dialog.set_project_details)
-        self.atlauncher_controller.versions_changed.connect(self.atlauncher_modpack_dialog.set_versions)
-        self.atlauncher_controller.version_details_changed.connect(self.atlauncher_modpack_dialog.set_version_details)
-        self.atlauncher_controller.cache_cleared.connect(lambda info: (self.atlauncher_modpack_dialog.set_cache_info(info), QMessageBox.information(self, tr("atlauncher.modpack.title"), tr("atlauncher.cache.cleared"))))
+        self.atlauncher_controller.search_results_changed.connect(lambda res: self._atlauncher_modpack_dialog.set_search_result(res) if self._atlauncher_modpack_dialog is not None else None)
+        self.atlauncher_controller.project_details_changed.connect(lambda det: self._atlauncher_modpack_dialog.set_project_details(det) if self._atlauncher_modpack_dialog is not None else None)
+        self.atlauncher_controller.versions_changed.connect(lambda ver: self._atlauncher_modpack_dialog.set_versions(ver) if self._atlauncher_modpack_dialog is not None else None)
+        self.atlauncher_controller.version_details_changed.connect(lambda vdet: self._atlauncher_modpack_dialog.set_version_details(vdet) if self._atlauncher_modpack_dialog is not None else None)
+        self.atlauncher_controller.cache_cleared.connect(lambda info: (self._atlauncher_modpack_dialog.set_cache_info(info) if self._atlauncher_modpack_dialog is not None else None, QMessageBox.information(self, tr("atlauncher.modpack.title"), tr("atlauncher.cache.cleared"))))
         self.atlauncher_controller.modpack_installed.connect(self._atlauncher_modpack_installed)
 
-        self.content_pack_manager_dialog.browse_requested.connect(self._open_content_pack_browser)
-        self.content_pack_manager_dialog.import_requested.connect(self._import_content_pack)
-        self.content_pack_manager_dialog.refresh_requested.connect(self._refresh_content_pack_entries)
-        self.content_pack_manager_dialog.toggle_requested.connect(self._toggle_content_pack)
-        self.content_pack_manager_dialog.remove_requested.connect(self._remove_content_pack)
-        self.content_pack_manager_dialog.open_folder_requested.connect(self._open_content_pack_folder)
-        for dialog in (self.resource_pack_browser_dialog, self.shader_pack_browser_dialog):
-            dialog.search_requested.connect(self.content_pack_controller.search)
-            dialog.versions_requested.connect(self.content_pack_controller.load_versions)
-            dialog.project_details_requested.connect(self.content_pack_controller.load_project_details)
-            dialog.install_modrinth_requested.connect(self.content_pack_controller.install_modrinth)
-            dialog.install_curseforge_requested.connect(self._install_curseforge_content_pack)
-            dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
-        self.content_pack_controller.search_results_changed.connect(self.resource_pack_browser_dialog.set_search_result)
-        self.content_pack_controller.search_results_changed.connect(self.shader_pack_browser_dialog.set_search_result)
-        self.content_pack_controller.search_failed.connect(self.resource_pack_browser_dialog.set_search_error)
-        self.content_pack_controller.search_failed.connect(self.shader_pack_browser_dialog.set_search_error)
-        self.content_pack_controller.versions_changed.connect(self.resource_pack_browser_dialog.set_versions)
-        self.content_pack_controller.versions_changed.connect(self.shader_pack_browser_dialog.set_versions)
-        self.content_pack_controller.files_changed.connect(self.resource_pack_browser_dialog.set_files)
-        self.content_pack_controller.files_changed.connect(self.shader_pack_browser_dialog.set_files)
-        self.content_pack_controller.project_details_changed.connect(self.resource_pack_browser_dialog.set_project_details)
-        self.content_pack_controller.project_details_changed.connect(self.shader_pack_browser_dialog.set_project_details)
-        self.content_pack_controller.entries_changed.connect(self.content_pack_manager_dialog.set_entries)
+        self.content_pack_controller.search_results_changed.connect(lambda *args: (self._resource_pack_browser_dialog.set_search_result(*args) if self._resource_pack_browser_dialog is not None else None, self._shader_pack_browser_dialog.set_search_result(*args) if self._shader_pack_browser_dialog is not None else None))
+        self.content_pack_controller.search_failed.connect(lambda *args: (self._resource_pack_browser_dialog.set_search_error(*args) if self._resource_pack_browser_dialog is not None else None, self._shader_pack_browser_dialog.set_search_error(*args) if self._shader_pack_browser_dialog is not None else None))
+        self.content_pack_controller.versions_changed.connect(lambda *args: (self._resource_pack_browser_dialog.set_versions(*args) if self._resource_pack_browser_dialog is not None else None, self._shader_pack_browser_dialog.set_versions(*args) if self._shader_pack_browser_dialog is not None else None))
+        self.content_pack_controller.files_changed.connect(lambda *args: (self._resource_pack_browser_dialog.set_files(*args) if self._resource_pack_browser_dialog is not None else None, self._shader_pack_browser_dialog.set_files(*args) if self._shader_pack_browser_dialog is not None else None))
+        self.content_pack_controller.project_details_changed.connect(lambda *args: (self._resource_pack_browser_dialog.set_project_details(*args) if self._resource_pack_browser_dialog is not None else None, self._shader_pack_browser_dialog.set_project_details(*args) if self._shader_pack_browser_dialog is not None else None))
+        self.content_pack_controller.entries_changed.connect(lambda entries: self._content_pack_manager_dialog.set_entries(entries) if self._content_pack_manager_dialog is not None else None)
         self.content_pack_controller.installed.connect(self._content_pack_installed)
-        self.curseforge_manual_dialog.files_selected.connect(self._install_manual_curseforge_files)
-        self.curseforge_manual_dialog.cancelled.connect(self._on_manual_download_dialog_cancelled)
 
         self.launch_controller.progress_received.connect(self._on_progress)
         self.launch_controller.progress_received.connect(lambda _event: self.instance_controller.refresh_running())
@@ -713,19 +969,15 @@ class MainWindow(QMainWindow):
         self.launch_controller.cancel_requested.connect(self._on_launch_cancel_requested)
         self.launch_controller.launch_cancelled.connect(self._on_launch_cancelled)
         self.instance_controller.repair_progress.connect(self._on_progress)
-        self.instance_controller.repair_progress.connect(self.repair_center_dialog.set_progress)
+        self.instance_controller.repair_progress.connect(lambda p: self._repair_center_dialog.set_progress(p) if self._repair_center_dialog is not None else None)
         self.instance_controller.loader_progress.connect(self._on_progress)
         self.instance_controller.package_progress.connect(self._on_progress)
         self.instance_controller.repair_finished.connect(self._on_repair_finished)
-        self.instance_controller.repair_scan_finished.connect(self.repair_center_dialog.set_report)
-        self.instance_controller.repair_execution_finished.connect(self.repair_center_dialog.set_repair_result)
-        self.instance_controller.repair_center_failed.connect(self.repair_center_dialog.set_error)
+        self.instance_controller.repair_scan_finished.connect(lambda r: self._repair_center_dialog.set_report(r) if self._repair_center_dialog is not None else None)
+        self.instance_controller.repair_execution_finished.connect(lambda r: self._repair_center_dialog.set_repair_result(r) if self._repair_center_dialog is not None else None)
+        self.instance_controller.repair_center_failed.connect(lambda err: self._repair_center_dialog.set_error(err) if self._repair_center_dialog is not None else None)
 
-        self.optifine_dialog.state_requested.connect(self.optifine_controller.load_state)
-        self.optifine_dialog.install_requested.connect(self.optifine_controller.install)
-        self.optifine_dialog.repair_requested.connect(self.optifine_controller.repair)
-        self.optifine_dialog.uninstall_requested.connect(self.optifine_controller.uninstall)
-        self.optifine_controller.state_ready.connect(self.optifine_dialog.set_state)
+        self.optifine_controller.state_ready.connect(lambda s: self._optifine_dialog.set_state(s) if self._optifine_dialog is not None else None)
         self.optifine_controller.progress.connect(self._on_progress)
         self.optifine_controller.install_finished.connect(lambda result: self.instance_controller.refresh(result.instance_name))
         self.optifine_controller.repair_finished.connect(lambda result: self.instance_controller.refresh(result.instance_name))
@@ -746,7 +998,7 @@ class MainWindow(QMainWindow):
         self.task_runner.task_failed.connect(self._on_mclogs_task_failed)
         self.task_runner.task_settled.connect(self._on_task_settled)
         self.task_runner.busy_changed.connect(self._set_busy)
-        self.task_runner.busy_changed.connect(self.mod_manager_dialog.set_busy)
+        self.task_runner.busy_changed.connect(lambda b: self._mod_manager_dialog.set_busy(b) if self._mod_manager_dialog is not None else None)
         self.task_runner.task_rejected.connect(lambda message: QMessageBox.information(self, tr("MCW Launcher"), tr(message)))
 
         controllers = (
@@ -815,6 +1067,7 @@ class MainWindow(QMainWindow):
         self.logs_page.append(tr("Started {launcher_name}", launcher_name=LAUNCHER_NAME))
         if settings.get("auto_check_updates", True):
             QTimer.singleShot(2000, self._check_startup_update)
+            QTimer.singleShot(3500, self._check_hotfix_update)
         if settings.get("notify_legacy_cache_cleanup", True):
             retention_days = int(settings.get("unused_version_retention_days", 14) or 14)
             QTimer.singleShot(2500, lambda days=retention_days: self.storage_controller.probe(days))
@@ -2445,6 +2698,9 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, lambda: self.instance_controller.select(instance_name))
 
     def _apply_gui_settings(self, settings: dict) -> None:
+        initial = not getattr(self, "_initial_gui_applied", False)
+        self._initial_gui_applied = True
+        self._cached_gui_settings = dict(settings)
         requested_locale = str(settings.get("language", "en-US"))
         language_manager.reload()
         # Language changes are committed to settings but applied only after a
@@ -2460,31 +2716,50 @@ class MainWindow(QMainWindow):
         include_beta = bool(settings.get("modrinth_include_beta", False))
         include_alpha = bool(settings.get("modrinth_include_alpha", False))
         self.mods_page.set_channel_preferences(include_beta, include_alpha)
-        self.modrinth_mod_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.modrinth_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.curseforge_mod_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.curseforge_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.ftb_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.atlauncher_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.resource_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.shader_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
+        if self._modrinth_mod_dialog is not None:
+            self._modrinth_mod_dialog.set_channel_preferences(include_beta, include_alpha)
+        if self._modrinth_modpack_dialog is not None:
+            self._modrinth_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        if self._curseforge_mod_dialog is not None:
+            self._curseforge_mod_dialog.set_channel_preferences(include_beta, include_alpha)
+        if self._curseforge_modpack_dialog is not None:
+            self._curseforge_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        if self._ftb_modpack_dialog is not None:
+            self._ftb_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        if self._atlauncher_modpack_dialog is not None:
+            self._atlauncher_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        if self._resource_pack_browser_dialog is not None:
+            self._resource_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
+        if self._shader_pack_browser_dialog is not None:
+            self._shader_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
+        if self._mod_manager_dialog is not None:
+            self._mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
         show_content_descriptions = bool(settings.get("show_content_descriptions", False))
         self.mods_page.set_show_project_descriptions(show_content_descriptions)
-        self.modrinth_mod_dialog.set_show_project_descriptions(show_content_descriptions)
-        self.modrinth_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
-        self.curseforge_mod_dialog.set_show_project_descriptions(show_content_descriptions)
-        self.curseforge_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
-        self.ftb_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
-        self.atlauncher_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
-        self.resource_pack_browser_dialog.set_show_project_descriptions(show_content_descriptions)
-        self.shader_pack_browser_dialog.set_show_project_descriptions(show_content_descriptions)
+        if self._modrinth_mod_dialog is not None:
+            self._modrinth_mod_dialog.set_show_project_descriptions(show_content_descriptions)
+        if self._modrinth_modpack_dialog is not None:
+            self._modrinth_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
+        if self._curseforge_mod_dialog is not None:
+            self._curseforge_mod_dialog.set_show_project_descriptions(show_content_descriptions)
+        if self._curseforge_modpack_dialog is not None:
+            self._curseforge_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
+        if self._ftb_modpack_dialog is not None:
+            self._ftb_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
+        if self._atlauncher_modpack_dialog is not None:
+            self._atlauncher_modpack_dialog.set_show_project_descriptions(show_content_descriptions)
+        if self._resource_pack_browser_dialog is not None:
+            self._resource_pack_browser_dialog.set_show_project_descriptions(show_content_descriptions)
+        if self._shader_pack_browser_dialog is not None:
+            self._shader_pack_browser_dialog.set_show_project_descriptions(show_content_descriptions)
         curseforge_available = bool(settings.get("curseforge_gateway_urls", ()))
         self.instances_page.browse_curseforge_modpacks_button.setVisible(curseforge_available)
-        self.mod_manager_dialog.curseforge_button.setVisible(curseforge_available)
+        if self._mod_manager_dialog is not None:
+            self._mod_manager_dialog.curseforge_button.setVisible(curseforge_available)
         self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")), bool(settings.get("show_static_text", False)), str(settings.get("accent_mode", "theme")), str(settings.get("accent_color", "#8ed35b")), str(settings.get("text_color_mode", "theme")), str(settings.get("text_color", "#f4f4f4")))
         self.motion_runtime.apply(settings.get("motion_mode", "full"))
-        self._retranslate_ui()
+        if not initial:
+            self._retranslate_ui()
 
         if requested_locale == self._session_locale:
             self._pending_restart_locale = ""
@@ -2520,15 +2795,22 @@ class MainWindow(QMainWindow):
 
     def _set_modrinth_channel_preferences(self, include_beta: bool, include_alpha: bool) -> None:
         self.mods_page.set_channel_preferences(include_beta, include_alpha)
-        self.modrinth_mod_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.modrinth_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.curseforge_mod_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.curseforge_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.ftb_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.atlauncher_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.resource_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.shader_pack_browser_dialog.set_channel_preferences(include_beta, include_alpha)
-        self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
+        if hasattr(self, "_cached_gui_settings"):
+            self._cached_gui_settings["modrinth_include_beta"] = include_beta
+            self._cached_gui_settings["modrinth_include_alpha"] = include_alpha
+        for dialog in (
+            self._modrinth_mod_dialog,
+            self._modrinth_modpack_dialog,
+            self._curseforge_mod_dialog,
+            self._curseforge_modpack_dialog,
+            self._ftb_modpack_dialog,
+            self._atlauncher_modpack_dialog,
+            self._resource_pack_browser_dialog,
+            self._shader_pack_browser_dialog,
+            self._mod_manager_dialog,
+        ):
+            if dialog is not None:
+                dialog.set_channel_preferences(include_beta, include_alpha)
         self.gui_settings_controller.set_modrinth_channels(include_beta, include_alpha)
 
     def _run_first_run_setup(self) -> None:
@@ -2641,14 +2923,74 @@ class MainWindow(QMainWindow):
         self.toast_manager.show(
             tr(
                 "hotfix.applied_restart_prompt",
-                f"Hotfix v{target_version} applied. Please restart launcher to take full effect.",
                 version=target_version,
             ),
             "info",
-            tr("hotfix.update_title", "Hotfix Update"),
+            tr("hotfix.update_title"),
         )
         if hasattr(self, "launcher_settings_page"):
             self.launcher_settings_page._refresh_hotfix_status_label()
+        reply = QMessageBox.question(
+            self,
+            tr("hotfix.update_title"),
+            tr("hotfix.applied_restart_prompt", version=target_version),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self._restart_launcher()
+
+    def _check_hotfix_update(self) -> None:
+        def _worker() -> None:
+            try:
+                from mcw_core.api.update.hotfix_manager import HotfixManager
+                manager = HotfixManager()
+                entry = manager.check_for_hotfix(VERSION_ID, timeout=4.0)
+                if entry is not None:
+                    QTimer.singleShot(0, lambda: self._prompt_hotfix_install(entry))
+            except Exception:
+                pass
+
+        threading.Thread(target=_worker, daemon=True, name="hotfix-check").start()
+
+    def _prompt_hotfix_install(self, entry: object) -> None:
+        if self._closing:
+            return
+        version = str(getattr(entry, "target_version", "") or getattr(entry, "release_tag", "") or "update")
+        reply = QMessageBox.question(
+            self,
+            tr("hotfix.update_title"),
+            tr("hotfix.available_prompt", version=version),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self._apply_hotfix_entry(entry)
+
+    def _apply_hotfix_entry(self, entry: object) -> None:
+        version = str(getattr(entry, "target_version", "") or getattr(entry, "release_tag", "") or "update")
+        self.logs_page.append(tr("hotfix.installing", version=version))
+
+        def _worker() -> None:
+            try:
+                from mcw_core.api.update.hotfix_manager import HotfixManager
+                manager = HotfixManager()
+                manager.apply_hotfix(entry)
+            except Exception as exc:
+                err_msg = str(exc)
+                QTimer.singleShot(0, lambda: self._on_hotfix_failed(version, err_msg))
+
+        threading.Thread(target=_worker, daemon=True, name="hotfix-apply").start()
+
+    def _on_hotfix_failed(self, version: str, error: str) -> None:
+        if self._closing:
+            return
+        self.logs_page.append(tr("hotfix.install_failed", version=version, error=error))
+        QMessageBox.warning(
+            self,
+            tr("hotfix.update_title"),
+            tr("hotfix.install_failed", version=version, error=error),
+        )
 
     def _retranslate_ui(self) -> None:
         retranslate_widget_tree(self)
@@ -2667,24 +3009,31 @@ class MainWindow(QMainWindow):
             self.launcher_settings_page,
             self.launch_control,
             self.right_panel,
-            self.mod_manager_dialog,
-            self.modrinth_mod_dialog,
-            self.modrinth_modpack_dialog,
-            self.curseforge_mod_dialog,
-            self.curseforge_modpack_dialog,
-            self.ftb_modpack_dialog,
-            self.atlauncher_modpack_dialog,
-            self.content_pack_manager_dialog,
-            self.content_library_dialog,
-            self.resource_pack_browser_dialog,
-            self.shader_pack_browser_dialog,
-            self.curseforge_manual_dialog,
-            self.portable_manual_dialog,
-            self.repair_center_dialog,
         ):
             retranslate_dynamic = getattr(widget, "retranslate_dynamic", None)
             if callable(retranslate_dynamic):
                 retranslate_dynamic()
+
+        for dialog in (
+            self._mod_manager_dialog,
+            self._modrinth_mod_dialog,
+            self._modrinth_modpack_dialog,
+            self._curseforge_mod_dialog,
+            self._curseforge_modpack_dialog,
+            self._ftb_modpack_dialog,
+            self._atlauncher_modpack_dialog,
+            self._content_pack_manager_dialog,
+            self._content_library_dialog,
+            self._resource_pack_browser_dialog,
+            self._shader_pack_browser_dialog,
+            self._curseforge_manual_dialog,
+            self._portable_manual_dialog,
+            self._repair_center_dialog,
+        ):
+            if dialog is not None:
+                retranslate_dynamic = getattr(dialog, "retranslate_dynamic", None)
+                if callable(retranslate_dynamic):
+                    retranslate_dynamic()
         self.theme_runtime.reapply_assets(self)
 
     def _track_progress_task(self, task_id: str, message: str) -> None:
@@ -2764,8 +3113,8 @@ class MainWindow(QMainWindow):
             MainWindow._track_progress_task(self, task_id, message)
             MainWindow._show_tracked_task_running(self, task_id, message)
 
-        if task_id == "mods.update.check":
-            self.mod_manager_dialog.set_update_checking(True)
+        if task_id == "mods.update.check" and self._mod_manager_dialog is not None:
+            self._mod_manager_dialog.set_update_checking(True)
         if task_id.startswith("modpack."):
             self.instances_page.set_modpack_busy(True)
         if task_id.startswith("update."):
@@ -2773,27 +3122,37 @@ class MainWindow(QMainWindow):
             self.launcher_settings_page.set_update_status(message)
         if task_id.startswith("modrinth."):
             self._modrinth_tasks.add(task_id)
-            self.modrinth_mod_dialog.set_busy(True)
-            self.modrinth_modpack_dialog.set_busy(True)
+            if self._modrinth_mod_dialog is not None:
+                self._modrinth_mod_dialog.set_busy(True)
+            if self._modrinth_modpack_dialog is not None:
+                self._modrinth_modpack_dialog.set_busy(True)
         if task_id.startswith("mod_catalog."):
             self._mod_catalog_tasks.add(task_id)
             self.mods_page.set_busy(True)
         if task_id.startswith("ftb."):
             self._ftb_tasks.add(task_id)
-            self.ftb_modpack_dialog.set_busy(True)
+            if self._ftb_modpack_dialog is not None:
+                self._ftb_modpack_dialog.set_busy(True)
         if task_id.startswith("atlauncher."):
             self._atlauncher_tasks.add(task_id)
-            self.atlauncher_modpack_dialog.set_busy(True)
+            if self._atlauncher_modpack_dialog is not None:
+                self._atlauncher_modpack_dialog.set_busy(True)
         if task_id.startswith("content."):
             self._content_tasks.add(task_id)
-            self.content_pack_manager_dialog.set_busy(True)
-            self.content_library_dialog.set_busy(True)
-            self.resource_pack_browser_dialog.set_busy(True)
-            self.shader_pack_browser_dialog.set_busy(True)
+            if self._content_pack_manager_dialog is not None:
+                self._content_pack_manager_dialog.set_busy(True)
+            if self._content_library_dialog is not None:
+                self._content_library_dialog.set_busy(True)
+            if self._resource_pack_browser_dialog is not None:
+                self._resource_pack_browser_dialog.set_busy(True)
+            if self._shader_pack_browser_dialog is not None:
+                self._shader_pack_browser_dialog.set_busy(True)
         if task_id.startswith("curseforge."):
             self._curseforge_tasks.add(task_id)
-            self.curseforge_mod_dialog.set_busy(True)
-            self.curseforge_modpack_dialog.set_busy(True)
+            if self._curseforge_mod_dialog is not None:
+                self._curseforge_mod_dialog.set_busy(True)
+            if self._curseforge_modpack_dialog is not None:
+                self._curseforge_modpack_dialog.set_busy(True)
             if ".catalog." in task_id or task_id.endswith(".catalog"):
                 self._curseforge_catalog_tasks.add(task_id)
                 self.mods_page.set_busy(True)
@@ -2847,19 +3206,20 @@ class MainWindow(QMainWindow):
     def _on_task_completed(self, task_id: str, _result: object) -> None:
         active_ids = set(getattr(self.task_runner, "active_task_ids", ()))
 
-        if task_id == "curseforge.install.manual.batch":
-            self.curseforge_manual_dialog.set_import_busy(task_id in active_ids)
-        elif task_id == "modrinth.install.manual.batch":
-            self.modrinth_manual_dialog.set_import_busy(task_id in active_ids)
+        if task_id == "curseforge.install.manual.batch" and self._curseforge_manual_dialog is not None:
+            self._curseforge_manual_dialog.set_import_busy(task_id in active_ids)
+        elif task_id == "modrinth.install.manual.batch" and self._modrinth_manual_dialog is not None:
+            self._modrinth_manual_dialog.set_import_busy(task_id in active_ids)
         if task_id == self.launch_controller.TASK_ID and task_id not in active_ids:
             self._set_launch_active(False)
             if self._manual_launch_provider:
-                dialog = self.curseforge_manual_dialog if self._manual_launch_provider == "curseforge" else self.modrinth_manual_dialog
-                dialog.close()
+                dialog = self._curseforge_manual_dialog if self._manual_launch_provider == "curseforge" else self._modrinth_manual_dialog
+                if dialog is not None:
+                    dialog.close()
                 self._manual_launch_provider = ""
                 self._manual_launch_lock_token = ""
-        if task_id == "mods.update.check":
-            self.mod_manager_dialog.set_update_checking(task_id in active_ids)
+        if task_id == "mods.update.check" and self._mod_manager_dialog is not None:
+            self._mod_manager_dialog.set_update_checking(task_id in active_ids)
 
         modpack_busy = any(value.startswith("modpack.") for value in active_ids)
         update_busy = any(value.startswith("update.") for value in active_ids)
@@ -2881,22 +3241,32 @@ class MainWindow(QMainWindow):
 
         if task_id.startswith("modrinth."):
             busy = bool(self._modrinth_tasks)
-            self.modrinth_mod_dialog.set_busy(busy)
-            self.modrinth_modpack_dialog.set_busy(busy)
+            if self._modrinth_mod_dialog is not None:
+                self._modrinth_mod_dialog.set_busy(busy)
+            if self._modrinth_modpack_dialog is not None:
+                self._modrinth_modpack_dialog.set_busy(busy)
         if task_id.startswith("ftb."):
-            self.ftb_modpack_dialog.set_busy(bool(self._ftb_tasks))
+            if self._ftb_modpack_dialog is not None:
+                self._ftb_modpack_dialog.set_busy(bool(self._ftb_tasks))
         if task_id.startswith("atlauncher."):
-            self.atlauncher_modpack_dialog.set_busy(bool(self._atlauncher_tasks))
+            if self._atlauncher_modpack_dialog is not None:
+                self._atlauncher_modpack_dialog.set_busy(bool(self._atlauncher_tasks))
         if task_id.startswith("content."):
             busy = bool(self._content_tasks)
-            self.content_pack_manager_dialog.set_busy(busy)
-            self.content_library_dialog.set_busy(busy)
-            self.resource_pack_browser_dialog.set_busy(busy)
-            self.shader_pack_browser_dialog.set_busy(busy)
+            if self._content_pack_manager_dialog is not None:
+                self._content_pack_manager_dialog.set_busy(busy)
+            if self._content_library_dialog is not None:
+                self._content_library_dialog.set_busy(busy)
+            if self._resource_pack_browser_dialog is not None:
+                self._resource_pack_browser_dialog.set_busy(busy)
+            if self._shader_pack_browser_dialog is not None:
+                self._shader_pack_browser_dialog.set_busy(busy)
         if task_id.startswith("curseforge."):
             busy = bool(self._curseforge_tasks)
-            self.curseforge_mod_dialog.set_busy(busy)
-            self.curseforge_modpack_dialog.set_busy(busy)
+            if self._curseforge_mod_dialog is not None:
+                self._curseforge_mod_dialog.set_busy(busy)
+            if self._curseforge_modpack_dialog is not None:
+                self._curseforge_modpack_dialog.set_busy(busy)
 
         if task_id.startswith("mod_catalog.") or task_id.startswith("curseforge."):
             self.mods_page.set_busy(self.task_runner.is_busy or bool(self._mod_catalog_tasks) or bool(self._curseforge_catalog_tasks))
@@ -2906,7 +3276,11 @@ class MainWindow(QMainWindow):
         if task_id == self.instance_controller.CREATE_TASK_ID:
             self._pending_mod_install_after_create = None
         if task_id == "mods.update.check":
-            self.mod_manager_dialog.set_update_error(str(error))
+            dialog = getattr(self, "_mod_manager_dialog", None)
+            if dialog is None and not hasattr(self, "_mod_manager_dialog"):
+                dialog = getattr(self, "mod_manager_dialog", None)
+            if dialog is not None:
+                dialog.set_update_error(str(error))
         if task_id == self.launch_controller.TASK_ID:
             if revision is None:
                 return
@@ -3077,8 +3451,10 @@ class MainWindow(QMainWindow):
         self.launch_control.set_busy(busy)
         self.right_panel.set_busy(busy)
         if not self._content_tasks:
-            self.content_pack_manager_dialog.set_busy(busy)
-            self.content_library_dialog.set_busy(busy)
+            if self._content_pack_manager_dialog is not None:
+                self._content_pack_manager_dialog.set_busy(busy)
+            if self._content_library_dialog is not None:
+                self._content_library_dialog.set_busy(busy)
 
     def _export_diagnostics(self) -> None:
         suggested = Paths.diagnostics_default_path()

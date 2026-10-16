@@ -2302,6 +2302,10 @@
     "account.microsoft.device_code.open_link": "Mở liên kết",
     "hotfix.update_title": "Cập nhật Hotfix",
     "hotfix.applied_restart_prompt": "Đã áp dụng bản vá hotfix v{version}. Vui lòng khởi động lại launcher để áp dụng đầy đủ.",
+    "hotfix.checking": "Đang kiểm tra bản vá lỗi hotfix...",
+    "hotfix.available_prompt": "Đã có bản vá lỗi hotfix mới (v{version}). Bạn có muốn cập nhật ngay bây giờ không?",
+    "hotfix.installing": "Đang tải và cài đặt bản vá lỗi hotfix v{version}...",
+    "hotfix.install_failed": "Cài đặt bản vá lỗi hotfix v{version} thất bại: {error}",
     "restart.failed_title": "Khởi động lại thất bại",
     "restart.failed_message": "Không thể khởi động lại launcher."
   },

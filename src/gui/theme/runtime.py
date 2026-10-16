@@ -152,9 +152,23 @@ class ThemeRuntime:
         self._accent_mode = "theme"
         self._accent_color = "#8ed35b"
         self._text_color_mode = "theme"
-        self._text_color = "#f4f4f4"
+        self._applied_signature: tuple[str, str, bool, str, str, str, str] | None = None
 
     def apply(self, root: QWidget, base_stylesheet: str, theme_id: str, show_static_text: bool = False, accent_mode: str = "theme", accent_color: str = "#8ed35b", text_color_mode: str = "theme", text_color: str = "#f4f4f4") -> str:
+        current_signature = (
+            str(base_stylesheet),
+            str(theme_id),
+            bool(show_static_text),
+            str(accent_mode or "theme"),
+            str(accent_color or "#8ed35b"),
+            str(text_color_mode or "theme"),
+            str(text_color or "#f4f4f4"),
+        )
+        if self._applied_signature == current_signature:
+            self.apply_assets(root)
+            return self.manager.current.theme_id
+
+        self._applied_signature = current_signature
         self._base_stylesheet = str(base_stylesheet)
         self._show_static_text = bool(show_static_text)
         self.manager.reload()
@@ -170,19 +184,24 @@ class ThemeRuntime:
             self.accent_runtime.apply_application_palette(application)
         stylesheet = self.build_stylesheet(self._base_stylesheet)
         if application is not None:
-            application.setStyleSheet(stylesheet)
+            if application.styleSheet() != stylesheet:
+                application.setStyleSheet(stylesheet)
         else:
-            root.setStyleSheet(stylesheet)
+            if root.styleSheet() != stylesheet:
+                root.setStyleSheet(stylesheet)
         self.apply_assets(root)
-        # A single polish/repaint pass prevents stale backing-store regions after
-        # runtime theme changes and scroll operations on Windows.
-        if application is not None:
-            application.processEvents()
-        for widget in (root, *root.findChildren(QWidget)):
-            widget.style().unpolish(widget)
-            widget.style().polish(widget)
-            widget.update()
-        root.update()
+        # A polish/repaint pass is only needed when dynamically switching themes on already-visible widgets.
+        is_visible = getattr(root, "isVisible", None)
+        if callable(is_visible) and is_visible():
+            if application is not None:
+                application.processEvents()
+            for widget in (root, *root.findChildren(QWidget)):
+                widget.style().unpolish(widget)
+                widget.style().polish(widget)
+                widget.update()
+        root_updater = getattr(root, "update", None)
+        if callable(root_updater):
+            root_updater()
         return self.manager.current.theme_id
 
     def reapply_assets(self, root: QWidget) -> None:
@@ -230,8 +249,9 @@ class ThemeRuntime:
                 self._apply_label_pixmap(widget)
                 self._apply_static_text(widget)
         icon_path = self.manager.resolve_asset("icon.app")
-        window = root.window()
-        if icon_path is not None:
+        window_getter = getattr(root, "window", None)
+        window = window_getter() if callable(window_getter) else root
+        if icon_path is not None and window is not None and hasattr(window, "setWindowIcon"):
             window.setWindowIcon(QIcon(str(icon_path)))
 
     def _apply_button_icon(self, button: QPushButton) -> None:
