@@ -133,7 +133,7 @@ mcw-launcher/
 - [Hệ thống Hotfix CDN](docs/HOTFIX_SYSTEM.md)
 - [Hướng dẫn tạo Theme tùy chỉnh](docs/THEME_CREATION_GUIDE.md)
 - [Lịch sử thay đổi chi tiết (Changelog)](CHANGELOG.md)
-- [Ghi chú bản phát hành v1.8.1](docs/releases/v1.8.1.md)
+- [Ghi chú bản phát hành v1.8.3](docs/releases/v1.8.3.md)
 
 ---
 
