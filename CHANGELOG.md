@@ -2,6 +2,26 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.3-beta.3] - 2026-10-17
+
+### Added
+- **Giới hạn Chơi nhanh (Quick Play) theo chuẩn Minecraft 1.20+**:
+  - Tính năng Chơi nhanh (`Quick Play`) chỉ hỗ trợ chính thức từ Minecraft 1.20 trở lên (Mojang bổ sung từ snapshot 23w14a / release 1.20).
+  - Tự động ẩn nút Chơi nhanh (`quick_play_button`) trên thanh điều khiển chính của `InstanceWorkspacePage` đối với các instance chạy phiên bản cũ hơn (< 1.20).
+  - Tự động ẩn nút Chơi (`play_button`) trên từng thẻ thế giới (`WorldCardWidget`) thuộc tab Worlds nếu instance không hỗ trợ Quick Play.
+  - Bộ xây dựng tham số game (`LauncherManager.build`) chủ động bỏ qua tham số `--quickPlaySingleplayer` / `--quickPlayMultiplayer` nếu phiên bản Minecraft chạy dưới 1.20.
+
+### Changed
+- **Cải thiện màn hình Loading (`StartupSplash`)**:
+  - Chuyển cờ loại cửa sổ sang `Qt.WindowType.Window` tiêu chuẩn thay vì `Qt.WindowType.Tool`, loại bỏ hiện tượng bị hệ điều hành Windows tự động đẩy cửa sổ loading xuống layer đáy cùng (nằm sau mọi ứng dụng khác).
+  - Tự động gọi `raise_()` khi hiển thị giúp màn hình loading luôn xuất hiện rõ ràng, dễ nhìn ở trung tâm màn hình trong lúc launcher khởi động.
+  - Không gán cờ `WindowStaysOnTopHint`, cho phép người dùng thoải mái chuyển đổi cửa sổ và thao tác đa nhiệm với các ứng dụng khác mà không bị che khuất.
+
+### Fixed
+- **Cô lập hoàn toàn Hotfix trong môi trường Test tự động**:
+  - Bổ sung kiểm tra `if "pytest" in sys.modules: return` trong các callback xử lý thông báo và modal restart của `HotfixManager` trong `MainWindow`, triệt tiêu hoàn toàn hiện tượng test runner bị treo chờ tương tác người dùng.
+  - Làm sạch danh sách callbacks toàn cục `HotfixManager._on_applied_callbacks` trước và sau mỗi unit test.
+
 ## [1.8.3-beta.2] - 2026-10-17
 
 ### Added

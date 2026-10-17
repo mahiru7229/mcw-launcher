@@ -212,6 +212,7 @@ def test_workspace_favorite_action_emits_selected_state_change(gui_app):
 
 def test_workspace_hub_tabs_and_quick_play(gui_app, tmp_path):
     page = InstanceWorkspacePage()
+    page.show()
     inst_dir = tmp_path / "QuickPlayInstance"
     inst_dir.mkdir()
     instance = make_instance("QuickPlayInstance")
@@ -226,8 +227,9 @@ def test_workspace_hub_tabs_and_quick_play(gui_app, tmp_path):
 
     page.set_instances([instance], instance.name)
 
-    # By default, no worlds exist -> quick_play_button disabled
+    # By default, no worlds exist -> quick_play_button disabled, but visible for 1.20+
     assert page.quick_play_button.isEnabled() is False
+    assert page.quick_play_button.isVisible() is True
 
     # Listen to quick_play_requested
     emitted: list[str] = []
@@ -236,6 +238,33 @@ def test_workspace_hub_tabs_and_quick_play(gui_app, tmp_path):
     # Emitting from worlds_tab directly
     page.worlds_tab.quick_play_requested.emit("SurvivalSave")
     assert emitted == ["SurvivalSave"]
+
+
+def test_workspace_quick_play_hidden_for_versions_below_1_20(gui_app):
+    page = InstanceWorkspacePage()
+    page.show()
+
+    # Initially without instances, quick play button is hidden
+    assert page.quick_play_button.isVisible() is False
+
+    # Instance with 1.16.5 (< 1.20)
+    old_inst = make_instance("OldInst", version="1.16.5")
+    page.set_instances([old_inst], old_inst.name)
+    assert page.quick_play_button.isVisible() is False
+
+    # Instance with 1.19.4 (< 1.20)
+    inst_119 = make_instance("Inst119", version="1.19.4")
+    page.set_instances([inst_119], inst_119.name)
+    assert page.quick_play_button.isVisible() is False
+
+    # Switching to 1.20+ instance
+    new_inst = make_instance("ModernInst", version="1.20.4")
+    page.set_instances([old_inst, new_inst], new_inst.name)
+    assert page.quick_play_button.isVisible() is True
+
+    # Switching back to old instance hides the button
+    page.select_instance(old_inst.name)
+    assert page.quick_play_button.isVisible() is False
 
 
 def test_workspace_instance_switching_animation_lifecycle(gui_app, tmp_path):

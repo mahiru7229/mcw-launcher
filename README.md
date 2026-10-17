@@ -12,17 +12,17 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.8.3--beta.2-orange" alt="v1.8.3-beta.2">
+  <img src="https://img.shields.io/badge/version-v1.8.3--beta.3-orange" alt="v1.8.3-beta.3">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!NOTE]
-> **Phiên bản mới nhất (v1.8.3-beta.2)**:
+> **Phiên bản mới nhất (v1.8.3-beta.3)**:
+> - **Giới hạn Chơi nhanh (Quick Play) đúng chuẩn Minecraft 1.20+**: Tính năng Chơi nhanh chỉ hiển thị và hỗ trợ cho các instance từ Minecraft 1.20 trở lên; tự động ẩn nút Chơi nhanh trên thanh công cụ và thẻ thế giới nếu instance chạy phiên bản cũ hơn (< 1.20).
+> - **Màn hình Loading (`StartupSplash`) thân thiện, hiển thị tự nhiên**: Sử dụng layer cửa sổ tiêu chuẩn (`Qt.WindowType.Window`), khắc phục triệt để lỗi màn hình loading bị Windows tự động đẩy xuống layer đáy (bị che khuất phía sau mọi cửa sổ), giúp người dùng dễ dàng theo dõi tiến trình khởi động mà vẫn thoải mái đa nhiệm mà không lo bị chiếm quyền cửa sổ trên cùng.
 > - **Thiết lập tài khoản trong First Run Setup**: Hỗ trợ tạo tài khoản Offline và đăng nhập tài khoản Microsoft trực tiếp từ trình hướng dẫn khởi chạy lần đầu; mặc định chọn Java luôn là `Auto`.
-> - **Triệt tiêu hiện tượng đơ UI (Freezing) trên Instance Workspace**: Caching `_hub_loaded_instance_key` và triển khai Lazy-loading cho 3 tab Worlds/Screenshots/Live Logs/Mods; ngắt timer đọc log khi tab ẩn.
-> - **Giảm 50% I/O đĩa khi làm mới danh sách Instance**: Tái sử dụng danh sách `instances` đã nạp giữa `list()` và `list_health()`, loại bỏ đọc lặp `instance.json`.
 > - **Bảo vệ thao tác lăn chuột (Wheel Guard)**: Bộ lọc `WheelBlockFilter` ngăn chặn việc cuộn trang làm thay đổi nhầm giá trị của các `QSpinBox`, `QComboBox`, `QSlider`.
-> - **Khắc phục kết nối Microsoft OAuth & Điều chỉnh giao diện**: Cải thiện modal parenting của Device Code Dialog, hỗ trợ ưu tiên IPv4 chống timeout mạng dual-stack IPv6, căn chỉnh hiển thị nút copy và header.
+> - **Cô lập hoàn toàn Hotfix trong môi trường Test**: Ngăn ngừa hiện tượng modal dialog xác nhận restart làm đóng băng luồng test CI tự động.
 
 > [!IMPORTANT]
 > **Dự án liên quan & Nguồn tham khảo:**

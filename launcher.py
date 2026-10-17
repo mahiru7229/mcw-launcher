@@ -146,6 +146,8 @@ def main() -> None:
     app.aboutToQuit.connect(network_session.close)
     splash = StartupSplash()
     splash.show()
+    splash.raise_()
+    splash.activateWindow()
     splash.update_progress(2, "startup.starting")
     startup_stage_key = "startup.starting"
 

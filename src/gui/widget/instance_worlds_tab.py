@@ -41,10 +41,11 @@ class WorldCardWidget(QFrame):
     quick_play_clicked = Signal(str)
     action_completed = Signal()
 
-    def __init__(self, instance_dir: Path, world: WorldInfo, parent=None) -> None:
+    def __init__(self, instance_dir: Path, world: WorldInfo, quick_play_supported: bool = True, parent=None) -> None:
         super().__init__(parent)
         self.instance_dir = instance_dir
         self.world = world
+        self.quick_play_supported = quick_play_supported
         self.setObjectName("WorldCard")
         self.setStyleSheet(
             "#WorldCard { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 6px; } "
@@ -127,6 +128,7 @@ class WorldCardWidget(QFrame):
         self.play_button = set_theme_icon(QPushButton(tr("world.action.play")), "icon.action.launch")
         self.play_button.setObjectName("PrimaryButton")
         self.play_button.clicked.connect(lambda: self.quick_play_clicked.emit(self.world.folder_name))
+        self.play_button.setVisible(self.quick_play_supported)
         btn_layout.addWidget(self.play_button)
 
         self.backup_button = set_theme_icon(QPushButton(tr("world.action.backup")), "icon.action.save")
@@ -265,11 +267,13 @@ class InstanceWorldsTab(QWidget):
             return
 
         self.empty_label.setVisible(False)
+        quick_play_supported = WorldManager.is_quick_play_supported(str(getattr(self._instance, "version_id", "")))
         for world in self._worlds:
-            card = WorldCardWidget(instance_dir, world, self)
+            card = WorldCardWidget(instance_dir, world, quick_play_supported=quick_play_supported, parent=self)
             card.quick_play_clicked.connect(self.quick_play_requested.emit)
             card.action_completed.connect(self.reload)
             self.cards_layout.insertWidget(self.cards_layout.count() - 1, card)
+            card.show()
 
     @property
     def latest_world(self) -> WorldInfo | None:

@@ -32,7 +32,11 @@ def test_startup_splash_clamps_progress_and_can_show_failure(gui_app):
     splash.close()
 
 
-def test_startup_splash_does_not_stay_on_top(gui_app):
+def test_startup_splash_does_not_stay_on_top_or_bottom(gui_app):
     splash = StartupSplash()
-    assert not bool(splash.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+    flags = splash.windowFlags()
+    assert not bool(flags & Qt.WindowType.WindowStaysOnTopHint)
+    assert not bool(flags & Qt.WindowType.WindowStaysOnBottomHint)
+    assert (flags & Qt.WindowType.WindowType_Mask) == Qt.WindowType.Window
+    assert (flags & Qt.WindowType.WindowType_Mask) != Qt.WindowType.Tool
     splash.close()

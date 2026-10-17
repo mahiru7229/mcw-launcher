@@ -718,3 +718,47 @@ def test_build_places_runtime_jvm_arguments_before_classpath_and_main(monkeypatc
         "--username",
         "Steve",
     ]
+
+
+def test_build_quick_play_arguments_supported_on_1_20_plus(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    version = make_version()
+    settings = make_settings()
+    account = make_account()
+
+    monkeypatch.setattr(Paths, "client", lambda _version: tmp_path / "client.jar")
+    monkeypatch.setattr(Paths, "libraries", lambda: tmp_path / "libraries")
+    monkeypatch.setattr(ClasspathBuilder, "build", lambda *_args: "classpath")
+    monkeypatch.setattr(ArgumentBuilder, "build", lambda *_args: (["-Xmx2G"], ["--username", "Steve"]))
+
+    result = LauncherManager.build(
+        version=version,
+        context={},
+        settings=settings,
+        account=account,
+        quick_play_singleplayer="ModernSave",
+    )
+    assert "--quickPlaySingleplayer" in result
+    assert "ModernSave" in result
+
+
+def test_build_quick_play_arguments_omitted_below_1_20(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    version = make_version()
+    version.id = "1.16.5"
+    settings = make_settings()
+    account = make_account()
+
+    monkeypatch.setattr(Paths, "client", lambda _version: tmp_path / "client.jar")
+    monkeypatch.setattr(Paths, "libraries", lambda: tmp_path / "libraries")
+    monkeypatch.setattr(ClasspathBuilder, "build", lambda *_args: "classpath")
+    monkeypatch.setattr(ArgumentBuilder, "build", lambda *_args: (["-Xmx2G"], ["--username", "Steve"]))
+
+    result = LauncherManager.build(
+        version=version,
+        context={},
+        settings=settings,
+        account=account,
+        quick_play_singleplayer="OldSave",
+    )
+    assert "--quickPlaySingleplayer" not in result
+    assert "OldSave" not in result
+

@@ -11,8 +11,36 @@ import zipfile
 from src.models.world.world_info import WorldInfo
 
 
+def is_quick_play_supported(version_str: str) -> bool:
+    """Return True if the Minecraft version supports Java Edition Quick Play (>= 1.20)."""
+    if not version_str or not isinstance(version_str, str):
+        return False
+    version = version_str.strip()
+    match = re.match(r"^(\d+)\.(\d+)(?:\.(\d+))?", version)
+    if match:
+        major = int(match.group(1))
+        minor = int(match.group(2))
+        if major > 1:
+            return True
+        if major == 1:
+            return minor >= 20
+        return False
+    snapshot_match = re.match(r"^(\d{2})w(\d{2})[a-z]$", version)
+    if snapshot_match:
+        year = int(snapshot_match.group(1))
+        week = int(snapshot_match.group(2))
+        if year > 23:
+            return True
+        if year == 23:
+            return week >= 14
+        return False
+    return False
+
+
 class WorldManager:
     """Manages singleplayer saves, NBT metadata extraction, backup, and restore."""
+
+    is_quick_play_supported = staticmethod(is_quick_play_supported)
 
     GAME_MODES = {
         0: "survival",

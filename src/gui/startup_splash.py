@@ -18,7 +18,7 @@ class StartupSplash(QWidget):
     MINIMUM_VISIBLE_MS = 450
 
     def __init__(self) -> None:
-        super().__init__(None, Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
+        super().__init__(None, Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setObjectName("StartupSplash")
         self.setFixedSize(520, 278)
@@ -156,6 +156,10 @@ class StartupSplash(QWidget):
         x = available.left() + max(0, (available.width() - self.width()) // 2)
         y = available.top() + max(0, (available.height() - self.height()) // 2)
         self.move(x, y)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self.raise_()
 
     def update_progress(self, percent: int, message_key: str, detail_key: str = "startup.please_wait") -> None:
         if self._failed:

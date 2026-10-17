@@ -30,10 +30,13 @@ class LauncherManager:
         )
 
         jvm_args, game_args = ArgumentBuilder.build(version, context, settings, account)
-        if quick_play_singleplayer:
-            game_args.extend(["--quickPlaySingleplayer", str(quick_play_singleplayer).strip()])
-        elif quick_play_multiplayer:
-            game_args.extend(["--quickPlayMultiplayer", str(quick_play_multiplayer).strip()])
+        game_version = ArgumentBuilder.extract_game_version(version)
+        from src.core.minecraft.world_manager import is_quick_play_supported
+        if is_quick_play_supported(game_version):
+            if quick_play_singleplayer:
+                game_args.extend(["--quickPlaySingleplayer", str(quick_play_singleplayer).strip()])
+            elif quick_play_multiplayer:
+                game_args.extend(["--quickPlayMultiplayer", str(quick_play_multiplayer).strip()])
         game_args = GameArgumentNormalizer.normalize(game_args, context)
         jvm_args = ForgeLaunchCommandManager.prepare(version, jvm_args, client_path=Paths.client(version), library_directory=Paths.libraries())
         if runtime_jvm_arguments:

@@ -1,11 +1,14 @@
 MCW Launcher release verification
-Version: 1.8.3-beta.2
+Version: 1.8.3-beta.3
 Channel: beta
 
 Beta checks in this build workspace:
-- MCW Core & GUI regression suite: 2162 passed, 10 skipped
+- MCW Core & GUI regression suite: 2168 passed, 10 skipped
 - 100% Core & GUI AST boundary & JSON-RPC 2.0 checks (direct, HTTP/SSE, Stdio Sidecar): passed
-- Complete GUI test suite: 295 passed in 25.64s
+- Complete GUI test suite: 298 passed in 26.20s
+- Quick Play restricted to Minecraft 1.20+ with automatic button hiding: passed
+- StartupSplash standard Window layer and raise_ behavior (not at bottom layer): passed
+- Hotfix test suite modal isolation without blocking test runner: passed
 - Account setup in First Run Setup with Auto Java default: passed
 - Instance Workspace hub tab lazy-loading & UI freeze elimination: passed
 - Deduplicate instance.json disk reads in list & health scan: passed

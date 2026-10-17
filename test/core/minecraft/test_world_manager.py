@@ -137,3 +137,39 @@ def test_world_manager_import_world(tmp_path: Path) -> None:
     imported_folder = WorldManager.import_world(instance_dir, zip_path)
     assert (instance_dir / "saves" / imported_folder).is_dir()
     assert (instance_dir / "saves" / imported_folder / "map_meta.txt").read_text(encoding="utf-8") == "map content"
+
+
+def test_is_quick_play_supported() -> None:
+    from mcw_core.api.minecraft.world_manager import is_quick_play_supported
+
+    # 1.20+ versions
+    assert is_quick_play_supported("1.20") is True
+    assert is_quick_play_supported("1.20.1") is True
+    assert is_quick_play_supported("1.20.4") is True
+    assert is_quick_play_supported("1.21") is True
+    assert is_quick_play_supported("1.21.1") is True
+    assert is_quick_play_supported("1.21.4") is True
+    assert is_quick_play_supported("1.20-pre1") is True
+    assert is_quick_play_supported("1.20.1-rc1") is True
+    assert is_quick_play_supported("2.0") is True
+
+    # Pre-1.20 versions
+    assert is_quick_play_supported("1.19.4") is False
+    assert is_quick_play_supported("1.19") is False
+    assert is_quick_play_supported("1.18.2") is False
+    assert is_quick_play_supported("1.16.5") is False
+    assert is_quick_play_supported("1.12.2") is False
+    assert is_quick_play_supported("1.7.10") is False
+
+    # Snapshots
+    assert is_quick_play_supported("23w14a") is True
+    assert is_quick_play_supported("23w18a") is True
+    assert is_quick_play_supported("24w03a") is True
+    assert is_quick_play_supported("23w13a") is False
+    assert is_quick_play_supported("22w45a") is False
+
+    # Invalid / empty
+    assert is_quick_play_supported("") is False
+    assert is_quick_play_supported("unknown") is False
+    assert is_quick_play_supported(None) is False  # type: ignore[arg-type]
+

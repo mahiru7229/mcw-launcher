@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
 from mcw_core.api.account.account_skin_manager import AccountSkinManager
 from mcw_core.api.config.curseforge_config_manager import CurseForgeConfigManager
 from mcw_core.api.language.language_manager import tr
+from mcw_core.api.minecraft.world_manager import is_quick_play_supported
 from mcw_core.api.theme.theme_manager import theme_manager
 from src.gui.dialogs.create_instance_dialog import CreateInstanceDialog
 from src.gui.dialogs.instance_management_dialog import AdvancedInstanceManagerDialog, InstanceManagementDialog
@@ -292,6 +293,7 @@ class InstanceWorkspacePage(BasePage):
         self.quick_play_button.setFixedHeight(40)
         self.quick_play_button.setMinimumWidth(120)
         self.quick_play_button.clicked.connect(self._request_quick_play)
+        self.quick_play_button.setVisible(False)
 
         self.launch_button = set_theme_icon(QPushButton(), "icon.action.launch")
         self.launch_button.setObjectName("PrimaryButton")
@@ -860,6 +862,7 @@ class InstanceWorkspacePage(BasePage):
             self.manage_content_packs_button.setEnabled(False)
             self.manage_content_library_button.setEnabled(False)
             self.quick_play_button.setEnabled(False)
+            self.quick_play_button.setVisible(False)
             self.management_dialog.set_instance(None)
             if self._hub_loaded_instance_key is not None:
                 self._hub_loaded_instance_key = None
@@ -944,26 +947,37 @@ class InstanceWorkspacePage(BasePage):
             self.logs_tab.set_instance(instance, lazy=(current_tab is not self.logs_tab))
             self.mods_tab.set_instance(instance, lazy=(current_tab is not self.mods_tab))
 
-        latest_world = self.worlds_tab.latest_world
-        if latest_world is not None:
-            self.quick_play_button.setEnabled(enabled and state != "running")
-            self.quick_play_button.setText(tr("workspace.action.quick_play_world", world=latest_world.name))
-            self.quick_play_button.setToolTip(tr("workspace.action.quick_play_world_tooltip", world=latest_world.name))
+        supported = is_quick_play_supported(getattr(instance, "version_id", ""))
+        self.quick_play_button.setVisible(supported)
+        if supported:
+            latest_world = self.worlds_tab.latest_world
+            if latest_world is not None:
+                self.quick_play_button.setEnabled(enabled and state != "running")
+                self.quick_play_button.setText(tr("workspace.action.quick_play_world", world=latest_world.name))
+                self.quick_play_button.setToolTip(tr("workspace.action.quick_play_world_tooltip", world=latest_world.name))
+            else:
+                self.quick_play_button.setEnabled(False)
+                self.quick_play_button.setText(tr("workspace.action.quick_play"))
+                self.quick_play_button.setToolTip(tr("workspace.action.quick_play_no_world"))
         else:
             self.quick_play_button.setEnabled(False)
-            self.quick_play_button.setText(tr("workspace.action.quick_play"))
-            self.quick_play_button.setToolTip(tr("workspace.action.quick_play_no_world"))
 
     def _on_manage_mods_clicked(self) -> None:
         self.hub_tabs.setCurrentWidget(self.mods_tab)
         self.manage_mods_requested.emit(self.current_instance_name())
 
     def _request_quick_play(self) -> None:
+        instance = self._instances.get(self.current_instance_name())
+        if instance is None or not is_quick_play_supported(getattr(instance, "version_id", "")):
+            return
         latest = self.worlds_tab.latest_world
         if latest is not None and latest.folder_name:
             self.quick_play_requested.emit(latest.folder_name)
 
     def _request_quick_play_world(self, world_folder: str) -> None:
+        instance = self._instances.get(self.current_instance_name())
+        if instance is None or not is_quick_play_supported(getattr(instance, "version_id", "")):
+            return
         if world_folder:
             self.quick_play_requested.emit(world_folder)
 
