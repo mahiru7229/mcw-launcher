@@ -12,17 +12,18 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.8.3--beta.3-orange" alt="v1.8.3-beta.3">
+  <img src="https://img.shields.io/badge/version-v1.8.3-brightgreen" alt="v1.8.3">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!NOTE]
-> **Phiên bản mới nhất (v1.8.3-beta.3)**:
+> **Phiên bản mới nhất (v1.8.3)**:
+> - **Thiết kế lại trang Giới thiệu (About Page)**: Tinh gọn theo chuẩn README thu nhỏ với logo ứng dụng trực quan, thông tin tác giả, giấy phép mã nguồn mở MIT, công nghệ Python/PySide6, liên kết kho lưu trữ và hệ sinh thái MCW Core, lược bỏ các thành phần kỹ thuật chi tiết dư thừa.
 > - **Giới hạn Chơi nhanh (Quick Play) đúng chuẩn Minecraft 1.20+**: Tính năng Chơi nhanh chỉ hiển thị và hỗ trợ cho các instance từ Minecraft 1.20 trở lên; tự động ẩn nút Chơi nhanh trên thanh công cụ và thẻ thế giới nếu instance chạy phiên bản cũ hơn (< 1.20).
 > - **Màn hình Loading (`StartupSplash`) thân thiện, hiển thị tự nhiên**: Sử dụng layer cửa sổ tiêu chuẩn (`Qt.WindowType.Window`), khắc phục triệt để lỗi màn hình loading bị Windows tự động đẩy xuống layer đáy (bị che khuất phía sau mọi cửa sổ), giúp người dùng dễ dàng theo dõi tiến trình khởi động mà vẫn thoải mái đa nhiệm mà không lo bị chiếm quyền cửa sổ trên cùng.
 > - **Thiết lập tài khoản trong First Run Setup**: Hỗ trợ tạo tài khoản Offline và đăng nhập tài khoản Microsoft trực tiếp từ trình hướng dẫn khởi chạy lần đầu; mặc định chọn Java luôn là `Auto`.
 > - **Bảo vệ thao tác lăn chuột (Wheel Guard)**: Bộ lọc `WheelBlockFilter` ngăn chặn việc cuộn trang làm thay đổi nhầm giá trị của các `QSpinBox`, `QComboBox`, `QSlider`.
-> - **Cô lập hoàn toàn Hotfix trong môi trường Test**: Ngăn ngừa hiện tượng modal dialog xác nhận restart làm đóng băng luồng test CI tự động.
+> - **Tối ưu hóa hiệu năng & Giảm 50% I/O đĩa**: Loại bỏ giật đơ giao diện bằng lazy-loading các hub tabs và khử trùng lặp nạp `instance.json`.
 
 > [!IMPORTANT]
 > **Dự án liên quan & Nguồn tham khảo:**
@@ -45,7 +46,7 @@
 
 ## Hỗ trợ nền tảng
 
-| Nền tảng | Trạng thái (v1.8.2) | Ghi chú |
+| Nền tảng | Trạng thái (v1.8.3) | Ghi chú |
 | --- | --- | --- |
 | **Windows 10/11 x64** | Hỗ trợ chính thức | Bản build portable một file thực thi duy nhất (`MCW Launcher.exe`). |
 | **Linux x64** | Hỗ trợ chính thức | Bản build portable một file thực thi (`mcw-launcher`). Đã kiểm thử trên Lubuntu/Ubuntu. |

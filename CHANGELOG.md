@@ -2,6 +2,44 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.3] - 2026-10-17
+
+### Added
+- **Thiết kế lại trang Giới thiệu (About Page) theo chuẩn README thu nhỏ**:
+  - Tích hợp biểu tượng ứng dụng sắc nét (72x72) và huy hiệu phiên bản nổi bật.
+  - Trình bày thông tin dự án, tác giả (`mahiru7229`), giấy phép bản quyền (`MIT`), công nghệ nền tảng (`Python 3.12+ • PySide6`) và liên kết kho GitHub chính thức.
+  - Loại bỏ các khối thông tin kỹ thuật dư thừa (Kiến trúc SRP, Tài nguyên theme).
+  - Tích hợp liên kết tài liệu **MCW Core Engine** (`mcw_core`), cổng **CurseForge Gateway** tự host và ghi nhận đóng góp từ cộng đồng **Prism Launcher**.
+  - Hỗ trợ đầy đủ song ngữ Anh - Việt với cơ chế dynamic retranslation tức thời.
+- **Giới hạn Chơi nhanh (Quick Play) theo chuẩn Minecraft 1.20+**:
+  - Tự động ẩn nút Chơi nhanh (`quick_play_button`) trên thanh hành động và nút Chơi (`play_button`) trên thẻ thế giới đối với các instance chạy phiên bản < 1.20.
+  - Bộ chuẩn bị lệnh khởi chạy (`LauncherManager.build`) chủ động bỏ qua các cờ `--quickPlaySingleplayer` / `--quickPlayMultiplayer` khi phiên bản game dưới 1.20.
+- **Quản lý tài khoản trong First Run Setup**:
+  - Hỗ trợ tạo tài khoản Offline và đăng nhập tài khoản Microsoft trực tiếp từ hộp thoại thiết lập ban đầu (`FirstRunSetupDialog`).
+  - Đặt giá trị mặc định cho tùy chọn Java luôn là `Auto` (`first_run.java.auto`).
+- **Bảo vệ thao tác lăn chuột (Wheel Guard)**:
+  - Bổ sung `WheelBlockFilter` ngăn chặn việc vô tình thay đổi giá trị của các `QSpinBox`, `QComboBox`, `QSlider` khi cuộn trang cài đặt.
+
+### Changed
+- **Cải thiện màn hình Loading (`StartupSplash`)**:
+  - Chuyển cờ loại cửa sổ sang `Qt.WindowType.Window` tiêu chuẩn kết hợp gọi `raise_()`, ngăn chặn hệ điều hành Windows tự động đẩy cửa sổ loading xuống layer đáy cùng.
+  - Không gán cờ `WindowStaysOnTopHint`, cho phép người dùng thoải mái chuyển đổi cửa sổ và thao tác đa nhiệm mà không bị chiếm quyền hay che khuất.
+
+### Performance
+- **Triệt tiêu hiện tượng đơ giao diện (UI Freezing) trên Instance Workspace**:
+  - Caching `_hub_loaded_instance_key` trong `InstanceWorkspacePage`, không còn quét lại toàn bộ thư mục khi cập nhật giao diện.
+  - Cơ chế Lazy-loading cho tab Screenshots, Live Logs, và Mods: chỉ đọc đĩa khi người dùng chủ động chuyển tab.
+  - Tạm dừng timer đọc log nền khi ở tab khác.
+  - Khử trùng lặp nạp `instance.json` giữa `InstanceService.list()` và `list_health()`.
+
+### Fixed
+- **Ổn định hóa luồng đăng nhập Microsoft OAuth**:
+  - Tự động gán modal parent chính xác theo cửa sổ đang kích hoạt (First Run Setup hoặc MainWindow), khắc phục lỗi `NameError`.
+  - Khôi phục `parent` về `MainWindow` khi kết thúc hoặc hủy phiên đăng nhập.
+  - Ưu tiên phân giải IPv4 (`prefer_ipv4_dns`) trong `NetworkSession` để khắc phục lỗi timeout kết nối Microsoft trên mạng dual-stack IPv6.
+- **Cô lập hoàn toàn Hotfix trong môi trường Test**:
+  - Tự động bỏ qua các modal câu hỏi restart và request mạng nền trong môi trường test (`if "pytest" in sys.modules: return`).
+
 ## [1.8.3-beta.3] - 2026-10-17
 
 ### Added
