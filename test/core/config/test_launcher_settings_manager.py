@@ -84,6 +84,7 @@ def test_update_settings_are_created_and_persisted(tmp_path: Path) -> None:
         "channel": "stable",
         "channel_policy_version": manager.UPDATE_CHANNEL_POLICY_VERSION,
         "last_checked_at": None,
+        "source": "cloudflare",
     }
 
     manager.update_section("updates", {"auto_check": False, "last_checked_at": "2026-07-15T12:00:00+00:00"})
@@ -91,6 +92,7 @@ def test_update_settings_are_created_and_persisted(tmp_path: Path) -> None:
     assert updated["auto_check"] is False
     assert updated["channel"] == "stable"
     assert updated["last_checked_at"] == "2026-07-15T12:00:00+00:00"
+    assert updated["source"] == "cloudflare"
 
 
 def test_existing_beta_channel_is_migrated_to_stable_once_for_stable_release(tmp_path: Path) -> None:
