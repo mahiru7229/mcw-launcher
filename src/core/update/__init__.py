@@ -1,4 +1,6 @@
 from src.core.update.automatic_update_installer import AutomaticUpdateInstaller
+from src.core.update.base_release_client import BaseReleaseClient
+from src.core.update.cloudflare_release_client import CloudflareReleaseClient
 from src.core.update.github_release_client import GitHubReleaseClient
 from src.core.update.hotfix_manager import (
     HotfixEntry,
@@ -18,6 +20,8 @@ from src.core.update.windows_update_installer import WindowsUpdateInstaller
 __all__ = [
     "AutomaticUpdateInstaller",
     "AutomaticUpdateUnsupportedError",
+    "BaseReleaseClient",
+    "CloudflareReleaseClient",
     "GitHubReleaseClient",
     "HotfixEntry",
     "HotfixError",

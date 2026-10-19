@@ -26,11 +26,17 @@ class UpdateController(BaseController):
     MANUAL_CHECK_TASK_ID = "update.check.manual"
     PREPARE_TASK_ID = "update.prepare"
 
-    def __init__(self, task_runner: TaskRunner, channel: str = UPDATE_CHANNEL) -> None:
+    def __init__(self, task_runner: TaskRunner, channel: str = UPDATE_CHANNEL, source: str = "cloudflare") -> None:
         super().__init__()
         self._task_runner = task_runner
         self._channel = self._normalize_channel(channel)
-        self._manager = UpdateManager(repository=GITHUB_REPOSITORY, current_version=VERSION_ID, channel=self._channel)
+        self._source = self._normalize_source(source)
+        self._manager = UpdateManager(
+            repository=GITHUB_REPOSITORY,
+            current_version=VERSION_ID,
+            channel=self._channel,
+            source=self._source,
+        )
         self._settings = LauncherSettingsManager()
         self._core = get_default_core()
         self._pending_update_info: UpdateInfo | None = None
@@ -43,17 +49,43 @@ class UpdateController(BaseController):
     def channel(self) -> str:
         return self._channel
 
+    @property
+    def source(self) -> str:
+        return self._source
+
     def set_channel(self, channel: str) -> None:
         normalized = self._normalize_channel(channel)
         if normalized == self._channel:
             return
         self._channel = normalized
-        self._manager = UpdateManager(repository=GITHUB_REPOSITORY, current_version=VERSION_ID, channel=self._channel)
+        self._manager = UpdateManager(
+            repository=GITHUB_REPOSITORY,
+            current_version=VERSION_ID,
+            channel=self._channel,
+            source=self._source,
+        )
+
+    def set_source(self, source: str) -> None:
+        normalized = self._normalize_source(source)
+        if normalized == self._source:
+            return
+        self._source = normalized
+        self._manager = UpdateManager(
+            repository=GITHUB_REPOSITORY,
+            current_version=VERSION_ID,
+            channel=self._channel,
+            source=self._source,
+        )
 
     @staticmethod
     def _normalize_channel(channel: str) -> str:
         value = str(channel or "stable").strip().lower()
         return value if value in {"stable", "beta"} else "stable"
+
+    @staticmethod
+    def _normalize_source(source: str | None) -> str:
+        value = str(source or "cloudflare").strip().lower()
+        return value if value in {"cloudflare", "github", "auto"} else "cloudflare"
 
     def check(self, manual: bool = False) -> None:
         task_id = self.MANUAL_CHECK_TASK_ID if manual else self.AUTO_CHECK_TASK_ID

@@ -41,6 +41,7 @@ class ATLauncherController(BaseController):
             f"atlauncher.details.{token}",
             lambda: (token, ATLauncherClient.get_project_details(token)),
             tr("task.atlauncher.load_details"),
+            group="atlauncher.details",
             blocking=False,
         )
 
@@ -51,6 +52,7 @@ class ATLauncherController(BaseController):
             f"atlauncher.versions.{token}",
             lambda: (token, ATLauncherClient.list_versions(token, allowed_release_types)),
             tr("task.atlauncher.load_versions"),
+            group="atlauncher.versions",
             blocking=False,
         )
 
@@ -62,6 +64,7 @@ class ATLauncherController(BaseController):
             f"atlauncher.version.{token}.{version}",
             lambda: (token, version, ATLauncherClient.get_version(token, version)),
             tr("task.atlauncher.load_version_metadata"),
+            group="atlauncher.version",
             blocking=False,
         )
 

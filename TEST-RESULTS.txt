@@ -1,8 +1,12 @@
 MCW Launcher release verification
-Version: 1.8.3
+Version: 1.8.3.1
 Channel: stable
 
 Release checks in this build workspace:
+- Cloudflare Edge CDN release client and mirror download failover: passed
+- MainWindow lazy dialog signal parameter preservation (*args): passed
+- ATLauncher devVersions parsing and stable index tie-breaker sorting: passed
+- FTB parallel project search acceleration and task conflict grouping: passed
 - Miniature README About page redesign without SRP/theme cards: passed
 - MCW Core & GUI regression suite: 2169 passed, 10 skipped
 - 100% Core & GUI AST boundary & JSON-RPC 2.0 checks (direct, HTTP/SSE, Stdio Sidecar): passed

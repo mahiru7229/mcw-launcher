@@ -74,6 +74,7 @@ class LauncherSettingsManager:
             "channel": "stable",
             "channel_policy_version": UPDATE_CHANNEL_POLICY_VERSION,
             "last_checked_at": None,
+            "source": "cloudflare",
         },
     }
 
@@ -259,6 +260,8 @@ class LauncherSettingsManager:
             normalized_channel = "stable"
         updates["channel"] = normalized_channel
         updates["channel_policy_version"] = self.UPDATE_CHANNEL_POLICY_VERSION
+        source = str(updates.get("source") or "cloudflare").strip().lower()
+        updates["source"] = source if source in {"cloudflare", "github", "auto"} else "cloudflare"
         last_checked_at = updates.get("last_checked_at")
         updates["last_checked_at"] = last_checked_at if isinstance(last_checked_at, str) and last_checked_at else None
 

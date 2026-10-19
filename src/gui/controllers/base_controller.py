@@ -19,6 +19,7 @@ class _NetworkTaskRegistration:
     task: Callable[[], Any]
     message: str
     blocking: bool
+    group: str | None = None
 
 
 class BaseController(QObject):
@@ -41,6 +42,7 @@ class BaseController(QObject):
         task: Callable[[], Any],
         message: str,
         *,
+        group: str | None = None,
         blocking: bool = False,
     ) -> bool:
         normalized_id = str(task_id).strip()
@@ -52,6 +54,7 @@ class BaseController(QObject):
             task=task,
             message=str(message),
             blocking=bool(blocking),
+            group=group,
         )
         self._network_tasks.move_to_end(normalized_id)
         while len(self._network_tasks) > self.MAX_REMEMBERED_NETWORK_TASKS:
@@ -61,6 +64,7 @@ class BaseController(QObject):
             normalized_id,
             self._network_task(normalized_id, task),
             str(message),
+            group=group,
             blocking=blocking,
             conflict_policy=TaskConflictPolicy.REPLACE,
             cooperative=True,
@@ -82,6 +86,7 @@ class BaseController(QObject):
             normalized_id,
             self._network_task(normalized_id, registration.task),
             registration.message,
+            group=registration.group,
             blocking=registration.blocking,
             conflict_policy=TaskConflictPolicy.REPLACE,
             cooperative=True,

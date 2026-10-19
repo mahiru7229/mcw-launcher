@@ -45,6 +45,7 @@ class FTBController(BaseController):
             task_id,
             task,
             tr("task.ftb.load_details"),
+            group="ftb.details",
             blocking=False,
         )
 
@@ -56,6 +57,7 @@ class FTBController(BaseController):
             task_id,
             task,
             tr("task.ftb.load_versions"),
+            group="ftb.versions",
             blocking=False,
         )
 
@@ -67,6 +69,7 @@ class FTBController(BaseController):
             task_id,
             task,
             tr("task.ftb.load_version_metadata"),
+            group="ftb.version",
             blocking=False,
         )
 

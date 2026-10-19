@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Iterable
 
@@ -70,15 +71,28 @@ class FTBClient:
             project = FTBClient._parse_project(item)
             if project.project_id > 0 and not project.private:
                 projects_by_id[project.project_id] = project
-        for identifier in identifiers:
-            if identifier in projects_by_id:
-                continue
+        missing_ids = [identifier for identifier in identifiers if identifier not in projects_by_id]
+        if len(missing_ids) > 1:
+            def _fetch_project(identifier: int) -> tuple[int, FTBProject | None]:
+                try:
+                    p = FTBClient.get_project(identifier, force_refresh=force_refresh)
+                    return identifier, p if not p.private else None
+                except RuntimeError:
+                    return identifier, None
+
+            with ThreadPoolExecutor(max_workers=min(6, len(missing_ids))) as executor:
+                results = executor.map(_fetch_project, missing_ids)
+                for _identifier, project in results:
+                    if project is not None:
+                        projects_by_id[project.project_id] = project
+        elif len(missing_ids) == 1:
+            identifier = missing_ids[0]
             try:
                 project = FTBClient.get_project(identifier, force_refresh=force_refresh)
+                if not project.private:
+                    projects_by_id[project.project_id] = project
             except RuntimeError:
-                continue
-            if not project.private:
-                projects_by_id[project.project_id] = project
+                pass
         projects = list(projects_by_id.values())
         normalized_sort = str(sort or "popularity").strip().casefold()
         if normalized_sort == "updated":

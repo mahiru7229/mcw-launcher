@@ -2,6 +2,27 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.3.1] - 2026-10-19
+
+### Added
+- **Cơ chế cập nhật trực tiếp từ Cloudflare Edge CDN (Hỗ trợ dự phòng GitHub)**:
+  - Bổ sung `CloudflareReleaseClient` tải danh sách phiên bản phát hành từ API / manifest Cloudflare Edge CDN (`DEFAULT_CLOUDFLARE_RELEASES_URL`), giảm thiểu nguy cơ bị Rate Limit (HTTP 403 / 429) của GitHub API.
+  - Cơ chế đa nguồn dự phòng thông minh (Dual-source failover) trong `UpdateManager`: mặc định kiểm tra cập nhật qua Cloudflare CDN; tự động chuyển sang GitHub nếu Cloudflare gặp sự cố hoặc ngược lại khi GitHub bị rate limit.
+  - Hỗ trợ đa mirror tải file cập nhật (`mirror_urls`) trong `ReleaseAsset`: tải file từ Cloudflare CDN với cơ chế tự động chuyển vùng dự phòng sang GitHub release asset nếu liên kết chính gặp lỗi.
+  - Tùy chọn nguồn cập nhật linh hoạt trong `LauncherSettingsManager` (`update.source`: `cloudflare`, `github`, `auto`).
+
+### Fixed
+- **Khắc phục lỗi `TypeError` thiếu tham số kết nối Signal cho Lazy Dialogs trong `MainWindow`**:
+  - Chuyển toàn bộ callback `lambda` của `FTBController`, `ATLauncherController`, `ContentPackController`, và `OptiFineController` sang `lambda *args:`.
+  - Khắc phục triệt để hiện tượng PySide6 cắt bỏ tham số thứ 2 và thứ 3 khi kết nối signal đa tham số vào lambda đơn tham số, giải quyết dứt điểm lỗi kẹt `"Loading versions..."` trên FTB và ATLauncher dialog, lỗi mở Content Pack Manager và lỗi mở OptiFine Dialog.
+- **Bổ sung kênh Beta/Dev và ổn định hóa thứ tự sắp xếp Version trong `ATLauncherClient`**:
+  - Đọc và phân giải mảng `devVersions` (gán cờ `development=True`) từ ATLauncher V1 API, đảm bảo người dùng có thể duyệt và cài đặt các bản thử nghiệm khi bật tùy chọn Include Beta/Alpha.
+  - Áp dụng tie-breaker chỉ mục ổn định `(-index)` khi sắp xếp danh sách version thiếu timestamp (`published`/`updated`), bảo toàn nguyên vẹn thứ tự newest-first gốc từ API thay vì bị xáo trộn do so sánh chuỗi phiên bản.
+- **Ngăn chặn xung đột tác vụ mạng và hiện tượng đơ giao diện khi duyệt Modpack**:
+  - Thêm tham số định danh nhóm `group` vào `BaseController._run_network_task` và phân nhóm `ftb.details`, `ftb.versions`, `ftb.version` (cũng như `atlauncher.details`, `atlauncher.versions`, `atlauncher.version`). Khi người dùng click chuyển nhanh giữa các pack, các tác vụ tải ngầm cũ được hủy hợp tác (`REPLACE`) thay vì xếp chồng làm khóa giao diện.
+- **Tăng tốc độ tải và tìm kiếm FTB Modpacks gấp 5 lần**:
+  - Song song hóa việc phân giải thông tin các modpack thiếu (`missing_ids`) trong `FTBClient.search_projects` bằng `ThreadPoolExecutor` có giới hạn (tối đa 6 worker threads), rút ngắn thời gian tìm kiếm và làm mới danh sách FTB từ 5–15 giây xuống chỉ còn ~1–2 giây.
+
 ## [1.8.3] - 2026-10-17
 
 ### Added

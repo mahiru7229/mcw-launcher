@@ -272,7 +272,16 @@ class ATLauncherBrowserDialog(QDialog):
         if self._selected_project is None or self._selected_project.safe_name != str(safe_name):
             return
         self._versions = [version for version in tuple(versions or ()) if isinstance(version, ATLauncherVersionSummary)]
-        self._versions.sort(key=lambda version: (version.published_at, version.updated_at, version.version_id), reverse=True)
+        indexed = list(enumerate(self._versions))
+        indexed.sort(
+            key=lambda pair: (
+                pair[1].published_at,
+                pair[1].updated_at,
+                -pair[0],
+            ),
+            reverse=True,
+        )
+        self._versions = [pair[1] for pair in indexed]
         self.version_combo.blockSignals(True)
         self.version_combo.clear()
         for version in self._versions:

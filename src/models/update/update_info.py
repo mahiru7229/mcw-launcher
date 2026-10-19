@@ -11,6 +11,7 @@ class ReleaseAsset:
     size: int
     sha256: str | None = None
     sha256_url: str | None = None
+    mirror_urls: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

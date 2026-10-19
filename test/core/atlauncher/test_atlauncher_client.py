@@ -310,3 +310,27 @@ def test_parse_version_skyfactory4_server_configs_not_blocked() -> None:
     assert not version.warnings
     assert len(version.files) == 2
 
+
+def test_parse_pack_parses_dev_versions_and_preserves_order() -> None:
+    data = {
+        "id": 1,
+        "name": "Dev Test Pack",
+        "safeName": "DevTestPack",
+        "versions": [
+            {"version": "1.10.0", "minecraft": "1.20.1"},
+            {"version": "1.9.0", "minecraft": "1.20.1"},
+        ],
+        "devVersions": [
+            {"version": "1.11.0-dev", "minecraft": "1.20.1"},
+        ],
+    }
+    pack = ATLauncherClient._parse_pack(data)
+    assert len(pack.versions) == 3
+    # 1.10.0 comes before 1.9.0 because of original API order (not lexicographical '1.9.0' > '1.10.0')
+    assert pack.versions[0].version == "1.10.0"
+    assert pack.versions[1].version == "1.9.0"
+    assert pack.versions[2].version == "1.11.0-dev"
+    assert pack.versions[2].development is True
+    assert pack.versions[2].release_type == "alpha"
+
+

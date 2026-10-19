@@ -177,7 +177,12 @@ class MainWindow(QMainWindow):
         self.motion_runtime = MotionRuntime(parent=self)
         self.launch_controller = LaunchController(self.task_runner)
         self.lan_hosting_controller = LanHostingController(self.task_runner)
-        self.update_controller = UpdateController(self.task_runner, channel=self._startup_settings.get("update_channel", "stable"))
+        update_source = self._startup_settings.get("update_source") or self._startup_settings.get("updates", {}).get("source", "cloudflare")
+        self.update_controller = UpdateController(
+            self.task_runner,
+            channel=self._startup_settings.get("update_channel", "stable"),
+            source=update_source,
+        )
         self.discord_rpc_service = get_discord_rpc_service()
         self.discord_rpc_service.set_client_id(self._startup_settings.get("discord_client_id"))
         self.discord_rpc_service.set_enabled(bool(self._startup_settings.get("discord_rpc_enabled", True)))
@@ -956,17 +961,17 @@ class MainWindow(QMainWindow):
         self.curseforge_controller.modpack_installed.connect(self._curseforge_modpack_installed)
         self.curseforge_controller.modpack_manual_download_required.connect(self._curseforge_modpack_manual_download_required)
 
-        self.ftb_controller.search_results_changed.connect(lambda res: self._ftb_modpack_dialog.set_search_result(res) if self._ftb_modpack_dialog is not None else None)
-        self.ftb_controller.project_details_changed.connect(lambda det: self._ftb_modpack_dialog.set_project_details(det) if self._ftb_modpack_dialog is not None else None)
-        self.ftb_controller.versions_changed.connect(lambda ver: self._ftb_modpack_dialog.set_versions(ver) if self._ftb_modpack_dialog is not None else None)
-        self.ftb_controller.version_details_changed.connect(lambda vdet: self._ftb_modpack_dialog.set_version_details(vdet) if self._ftb_modpack_dialog is not None else None)
+        self.ftb_controller.search_results_changed.connect(lambda *args: self._ftb_modpack_dialog.set_search_result(*args) if self._ftb_modpack_dialog is not None else None)
+        self.ftb_controller.project_details_changed.connect(lambda *args: self._ftb_modpack_dialog.set_project_details(*args) if self._ftb_modpack_dialog is not None else None)
+        self.ftb_controller.versions_changed.connect(lambda *args: self._ftb_modpack_dialog.set_versions(*args) if self._ftb_modpack_dialog is not None else None)
+        self.ftb_controller.version_details_changed.connect(lambda *args: self._ftb_modpack_dialog.set_version_details(*args) if self._ftb_modpack_dialog is not None else None)
         self.ftb_controller.cache_cleared.connect(lambda info: (self._ftb_modpack_dialog.set_cache_info(info) if self._ftb_modpack_dialog is not None else None, QMessageBox.information(self, tr("ftb.modpack.title"), tr("ftb.cache.cleared"))))
         self.ftb_controller.modpack_installed.connect(self._ftb_modpack_installed)
 
-        self.atlauncher_controller.search_results_changed.connect(lambda res: self._atlauncher_modpack_dialog.set_search_result(res) if self._atlauncher_modpack_dialog is not None else None)
-        self.atlauncher_controller.project_details_changed.connect(lambda det: self._atlauncher_modpack_dialog.set_project_details(det) if self._atlauncher_modpack_dialog is not None else None)
-        self.atlauncher_controller.versions_changed.connect(lambda ver: self._atlauncher_modpack_dialog.set_versions(ver) if self._atlauncher_modpack_dialog is not None else None)
-        self.atlauncher_controller.version_details_changed.connect(lambda vdet: self._atlauncher_modpack_dialog.set_version_details(vdet) if self._atlauncher_modpack_dialog is not None else None)
+        self.atlauncher_controller.search_results_changed.connect(lambda *args: self._atlauncher_modpack_dialog.set_search_result(*args) if self._atlauncher_modpack_dialog is not None else None)
+        self.atlauncher_controller.project_details_changed.connect(lambda *args: self._atlauncher_modpack_dialog.set_project_details(*args) if self._atlauncher_modpack_dialog is not None else None)
+        self.atlauncher_controller.versions_changed.connect(lambda *args: self._atlauncher_modpack_dialog.set_versions(*args) if self._atlauncher_modpack_dialog is not None else None)
+        self.atlauncher_controller.version_details_changed.connect(lambda *args: self._atlauncher_modpack_dialog.set_version_details(*args) if self._atlauncher_modpack_dialog is not None else None)
         self.atlauncher_controller.cache_cleared.connect(lambda info: (self._atlauncher_modpack_dialog.set_cache_info(info) if self._atlauncher_modpack_dialog is not None else None, QMessageBox.information(self, tr("atlauncher.modpack.title"), tr("atlauncher.cache.cleared"))))
         self.atlauncher_controller.modpack_installed.connect(self._atlauncher_modpack_installed)
 
@@ -975,7 +980,7 @@ class MainWindow(QMainWindow):
         self.content_pack_controller.versions_changed.connect(lambda *args: (self._resource_pack_browser_dialog.set_versions(*args) if self._resource_pack_browser_dialog is not None else None, self._shader_pack_browser_dialog.set_versions(*args) if self._shader_pack_browser_dialog is not None else None))
         self.content_pack_controller.files_changed.connect(lambda *args: (self._resource_pack_browser_dialog.set_files(*args) if self._resource_pack_browser_dialog is not None else None, self._shader_pack_browser_dialog.set_files(*args) if self._shader_pack_browser_dialog is not None else None))
         self.content_pack_controller.project_details_changed.connect(lambda *args: (self._resource_pack_browser_dialog.set_project_details(*args) if self._resource_pack_browser_dialog is not None else None, self._shader_pack_browser_dialog.set_project_details(*args) if self._shader_pack_browser_dialog is not None else None))
-        self.content_pack_controller.entries_changed.connect(lambda entries: self._content_pack_manager_dialog.set_entries(entries) if self._content_pack_manager_dialog is not None else None)
+        self.content_pack_controller.entries_changed.connect(lambda *args: self._content_pack_manager_dialog.set_entries(*args) if self._content_pack_manager_dialog is not None else None)
         self.content_pack_controller.installed.connect(self._content_pack_installed)
 
         self.launch_controller.progress_received.connect(self._on_progress)
@@ -1012,7 +1017,7 @@ class MainWindow(QMainWindow):
         self.instance_controller.repair_execution_finished.connect(lambda r: self._repair_center_dialog.set_repair_result(r) if self._repair_center_dialog is not None else None)
         self.instance_controller.repair_center_failed.connect(lambda err: self._repair_center_dialog.set_error(err) if self._repair_center_dialog is not None else None)
 
-        self.optifine_controller.state_ready.connect(lambda s: self._optifine_dialog.set_state(s) if self._optifine_dialog is not None else None)
+        self.optifine_controller.state_ready.connect(lambda *args: self._optifine_dialog.set_state(*args) if self._optifine_dialog is not None else None)
         self.optifine_controller.progress.connect(self._on_progress)
         self.optifine_controller.install_finished.connect(lambda result: self.instance_controller.refresh(result.instance_name))
         self.optifine_controller.repair_finished.connect(lambda result: self.instance_controller.refresh(result.instance_name))
@@ -2774,6 +2779,9 @@ class MainWindow(QMainWindow):
         self.discord_rpc_service.set_client_id(settings.get("discord_client_id"))
         self.discord_rpc_service.set_enabled(bool(settings.get("discord_rpc_enabled", True)))
         self.update_controller.set_channel(str(settings.get("update_channel", "stable")))
+        update_source = settings.get("update_source") or settings.get("updates", {}).get("source")
+        if update_source:
+            self.update_controller.set_source(str(update_source))
         include_beta = bool(settings.get("modrinth_include_beta", False))
         include_alpha = bool(settings.get("modrinth_include_alpha", False))
         self.mods_page.set_channel_preferences(include_beta, include_alpha)

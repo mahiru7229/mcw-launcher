@@ -177,8 +177,16 @@ class ATLauncherClient:
         project = ATLauncherClient.get_project(safe_name, force_refresh=force_refresh)
         allowed = ATLauncherClient._normalized_release_types(release_types)
         versions = [version for version in project.versions if version.release_type in allowed]
-        versions.sort(key=lambda item: (item.published_at, item.updated_at, item.version_id, item.version), reverse=True)
-        return tuple(versions)
+        indexed = list(enumerate(versions))
+        indexed.sort(
+            key=lambda pair: (
+                pair[1].published_at,
+                pair[1].updated_at,
+                -pair[0],
+            ),
+            reverse=True,
+        )
+        return tuple(pair[1] for pair in indexed)
 
     @staticmethod
     def get_version(safe_name: str, version: str, force_refresh: bool = False) -> ATLauncherVersion:
@@ -365,14 +373,33 @@ class ATLauncherClient:
             safe_name = re.sub(r"[^A-Za-z0-9]", "", name)
         description = ATLauncherClient._text(data.get("description"))
         raw_versions = data.get("versions") if isinstance(data.get("versions"), list) else []
+        raw_dev_versions = data.get("devVersions") if isinstance(data.get("devVersions"), list) else []
         latest = data.get("latestVersion") if isinstance(data.get("latestVersion"), dict) else None
         versions = [ATLauncherClient._parse_version_summary(item) for item in raw_versions if isinstance(item, dict)]
+        for item in raw_dev_versions:
+            if isinstance(item, dict):
+                dev_item = {**item, "isDevelopment": True} if not (item.get("isDevelopment") or item.get("development")) else item
+                versions.append(ATLauncherClient._parse_version_summary(dev_item))
         if latest is not None:
             latest_summary = ATLauncherClient._parse_version_summary(latest)
             if latest_summary.version and all(item.version != latest_summary.version for item in versions):
                 versions.insert(0, latest_summary)
-        versions = [item for item in versions if item.version]
-        versions.sort(key=lambda item: (item.published_at, item.updated_at, item.version_id, item.version), reverse=True)
+        seen_versions = set()
+        unique_versions = []
+        for item in versions:
+            if item.version and item.version not in seen_versions:
+                seen_versions.add(item.version)
+                unique_versions.append(item)
+        indexed = list(enumerate(unique_versions))
+        indexed.sort(
+            key=lambda pair: (
+                pair[1].published_at,
+                pair[1].updated_at,
+                -pair[0],
+            ),
+            reverse=True,
+        )
+        versions = [pair[1] for pair in indexed]
         icon_token = re.sub(r"[^A-Za-z0-9]", "", name).casefold() + ".png" if name else ""
         icon_url = f"{ATLauncherClient.CDN_BASE_URL}launcher/images/{quote(icon_token, safe='')}" if icon_token else ""
         website = ATLauncherClient._text(data.get("websiteURL") or data.get("websiteUrl"))

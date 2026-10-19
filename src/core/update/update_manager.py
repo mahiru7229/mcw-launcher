@@ -11,6 +11,7 @@ import zipfile
 
 import httpx
 
+import logging
 from src.core.fs.paths import Paths
 from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter  # shared singleton; compatibility export
 from src.core.network.download_manager import download_manager
@@ -18,10 +19,13 @@ from src.core.network.download_models import DownloadRequest
 from src.core.network.httpx_downloader import HttpDownloader
 from src.core.progress.progress_reporter import ProgressReporter
 from src.core.system.platform_info import PlatformInfo
+from src.core.update.cloudflare_release_client import CloudflareReleaseClient
 from src.core.update.github_release_client import GitHubReleaseClient
 from src.core.update.versioning import LauncherVersion
 from src.models.update.update_info import PreparedUpdate, UpdateInfo
 from src.models.progress.progress_stage import ProgressStage
+
+logger = logging.getLogger(__name__)
 
 
 class UpdateManager:
@@ -37,17 +41,65 @@ class UpdateManager:
         current_version: str,
         channel: str = "stable",
         platform_id: str | None = None,
+        source: str = "cloudflare",
+        cloudflare_url: str | None = None,
     ) -> None:
         self.platform_id = platform_id or self._current_platform_id()
-        self.client = GitHubReleaseClient(
-            repository=repository,
+        self.source = self._normalize_source(source)
+        self.repository = str(repository).strip().strip("/")
+        self.github_client = GitHubReleaseClient(
+            repository=self.repository,
             current_version=current_version,
             channel=channel,
             platform_id=self.platform_id,
         )
+        self.cloudflare_client = CloudflareReleaseClient(
+            current_version=current_version,
+            channel=channel,
+            endpoint_url=cloudflare_url,
+            repository=self.repository,
+            platform_id=self.platform_id,
+        )
+        self.client = self.cloudflare_client if self.source in {"cloudflare", "auto"} else self.github_client
+
+    @staticmethod
+    def _normalize_source(source: str | None) -> str:
+        val = str(source or "cloudflare").strip().lower()
+        return val if val in {"cloudflare", "github", "auto"} else "cloudflare"
 
     def check_for_update(self, force_refresh: bool = False) -> UpdateInfo | None:
-        return self.client.check(force_refresh=force_refresh)
+        if self.source in {"cloudflare", "auto"}:
+            primary_client = self.cloudflare_client
+            fallback_client = self.github_client
+            primary_name = "Cloudflare CDN"
+            fallback_name = "GitHub API"
+        else:
+            primary_client = self.github_client
+            fallback_client = self.cloudflare_client
+            primary_name = "GitHub API"
+            fallback_name = "Cloudflare CDN"
+
+        try:
+            return primary_client.check(force_refresh=force_refresh)
+        except Exception as primary_error:
+            logger.warning(
+                "%s update check failed (%s: %s); falling back to backup branch (%s)...",
+                primary_name,
+                type(primary_error).__name__,
+                primary_error,
+                fallback_name,
+            )
+            try:
+                return fallback_client.check(force_refresh=force_refresh)
+            except Exception as fallback_error:
+                logger.error(
+                    "Both update branches failed (%s: %s; %s: %s)",
+                    primary_name,
+                    primary_error,
+                    fallback_name,
+                    fallback_error,
+                )
+                raise
 
     def prepare_update(self, info: UpdateInfo, reporter: ProgressReporter | None = None) -> PreparedUpdate:
         archive_path = Paths.update_download_path(info.tag_name, info.asset.name)
@@ -201,8 +253,15 @@ class UpdateManager:
                 reporter.bytes(stage=ProgressStage.DOWNLOADING_UPDATE, message="Using cached launcher update...", current=size, total=size)
             return
 
+        urls: list[str] = [info.asset.download_url]
+        mirrors = getattr(info.asset, "mirror_urls", ()) or ()
+        for mirror in mirrors:
+            m_str = str(mirror or "").strip()
+            if m_str and m_str not in urls:
+                urls.append(m_str)
+
         request = DownloadRequest(
-            urls=(info.asset.download_url,),
+            urls=tuple(urls),
             destination=archive_path,
             expected_size=max(0, int(info.asset.size or 0)),
             hashes={"sha256": expected_sha256},
@@ -241,19 +300,37 @@ class UpdateManager:
         if not checksum_url.startswith("https://"):
             raise RuntimeError("Automatic launcher updates require a trusted SHA-256 digest or .sha256 release asset.")
 
-        response = HttpDownloader.get_client().get(
-            checksum_url,
-            headers={"User-Agent": f"mahiru7229/mcw-launcher/{info.current_version}"},
-            timeout=15.0,
-        )
-        response.raise_for_status()
-        if len(response.content) > 4096:
-            raise RuntimeError("The launcher update checksum file is unexpectedly large.")
-        first_line = response.text.lstrip("\ufeff").strip().splitlines()[0] if response.text.strip() else ""
-        candidate = first_line.split()[0].strip().casefold() if first_line else ""
-        if not self._valid_sha256(candidate):
-            raise RuntimeError("The launcher update checksum file does not contain a valid SHA-256 digest.")
-        return candidate
+        checksum_candidates = [checksum_url]
+        tag_name = info.tag_name
+        sidecar_name = f"{info.asset.name}.sha256"
+        cf_checksum = f"https://mcw-download.pages.dev/releases/{tag_name}/{sidecar_name}"
+        gh_checksum = f"https://github.com/{self.repository}/releases/download/{tag_name}/{sidecar_name}"
+        if checksum_url.startswith("https://mcw-download.pages.dev") and gh_checksum not in checksum_candidates:
+            checksum_candidates.append(gh_checksum)
+        elif "github.com" in checksum_url and cf_checksum not in checksum_candidates:
+            checksum_candidates.append(cf_checksum)
+
+        last_error: Exception | None = None
+        for candidate_url in checksum_candidates:
+            try:
+                response = HttpDownloader.get_client().get(
+                    candidate_url,
+                    headers={"User-Agent": f"mahiru7229/mcw-launcher/{info.current_version}"},
+                    timeout=15.0,
+                )
+                response.raise_for_status()
+                if len(response.content) > 4096:
+                    raise RuntimeError("The launcher update checksum file is unexpectedly large.")
+                first_line = response.text.lstrip("\ufeff").strip().splitlines()[0] if response.text.strip() else ""
+                candidate = first_line.split()[0].strip().casefold() if first_line else ""
+                if not self._valid_sha256(candidate):
+                    raise RuntimeError("The launcher update checksum file does not contain a valid SHA-256 digest.")
+                return candidate
+            except Exception as err:
+                last_error = err
+                continue
+
+        raise RuntimeError(f"Failed to resolve launcher update SHA-256 digest: {last_error}") from last_error
 
     @staticmethod
     def _response_size(response: httpx.Response) -> int:
