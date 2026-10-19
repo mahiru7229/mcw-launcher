@@ -47,10 +47,22 @@ class HotfixMetaPathFinder(importlib.abc.MetaPathFinder):
             return importlib.util.spec_from_file_location(fullname, candidate_file)
         init_file = candidate / "__init__.py"
         if init_file.is_file():
+            search_locations = [str(candidate)]
+            for finder in sys.meta_path:
+                if finder is self or not hasattr(finder, "find_spec"):
+                    continue
+                try:
+                    orig_spec = finder.find_spec(fullname, path, target)
+                    if orig_spec and orig_spec.submodule_search_locations:
+                        for loc in orig_spec.submodule_search_locations:
+                            if loc not in search_locations:
+                                search_locations.append(loc)
+                except Exception:
+                    pass
             return importlib.util.spec_from_file_location(
                 fullname,
                 init_file,
-                submodule_search_locations=[str(candidate)],
+                submodule_search_locations=search_locations,
             )
         return None
 
