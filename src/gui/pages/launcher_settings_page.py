@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 
-from PySide6.QtCore import QSignalBlocker, QTimer, Signal
+from PySide6.QtCore import QSignalBlocker, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QCheckBox, QColorDialog, QFrame, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy, QSpinBox
 
@@ -503,12 +503,13 @@ class LauncherSettingsPage(BasePage):
 
         self.floating_action_bar = QFrame()
         self.floating_action_bar.setObjectName("FloatingSettingsBar")
-        floating_layout = QHBoxLayout(self.floating_action_bar)
-        floating_layout.setContentsMargins(16, 10, 16, 10)
-        floating_layout.setSpacing(12)
+        self.floating_layout = QHBoxLayout(self.floating_action_bar)
+        self.floating_layout.setContentsMargins(16, 10, 16, 10)
+        self.floating_layout.setSpacing(12)
 
         self.unsaved_label = QLabel(tr("settings.unsaved.banner"))
         self.unsaved_label.setObjectName("UnsavedChangesBanner")
+        self.unsaved_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
         self.unsaved_label.setWordWrap(True)
         self.unsaved_label.setVisible(False)
 
@@ -523,10 +524,10 @@ class LauncherSettingsPage(BasePage):
         self.save_button.setMinimumHeight(40)
         self.save_button.clicked.connect(self.request_save)
 
-        floating_layout.addWidget(self.unsaved_label, 1)
-        floating_layout.addStretch(1)
-        floating_layout.addWidget(self.discard_button)
-        floating_layout.addWidget(self.save_button)
+        self.floating_layout.addWidget(self.unsaved_label, 1)
+        self.floating_layout.addStretch(1)
+        self.floating_layout.addWidget(self.discard_button)
+        self.floating_layout.addWidget(self.save_button)
         self.install_floating_action_bar(self.floating_action_bar)
 
         self.root_layout.addStretch()
@@ -1383,6 +1384,8 @@ class LauncherSettingsPage(BasePage):
         self.unsaved_label.setText(tr("settings.unsaved.banner"))
         if hasattr(self, "discard_button"):
             self.discard_button.setEnabled(dirty)
+        if hasattr(self, "floating_layout"):
+            self.floating_layout.setStretch(1, 0 if dirty else 1)
         if hasattr(self, "floating_action_bar"):
             self.floating_action_bar.setProperty("unsavedChanges", dirty)
             self.floating_action_bar.style().unpolish(self.floating_action_bar)
@@ -1391,6 +1394,7 @@ class LauncherSettingsPage(BasePage):
         self.save_button.style().unpolish(self.save_button)
         self.save_button.style().polish(self.save_button)
         self._update_save_button_text()
+        self._sync_busy_overlay_geometry()
         if changed:
             self.dirty_changed.emit(dirty)
 

@@ -1,4 +1,4 @@
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QEvent, QTimer, Qt
 from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 from src.gui.widget.card_widget import CardWidget
@@ -101,14 +101,27 @@ class BasePage(QScrollArea):
         if not getattr(self, "_wheel_guard_installed", False):
             self._wheel_guard_installed = True
             prevent_wheel_value_changes(self)
+        self._sync_busy_overlay_geometry()
+        QTimer.singleShot(0, self._sync_busy_overlay_geometry)
 
     def install_floating_action_bar(self, bar: QWidget) -> None:
         self._floating_action_bar = bar
         bar.setParent(self.viewport())
+        bar.installEventFilter(self)
         bar.show()
         bar.raise_()
         self._apply_root_margins()
         self._sync_busy_overlay_geometry()
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched is getattr(self, "_floating_action_bar", None) and event.type() in (
+            QEvent.Type.LayoutRequest,
+            QEvent.Type.PolishRequest,
+            QEvent.Type.StyleChange,
+        ):
+            if not getattr(self, "_syncing_floating_bar", False):
+                self._sync_busy_overlay_geometry()
+        return super().eventFilter(watched, event)
 
     def _apply_root_margins(self) -> None:
         if getattr(self, "_floating_action_bar", None) is not None:
@@ -125,16 +138,28 @@ class BasePage(QScrollArea):
     def _sync_busy_overlay_geometry(self) -> None:
         vp_rect = self.viewport().rect()
         if getattr(self, "_floating_action_bar", None) is not None:
-            margin = 12 if self._compact else 16
-            bar_height = max(56, self._floating_action_bar.sizeHint().height())
-            bar_width = max(260, vp_rect.width() - margin * 2)
-            self._floating_action_bar.setGeometry(
-                margin,
-                max(margin, vp_rect.height() - bar_height - margin),
-                bar_width,
-                bar_height,
-            )
-            self._floating_action_bar.raise_()
+            self._syncing_floating_bar = True
+            try:
+                margin = 12 if self._compact else 16
+                bar_width = max(260, vp_rect.width() - margin * 2)
+                layout = self._floating_action_bar.layout()
+                if layout is not None:
+                    layout.invalidate()
+                    layout.activate()
+                hint_height = self._floating_action_bar.sizeHint().height()
+                hfw = self._floating_action_bar.heightForWidth(bar_width)
+                if hfw <= 0 and layout is not None and layout.hasHeightForWidth():
+                    hfw = layout.totalHeightForWidth(bar_width)
+                bar_height = max(60, hint_height, hfw)
+                self._floating_action_bar.setGeometry(
+                    margin,
+                    max(margin, vp_rect.height() - bar_height - margin),
+                    bar_width,
+                    bar_height,
+                )
+                self._floating_action_bar.raise_()
+            finally:
+                self._syncing_floating_bar = False
         if hasattr(self, "_busy_overlay"):
             self._busy_overlay.setGeometry(vp_rect)
             if self._interaction_locked:

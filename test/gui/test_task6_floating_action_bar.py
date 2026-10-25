@@ -34,46 +34,62 @@ def test_launcher_settings_reset_button_in_card_and_emits(qapp) -> None:
 
 def test_launcher_settings_floating_action_bar_parent_and_dirty(qapp) -> None:
     page = LauncherSettingsPage()
+    page.resize(900, 700)
+    page.show()
     assert hasattr(page, "floating_action_bar")
     assert page.floating_action_bar.parentWidget() is page.viewport()
     assert hasattr(page, "discard_button")
     assert hasattr(page, "save_button")
     assert hasattr(page, "unsaved_label")
+    assert hasattr(page, "floating_layout")
 
     # Initial clean state
     page._saved_data = page.form_data()
     page._set_dirty(False)
     assert page.discard_button.isEnabled() is False
     assert page.floating_action_bar.property("unsavedChanges") is False
+    assert page.floating_layout.stretch(1) == 1
 
-    # Dirty state
+    # Dirty state without manual resizeEvent
     page._set_dirty(True)
     assert page.discard_button.isEnabled() is True
     assert page.floating_action_bar.property("unsavedChanges") is True
+    assert page.unsaved_label.isVisible() is True
+    assert page.floating_layout.stretch(1) == 0
+    assert page.floating_action_bar.height() >= page.floating_action_bar.sizeHint().height()
 
     # Clicking discard resets dirty
     page.discard_button.click()
     assert page._dirty is False
     assert page.discard_button.isEnabled() is False
+    assert page.floating_layout.stretch(1) == 1
 
 
 def test_instance_settings_floating_action_bar_parent_and_dirty(qapp) -> None:
     page = InstanceSettingsPage()
+    page.resize(900, 700)
+    page.show()
     assert hasattr(page, "floating_action_bar")
     assert page.floating_action_bar.parentWidget() is page.viewport()
     assert hasattr(page, "discard_button")
     assert hasattr(page, "save_button")
     assert hasattr(page, "unsaved_label")
+    assert hasattr(page, "floating_layout")
 
     page._saved_data = page.form_data()
     page._set_dirty(False)
     assert page.discard_button.isEnabled() is False
     assert page.floating_action_bar.property("unsavedChanges") is False
+    assert page.floating_layout.stretch(1) == 1
 
     page._set_dirty(True)
     assert page.discard_button.isEnabled() is True
     assert page.floating_action_bar.property("unsavedChanges") is True
+    assert page.unsaved_label.isVisible() is True
+    assert page.floating_layout.stretch(1) == 0
+    assert page.floating_action_bar.height() >= page.floating_action_bar.sizeHint().height()
 
     page.discard_button.click()
     assert page._dirty is False
     assert page.discard_button.isEnabled() is False
+    assert page.floating_layout.stretch(1) == 1

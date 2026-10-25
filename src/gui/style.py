@@ -315,7 +315,8 @@ QLabel#UnsavedChangesBanner {
     background: #5a421d;
     color: #ffffff;
     border: 2px solid #d6a93c;
-    padding: 9px 12px;
+    border-radius: 4px;
+    padding: 6px 12px;
     font-weight: 900;
 }
 

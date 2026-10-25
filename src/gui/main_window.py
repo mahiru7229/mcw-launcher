@@ -43,6 +43,7 @@ from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from mcw_core.api.modrinth.modrinth_errors import ModrinthManagedFilesRequired, ModrinthModpackManualDownloadRequired
 from mcw_core.api.network.download_pause import is_download_cancelled, is_download_paused
 from mcw_core.api.runtime.game_runtime_manager import GameRuntimeManager
+from mcw_core.api.system.platform_info import PlatformInfo
 from mcw_core.api.update.automatic_update_installer import AutomaticUpdateInstaller, AutomaticUpdateUnsupportedError
 from src.gui.application import create_application
 from src.gui.animation.motion_runtime import MotionRuntime
@@ -2572,7 +2573,18 @@ class MainWindow(QMainWindow):
         minimize = self._last_launch_was_quick_play or bool(self.gui_settings_controller.current.get("minimize_on_launch", True))
         if minimize and not self.isMinimized():
             self._minimized_for_game = True
-            self.showMinimized()
+            if PlatformInfo.is_windows() and not self.isActiveWindow():
+                try:
+                    import ctypes
+                    SW_SHOWMINNOACTIVE = 7
+                    ctypes.windll.user32.ShowWindow(int(self.winId()), SW_SHOWMINNOACTIVE)
+                except Exception:
+                    self.showMinimized()
+            else:
+                self.showMinimized()
+            if PlatformInfo.is_windows() and isinstance(_hwnd, int) and _hwnd > 0:
+                from mcw_core.api.runtime.game_window_activator import GameWindowActivator
+                GameWindowActivator.activate_window(_hwnd)
 
     def _on_game_exited(self, result: object) -> None:
         if getattr(self, "_minimized_for_game", False):

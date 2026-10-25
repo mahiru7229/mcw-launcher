@@ -31,6 +31,55 @@ class GameWindowActivator:
             return False
 
     @classmethod
+    def _collect_process_tree_pids(cls, root_pid: int) -> set[int]:
+        """Returns root_pid and any direct/indirect child PIDs on Windows."""
+        pids = {int(root_pid)}
+        if not PlatformInfo.is_windows() or root_pid <= 0:
+            return pids
+        try:
+            kernel32 = ctypes.windll.kernel32
+            TH32CS_SNAPPROCESS = 0x00000002
+
+            class PROCESSENTRY32W(ctypes.Structure):
+                _fields_ = [
+                    ("dwSize", wintypes.DWORD),
+                    ("cntUsage", wintypes.DWORD),
+                    ("th32ProcessID", wintypes.DWORD),
+                    ("th32DefaultHeapID", ctypes.c_void_p),
+                    ("th32ModuleID", wintypes.DWORD),
+                    ("cntThreads", wintypes.DWORD),
+                    ("th32ParentProcessID", wintypes.DWORD),
+                    ("pcPriClassBase", ctypes.c_long),
+                    ("dwFlags", wintypes.DWORD),
+                    ("szExeFile", wintypes.WCHAR * 260),
+                ]
+
+            snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+            if snapshot == ctypes.c_void_p(-1).value or not snapshot:
+                return pids
+            try:
+                parent_map: dict[int, int] = {}
+                entry = PROCESSENTRY32W()
+                entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+                if kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
+                    while True:
+                        parent_map[int(entry.th32ProcessID)] = int(entry.th32ParentProcessID)
+                        if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
+                            break
+                changed = True
+                while changed:
+                    changed = False
+                    for child_pid, parent_pid in parent_map.items():
+                        if parent_pid in pids and child_pid not in pids:
+                            pids.add(child_pid)
+                            changed = True
+            finally:
+                kernel32.CloseHandle(snapshot)
+        except Exception:
+            pass
+        return pids
+
+    @classmethod
     def find_window_for_pid(cls, pid: int) -> int | None:
         """Finds the main visible game window handle (HWND) for the given process PID."""
         if not PlatformInfo.is_windows():
@@ -41,7 +90,9 @@ class GameWindowActivator:
             user32.EnumWindows.argtypes = [WNDENUMPROC, wintypes.LPARAM]
             user32.EnumWindows.restype = wintypes.BOOL
 
+            target_pids = cls._collect_process_tree_pids(pid)
             matched_hwnd: int | None = None
+            GW_OWNER = 4
 
             def enum_proc(hwnd: int, _lparam: int) -> bool:
                 nonlocal matched_hwnd
@@ -51,8 +102,13 @@ class GameWindowActivator:
 
                     window_pid = wintypes.DWORD()
                     user32.GetWindowThreadProcessId(hwnd, ctypes.byref(window_pid))
+                    if int(window_pid.value) not in target_pids:
+                        return True
 
-                    # Filter out 0x0 or tiny dummy helper windows
+                    if user32.GetWindow(hwnd, GW_OWNER):
+                        return True
+
+                    # Filter out 0x0 or tiny dummy helper windows (e.g. GLFW/OpenGL dummy context windows)
                     rect = wintypes.RECT()
                     user32.GetWindowRect(hwnd, ctypes.byref(rect))
                     width = rect.right - rect.left
@@ -60,18 +116,8 @@ class GameWindowActivator:
                     if width < 100 or height < 100:
                         return True
 
-                    if window_pid.value == pid:
-                        matched_hwnd = hwnd
-                        return False
-
-                    # Secondary check: title contains "Minecraft" while our process is active
-                    length = user32.GetWindowTextLengthW(hwnd)
-                    if length > 0:
-                        buf = ctypes.create_unicode_buffer(length + 1)
-                        user32.GetWindowTextW(hwnd, buf, length + 1)
-                        if "minecraft" in buf.value.casefold():
-                            matched_hwnd = hwnd
-                            return False
+                    matched_hwnd = hwnd
+                    return False
                 except Exception:
                     pass
 
@@ -93,15 +139,11 @@ class GameWindowActivator:
             user32 = ctypes.windll.user32
             kernel32 = ctypes.windll.kernel32
 
-            # Restore if minimized
-            SW_RESTORE = 9
-            user32.ShowWindow(hwnd, SW_RESTORE)
-
-            # Synthesize ALT key press to reset Windows foreground lock timeout
-            VK_MENU = 0x12
-            KEYEVENTF_KEYUP = 0x0002
-            user32.keybd_event(VK_MENU, 0, 0, 0)
-            user32.keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
+            # Only restore if the window is actually minimized (iconic); calling
+            # SW_RESTORE on a maximized window would un-maximize (shrink) it.
+            if user32.IsIconic(hwnd):
+                SW_RESTORE = 9
+                user32.ShowWindow(hwnd, SW_RESTORE)
 
             current_thread = kernel32.GetCurrentThreadId()
             target_thread = user32.GetWindowThreadProcessId(hwnd, None)
@@ -111,13 +153,13 @@ class GameWindowActivator:
             attached_current = False
             attached_foreground = False
             try:
-                if current_thread != target_thread:
+                if current_thread and target_thread and current_thread != target_thread:
                     attached_current = bool(user32.AttachThreadInput(current_thread, target_thread, True))
-                if foreground_thread and foreground_thread != target_thread:
+                if foreground_thread and target_thread and foreground_thread != target_thread:
                     attached_foreground = bool(user32.AttachThreadInput(foreground_thread, target_thread, True))
 
                 # Pop to top of z-order: HWND_TOPMOST (-1) then HWND_NOTOPMOST (-2)
-                user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0002 | 0x0001)
+                user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0010)
                 user32.SetWindowPos(hwnd, -2, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0040)
                 user32.BringWindowToTop(hwnd)
                 user32.SetForegroundWindow(hwnd)
@@ -159,12 +201,12 @@ class GameWindowActivator:
 
                 hwnd = cls.find_window_for_pid(pid)
                 if hwnd is not None:
-                    cls.activate_window(hwnd)
                     if on_window_found is not None:
                         try:
                             on_window_found(hwnd)
                         except Exception as cb_err:
                             logger.debug("on_window_found error: %s", cb_err)
+                    cls.activate_window(hwnd)
                     break
 
                 time.sleep(poll_interval)
