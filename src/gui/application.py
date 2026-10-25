@@ -14,8 +14,17 @@ from src.gui.input_guard import install_combo_box_wheel_guard
 from src.gui.widget.adaptive_combo_box import install_adaptive_combo_boxes
 
 
+_RELOADING_HOTFIX_MODULES = False
+
+
 def _reload_hotfixed_core_modules() -> None:
     """Ensure any modules in hotfixes/live that were pre-loaded during bootstrap are refreshed."""
+    global _RELOADING_HOTFIX_MODULES
+    if _RELOADING_HOTFIX_MODULES:
+        return
+
+    _RELOADING_HOTFIX_MODULES = True
+    _self_module = sys.modules.get(__name__)
     try:
         if getattr(sys, "frozen", False):
             project_root = Path(sys.executable).resolve().parent
@@ -26,16 +35,30 @@ def _reload_hotfixed_core_modules() -> None:
         if not live_dir.is_dir():
             return
 
+        import importlib
+
+        live_str = str(live_dir.resolve())
+        if live_str not in sys.path:
+            sys.path.insert(0, live_str)
+
+        sys.modules.pop("mcw_core.api.update.hotfix_manager", None)
+        sys.modules.pop("src.core.update.hotfix_manager", None)
+
+        hm_mod = importlib.import_module("src.core.update.hotfix_manager")
         try:
-            from mcw_core.api.update.hotfix_manager import HotfixManager
+            importlib.import_module("mcw_core.api.update.hotfix_manager")
         except Exception:
-            import importlib
+            pass
 
-            HotfixManager = getattr(importlib.import_module("src.core.update.hotfix_manager"), "HotfixManager")
-
+        HotfixManager = getattr(hm_mod, "HotfixManager")
+        HotfixManager._install_meta_path_finder(live_dir)
         HotfixManager._evict_cached_hotfix_modules(live_dir)
     except Exception:
         pass
+    finally:
+        if _self_module is not None:
+            sys.modules[__name__] = _self_module
+        _RELOADING_HOTFIX_MODULES = False
 
 
 _reload_hotfixed_core_modules()

@@ -525,4 +525,52 @@ def test_evict_cached_hotfix_modules_preserves_update_info_identity(tmp_path: Pa
     assert m_uc.UpdateInfo is m_ui.UpdateInfo
     assert UpdateController._is_valid_update_info(old_update_info) is True
 
+def test_application_reload_resilient_to_legacy_hotfix_manager(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import importlib
+    import types
+    from src.core.update.base_release_client import _get_update_info_module
+
+    live_dir = tmp_path / "hotfixes" / "live"
+    live_dir.mkdir(parents=True)
+
+    for rel_path in [
+        "src/gui/application.py",
+        "src/core/update/hotfix_manager.py",
+        "mcw_core/api/update/hotfix_manager.py",
+        "src/models/update/update_info.py",
+        "mcw_core/api/models/update/update_info.py",
+        "src/core/update/base_release_client.py",
+        "src/gui/controllers/update_controller.py",
+    ]:
+        dest = live_dir / rel_path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(Path(rel_path).read_text(encoding="utf-8"), encoding="utf-8")
+
+    old_mod = types.ModuleType("src.core.update.hotfix_manager")
+
+    class OldHotfixManager:
+        @classmethod
+        def _install_meta_path_finder(cls, d):
+            pass
+
+        @classmethod
+        def _evict_cached_hotfix_modules(cls, d):
+            sys.modules.pop("src.gui.application", None)
+
+    old_mod.HotfixManager = OldHotfixManager
+    monkeypatch.setitem(sys.modules, "src.core.update.hotfix_manager", old_mod)
+    monkeypatch.setitem(sys.modules, "mcw_core.api.update.hotfix_manager", old_mod)
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "MCW Launcher.exe"))
+
+    sys.modules.pop("src.gui.application", None)
+    app_mod = importlib.import_module("src.gui.application")
+
+    assert "src.gui.application" in sys.modules
+    assert sys.modules["src.gui.application"] is app_mod
+    assert getattr(sys.modules["src.core.update.hotfix_manager"], "HotfixManager", None) is not OldHotfixManager
+
+    import src.gui.controllers.update_controller as uc_mod
+    assert uc_mod.UpdateInfo is _get_update_info_module().UpdateInfo
 

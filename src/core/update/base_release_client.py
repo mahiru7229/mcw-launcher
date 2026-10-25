@@ -14,6 +14,13 @@ from src.models.update.update_info import ReleaseAsset, UpdateInfo
 logger = logging.getLogger(__name__)
 
 
+def _get_update_info_module():
+    import sys
+    from src.models.update import update_info as _mod
+
+    return sys.modules.get("src.models.update.update_info", _mod)
+
+
 class BaseReleaseClient:
     """Base release client providing release evaluation, filtering, and cache lifecycle."""
 
@@ -106,7 +113,7 @@ class BaseReleaseClient:
         emergency_candidates = [c for c in candidates if c[4]]
         selection_pool = emergency_candidates if emergency_candidates else candidates
         version, release, asset, strategy, is_emergency = max(selection_pool, key=lambda item: item[0].comparison_key())
-        return _update_info_mod.UpdateInfo(
+        return _get_update_info_module().UpdateInfo(
             current_version=self.current_version,
             version=str(version),
             tag_name=str(release.get("tag_name") or version),
@@ -212,7 +219,7 @@ class BaseReleaseClient:
             if m_str.startswith("https://") and m_str != download_url:
                 mirror_urls.append(m_str)
 
-        return _update_info_mod.ReleaseAsset(
+        return _get_update_info_module().ReleaseAsset(
             name=name,
             download_url=download_url,
             size=max(0, int(raw_asset.get("size") or 0)),
@@ -296,7 +303,7 @@ class BaseReleaseClient:
             if m_str.startswith("https://") and m_str != download_url:
                 mirror_urls.append(m_str)
 
-        return _update_info_mod.ReleaseAsset(
+        return _get_update_info_module().ReleaseAsset(
             name=asset_name,
             download_url=download_url,
             size=max(0, int(raw_asset.get("size") or 0)),
