@@ -6,6 +6,8 @@ import zipfile
 dest_zip = Path("d:/WORKBASE/mcw-download/public/hotfixes/v1.8.3.2.zip")
 
 files_to_pack = [
+    "mcw_core/api/runtime/game_window_activator.py",
+    "mcw_core/api/system/platform_info.py",
     "mcw_core/api/update/base_release_client.py",
     "mcw_core/api/update/cloudflare_release_client.py",
     "mcw_core/api/update/update_cleanup.py",
@@ -20,6 +22,7 @@ files_to_pack = [
     "src/core/progress/file_batch_progress.py",
     "src/core/repair/verification_cache.py",
     "src/core/runtime/game_window_activator.py",
+    "src/core/system/platform_info.py",
     "src/core/update/base_release_client.py",
     "src/core/update/cloudflare_release_client.py",
     "src/core/update/github_release_client.py",
