@@ -43,10 +43,13 @@ from mcw_core.api.modloader.mod_loader_manager import ModLoaderManager
 from mcw_core.api.modrinth.modrinth_errors import ModrinthManagedFilesRequired, ModrinthModpackManualDownloadRequired
 from mcw_core.api.network.download_pause import is_download_cancelled, is_download_paused
 from mcw_core.api.runtime.game_runtime_manager import GameRuntimeManager
-class PlatformInfo:
-    @staticmethod
-    def is_windows() -> bool:
-        return sys.platform.startswith("win")
+try:
+    from mcw_core.api.system.platform_info import PlatformInfo
+except Exception:
+    class PlatformInfo:  # type: ignore[no-redef]
+        @staticmethod
+        def is_windows() -> bool:
+            return sys.platform.startswith("win")
 from mcw_core.api.update.automatic_update_installer import AutomaticUpdateInstaller, AutomaticUpdateUnsupportedError
 from src.gui.application import create_application
 from src.gui.animation.motion_runtime import MotionRuntime

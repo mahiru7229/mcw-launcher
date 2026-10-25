@@ -84,4 +84,3 @@ def test_update_controller_uses_active_hotfix_version(gui_app, monkeypatch: pyte
     monkeypatch.setattr("src.gui.controllers.update_controller.get_active_hotfix_version", lambda: "1.8.3.2")
     controller.check(manual=True)
     assert controller._manager.current_version == "1.8.3.2"
-

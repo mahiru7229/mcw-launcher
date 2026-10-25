@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import sys
 
 from PySide6.QtCore import Signal, Slot
 
@@ -44,8 +45,12 @@ class UpdateController(BaseController):
 
     @classmethod
     def _effective_version(cls) -> str:
-        return get_active_hotfix_version() or VERSION_ID
-
+        import sys
+        mod = sys.modules.get("src.gui.controllers.update_controller")
+        fn = getattr(mod, "get_active_hotfix_version", None) if mod else None
+        if fn is None:
+            fn = get_active_hotfix_version
+        return fn() or VERSION_ID
     def __init__(self, task_runner: TaskRunner, channel: str = UPDATE_CHANNEL, source: str = "cloudflare") -> None:
         super().__init__()
         self._task_runner = task_runner

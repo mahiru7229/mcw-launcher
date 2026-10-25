@@ -167,6 +167,7 @@ def test_main_window_on_game_window_ready_when_inactive_uses_showminnoactive(mon
     fake_windll.user32 = fake_user32
     monkeypatch.setattr(ctypes, "windll", fake_windll, raising=False)
     monkeypatch.setattr("mcw_core.api.system.platform_info.PlatformInfo.is_windows", lambda: True)
+    monkeypatch.setattr("src.gui.main_window.PlatformInfo.is_windows", lambda: True)
     monkeypatch.setattr("mcw_core.api.runtime.game_window_activator.GameWindowActivator.activate_window", lambda hwnd: True)
 
     MainWindow._on_game_window_ready(fake_window, 99999)

@@ -525,3 +525,4 @@ def test_evict_cached_hotfix_modules_preserves_update_info_identity(tmp_path: Pa
     assert m_uc.UpdateInfo is m_ui.UpdateInfo
     assert UpdateController._is_valid_update_info(old_update_info) is True
 
+
