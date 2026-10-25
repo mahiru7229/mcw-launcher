@@ -17,11 +17,6 @@ from src.gui.widget.adaptive_combo_box import install_adaptive_combo_boxes
 def _reload_hotfixed_core_modules() -> None:
     """Ensure any modules in hotfixes/live that were pre-loaded during bootstrap are refreshed."""
     try:
-        import importlib
-        import logging
-
-        logger = logging.getLogger("mcw_core.hotfix_bootstrap")
-
         if getattr(sys, "frozen", False):
             project_root = Path(sys.executable).resolve().parent
         else:
@@ -31,40 +26,14 @@ def _reload_hotfixed_core_modules() -> None:
         if not live_dir.is_dir():
             return
 
-        reloaded = []
-        for py_file in live_dir.rglob("*.py"):
-            rel_path = py_file.relative_to(live_dir)
-            parts = list(rel_path.parts)
-            if parts[-1].endswith(".py"):
-                parts[-1] = parts[-1][:-3]
-            if parts[-1] == "__init__":
-                parts.pop()
-            mod_name = ".".join(parts)
-            if mod_name in sys.modules and mod_name != "src.gui.application":
-                del sys.modules[mod_name]
-                try:
-                    importlib.import_module(mod_name)
-                    reloaded.append(mod_name)
-                except Exception as exc:
-                    logger.debug("Failed to reimport hotfix module %s: %s", mod_name, exc)
+        try:
+            from mcw_core.api.update.hotfix_manager import HotfixManager
+        except Exception:
+            import importlib
 
-        if "mcw_core.facade" in sys.modules:
-            try:
-                import mcw_core.facade
+            HotfixManager = getattr(importlib.import_module("src.core.update.hotfix_manager"), "HotfixManager")
 
-                importlib.reload(mcw_core.facade)
-            except Exception as exc:
-                logger.debug("Failed to reload mcw_core.facade: %s", exc)
-        if "mcw_core" in sys.modules:
-            try:
-                import mcw_core
-
-                importlib.reload(mcw_core)
-            except Exception as exc:
-                logger.debug("Failed to reload mcw_core: %s", exc)
-
-        if reloaded:
-            logger.info("Successfully reloaded %d hotfix modules from live: %s", len(reloaded), reloaded)
+        HotfixManager._evict_cached_hotfix_modules(live_dir)
     except Exception:
         pass
 

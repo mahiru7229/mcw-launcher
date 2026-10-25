@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import argparse
+import tempfile
+import uuid
 import hashlib
 import json
 import os
@@ -365,3 +368,83 @@ def test_windows_rename_away_restores_old_launcher_if_new_install_fails(tmp_path
         bridge.replace_windows_launcher_with_retry(source, destination, timeout_seconds=0.0)
 
     assert destination.read_bytes() == b"old"
+
+def test_select_release_package_never_selects_legacy_bridge_shim() -> None:
+    payload = {
+        "assets": [
+            {
+                "name": "MCW-Launcher-LegacyBridge-v1.8.4-beta.2-windows-x64.zip",
+                "browser_download_url": "https://example.invalid/shim.zip",
+                "size": 1234,
+            },
+            {
+                "name": "MCW-Launcher-v1.8.4-beta.2-windows-x64.zip",
+                "browser_download_url": "https://example.invalid/real.zip",
+                "size": 5678,
+            },
+            {
+                "name": "MCW-Launcher-v1.8.4-beta.2-windows-x64.zip.sha256",
+                "browser_download_url": "https://example.invalid/real.sha256",
+                "size": 100,
+            },
+        ]
+    }
+    selected = bridge.select_release_package(payload, "v1.8.4-beta.2", "windows-x64")
+    assert selected.archive.name == "MCW-Launcher-v1.8.4-beta.2-windows-x64.zip"
+
+
+def test_main_handles_cleanup_update_and_spawns_self_relocated_bridge(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    temp_updater_dir = Path(tempfile.gettempdir()) / f"test_updater_{uuid.uuid4().hex}"
+    temp_updater_dir.mkdir()
+    (temp_updater_dir / "dummy.bin").write_bytes(b"data")
+
+    install_dir = tmp_path / "install"
+    install_dir.mkdir()
+    fake_exe = install_dir / "MCW Launcher.exe"
+    fake_exe.write_bytes(b"fake-launcher")
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(fake_exe))
+    monkeypatch.setattr(sys, "argv", ["MCW Launcher.exe", "--cleanup-update", str(temp_updater_dir), "99999"])
+
+    spawn_called: list[tuple[Path, Path, str]] = []
+    monkeypatch.setattr(bridge, "spawn_self_relocated_bridge", lambda exe, inst, tag: spawn_called.append((exe, inst, tag)))
+
+    ret = bridge.main()
+    assert ret == 0
+    assert len(spawn_called) == 1
+    assert spawn_called[0][1] == install_dir
+
+
+def test_auto_detect_install_directory_scores_features(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    dir_empty = tmp_path / "empty"
+    dir_full = tmp_path / "full"
+    dir_empty.mkdir()
+    dir_full.mkdir()
+
+    (dir_empty / "MCW Launcher.exe").write_bytes(b"stub")
+
+    (dir_full / "MCW Launcher.exe").write_bytes(b"stub")
+    (dir_full / "mcw-update.json").write_text("{}", encoding="utf-8")
+    (dir_full / "instances").mkdir()
+    (dir_full / "config").mkdir()
+
+    monkeypatch.setattr(bridge, "_candidate_install_directories", lambda _plat=None: [dir_empty, dir_full])
+    detected = bridge.auto_detect_install_directory("windows-x64")
+    assert detected == dir_full
+
+
+def test_terminal_main_auto_starts_when_install_directory_detected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    install_dir = tmp_path / "install"
+    install_dir.mkdir()
+    (install_dir / "MCW Launcher.exe").write_bytes(b"exe")
+
+    cli_called: list[object] = []
+    monkeypatch.setattr(bridge, "auto_detect_install_directory", lambda _plat=None: install_dir)
+    monkeypatch.setattr(bridge, "cli_main", lambda args: cli_called.append(args) or 0)
+
+    ret = bridge.terminal_main(argparse.Namespace(install_dir=None, tag="latest", force_close=False, no_auto_start=False))
+    assert ret == 0
+    assert len(cli_called) == 1
+    assert cli_called[0].install_dir == install_dir
+    assert cli_called[0].force_close is True

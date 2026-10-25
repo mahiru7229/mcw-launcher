@@ -8,6 +8,7 @@ from typing import Any
 
 from src.core.fs.atomic_file import atomic_write_text
 from src.core.update.versioning import LauncherVersion
+from src.models.update import update_info as _update_info_mod
 from src.models.update.update_info import ReleaseAsset, UpdateInfo
 
 logger = logging.getLogger(__name__)
@@ -105,7 +106,7 @@ class BaseReleaseClient:
         emergency_candidates = [c for c in candidates if c[4]]
         selection_pool = emergency_candidates if emergency_candidates else candidates
         version, release, asset, strategy, is_emergency = max(selection_pool, key=lambda item: item[0].comparison_key())
-        return UpdateInfo(
+        return _update_info_mod.UpdateInfo(
             current_version=self.current_version,
             version=str(version),
             tag_name=str(release.get("tag_name") or version),
@@ -211,7 +212,7 @@ class BaseReleaseClient:
             if m_str.startswith("https://") and m_str != download_url:
                 mirror_urls.append(m_str)
 
-        return ReleaseAsset(
+        return _update_info_mod.ReleaseAsset(
             name=name,
             download_url=download_url,
             size=max(0, int(raw_asset.get("size") or 0)),
@@ -244,6 +245,8 @@ class BaseReleaseClient:
             score = 20 if lowered.endswith(f"-{self.platform_id}.zip") else 10
             if "mcw" in lowered or "launcher" in lowered:
                 score += 2
+            if "legacy" in lowered or "bridge" in lowered:
+                score -= 10
             scored.append((score, raw_asset))
 
         if not scored:
@@ -293,7 +296,7 @@ class BaseReleaseClient:
             if m_str.startswith("https://") and m_str != download_url:
                 mirror_urls.append(m_str)
 
-        return ReleaseAsset(
+        return _update_info_mod.ReleaseAsset(
             name=asset_name,
             download_url=download_url,
             size=max(0, int(raw_asset.get("size") or 0)),

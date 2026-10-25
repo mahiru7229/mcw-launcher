@@ -22,6 +22,7 @@ DEFAULT_DIRECTORIES = ("lang", "themes")
 DEFAULT_CLEANUP_PATHS = ("docs", "_internal")
 SUPPORTED_PLATFORMS = ("windows-x64", "linux-x64")
 PACKAGE_MANIFEST_SCHEMA_VERSION = 2
+LEGACY_SHIM_MANIFEST_SCHEMA_VERSION = 1
 
 
 def bundled_updater_name(platform_id: str) -> str:
@@ -182,12 +183,70 @@ def build_release_zip(
     return output
 
 
+
+
+def default_legacy_shim_output_path(project_root: Path, version: str, platform_id: str = "windows-x64") -> Path:
+    platform_id = validate_platform(platform_id)
+    return project_root / "release" / f"MCW-Launcher-LegacyBridge-v{version}-{platform_id}.zip"
+
+
+def build_legacy_bridge_shim_zip(
+    bridge_executable: Path,
+    version: str,
+    output: Path,
+    platform_id: str = "windows-x64",
+) -> Path:
+    platform_id = validate_platform(platform_id)
+    bridge_executable = Path(bridge_executable).resolve()
+    if not bridge_executable.is_file():
+        raise FileNotFoundError(f"Bridge executable not found: {bridge_executable}")
+
+    package_name = f"MCW-Launcher-LegacyBridge-v{version}-{platform_id}"
+    launcher_name = "MCW Launcher.exe" if platform_id == "windows-x64" else "mcw-launcher"
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="mcw-legacy-shim-") as temporary:
+        payload_root = Path(temporary) / package_name
+        payload_root.mkdir(parents=True)
+        dest_exe = payload_root / launcher_name
+        shutil.copy2(bridge_executable, dest_exe)
+
+        manifest = {
+            "schema_version": LEGACY_SHIM_MANIFEST_SCHEMA_VERSION,
+            "version": version,
+            "platform": platform_id,
+            "executable": launcher_name,
+            "files": [launcher_name, "mcw-update.json"],
+        }
+        (payload_root / "mcw-update.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+            for path in sorted(payload_root.rglob("*")):
+                if not path.is_file():
+                    continue
+                archive_name = path.relative_to(payload_root.parent).as_posix()
+                info = zipfile.ZipInfo.from_file(path, archive_name)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                if platform_id == "linux-x64" and path.name == launcher_name:
+                    info.create_system = 3
+                    info.external_attr = (stat.S_IFREG | 0o755) << 16
+                with path.open("rb") as source, archive.open(info, "w", force_zip64=True) as target:
+                    shutil.copyfileobj(source, target, length=1024 * 1024)
+
+    checksum_path = output.with_name(f"{output.name}.sha256")
+    checksum_path.write_bytes(f"{sha256_file(output)}  {output.name}\n".encode("utf-8"))
+    return output
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Build an MCW Launcher schema-2 ZIP with a bundled updater executable."
     )
-    parser.add_argument("--exe", type=Path, required=True, help="Path to the packaged native launcher executable")
-    parser.add_argument("--updater", type=Path, required=True, help="Path to the packaged native updater executable")
+    parser.add_argument("--exe", type=Path, help="Path to the packaged native launcher executable")
+    parser.add_argument("--updater", type=Path, help="Path to the packaged native updater executable")
     parser.add_argument("--version", required=True, help=f"Version without a leading v; it must match {VERSION_ID}")
     parser.add_argument(
         "--platform",
@@ -196,6 +255,8 @@ def main() -> None:
         help="Target platform encoded in the package name and manifest",
     )
     parser.add_argument("--output", type=Path, help="Output ZIP path")
+    parser.add_argument("--legacy-bridge-shim", type=Path, help="Build a legacy bridge shim ZIP using the given bridge executable")
+    parser.add_argument("--legacy-shim-output", type=Path, help="Output ZIP path for the legacy bridge shim")
     args = parser.parse_args()
 
     try:
@@ -203,17 +264,32 @@ def main() -> None:
         platform_id = validate_platform(args.platform)
     except ValueError as error:
         parser.error(str(error))
-    output = args.output or default_output_path(PROJECT_ROOT, version, platform_id)
-    result = build_release_zip(
-        PROJECT_ROOT,
-        args.exe.resolve(),
-        args.updater.resolve(),
-        version,
-        output.resolve(),
-        platform_id,
-    )
-    print(result)
-    print(result.with_name(f"{result.name}.sha256"))
+
+    if args.legacy_bridge_shim is not None:
+        shim_output = args.legacy_shim_output or default_legacy_shim_output_path(PROJECT_ROOT, version, platform_id)
+        shim_result = build_legacy_bridge_shim_zip(
+            args.legacy_bridge_shim.resolve(),
+            version,
+            shim_output.resolve(),
+            platform_id,
+        )
+        print(shim_result)
+        print(shim_result.with_name(f"{shim_result.name}.sha256"))
+
+    if args.exe is not None or args.updater is not None:
+        if args.exe is None or args.updater is None:
+            parser.error("Both --exe and --updater are required when building standard release ZIP")
+        output = args.output or default_output_path(PROJECT_ROOT, version, platform_id)
+        result = build_release_zip(
+            PROJECT_ROOT,
+            args.exe.resolve(),
+            args.updater.resolve(),
+            version,
+            output.resolve(),
+            platform_id,
+        )
+        print(result)
+        print(result.with_name(f"{result.name}.sha256"))
 
 
 if __name__ == "__main__":

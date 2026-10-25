@@ -26,6 +26,22 @@ class UpdateController(BaseController):
     MANUAL_CHECK_TASK_ID = "update.check.manual"
     PREPARE_TASK_ID = "update.prepare"
 
+    @staticmethod
+    def _is_valid_update_info(result: object) -> bool:
+        if isinstance(result, UpdateInfo):
+            return True
+        cls_obj = type(result)
+        return (
+            cls_obj.__name__ == "UpdateInfo"
+            and getattr(cls_obj, "__module__", "") in {
+                "src.models.update.update_info",
+                "mcw_core.api.models.update.update_info",
+            }
+            and hasattr(result, "version")
+            and hasattr(result, "tag_name")
+            and hasattr(result, "asset")
+        )
+
     @classmethod
     def _effective_version(cls) -> str:
         return get_active_hotfix_version() or VERSION_ID
@@ -158,7 +174,7 @@ class UpdateController(BaseController):
             self.status_changed.emit(tr("update.status.latest"))
             self.no_update_available.emit(manual)
             return
-        if not isinstance(result, UpdateInfo):
+        if not self._is_valid_update_info(result):
             self.update_check_failed.emit(RuntimeError("Update check returned an invalid result."), manual)
             return
 
@@ -189,3 +205,15 @@ class UpdateController(BaseController):
         if self._pending_update_info is None or task_id.startswith("update."):
             return
         self._start_pending_prepare()
+
+try:
+    from PySide6.QtWidgets import QApplication
+
+    _app = QApplication.instance()
+    if _app is not None:
+        for _widget in _app.topLevelWidgets():
+            _ctrl = getattr(_widget, "update_controller", None)
+            if _ctrl is not None and type(_ctrl).__name__ == "UpdateController" and type(_ctrl) is not UpdateController:
+                _ctrl.__class__ = UpdateController
+except Exception:
+    pass

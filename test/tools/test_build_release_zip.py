@@ -372,4 +372,45 @@ def test_onefile_package_upgrades_legacy_onedir_installation(tmp_path: Path, mon
     assert not (installation / "_internal").exists()
     assert (installation / "README.md").read_text(encoding="utf-8") == "readme-1.6.0"
 
+def test_build_legacy_bridge_shim_zip_windows_and_linux(tmp_path: Path) -> None:
+    from tools.build_release_zip import (
+        build_legacy_bridge_shim_zip,
+        default_legacy_shim_output_path,
+        LEGACY_SHIM_MANIFEST_SCHEMA_VERSION,
+    )
+    bridge_exe = tmp_path / "fake-bridge.exe"
+    bridge_exe.write_bytes(b"fake-bridge-binary")
+
+    # Windows shim
+    win_out = tmp_path / f"MCW-Launcher-LegacyBridge-v{VERSION_ID}-windows-x64.zip"
+    build_legacy_bridge_shim_zip(bridge_exe, VERSION_ID, win_out, "windows-x64")
+
+    assert win_out.is_file()
+    win_checksum = win_out.with_name(f"{win_out.name}.sha256").read_bytes()
+    assert win_checksum.endswith(b"\n")
+    assert b"\r" not in win_checksum
+
+    with zipfile.ZipFile(win_out) as archive:
+        root = f"MCW-Launcher-LegacyBridge-v{VERSION_ID}-windows-x64"
+        assert f"{root}/MCW Launcher.exe" in archive.namelist()
+        assert f"{root}/mcw-update.json" in archive.namelist()
+        manifest = json.loads(archive.read(f"{root}/mcw-update.json"))
+        assert manifest["schema_version"] == 1
+        assert manifest["version"] == VERSION_ID
+        assert manifest["platform"] == "windows-x64"
+        assert manifest["executable"] == "MCW Launcher.exe"
+        assert manifest["files"] == ["MCW Launcher.exe", "mcw-update.json"]
+
+    # Linux shim
+    linux_out = tmp_path / f"MCW-Launcher-LegacyBridge-v{VERSION_ID}-linux-x64.zip"
+    build_legacy_bridge_shim_zip(bridge_exe, VERSION_ID, linux_out, "linux-x64")
+
+    assert linux_out.is_file()
+    with zipfile.ZipFile(linux_out) as archive:
+        root = f"MCW-Launcher-LegacyBridge-v{VERSION_ID}-linux-x64"
+        info = archive.getinfo(f"{root}/mcw-launcher")
+        assert (info.external_attr >> 16) & 0o755 == 0o755
+        manifest = json.loads(archive.read(f"{root}/mcw-update.json"))
+        assert manifest["schema_version"] == 1
+        assert manifest["executable"] == "mcw-launcher"
 

@@ -136,3 +136,18 @@ def test_release_bridge_asset_does_not_override_without_marker(tmp_path: Path) -
     assert update is not None
     assert update.install_strategy == "updater"
     assert update.asset.name.endswith("windows-x64.zip")
+
+def test_select_asset_prefers_official_package_over_legacy_bridge_shim(tmp_path: Path) -> None:
+    client = GitHubReleaseClient("example/repo", "1.8.3", "beta", tmp_path / "cache.json")
+    update = client._select_update([
+        release("v1.8.4-beta.2", True, [
+            asset("MCW-Launcher-LegacyBridge-v1.8.4-beta.2-windows-x64.zip", digest="sha256:" + "b" * 64),
+            asset("MCW-Launcher-v1.8.4-beta.2-windows-x64.zip", digest="sha256:" + "a" * 64),
+        ]),
+    ])
+
+    assert update is not None
+    assert update.version == "1.8.4-beta.2"
+    assert update.asset.name == "MCW-Launcher-v1.8.4-beta.2-windows-x64.zip"
+    assert update.asset.sha256 == "a" * 64
+

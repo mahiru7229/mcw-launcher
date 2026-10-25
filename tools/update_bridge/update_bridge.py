@@ -294,7 +294,14 @@ def select_release_package(payload: dict, target_tag: str, platform_id: str | No
 
     archive = parsed.get(expected_archive)
     if archive is None:
-        candidates = [asset for asset in parsed.values() if asset.name.lower().endswith(f"-{contract.platform_id}.zip") and (expected_version in asset.name or tag == "latest")]
+        candidates = [
+            asset
+            for asset in parsed.values()
+            if asset.name.lower().endswith(f"-{contract.platform_id}.zip")
+            and "legacy" not in asset.name.lower()
+            and "bridge" not in asset.name.lower()
+            and (expected_version in asset.name or tag == "latest")
+        ]
         if len(candidates) == 1:
             archive = candidates[0]
     if archive is None:
@@ -822,9 +829,16 @@ def bridge_update(
     logger(f"Platform: {contract.display_name}")
     logger(f"Install directory: {install}")
     logger("Fetching release metadata from GitHub...")
-    payload, resolved_tag = fetch_target_release(repository, target_tag, contract.platform_id)
+    try:
+        payload, resolved_tag = fetch_target_release(repository, target_tag, contract.platform_id)
+        package = select_release_package(payload, resolved_tag, contract.platform_id)
+    except BridgeError as error:
+        if normalize_tag(target_tag) == "latest":
+            raise
+        logger(f"Target tag {target_tag} unavailable ({error}); falling back to latest release...")
+        payload, resolved_tag = fetch_target_release(repository, "latest", contract.platform_id)
+        package = select_release_package(payload, resolved_tag, contract.platform_id)
     logger(f"Resolved release: {resolved_tag}")
-    package = select_release_package(payload, resolved_tag, contract.platform_id)
     logger(f"Selected release asset: {package.archive.name}")
 
     with tempfile.TemporaryDirectory(prefix="mcw-update-bridge-") as temporary:
@@ -863,29 +877,7 @@ def bridge_update(
     return backup
 
 
-def _candidate_install_directories() -> list[Path]:
-    candidates: list[Path] = []
-    if getattr(sys, "frozen", False):
-        candidates.append(Path(sys.executable).resolve().parent)
-    else:
-        candidates.append(Path(__file__).resolve().parent)
-    candidates.append(Path.cwd())
-    seen: set[str] = set()
-    result: list[Path] = []
-    for candidate in candidates:
-        key = os.path.normcase(str(candidate.resolve()))
-        if key not in seen:
-            seen.add(key)
-            result.append(candidate)
-    return result
-
-
-def auto_detect_install_directory(platform_id: str | None = None) -> Path | None:
-    contract = platform_contract(platform_id)
-    for candidate in _candidate_install_directories():
-        if (candidate / contract.launcher_name).is_file():
-            return candidate.resolve()
-    return None
+# [Candidate detection relocated after process helpers]
 
 
 # Windows process helpers intentionally target the exact launcher path rather than
@@ -1061,8 +1053,305 @@ def force_terminate_processes(pids: Iterable[int]) -> None:
                 continue
 
 
+
+
+def _running_launcher_directories(launcher_name: str) -> list[Path]:
+    """Return directories of any currently running MCW Launcher processes."""
+    dirs: list[Path] = []
+    if os.name == "nt":
+        try:
+            kernel32, _ = _windows_apis()
+            if kernel32 is not None:
+                snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+                if snapshot != INVALID_HANDLE_VALUE:
+                    try:
+                        entry = PROCESSENTRY32W()
+                        entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+                        if kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
+                            while True:
+                                pid = int(entry.th32ProcessID)
+                                if pid and pid != os.getpid() and str(entry.szExeFile).casefold() == launcher_name.casefold():
+                                    proc_path = _windows_process_path(pid)
+                                    if proc_path is not None and proc_path.is_file():
+                                        dirs.append(proc_path.resolve().parent)
+                                if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
+                                    break
+                    finally:
+                        kernel32.CloseHandle(snapshot)
+        except Exception:
+            pass
+    elif sys.platform.startswith("linux"):
+        proc = Path("/proc")
+        if proc.is_dir():
+            for child in proc.iterdir():
+                if not child.name.isdigit() or int(child.name) == os.getpid():
+                    continue
+                proc_path = _linux_process_path(int(child.name))
+                if proc_path is not None and proc_path.name == launcher_name and proc_path.is_file():
+                    dirs.append(proc_path.resolve().parent)
+    return dirs
+
+
+def _registry_launcher_directories(launcher_name: str) -> list[Path]:
+    """Extract previously executed MCW Launcher paths from HKCU Windows Registry caches."""
+    if os.name != "nt":
+        return []
+    dirs: list[Path] = []
+    try:
+        import winreg
+
+        subkeys = (
+            r"Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache",
+            r"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Compatibility Assistant\Store",
+            r"Software\Microsoft\Windows\CurrentVersion\Explorer\FeatureUsage\AppSwitched",
+            r"Software\Microsoft\Windows\CurrentVersion\Explorer\FeatureUsage\AppLaunch",
+        )
+        target_lower = launcher_name.casefold()
+        suffixes = (".friendlyappname", ".applicationcompany")
+        for subkey in subkeys:
+            try:
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey) as key:
+                    index = 0
+                    while True:
+                        try:
+                            value_name, _, _ = winreg.EnumValue(key, index)
+                            index += 1
+                        except OSError:
+                            break
+                        raw = str(value_name or "").strip().strip('"')
+                        lowered = raw.casefold()
+                        if target_lower not in lowered:
+                            continue
+                        for suffix in suffixes:
+                            if lowered.endswith(suffix):
+                                raw = raw[: -len(suffix)]
+                                break
+                        candidate_exe = Path(raw)
+                        if candidate_exe.name.casefold() == target_lower and candidate_exe.is_file():
+                            dirs.append(candidate_exe.resolve().parent)
+            except OSError:
+                continue
+    except Exception:
+        pass
+    return dirs
+
+
+def _common_search_directories(platform_id: str) -> list[Path]:
+    """Return standard installation and extraction directories for MCW Launcher."""
+    roots: list[Path] = []
+    home = Path.home()
+    if platform_id == "windows-x64":
+        for env_key in ("LOCALAPPDATA", "APPDATA", "ProgramFiles", "ProgramFiles(x86)"):
+            val = os.environ.get(env_key, "").strip()
+            if val:
+                base = Path(val)
+                roots.extend([base / "Programs" / "MCW Launcher", base / "MCW Launcher", base / "mcw-launcher"])
+        roots.extend([Path("C:/Games"), Path("D:/Games"), Path("D:/")])
+    else:
+        roots.extend([
+            home / ".local" / "share" / "mcw-launcher",
+            home / ".local" / "bin",
+            home / "mcw-launcher",
+            Path("/opt/mcw-launcher"),
+        ])
+
+    for folder_name in ("Desktop", "Downloads", "Documents", "Games"):
+        folder = home / folder_name
+        if folder.is_dir():
+            roots.append(folder)
+
+    expanded: list[Path] = []
+    for root in roots:
+        try:
+            if not root.is_dir():
+                continue
+            expanded.append(root)
+            for child in root.iterdir():
+                if child.is_dir() and ("mcw" in child.name.casefold() or "launcher" in child.name.casefold()):
+                    expanded.append(child)
+        except OSError:
+            continue
+    return expanded
+
+
+def _candidate_install_directories(platform_id: str | None = None) -> list[Path]:
+    contract = platform_contract(platform_id)
+    raw_candidates: list[Path] = []
+    raw_candidates.extend(_running_launcher_directories(contract.launcher_name))
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        raw_candidates.extend([exe_dir, exe_dir.parent, exe_dir.parent.parent])
+    else:
+        script_dir = Path(__file__).resolve().parent
+        raw_candidates.extend([script_dir, script_dir.parent.parent])
+    raw_candidates.append(Path.cwd())
+    raw_candidates.extend(_registry_launcher_directories(contract.launcher_name))
+    raw_candidates.extend(_common_search_directories(contract.platform_id))
+
+    seen: set[str] = set()
+    result: list[Path] = []
+    for candidate in raw_candidates:
+        try:
+            resolved = candidate.expanduser().resolve()
+        except OSError:
+            continue
+        key = os.path.normcase(str(resolved))
+        if key not in seen:
+            seen.add(key)
+            result.append(resolved)
+    return result
+
+
+def _score_install_directory(directory: Path, contract: PlatformContract, running_dirs: set[str]) -> tuple[int, float]:
+    """Score a candidate directory containing the launcher executable."""
+    score = 0
+    key = os.path.normcase(str(directory))
+    if key in running_dirs:
+        score += 100
+    if getattr(sys, "frozen", False):
+        exe_dir_key = os.path.normcase(str(Path(sys.executable).resolve().parent))
+        if key == exe_dir_key:
+            score += 80
+    for marker, pts in (
+        ("mcw-update.json", 30),
+        ("instances", 25),
+        ("config", 20),
+        ("logs", 15),
+        ("lang", 10),
+        ("themes", 10),
+        ("updater", 10),
+    ):
+        if (directory / marker).exists():
+            score += pts
+    try:
+        mtime = (directory / contract.launcher_name).stat().st_mtime
+    except OSError:
+        mtime = 0.0
+    return score, mtime
+
+
+def auto_detect_install_directory(platform_id: str | None = None) -> Path | None:
+    contract = platform_contract(platform_id)
+    running_keys = {
+        os.path.normcase(str(path.resolve()))
+        for path in _running_launcher_directories(contract.launcher_name)
+    }
+    valid: list[tuple[tuple[int, float], Path]] = []
+    for candidate in _candidate_install_directories(contract.platform_id):
+        launcher_file = candidate / contract.launcher_name
+        if launcher_file.is_file():
+            valid.append((_score_install_directory(candidate, contract, running_keys), candidate))
+    if not valid:
+        return None
+    valid.sort(key=lambda item: item[0], reverse=True)
+    return valid[0][1]
+
+
+def cleanup_legacy_updater_directory(cleanup_args: list[str] | tuple[str, ...] | None) -> None:
+    """Best-effort cleanup of the temporary updater directory passed via --cleanup-update <dir> <pid>."""
+    if not cleanup_args:
+        return
+    updater_dir = Path(str(cleanup_args[0])).expanduser()
+    try:
+        temp_root = Path(tempfile.gettempdir()).resolve()
+        resolved_dir = updater_dir.resolve()
+        if temp_root not in resolved_dir.parents:
+            return
+    except OSError:
+        return
+
+    def _worker() -> None:
+        for _ in range(20):
+            if not resolved_dir.exists():
+                return
+            shutil.rmtree(resolved_dir, ignore_errors=True)
+            if not resolved_dir.exists():
+                return
+            time.sleep(0.25)
+
+    threading.Thread(target=_worker, name="mcw-legacy-updater-cleanup", daemon=True).start()
+
+
+def is_running_as_disguised_launcher(
+    executable_path: Path | None = None,
+    platform_id: str | None = None,
+) -> bool:
+    """Return True when the frozen bridge binary is executed under the launcher's filename."""
+    if not getattr(sys, "frozen", False):
+        return False
+    try:
+        contract = platform_contract(platform_id)
+    except BridgeError:
+        return False
+    exe = Path(executable_path) if executable_path is not None else Path(sys.executable)
+    return exe.name.casefold() == contract.launcher_name.casefold()
+
+
+def detect_disguised_target_tag(install_directory: Path, default_tag: str = TARGET_TAG) -> str:
+    """Read target version from Schema-1 mcw-update.json if left by a legacy shim update."""
+    manifest_path = Path(install_directory) / "mcw-update.json"
+    try:
+        if not manifest_path.is_file():
+            return default_tag
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict) and int(payload.get("schema_version") or 0) == 1:
+            version = str(payload.get("version") or "").strip()
+            if version:
+                return normalize_tag(version)
+    except Exception:
+        pass
+    return default_tag
+
+
+def spawn_self_relocated_bridge(
+    executable_path: Path,
+    install_directory: Path,
+    target_tag: str = TARGET_TAG,
+) -> Path:
+    """Copy the disguised bridge binary to %TEMP% and launch it detached so the original can exit."""
+    exe = Path(executable_path).resolve()
+    install = Path(install_directory).resolve()
+    suffix = exe.suffix if os.name == "nt" else ""
+    temp_binary = Path(tempfile.gettempdir()) / f"mcw-update-bridge-bootstrap-{uuid.uuid4().hex}{suffix}"
+    shutil.copy2(exe, temp_binary)
+    if os.name != "nt":
+        temp_binary.chmod(temp_binary.stat().st_mode | 0o755)
+
+    command = [
+        str(temp_binary),
+        "--install-dir",
+        str(install),
+        "--tag",
+        str(target_tag or TARGET_TAG),
+        "--force-close",
+        "--auto-start",
+    ]
+    creationflags = (
+        getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        | getattr(subprocess, "DETACHED_PROCESS", 0)
+    )
+    subprocess.Popen(
+        command,
+        cwd=str(Path(tempfile.gettempdir())),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        close_fds=True,
+        creationflags=creationflags if os.name == "nt" else 0,
+        start_new_session=(os.name != "nt"),
+    )
+    return temp_binary
+
+
 class BridgeWindow:
-    def __init__(self, root: tk.Tk, initial_directory: Path | None = None, target_tag: str = TARGET_TAG) -> None:
+    def __init__(
+        self,
+        root: tk.Tk,
+        initial_directory: Path | None = None,
+        target_tag: str = TARGET_TAG,
+        auto_start: bool = True,
+        force_close: bool = True,
+    ) -> None:
         self.root = root
         self.root.title("MCW Launcher Update Bridge")
         self.root.geometry("640x430")
@@ -1070,7 +1359,10 @@ class BridgeWindow:
         self.contract = platform_contract()
         self.target_tag = target_tag
         self.resolved_tag: str | None = None
-        self.install_var = tk.StringVar(value=str(initial_directory or auto_detect_install_directory(self.contract.platform_id) or ""))
+        self.auto_start = auto_start
+        self.force_close = force_close
+        detected_dir = initial_directory or auto_detect_install_directory(self.contract.platform_id)
+        self.install_var = tk.StringVar(value=str(detected_dir or ""))
         tag_desc = "latest release" if normalize_tag(self.target_tag) == "latest" else self.target_tag
         self.status_var = tk.StringVar(value=f"Universal recovery & update bridge → {tag_desc}")
         self.progress_var = tk.DoubleVar(value=0.0)
@@ -1078,6 +1370,8 @@ class BridgeWindow:
         self._build_ui()
         if normalize_tag(self.target_tag) == "latest":
             self._query_latest_in_background()
+        if detected_dir is not None and self.auto_start:
+            self.root.after(200, self._start)
 
     def _query_latest_in_background(self) -> None:
         def fetch() -> None:
@@ -1159,7 +1453,7 @@ class BridgeWindow:
         pids = launcher_process_ids(install / self.contract.launcher_name)
         if not pids:
             return True
-        if not messagebox.askyesno(
+        if not (self.force_close or self.auto_start) and not messagebox.askyesno(
             "Close MCW Launcher",
             "MCW Launcher is still running. The bridge must close it before replacing the executable.\n\nClose it now?",
         ):
@@ -1173,13 +1467,14 @@ class BridgeWindow:
             self.root.update()
             time.sleep(0.2)
         remaining = launcher_process_ids(install / self.contract.launcher_name)
-        if remaining and messagebox.askyesno(
-            "Force close required",
-            "MCW Launcher did not close normally. Force close only the launcher process from this installation?",
-        ):
-            force_terminate_processes(remaining)
-            time.sleep(0.5)
-            return not launcher_process_ids(install / self.contract.launcher_name)
+        if remaining:
+            if (self.force_close or self.auto_start) or messagebox.askyesno(
+                "Force close required",
+                "MCW Launcher did not close normally. Force close only the launcher process from this installation?",
+            ):
+                force_terminate_processes(remaining)
+                time.sleep(0.5)
+                return not launcher_process_ids(install / self.contract.launcher_name)
         return False
 
     def _start(self) -> None:
@@ -1226,10 +1521,13 @@ class BridgeWindow:
         self.progress_var.set(100)
         tag_desc = self.resolved_tag or (self.target_tag if normalize_tag(self.target_tag) != "latest" else "latest release")
         self.status_var.set(f"Updated successfully to {tag_desc}")
-        messagebox.showinfo(
-            "MCW Launcher updated",
-            f"MCW Launcher was updated to {tag_desc}.\n\nA recovery backup was kept at:\n{backup}",
-        )
+        if self.auto_start:
+            self.root.after(1200, self.root.destroy)
+        else:
+            messagebox.showinfo(
+                "MCW Launcher updated",
+                f"MCW Launcher was updated to {tag_desc}.\n\nA recovery backup was kept at:\n{backup}",
+            )
 
 
 def _wait_for_launcher_exit(launcher: Path, timeout_seconds: float) -> list[int]:
@@ -1266,10 +1564,15 @@ def cli_main(args: argparse.Namespace) -> int:
 
 def terminal_main(args: argparse.Namespace) -> int:
     contract = platform_contract()
+    detected = args.install_dir or auto_detect_install_directory(contract.platform_id)
+    if detected is not None and not getattr(args, "no_auto_start", False):
+        args.install_dir = Path(detected)
+        args.force_close = True
+        return cli_main(args)
+
     print(f"MCW Update Bridge {BRIDGE_VERSION} — {contract.display_name}")
     tag_desc = "latest release" if normalize_tag(args.tag) == "latest" else args.tag
     print(f"Universal recovery & update bridge → {tag_desc}")
-    detected = auto_detect_install_directory(contract.platform_id)
     prompt = f"Launcher folder [{detected}]: " if detected else "Launcher folder: "
     entered = input(prompt).strip()
     if not entered and detected is not None:
@@ -1293,20 +1596,41 @@ def main() -> int:
     parser.add_argument("--tag", default=TARGET_TAG, help=f"Target GitHub release tag (default: {TARGET_TAG})")
     parser.add_argument("--force-close", action="store_true", help="Allow the bridge to terminate matching launcher processes if needed")
     parser.add_argument("--cli", action="store_true", help="Run without the graphical interface")
-    args = parser.parse_args()
+    parser.add_argument("--auto-start", action="store_true", help="Automatically start the bridge update")
+    parser.add_argument("--no-auto-start", action="store_true", help="Wait for manual folder confirmation in the GUI/terminal")
+    parser.add_argument("--cleanup-update", nargs=2, metavar=("UPDATER_DIR", "UPDATER_PID"), help=argparse.SUPPRESS)
+    args, _unknown = parser.parse_known_args()
 
-    if args.cli or args.install_dir is not None:
+    if args.cleanup_update:
+        cleanup_legacy_updater_directory(args.cleanup_update)
+
+    if (
+        args.install_dir is None
+        and not args.cli
+        and not args.auto_start
+        and (is_running_as_disguised_launcher() or args.cleanup_update is not None)
+    ):
+        exe_path = Path(sys.executable).resolve()
+        install_dir = exe_path.parent
+        inferred_tag = detect_disguised_target_tag(install_dir, args.tag)
+        spawn_self_relocated_bridge(exe_path, install_dir, inferred_tag)
+        return 0
+
+    if args.cli or (args.install_dir is not None and (not args.auto_start or tk is None)):
         if args.install_dir is None:
             parser.error("--install-dir is required in CLI mode")
         return cli_main(args)
 
-    # Linux release builds intentionally exclude Tk to keep the recovery binary
-    # small and dependency-light. Running the binary directly opens an
-    # interactive terminal recovery flow instead.
     if tk is None:
         return terminal_main(args)
     root = tk.Tk()
-    BridgeWindow(root, target_tag=args.tag)
+    BridgeWindow(
+        root,
+        initial_directory=args.install_dir,
+        target_tag=args.tag,
+        auto_start=not args.no_auto_start,
+        force_close=True if not args.no_auto_start else args.force_close,
+    )
     root.mainloop()
     return 0
 

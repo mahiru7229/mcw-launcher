@@ -486,3 +486,42 @@ def test_evict_cached_hotfix_modules_refreshes_mcw_core_api(tmp_path: Path, monk
     assert "src.core.sample_mod" in reloaded_names
     assert "mcw_core.api.sample_mod" in reloaded_names
 
+def test_evict_cached_hotfix_modules_preserves_update_info_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    live_dir = tmp_path / "live"
+    (live_dir / "src" / "models" / "update").mkdir(parents=True)
+    (live_dir / "src" / "core" / "update").mkdir(parents=True)
+    (live_dir / "src" / "gui" / "controllers").mkdir(parents=True)
+
+    (live_dir / "src" / "models" / "update" / "update_info.py").write_text("# mod\n", encoding="utf-8")
+    (live_dir / "src" / "core" / "update" / "base_release_client.py").write_text("# mod\n", encoding="utf-8")
+    (live_dir / "src" / "gui" / "controllers" / "update_controller.py").write_text("# mod\n", encoding="utf-8")
+
+    from src.models.update.update_info import UpdateInfo, ReleaseAsset
+    from src.core.update.base_release_client import BaseReleaseClient
+    from src.gui.controllers.update_controller import UpdateController
+    from src.gui.application import _reload_hotfixed_core_modules
+
+    old_update_info = UpdateInfo(
+        current_version="1.8.3",
+        version="1.8.4-beta.1",
+        tag_name="v1.8.4-beta.1",
+        title="1.8.4-beta.1",
+        release_notes="",
+        release_url="",
+        published_at="",
+        prerelease=True,
+        asset=ReleaseAsset(name="update.zip", download_url="https://example.com/update.zip", size=100),
+    )
+
+    HotfixManager._evict_cached_hotfix_modules(live_dir)
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "MCW Launcher.exe"))
+    HotfixManager._evict_cached_hotfix_modules(live_dir)
+
+    import src.models.update.update_info as m_ui
+    import src.core.update.base_release_client as m_brc
+    import src.gui.controllers.update_controller as m_uc
+
+    assert m_uc.UpdateInfo is m_brc.UpdateInfo
+    assert m_uc.UpdateInfo is m_ui.UpdateInfo
+    assert UpdateController._is_valid_update_info(old_update_info) is True
+

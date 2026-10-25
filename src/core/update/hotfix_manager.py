@@ -322,10 +322,21 @@ class HotfixManager:
             if parts[-1] == "__init__":
                 parts.pop()
             mod_name = ".".join(parts)
-            if mod_name and mod_name != __name__:
+            if mod_name and mod_name not in {__name__, "src.gui.application"}:
                 collected_mods.append(mod_name)
 
-        collected_mods = sorted(set(collected_mods), key=lambda m: (m.count("."), m))
+        def _module_reload_priority(mod_name: str) -> tuple[int, int, str]:
+            if mod_name == "src.config" or mod_name.startswith("src.models."):
+                group = 0
+            elif mod_name.startswith("src.core."):
+                group = 1
+            elif mod_name.startswith("mcw_core."):
+                group = 2
+            else:
+                group = 3
+            return (group, mod_name.count("."), mod_name)
+
+        collected_mods = sorted(set(collected_mods), key=_module_reload_priority)
 
         previously_loaded: list[str] = []
         api_previously_loaded: list[str] = []
@@ -339,6 +350,11 @@ class HotfixManager:
                 if api_mod_name in sys.modules:
                     api_previously_loaded.append(api_mod_name)
                     del sys.modules[api_mod_name]
+            elif mod_name.startswith("src.models."):
+                api_mod_name = "mcw_core.api.models." + mod_name.removeprefix("src.models.")
+                if api_mod_name in sys.modules:
+                    api_previously_loaded.append(api_mod_name)
+                    del sys.modules[api_mod_name]
 
         for mod_name in previously_loaded:
             try:
@@ -347,12 +363,23 @@ class HotfixManager:
             except Exception:
                 pass
 
-        for api_mod in api_previously_loaded:
+        for api_mod in sorted(set(api_previously_loaded), key=_module_reload_priority):
             try:
                 importlib.import_module(api_mod)
                 reloaded.append(api_mod)
             except Exception:
                 pass
+
+        if "src.models.update" in sys.modules and "src.models.update.update_info" in sys.modules:
+            try:
+                ui_mod = sys.modules["src.models.update.update_info"]
+                pkg_mod = sys.modules["src.models.update"]
+                for attr in ("PreparedUpdate", "ReleaseAsset", "UpdateInfo"):
+                    if hasattr(ui_mod, attr):
+                        setattr(pkg_mod, attr, getattr(ui_mod, attr))
+            except Exception:
+                pass
+
         if "mcw_core.facade" in sys.modules:
             try:
                 import mcw_core.facade

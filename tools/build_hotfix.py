@@ -3,9 +3,10 @@ import os
 from pathlib import Path
 import zipfile
 
-dest_zip = Path("d:/WORKBASE/mcw-download/public/hotfixes/v1.8.3.2.zip")
+dest_zip = Path("d:/WORKBASE/mcw-download/public/hotfixes/v1.8.3.3.zip")
 
 files_to_pack = [
+    "mcw_core/api/models/update/update_info.py",
     "mcw_core/api/runtime/game_window_activator.py",
     "mcw_core/api/system/platform_info.py",
     "mcw_core/api/update/base_release_client.py",
@@ -29,6 +30,7 @@ files_to_pack = [
     "src/core/update/hotfix_manager.py",
     "src/core/update/update_cleanup.py",
     "src/core/update/update_manager.py",
+    "src/gui/application.py",
     "src/gui/controllers/atlauncher_controller.py",
     "src/gui/controllers/base_controller.py",
     "src/gui/controllers/content_pack_controller.py",
@@ -54,8 +56,8 @@ files_to_pack = [
 
 config_content = '''from __future__ import annotations
 
-VERSION = "v1.8.3.2"
-VERSION_ID = "1.8.3.2"
+VERSION = "v1.8.3.3"
+VERSION_ID = "1.8.3.3"
 VERSION_TAG = f"v{VERSION_ID}"
 UPDATE_CHANNEL = "beta"
 GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
