@@ -111,7 +111,9 @@ def test_find_window_for_pid_ignores_other_pid_with_minecraft_title(monkeypatch:
     fake_user32.EnumWindows.side_effect = fake_enum_windows
 
     import ctypes
-    monkeypatch.setattr(ctypes.windll, "user32", fake_user32)
+    fake_windll = MagicMock()
+    fake_windll.user32 = fake_user32
+    monkeypatch.setattr(ctypes, "windll", fake_windll, raising=False)
 
     # Looking for target PID 12345 should return None because PID 99999 doesn't match
     matched = GameWindowActivator.find_window_for_pid(12345)
@@ -127,8 +129,10 @@ def test_activate_window_restore_behavior_matches_is_iconic(monkeypatch: pytest.
     fake_user32.GetWindowThreadProcessId.return_value = 100
     fake_user32.GetForegroundWindow.return_value = 0
 
-    monkeypatch.setattr(ctypes.windll, "user32", fake_user32)
-    monkeypatch.setattr(ctypes.windll, "kernel32", fake_kernel32)
+    fake_windll = MagicMock()
+    fake_windll.user32 = fake_user32
+    fake_windll.kernel32 = fake_kernel32
+    monkeypatch.setattr(ctypes, "windll", fake_windll, raising=False)
 
     # Case 1: IsIconic returns 0 -> ShowWindow(SW_RESTORE=9) MUST NOT be called
     fake_user32.IsIconic.return_value = 0
@@ -159,7 +163,9 @@ def test_main_window_on_game_window_ready_when_inactive_uses_showminnoactive(mon
     fake_user32.ShowWindow = lambda hwnd, cmd: shown_commands.append((hwnd, cmd))
 
     import ctypes
-    monkeypatch.setattr(ctypes.windll, "user32", fake_user32)
+    fake_windll = MagicMock()
+    fake_windll.user32 = fake_user32
+    monkeypatch.setattr(ctypes, "windll", fake_windll, raising=False)
     monkeypatch.setattr("mcw_core.api.system.platform_info.PlatformInfo.is_windows", lambda: True)
     monkeypatch.setattr("mcw_core.api.runtime.game_window_activator.GameWindowActivator.activate_window", lambda hwnd: True)
 
