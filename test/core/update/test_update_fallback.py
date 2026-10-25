@@ -146,3 +146,50 @@ def test_resolve_expected_sha256_falls_back_when_cdn_checksum_fails(monkeypatch:
     assert len(requested_urls) == 2
     assert "mcw-download.pages.dev" in requested_urls[0]
     assert "github.com" in requested_urls[1]
+
+
+def test_update_manager_cloudflare_returns_none_falls_back_to_github() -> None:
+    import dataclasses
+    manager = UpdateManager(repository="example/repo", current_version="1.8.3", channel="beta", source="cloudflare")
+    raw_info = sample_update_info(source_url="https://github.com/example/repo/releases/download/v1.8.4-beta.1/update.zip")
+    github_info = dataclasses.replace(raw_info, version="1.8.4-beta.1", tag_name="v1.8.4-beta.1")
+
+    manager.cloudflare_client.check = MagicMock(return_value=None)
+    manager.github_client.check = MagicMock(return_value=github_info)
+
+    result = manager.check_for_update(force_refresh=True)
+
+    assert result == github_info
+    manager.cloudflare_client.check.assert_called_once_with(force_refresh=True)
+    manager.github_client.check.assert_called_once_with(force_refresh=True)
+
+
+def test_download_archive_synthesizes_cdn_url_when_missing_from_github_asset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import dataclasses
+    manager = UpdateManager(repository="example/repo", current_version="1.8.3", source="cloudflare")
+    asset = ReleaseAsset(
+        name="MCW-Launcher-v1.8.4-beta.1-windows-x64.zip",
+        download_url="https://github.com/example/repo/releases/download/v1.8.4-beta.1/MCW-Launcher-v1.8.4-beta.1-windows-x64.zip",
+        size=1000,
+        sha256="d" * 64,
+        mirror_urls=(),
+    )
+    raw_info = sample_update_info()
+    info = dataclasses.replace(raw_info, version="1.8.4-beta.1", tag_name="v1.8.4-beta.1", asset=asset)
+
+    captured_requests = []
+
+    def mock_download(request, **kwargs):
+        captured_requests.append(request)
+
+    monkeypatch.setattr("src.core.update.update_manager.download_manager.download", mock_download)
+    monkeypatch.setattr(manager, "_archive_matches", lambda path, size, sha: True)
+
+    archive_path = tmp_path / "downloaded.zip"
+    manager._download_archive(info, archive_path)
+
+    assert len(captured_requests) == 1
+    req = captured_requests[0]
+    assert len(req.urls) == 2
+    assert req.urls[0] == "https://mcw-download.pages.dev/releases/v1.8.4-beta.1/MCW-Launcher-v1.8.4-beta.1-windows-x64.zip"
+    assert req.urls[1] == "https://github.com/example/repo/releases/download/v1.8.4-beta.1/MCW-Launcher-v1.8.4-beta.1-windows-x64.zip"

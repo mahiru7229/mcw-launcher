@@ -81,7 +81,7 @@ class UpdateManager:
             fallback_name = "Cloudflare CDN"
 
         try:
-            return primary_client.check(force_refresh=force_refresh)
+            update = primary_client.check(force_refresh=force_refresh)
         except Exception as primary_error:
             logger.warning(
                 "%s update check failed (%s: %s); falling back to backup branch (%s)...",
@@ -101,6 +101,38 @@ class UpdateManager:
                     fallback_error,
                 )
                 raise
+
+        if update is None or self.source == "auto":
+            try:
+                fallback_update = fallback_client.check(force_refresh=force_refresh)
+                if fallback_update is not None:
+                    if update is None:
+                        logger.info(
+                            "%s reported no update, but %s detected update %s.",
+                            primary_name,
+                            fallback_name,
+                            fallback_update.version,
+                        )
+                        update = fallback_update
+                    else:
+                        try:
+                            primary_v = LauncherVersion.parse(update.version)
+                            fallback_v = LauncherVersion.parse(fallback_update.version)
+                            if fallback_v > primary_v:
+                                logger.info(
+                                    "%s has newer release (%s) than %s (%s).",
+                                    fallback_name,
+                                    fallback_update.version,
+                                    primary_name,
+                                    update.version,
+                                )
+                                update = fallback_update
+                        except ValueError:
+                            pass
+            except Exception as fallback_error:
+                logger.debug("Secondary fallback check failed: %s", fallback_error)
+
+        return update
 
     def prepare_update(self, info: UpdateInfo, reporter: ProgressReporter | None = None) -> PreparedUpdate:
         archive_path = Paths.update_download_path(info.tag_name, info.asset.name)
@@ -260,6 +292,15 @@ class UpdateManager:
             m_str = str(mirror or "").strip()
             if m_str and m_str not in urls:
                 urls.append(m_str)
+
+        if (
+            self.source in {"cloudflare", "auto"}
+            and info.tag_name
+            and info.asset.name
+            and not any("mcw-download.pages.dev" in u for u in urls)
+        ):
+            cdn_url = f"https://mcw-download.pages.dev/releases/{info.tag_name}/{info.asset.name}"
+            urls.insert(0, cdn_url)
 
         request = DownloadRequest(
             urls=tuple(urls),
