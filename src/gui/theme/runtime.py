@@ -19,8 +19,11 @@ def set_theme_icon(button: QPushButton, key: str, size: int = 24) -> QPushButton
     path = theme_manager.resolve_asset(str(key))
     if path is not None:
         path = theme_accent_runtime.tinted_path(path, key)
-        button.setIcon(QIcon(str(path)))
-        button.setIconSize(QSize(int(size), int(size)))
+        sig = f"{path}|{int(size)}"
+        if button.property("mcw_applied_icon_sig") != sig or button.icon().isNull():
+            button.setIcon(QIcon(str(path)))
+            button.setIconSize(QSize(int(size), int(size)))
+            button.setProperty("mcw_applied_icon_sig", sig)
     return button
 
 
@@ -36,10 +39,13 @@ def set_theme_pixmap(label: QLabel, key: str, width: int, height: int, fallback_
         pixmap = QPixmap(str(path))
         if not pixmap.isNull():
             label.setPixmap(pixmap.scaled(int(width), int(height), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+            label.setProperty("mcw_applied_pixmap_sig", f"{path}|{int(width)}|{int(height)}")
         else:
             label.setText(str(fallback_text))
+            label.setProperty("mcw_applied_pixmap_sig", None)
     else:
         label.setText(str(fallback_text))
+        label.setProperty("mcw_applied_pixmap_sig", None)
     return label
 
 
@@ -261,11 +267,16 @@ class ThemeRuntime:
         path = self.manager.resolve_asset(key)
         if path is None:
             button.setIcon(QIcon())
+            button.setProperty("mcw_applied_icon_sig", None)
             return
         size = max(1, int(button.property("themeIconSize") or 24))
         path = self.accent_runtime.tinted_path(path, key)
+        sig = f"{path}|{size}"
+        if button.property("mcw_applied_icon_sig") == sig and not button.icon().isNull():
+            return
         button.setIcon(QIcon(str(path)))
         button.setIconSize(QSize(size, size))
+        button.setProperty("mcw_applied_icon_sig", sig)
 
     def _apply_static_text(self, widget: QLabel | QPushButton) -> None:
         role = str(widget.property("themeStaticTextRole") or "").strip()
@@ -285,17 +296,27 @@ class ThemeRuntime:
         if path is None:
             label.setPixmap(QPixmap())
             label.setText(fallback_text)
+            label.setProperty("mcw_applied_pixmap_sig", None)
             return
         path = self.accent_runtime.tinted_path(path, key)
+        width = int(label.property("themePixmapWidth") or 0)
+        height = int(label.property("themePixmapHeight") or 0)
+        if width > 0 and height > 0:
+            sig = f"{path}|{width}|{height}"
+            existing = label.pixmap()
+            if label.property("mcw_applied_pixmap_sig") == sig and existing is not None and not existing.isNull():
+                return
         pixmap = QPixmap(str(path))
         if pixmap.isNull():
             label.setPixmap(QPixmap())
             label.setText(fallback_text)
+            label.setProperty("mcw_applied_pixmap_sig", None)
             return
-        width = max(1, int(label.property("themePixmapWidth") or pixmap.width()))
-        height = max(1, int(label.property("themePixmapHeight") or pixmap.height()))
+        width = max(1, width or pixmap.width())
+        height = max(1, height or pixmap.height())
         label.setText("")
         label.setPixmap(pixmap.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        label.setProperty("mcw_applied_pixmap_sig", f"{path}|{width}|{height}")
 
     @staticmethod
     def _qss_url(path: Path) -> str:

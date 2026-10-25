@@ -2,9 +2,14 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
-## [1.8.4-beta.1] - 2026-10-25
+## [1.8.4] - 2026-10-26
 
 ### Added
+- **[Thử nghiệm] Cầu nối cập nhật thế hệ mới (Universal Legacy Update Bridge) & Tự động dò tìm thư mục cài đặt**:
+  - Thử nghiệm cơ chế nâng cấp cho các bản Launcher cũ (`v0.5.1` – `v1.8.3.x`) thông qua quy tắc đặt tên gói `MCW-Launcher-LegacyBridge-v...` kết hợp ưu tiên chọn gói tiêu chuẩn `MCW-Launcher-v...` trên các bản Launcher mới (`>= 1.8.4`).
+  - Bổ sung `discover_launcher_install_dir` trong `tools/update_bridge.py`: tự động tìm thư mục cài đặt qua tiến trình đang chạy, biến môi trường, thư mục lân cận, shortcut `.lnk` (Desktop / Start Menu), `AppData`, và Windows Registry. Tính năng đang ở giai đoạn thử nghiệm thực tế; nếu ổn định sẽ được giữ nguyên, nếu phát sinh lỗi sẽ được cập nhật ở các bản sau.
+- **Công cụ đóng gói bản vá `tools/build_hotfix.py`**:
+  - Tự động đóng gói các file mã nguồn vào `hotfixes/v<version>.zip`, tính toán SHA-256 và xuất đoạn cấu hình JSON chuẩn cho `manifest.json`.
 - **Thanh hành động nổi (`FloatingSettingsBar`) trên Viewport**:
   - Tích hợp `install_floating_action_bar` trên `BasePage`, neo thanh lưu/hủy cài đặt cố định ở đáy viewport trên `LauncherSettingsPage` và `InstanceSettingsPage`.
   - Hỗ trợ thông báo thay đổi chưa lưu (`UnsavedChangesBanner`), nút hủy thay đổi (`Discard`) và nút lưu cài đặt (`Save`) trực tiếp trên thanh nổi.
@@ -19,17 +24,31 @@ Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. D�
   - `LaunchControlWidget`, `CompactProgressWidget`, và `GlobalTaskIndicator` áp dụng fast-path chỉ cập nhật riêng chuỗi tốc độ mạng, không vẽ lại thanh tiến trình hay dịch lại text khi các thuộc tính khác không đổi.
   - Loại bỏ header ép buộc `"Accept-Encoding": "identity"` toàn cục tại `NetworkSession.get_client()`, cho phép tự động nén Gzip/Deflate cho API và Manifest JSON.
   - Mở rộng luồng băm hash `_hash_limit = max(2, min(8, cores))`.
+- **Tối ưu hóa hiệu năng khởi động, Theme Asset Caching & Instance Workspace**:
+  - `InstanceWorkspacePage` bỏ qua việc dựng lại danh sách `_rebuild_library` và `_render_selected` khi trạng thái `running_instances`, `health_reports` hoặc item đang chọn không thay đổi.
+  - `InstanceController.refresh` tái sử dụng đối tượng `Instance` đã nạp sẵn khi chọn instance mặc định, tránh đọc lại `instance.json` từ đĩa.
+  - `InstanceHealthManager.list` nạp danh sách operation journal một lần duy nhất thay vì quét đĩa lặp cho từng instance.
+  - `ThemeRuntime` lưu chữ ký `mcw_applied_icon_sig` và `mcw_applied_pixmap_sig`, tránh nạp lại hàng trăm `QIcon`/`QPixmap` từ đĩa khi khởi động hoặc lưu cài đặt.
+  - `MainWindow._on_connectivity_changed` chỉ gọi `version_controller.refresh(force_refresh=True)` khi khôi phục từ trạng thái mất mạng (`previous is False`), tránh tải trùng lặp manifest Minecraft ngay lúc khởi động.
 
 ### Fixed
-- **Khắc phục tự che khuất (Self-shadowing) và làm mới Module trong Hotfix**:
+- **Khắc phục mất đồng bộ danh tính `UpdateInfo` và lỗi `KeyError: 'src.gui.application'` khi nạp Hotfix**:
+  - `BaseReleaseClient` sử dụng hàm tra cứu động `_get_update_info_module()` để luôn khởi tạo `UpdateInfo` và `ReleaseAsset` từ module hiện hành trong `sys.modules`, khắc phục triệt để lỗi `"Update check returned an invalid result."`.
+  - `HotfixManager._evict_cached_hotfix_modules` gộp quy trình nạp lại `src.*` và `mcw_core.api.*` vào một vòng lặp 2 pha thống nhất và loại trừ `src.gui.application` khỏi danh sách xóa giữa chừng.
+  - `src/gui/application.py` chủ động nạp lại `HotfixManager` mới nhất từ `hotfixes/live` và khôi phục an toàn `sys.modules["src.gui.application"]` nếu tương tác với `HotfixManager` thế hệ cũ.
   - `HotfixMetaPathFinder` bảo toàn đường dẫn package gốc trong `submodule_search_locations` khi `hotfixes/live` nằm tại `sys.path[0]`.
-  - `HotfixManager._evict_cached_hotfix_modules` áp dụng cơ chế 2 giai đoạn làm mới cả các module tương ứng trong `mcw_core.api.*`.
-- **Đồng bộ phiên bản Hotfix vào `UpdateController` & Hoàn thiện `CloudflareReleaseClient`**:
-  - `UpdateController` tự động đồng bộ phiên bản hotfix đang hoạt động làm `current_version`.
+- **Đồng bộ phiên bản Hotfix & Chuyển vùng dự phòng Cloudflare CDN / GitHub**:
+  - `UpdateManager.check_for_update` tự động chuyển vùng dự phòng (fallback) sang GitHub Releases khi Cloudflare CDN trả về `None` (chưa kịp đồng bộ bản mới) và tự động gắn URL tải mirror từ Cloudflare CDN.
+  - `UpdateController` tự động đồng bộ phiên bản hotfix đang chạy làm `current_version`.
   - `GuiSettingsController` bảo toàn trường `update_source`.
   - `CloudflareReleaseClient` tự động suy ra tên file asset từ URL khi metadata rút gọn.
+- **Khắc phục lỗi thu nhỏ cửa sổ nền khi khởi chạy Minecraft & lỗi cắt chữ `FloatingSettingsBar`**:
+  - `GameWindowActivator` kiểm tra `IsIconic(hwnd)` trước khi gọi `ShowWindow(SW_RESTORE)`, ngăn chặn Windows thu nhỏ nhầm cửa sổ đang active của người dùng khi cửa sổ ẩn của GLFW/Java xuất hiện lúc khởi chạy game.
+  - `FloatingSettingsBar` gọi `adjustSize()` cho các nút hành động và tính toán `max_banner_w` động, khắc phục lỗi `UnsavedChangesBanner` bị cắt chữ (`...`) trong lần đầu tiên mở Launcher.
+- **Khắc phục cảnh báo `RuntimeWarning` khi đóng trực tiếp `FirstRunSetupDialog`**:
+  - Bổ sung cờ `_account_signals_connected` trong `FirstRunSetupDialog._disconnect_account_signals()` để tránh ngắt kết nối tín hiệu 2 lần liên tiếp khi `closeEvent` kích hoạt `reject()`.
 - **Loại bỏ đóng băng giao diện khi nạp Metadata & Chống gọi đúp Modpack**:
-  - `MainWindow` không kích hoạt `set_busy(True)` cho các tác vụ tra cứu metadata nền.
+  - `MainWindow` không kích hoạt `set_busy(True)` cho các tác vụ tra cứu metadata nền và không import trực tiếp `mcw_core.api.system.platform_info`.
   - Phân nhóm `group=...` cho các tác vụ mạng để hủy tự động tác vụ cũ khi chuyển dòng.
   - Tích hợp khóa `RLock` chống gọi đúp `get_project` trong `FTBClient` và `ATLauncherClient`.
   - Giới hạn 2000 block tối đa cho `LogsPage`.

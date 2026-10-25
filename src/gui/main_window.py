@@ -1153,7 +1153,7 @@ class MainWindow(QMainWindow):
                 self.logs_page.append(tr("network.online.restored.log"))
                 if self.gui_settings_controller.current.get("auto_check_updates", True):
                     self.update_controller.check(manual=False)
-            self.version_controller.refresh(force_refresh=True)
+                self.version_controller.refresh(force_refresh=True)
             self.java_controller.refresh_latest_release()
             return
 

@@ -575,10 +575,21 @@ class InstanceWorkspacePage(BasePage):
         self.account_button.setToolTip(f"{username} — {account_type}" if account_type else username)
 
     def set_running_instances(self, running_instances: list[object]) -> None:
-        self._running_instances = list(running_instances)
-        self._rebuild_library(self.current_instance_name())
+        old_sig = tuple(
+            (str(getattr(i, "instance_id", "") or ""), str(getattr(i, "name", "") or ""), str(getattr(i, "state", "") or ""))
+            for i in self._running_instances
+        )
+        new_list = list(running_instances)
+        new_sig = tuple(
+            (str(getattr(i, "instance_id", "") or ""), str(getattr(i, "name", "") or ""), str(getattr(i, "state", "") or ""))
+            for i in new_list
+        )
+        self._running_instances = new_list
+        if old_sig != new_sig:
+            self._rebuild_library(self.current_instance_name())
 
     def set_health_reports(self, reports: list[object]) -> None:
+        old_states = {name: (self._instance_health_state(inst), len(tuple(getattr(self._instance_health_report(inst), "issues", ()) or ()))) for name, inst in self._instances.items()}
         mapped: dict[str, object] = {}
         for report in reports:
             instance_id = str(getattr(report, "instance_id", "") or "")
@@ -588,7 +599,9 @@ class InstanceWorkspacePage(BasePage):
             if name:
                 mapped[f"name:{name}"] = report
         self._health_reports = mapped
-        self._rebuild_library(self.current_instance_name())
+        new_states = {name: (self._instance_health_state(inst), len(tuple(getattr(self._instance_health_report(inst), "issues", ()) or ()))) for name, inst in self._instances.items()}
+        if old_states != new_states:
+            self._rebuild_library(self.current_instance_name())
 
     def set_busy(self, busy: bool) -> None:
         self._busy = bool(busy)
@@ -787,10 +800,13 @@ class InstanceWorkspacePage(BasePage):
             if str(item.data(self.ITEM_NAME_ROLE)) == name:
                 target = item
                 break
+        new_selected = name if target is not None else ""
+        if not emit and self._selected_name == new_selected and self.instance_list.currentItem() is target:
+            return
         self._synchronizing = True
         try:
             self.instance_list.setCurrentItem(target)
-            self._selected_name = name if target is not None else ""
+            self._selected_name = new_selected
         finally:
             self._synchronizing = False
         self._render_selected()

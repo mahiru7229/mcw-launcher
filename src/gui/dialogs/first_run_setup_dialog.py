@@ -53,6 +53,7 @@ class FirstRunSetupDialog(QDialog):
         self._gpu_detection = gpu_detection
         self._recommendation = recommendation or FirstRunRecommendationService.fallback()
         self._account_controller = account_controller or getattr(parent, "account_controller", None)
+        self._account_signals_connected = False
         self._page_index = 0
         self._build_ui()
         resize_dialog_to_screen(self, 760, 600, 640, 500)
@@ -60,6 +61,7 @@ class FirstRunSetupDialog(QDialog):
         if self._account_controller is not None:
             self._account_controller.accounts_changed.connect(self._populate_accounts)
             self._account_controller.microsoft_auth_state_changed.connect(self._on_microsoft_auth_state_changed)
+            self._account_signals_connected = True
             active = getattr(self._account_controller, "is_microsoft_auth_active", False)
             self._on_microsoft_auth_state_changed(active, tr("account.microsoft.waiting") if active else "")
         else:
@@ -543,8 +545,9 @@ class FirstRunSetupDialog(QDialog):
         self.accept()
 
     def _disconnect_account_signals(self) -> None:
-        if self._account_controller is None:
+        if self._account_controller is None or not getattr(self, "_account_signals_connected", False):
             return
+        self._account_signals_connected = False
         try:
             self._account_controller.accounts_changed.disconnect(self._populate_accounts)
         except (RuntimeError, TypeError, AttributeError):

@@ -86,7 +86,8 @@ class InstanceController(BaseController):
             health_reports = []
             self.log_created.emit(f"Instance health scan failed: {type(error).__name__}: {error}")
         self.health_reports_changed.emit(health_reports)
-        self.select(preferred)
+        preloaded = next((item for item in instances if item.name == preferred), None)
+        self.select(preferred, _preloaded=preloaded)
         self.log_created.emit(f"Instances refreshed: {len(instances)} found")
 
     def refresh_running(self, force: bool = False) -> None:
@@ -99,17 +100,20 @@ class InstanceController(BaseController):
         self._running_signature = signature
         self.running_instances_changed.emit(running_instances)
 
-    def select(self, name: str) -> None:
+    def select(self, name: str, *, _preloaded: object | None = None) -> None:
         self._selected_name = name.strip()
         if not self._selected_name:
             self.selected_instance_changed.emit(None)
             self.runtime_profile_changed.emit(None)
             return
-        try:
-            instance = self._core.instances.load(self._selected_name)
-        except Exception as error:
-            self._emit_error("Load instance", error)
-            return
+        if _preloaded is not None and getattr(_preloaded, "name", None) == self._selected_name:
+            instance = _preloaded
+        else:
+            try:
+                instance = self._core.instances.load(self._selected_name)
+            except Exception as error:
+                self._emit_error("Load instance", error)
+                return
         self.selected_instance_changed.emit(instance)
         task_id = f"{self.RUNTIME_PROFILE_TASK_PREFIX}{instance.name}"
         self._task_runner.run(

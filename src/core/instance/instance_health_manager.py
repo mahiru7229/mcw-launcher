@@ -30,7 +30,12 @@ class InstanceHealthManager:
     }
 
     @classmethod
-    def scan(cls, instance: Instance) -> InstanceHealthReport:
+    def scan(
+        cls,
+        instance: Instance,
+        *,
+        _journal_entries: tuple[tuple[Path, dict], ...] | None = None,
+    ) -> InstanceHealthReport:
         checked_at = datetime.now(timezone.utc).isoformat()
         issues: list[InstanceHealthIssue] = []
         instance_dir = Path(instance.instance_dir)
@@ -61,7 +66,7 @@ class InstanceHealthManager:
 
         cls._check_loader(instance, issues)
         cls._check_icon(instance, issues)
-        cls._check_operation_journal(instance, issues)
+        cls._check_operation_journal(instance, issues, _journal_entries=_journal_entries)
 
         if bool(getattr(instance, "last_launch_crashed", False)):
             issues.append(cls._issue("last_launch_crashed", InstanceHealthState.NEEDS_ATTENTION, InstanceHealthSeverity.WARNING, "The previous Minecraft session ended in a crash.", None, True))
@@ -70,10 +75,11 @@ class InstanceHealthManager:
 
     @classmethod
     def list(cls, instances: list[Instance]) -> list[InstanceHealthReport]:
+        journal_entries = cls._load_operation_journals()
         reports: list[InstanceHealthReport] = []
         for instance in instances:
             try:
-                reports.append(cls.scan(instance))
+                reports.append(cls.scan(instance, _journal_entries=journal_entries))
             except Exception as error:
                 reports.append(
                     InstanceHealthReport(
@@ -139,20 +145,35 @@ class InstanceHealthManager:
             issues.append(cls._issue("icon_missing", InstanceHealthState.NEEDS_ATTENTION, InstanceHealthSeverity.WARNING, "The custom instance icon is missing.", path, True))
 
     @classmethod
-    def _check_operation_journal(cls, instance: Instance, issues: list[InstanceHealthIssue]) -> None:
+    def _load_operation_journals(cls) -> tuple[tuple[Path, dict], ...]:
         root = Paths.instance_operations_root()
         try:
             paths = tuple(root.glob("*.json"))
         except OSError:
-            return
-        instance_dir = Path(instance.instance_dir).resolve(strict=False)
+            return ()
+        entries: list[tuple[Path, dict]] = []
         for path in paths:
             try:
                 payload = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError, TypeError, ValueError):
                 continue
-            if not isinstance(payload, dict):
-                continue
+            if isinstance(payload, dict):
+                entries.append((path, payload))
+        return tuple(entries)
+
+    @classmethod
+    def _check_operation_journal(
+        cls,
+        instance: Instance,
+        issues: list[InstanceHealthIssue],
+        *,
+        _journal_entries: tuple[tuple[Path, dict], ...] | None = None,
+    ) -> None:
+        entries = _journal_entries if _journal_entries is not None else cls._load_operation_journals()
+        if not entries:
+            return
+        instance_dir = Path(instance.instance_dir).resolve(strict=False)
+        for path, payload in entries:
             names_match = str(payload.get("instance_name") or "") == instance.name
             paths_match = False
             for key in ("source_path", "target_path"):

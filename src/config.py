@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-VERSION = "v1.8.4-beta.1"
-VERSION_ID = "1.8.4-beta.1"
+VERSION = "v1.8.4"
+VERSION_ID = "1.8.4"
 VERSION_TAG = f"v{VERSION_ID}"
-UPDATE_CHANNEL = "beta"
+UPDATE_CHANNEL = "stable"
 GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
 DEFAULT_CLOUDFLARE_RELEASES_URL = "https://mcw-download.pages.dev/releases/manifest.json"
 DEFAULT_UPDATE_SOURCE = "cloudflare"
