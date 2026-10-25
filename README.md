@@ -12,18 +12,17 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.8.3-brightgreen" alt="v1.8.3">
+  <img src="https://img.shields.io/badge/version-v1.8.4-brightgreen" alt="v1.8.4">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!NOTE]
-> **Phiên bản mới nhất (v1.8.3)**:
-> - **Thiết kế lại trang Giới thiệu (About Page)**: Tinh gọn theo chuẩn README thu nhỏ với logo ứng dụng trực quan, thông tin tác giả, giấy phép mã nguồn mở MIT, công nghệ Python/PySide6, liên kết kho lưu trữ và hệ sinh thái MCW Core, lược bỏ các thành phần kỹ thuật chi tiết dư thừa.
-> - **Giới hạn Chơi nhanh (Quick Play) đúng chuẩn Minecraft 1.20+**: Tính năng Chơi nhanh chỉ hiển thị và hỗ trợ cho các instance từ Minecraft 1.20 trở lên; tự động ẩn nút Chơi nhanh trên thanh công cụ và thẻ thế giới nếu instance chạy phiên bản cũ hơn (< 1.20).
-> - **Màn hình Loading (`StartupSplash`) thân thiện, hiển thị tự nhiên**: Sử dụng layer cửa sổ tiêu chuẩn (`Qt.WindowType.Window`), khắc phục triệt để lỗi màn hình loading bị Windows tự động đẩy xuống layer đáy (bị che khuất phía sau mọi cửa sổ), giúp người dùng dễ dàng theo dõi tiến trình khởi động mà vẫn thoải mái đa nhiệm mà không lo bị chiếm quyền cửa sổ trên cùng.
-> - **Thiết lập tài khoản trong First Run Setup**: Hỗ trợ tạo tài khoản Offline và đăng nhập tài khoản Microsoft trực tiếp từ trình hướng dẫn khởi chạy lần đầu; mặc định chọn Java luôn là `Auto`.
-> - **Bảo vệ thao tác lăn chuột (Wheel Guard)**: Bộ lọc `WheelBlockFilter` ngăn chặn việc cuộn trang làm thay đổi nhầm giá trị của các `QSpinBox`, `QComboBox`, `QSlider`.
-> - **Tối ưu hóa hiệu năng & Giảm 50% I/O đĩa**: Loại bỏ giật đơ giao diện bằng lazy-loading các hub tabs và khử trùng lặp nạp `instance.json`.
+> **Phiên bản mới nhất (v1.8.4)**:
+> - **Tối ưu hóa tốc độ tải mạng & Hiển thị tốc độ thực thời gian thực (~80ms / 12.5 Hz)**: Giảm chunk tải xuống 64 KB, phát sự kiện tốc độ mỗi 80ms kèm fast-path cập nhật riêng chuỗi tốc độ trên GUI, bật nén Gzip/Deflate cho API/Manifest JSON, mở rộng luồng băm và lưu cache xác thực tức thì (`VerificationCache.record_verified`).
+> - **[Thử nghiệm] Cầu nối cập nhật thế hệ mới (Universal Legacy Update Bridge)**: Tự động định tuyến các bản Launcher cũ (`v0.5.1` – `v1.8.3.x`) sang gói cầu nối và tự động dò tìm thư mục cài đặt (`discover_launcher_install_dir`) để nâng cấp không cần chọn thư mục thủ công (tính năng đang thử nghiệm thực tế; nếu ổn định sẽ giữ nguyên, nếu phát sinh lỗi sẽ tiếp tục cập nhật ở các bản sau).
+> - **Củng cố kiến trúc Hotfix & Nguồn cập nhật kép Cloudflare CDN / GitHub**: Bảo toàn danh tính lớp `UpdateInfo` và `src.gui.application` khi nạp lại module hotfix, tự động chuyển vùng dự phòng (fallback) sang GitHub Releases khi CDN chưa đồng bộ kịp và gắn liên kết tải mirror từ Cloudflare CDN.
+> - **Thanh hành động nổi (`FloatingSettingsBar`) & Thẻ `Reset to defaults`**: Neo cố định thanh lưu/hủy cài đặt kèm `UnsavedChangesBanner` ở đáy màn hình trên trang cài đặt và bố trí lại thẻ khôi phục mặc định trong nhóm General.
+> - **Tối ưu hóa khởi động & Sửa lỗi cửa sổ trên Windows**: Loại bỏ dựng lại danh sách instance thừa, cache chữ ký `QIcon`/`QPixmap` trong `ThemeRuntime`, tránh tải lặp manifest Minecraft lúc khởi động, và kiểm tra `IsIconic(hwnd)` trong `GameWindowActivator` để ngăn Windows thu nhỏ nhầm cửa sổ đang làm việc khi chạy game.
 
 > [!IMPORTANT]
 > **Dự án liên quan & Nguồn tham khảo:**
@@ -46,7 +45,7 @@
 
 ## Hỗ trợ nền tảng
 
-| Nền tảng | Trạng thái (v1.8.3) | Ghi chú |
+| Nền tảng | Trạng thái (v1.8.4) | Ghi chú |
 | --- | --- | --- |
 | **Windows 10/11 x64** | Hỗ trợ chính thức | Bản build portable một file thực thi duy nhất (`MCW Launcher.exe`). |
 | **Linux x64** | Hỗ trợ chính thức | Bản build portable một file thực thi (`mcw-launcher`). Đã kiểm thử trên Lubuntu/Ubuntu. |
@@ -133,7 +132,7 @@ mcw-launcher/
 - [Hệ thống Hotfix CDN](docs/HOTFIX_SYSTEM.md)
 - [Hướng dẫn tạo Theme tùy chỉnh](docs/THEME_CREATION_GUIDE.md)
 - [Lịch sử thay đổi chi tiết (Changelog)](CHANGELOG.md)
-- [Ghi chú bản phát hành v1.8.3](docs/releases/v1.8.3.md)
+- [Ghi chú bản phát hành v1.8.4](docs/releases/v1.8.4.md)
 
 ---
 
