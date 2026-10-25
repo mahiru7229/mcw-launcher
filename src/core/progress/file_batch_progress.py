@@ -21,6 +21,7 @@ class FileBatchProgress:
         self._completed = 0
         self._rates: dict[object, tuple[float, float]] = {}
         self._last_emit_at = float("-inf")
+        self._last_emitted_speed: float | None = None
         self._lock = Lock()
 
     def start(self) -> None:
@@ -37,6 +38,8 @@ class FileBatchProgress:
             self._rates.pop(token, None)
             self._completed = min(self._completed + 1, self._total)
             current = self._completed
+            if current >= self._total:
+                speed = None
         self._emit(current=current, bytes_per_second=speed, force=self._total <= 20 or current >= self._total)
 
     def discard(self, token: object) -> None:
@@ -48,19 +51,11 @@ class FileBatchProgress:
             self._emit(current=current, bytes_per_second=speed)
 
     def update_speed(self, token: object, bytes_per_second: float | None) -> None:
-        speed = float(bytes_per_second or 0.0)
+        if bytes_per_second is None or float(bytes_per_second) <= 0:
+            return
+        speed = float(bytes_per_second)
         with self._lock:
-            changed = False
-            if speed > 0:
-                self._rates[token] = (speed, self._clock())
-                changed = True
-            elif token in self._rates:
-                self._rates.pop(token, None)
-                changed = True
-
-            if not changed:
-                return
-
+            self._rates[token] = (speed, self._clock())
             current = self._completed
             aggregate_speed = self._aggregate_speed_locked()
         self._emit(current=current, bytes_per_second=aggregate_speed)
@@ -80,9 +75,11 @@ class FileBatchProgress:
 
         now = self._clock()
         with self._lock:
-            if not force and self._min_emit_interval_seconds > 0 and now - self._last_emit_at < self._min_emit_interval_seconds:
+            first_speed_report = bytes_per_second is not None and bytes_per_second > 0 and (self._last_emitted_speed is None or self._last_emitted_speed <= 0)
+            if not force and not first_speed_report and self._min_emit_interval_seconds > 0 and now - self._last_emit_at < self._min_emit_interval_seconds:
                 return
             self._last_emit_at = now
+            self._last_emitted_speed = bytes_per_second
 
         kwargs = {"stage": self._stage, "message": self._message, "current": current, "total": self._total}
         if bytes_per_second is not None and bytes_per_second > 0:

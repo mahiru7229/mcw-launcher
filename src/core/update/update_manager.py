@@ -46,6 +46,7 @@ class UpdateManager:
     ) -> None:
         self.platform_id = platform_id or self._current_platform_id()
         self.source = self._normalize_source(source)
+        self.current_version = str(current_version).strip()
         self.repository = str(repository).strip().strip("/")
         self.github_client = GitHubReleaseClient(
             repository=self.repository,

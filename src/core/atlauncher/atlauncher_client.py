@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+
 from datetime import datetime, timezone
 import json
 from pathlib import PurePosixPath
@@ -144,29 +146,42 @@ class ATLauncherClient:
             cache_info=lookup.cache_info,
         )
 
+    _PROJECT_LOCKS_GUARD = threading.Lock()
+    _PROJECT_LOCKS: dict[str, threading.RLock] = {}
+
+    @classmethod
+    def _project_lock(cls, token: str) -> threading.RLock:
+        with cls._PROJECT_LOCKS_GUARD:
+            lock = cls._PROJECT_LOCKS.get(token)
+            if lock is None:
+                lock = threading.RLock()
+                cls._PROJECT_LOCKS[token] = lock
+            return lock
+
     @staticmethod
     def get_project(safe_name: str, force_refresh: bool = False) -> ATLauncherPack:
         token = ATLauncherClient._safe_name(safe_name)
-        url = f"{ATLauncherClient.V1_BASE_URL}pack/{quote(token, safe='')}"
-        try:
-            lookup = ATLauncherClient._request_json(
-                url,
-                ttl=ATLauncherClient.PROJECT_TTL_SECONDS,
-                force_refresh=force_refresh,
-                allow_stale_on_error=True,
-                namespace="project-v1",
-            )
-            payload = lookup.payload
-            if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
-                payload = payload["data"]
-            if not isinstance(payload, dict):
-                raise RuntimeError(f"ATLauncher pack '{token}' is unavailable.")
-            project = ATLauncherClient._parse_pack(payload)
-        except RuntimeError:
-            project = ATLauncherClient._get_project_v2(token, force_refresh)
-        if not project.safe_name:
-            raise RuntimeError(f"ATLauncher pack '{token}' returned invalid metadata.")
-        return project
+        with ATLauncherClient._project_lock(token):
+            url = f"{ATLauncherClient.V1_BASE_URL}pack/{quote(token, safe='')}"
+            try:
+                lookup = ATLauncherClient._request_json(
+                    url,
+                    ttl=ATLauncherClient.PROJECT_TTL_SECONDS,
+                    force_refresh=force_refresh,
+                    allow_stale_on_error=True,
+                    namespace="project-v1",
+                )
+                payload = lookup.payload
+                if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
+                    payload = payload["data"]
+                if not isinstance(payload, dict):
+                    raise RuntimeError(f"ATLauncher pack '{token}' is unavailable.")
+                project = ATLauncherClient._parse_pack(payload)
+            except RuntimeError:
+                project = ATLauncherClient._get_project_v2(token, force_refresh)
+            if not project.safe_name:
+                raise RuntimeError(f"ATLauncher pack '{token}' returned invalid metadata.")
+            return project
 
     @staticmethod
     def get_project_details(safe_name: str, force_refresh: bool = False) -> ATLauncherPack:

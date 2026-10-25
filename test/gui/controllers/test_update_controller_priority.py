@@ -71,3 +71,17 @@ def test_prepare_enters_priority_mode_and_waits_for_cancelled_work_to_settle(gui
     assert started[0][0] == controller.PREPARE_TASK_ID
     assert started[0][1] is True
     assert controller._pending_update_info is None
+
+def test_update_controller_uses_active_hotfix_version(gui_app, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("src.gui.controllers.update_controller.get_active_hotfix_version", lambda: "1.8.3.1")
+    runner = TaskRunner()
+    controller = UpdateController(runner, channel="stable")
+    assert controller._manager.current_version == "1.8.3.1"
+
+    controller.set_channel("beta")
+    assert controller._manager.current_version == "1.8.3.1"
+
+    monkeypatch.setattr("src.gui.controllers.update_controller.get_active_hotfix_version", lambda: "1.8.3.2")
+    controller.check(manual=True)
+    assert controller._manager.current_version == "1.8.3.2"
+

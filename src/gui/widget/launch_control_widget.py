@@ -34,6 +34,9 @@ class LaunchControlWidget(QFrame):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
         self._mode = "idle"
         self._last_event: object | None = None
+        self._last_non_speed_key: tuple | None = None
+        self._last_prefix_detail: str = ""
+        self._last_percentage: int | None = None
         self._last_result: dict | None = None
         self._last_error_status = "Launch failed"
         self._last_error_detail = "launch.error.logs_hint"
@@ -150,38 +153,82 @@ class LaunchControlWidget(QFrame):
             self.detail_label.setText(tr(detail))
 
     def set_progress_event(self, event: object) -> None:
+        non_speed_key = (
+            getattr(event, "stage", None),
+            getattr(event, "state", None),
+            getattr(event, "message", None),
+            getattr(event, "detail", None),
+            getattr(event, "current", None),
+            getattr(event, "total", None),
+            getattr(event, "unit", None),
+        )
+
+        if self._mode == "progress" and non_speed_key == self._last_non_speed_key:
+            speed_text = ProgressPresenter.format_speed_text(getattr(event, "bytes_per_second", None))
+            parts = []
+            if self._last_prefix_detail:
+                parts.append(self._last_prefix_detail)
+            if speed_text:
+                parts.append(speed_text)
+            if self._last_percentage is not None:
+                parts.append(f"{self._last_percentage}%")
+            new_detail = " · ".join(parts)
+            if new_detail and self.detail_label.text() != new_detail:
+                self.detail_label.setText(new_detail)
+            return
+
+        self._last_non_speed_key = non_speed_key
         self._last_event = event
         view = ProgressPresenter.present(event)
 
         if view.state is ProgressState.FAILED:
+            self._last_non_speed_key = None
             self.set_failed(view.title, view.detail)
             return
         if view.state is ProgressState.CANCELLED:
+            self._last_non_speed_key = None
             self.set_cancelled(view.title, view.detail)
             return
         if view.state is ProgressState.SUCCEEDED:
+            self._last_non_speed_key = None
             self.set_operation_completed(view.title, view.detail)
             return
 
         self._mode = "progress"
-        self.status_label.setText(view.title)
-        self.detail_label.setText(view.detail)
-        self.stage_label.setText(view.stage_text)
+        self._last_percentage = view.percentage
+        detail_parts = [p.strip() for p in (view.detail or "").split(" · ")]
+        speed_text = ProgressPresenter.format_speed_text(getattr(event, "bytes_per_second", None))
+        prefix_parts = [p for p in detail_parts if p != speed_text and not p.endswith("%")]
+        self._last_prefix_detail = " · ".join(prefix_parts)
+
+        if self.status_label.text() != view.title:
+            self.status_label.setText(view.title)
+        if self.detail_label.text() != view.detail:
+            self.detail_label.setText(view.detail)
+        if self.stage_label.text() != view.stage_text:
+            self.stage_label.setText(view.stage_text)
         self._set_stage_state("busy")
 
         if view.percentage is None:
-            self.progress_bar.setRange(0, 0)
-            self.progress_bar.setFormat("")
-            self.percentage_label.setText("")
+            if self.progress_bar.maximum() != 0:
+                self.progress_bar.setRange(0, 0)
+                self.progress_bar.setFormat("")
+            if self.percentage_label.text() != "":
+                self.percentage_label.setText("")
             return
 
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(view.percentage)
-        self.progress_bar.setFormat("")
-        self.percentage_label.setText(self._percentage_text(view.percentage))
+        if self.progress_bar.minimum() != 0 or self.progress_bar.maximum() != 100:
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setFormat("")
+        if self.progress_bar.value() != view.percentage:
+            self.progress_bar.setValue(view.percentage)
+        pct_text = self._percentage_text(view.percentage)
+        if self.percentage_label.text() != pct_text:
+            self.percentage_label.setText(pct_text)
 
     def set_result(self, result: dict) -> None:
         self._mode = "result"
+        self._last_non_speed_key = None
         self._last_result = dict(result)
         version = result.get("minecraftVersion", "unknown")
         java_path = result.get("javaPath", "unknown")
@@ -207,6 +254,7 @@ class LaunchControlWidget(QFrame):
 
     def set_operation_completed(self, status: str, detail: str) -> None:
         self._mode = "operation_completed"
+        self._last_non_speed_key = None
         self._last_completed_status = status or "Task completed"
         self._last_completed_detail = detail or "Everything is ready."
         self._busy = False

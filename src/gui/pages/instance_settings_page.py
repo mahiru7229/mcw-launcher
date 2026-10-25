@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QSignalBlocker, Qt, Signal
-from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSlider, QSpinBox, QTextEdit, QVBoxLayout
+from PySide6.QtWidgets import QCheckBox, QComboBox, QFrame, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSlider, QSpinBox, QTextEdit, QVBoxLayout
 
 from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
 from mcw_core.api.java.jvm_presets import JvmPresetId, detect_preset, get_preset_flags
@@ -37,12 +37,6 @@ class InstanceSettingsPage(BasePage):
         self._set_dirty(False)
 
     def _build_ui(self) -> None:
-        self.unsaved_label = QLabel()
-        self.unsaved_label.setObjectName("UnsavedChangesBanner")
-        self.unsaved_label.setWordWrap(True)
-        self.unsaved_label.setVisible(False)
-        self.root_layout.addWidget(self.unsaved_label)
-
         target_section = SettingsSection("instance.settings.section.target", "instance.settings.section.target_detail")
         runtime_section = SettingsSection("instance.settings.section.runtime", "instance.settings.section.runtime_detail")
         multiplayer_section = SettingsSection("instance.settings.section.multiplayer", "instance.settings.section.multiplayer_detail")
@@ -221,11 +215,34 @@ class InstanceSettingsPage(BasePage):
         arguments_card.layout.addWidget(self.game_arguments)
         advanced_section.add_card(arguments_card, span=2)
 
+        self.floating_action_bar = QFrame()
+        self.floating_action_bar.setObjectName("FloatingSettingsBar")
+        floating_layout = QHBoxLayout(self.floating_action_bar)
+        floating_layout.setContentsMargins(16, 10, 16, 10)
+        floating_layout.setSpacing(12)
+
+        self.unsaved_label = QLabel(tr("settings.unsaved.banner"))
+        self.unsaved_label.setObjectName("UnsavedChangesBanner")
+        self.unsaved_label.setWordWrap(True)
+        self.unsaved_label.setVisible(False)
+
+        self.discard_button = set_theme_icon(QPushButton(tr("common.discard", "Discard")), "icon.action.reset")
+        self.discard_button.setObjectName("SecondaryButton")
+        self.discard_button.setMinimumHeight(40)
+        self.discard_button.setEnabled(False)
+        self.discard_button.clicked.connect(self.discard_changes)
+
         self.save_button = set_theme_icon(QPushButton("Save instance settings"), "icon.action.save")
         self.save_button.setObjectName("PrimaryButton")
-        self.save_button.setMinimumHeight(48)
+        self.save_button.setMinimumHeight(40)
         self.save_button.clicked.connect(self.request_save)
-        self.root_layout.addWidget(self.save_button)
+
+        floating_layout.addWidget(self.unsaved_label, 1)
+        floating_layout.addStretch(1)
+        floating_layout.addWidget(self.discard_button)
+        floating_layout.addWidget(self.save_button)
+        self.install_floating_action_bar(self.floating_action_bar)
+
         self.root_layout.addStretch()
         prevent_wheel_value_changes(self)
 
@@ -353,12 +370,16 @@ class InstanceSettingsPage(BasePage):
         self.java_mode_combo.setEnabled(enabled)
         self._update_java_mode(enabled=enabled)
         self.save_button.setEnabled(enabled)
+        if hasattr(self, "discard_button"):
+            self.discard_button.setEnabled(enabled and self._dirty)
         self.lan_prepare_button.setEnabled(enabled)
         self.lan_agent_log_button.setEnabled(enabled)
 
     def retranslate_dynamic(self) -> None:
         self._update_memory_labels()
         self.unsaved_label.setText(tr("settings.unsaved.banner"))
+        if hasattr(self, "discard_button"):
+            self.discard_button.setText(tr("common.discard", "Discard"))
         self._update_save_button_text()
         self._update_lan_help()
         self.modrinth_failure_label.setText(tr("managed_content.modrinth.label"))
@@ -407,6 +428,12 @@ class InstanceSettingsPage(BasePage):
         self._dirty = dirty
         self.unsaved_label.setVisible(dirty)
         self.unsaved_label.setText(tr("settings.unsaved.banner"))
+        if hasattr(self, "discard_button"):
+            self.discard_button.setEnabled(dirty)
+        if hasattr(self, "floating_action_bar"):
+            self.floating_action_bar.setProperty("unsavedChanges", dirty)
+            self.floating_action_bar.style().unpolish(self.floating_action_bar)
+            self.floating_action_bar.style().polish(self.floating_action_bar)
         self.save_button.setProperty("unsavedChanges", dirty)
         self.save_button.style().unpolish(self.save_button)
         self.save_button.style().polish(self.save_button)

@@ -47,18 +47,32 @@ class HotfixMetaPathFinder(importlib.abc.MetaPathFinder):
             return importlib.util.spec_from_file_location(fullname, candidate_file)
         init_file = candidate / "__init__.py"
         if init_file.is_file():
-            search_locations = [str(candidate)]
-            for finder in sys.meta_path:
-                if finder is self or not hasattr(finder, "find_spec"):
-                    continue
+            base_paths = list(path) if path is not None else list(sys.path)
+            filtered_paths = []
+            for entry in base_paths:
                 try:
-                    orig_spec = finder.find_spec(fullname, path, target)
-                    if orig_spec and orig_spec.submodule_search_locations:
-                        for loc in orig_spec.submodule_search_locations:
-                            if loc not in search_locations:
-                                search_locations.append(loc)
+                    if Path(entry).resolve().is_relative_to(self.root):
+                        continue
                 except Exception:
                     pass
+                filtered_paths.append(entry)
+
+            search_locations = [str(candidate)]
+            for finder in sys.meta_path:
+                if finder is self or isinstance(finder, HotfixMetaPathFinder):
+                    continue
+                find = getattr(finder, "find_spec", None)
+                if find is not None:
+                    try:
+                        orig_spec = find(fullname, filtered_paths if filtered_paths else path, target)
+                        if orig_spec is None and path is not None and filtered_paths != base_paths:
+                            orig_spec = find(fullname, path, target)
+                        if orig_spec and orig_spec.submodule_search_locations:
+                            for loc in orig_spec.submodule_search_locations:
+                                if loc not in search_locations:
+                                    search_locations.append(loc)
+                    except Exception:
+                        continue
             return importlib.util.spec_from_file_location(
                 fullname,
                 init_file,
@@ -299,6 +313,7 @@ class HotfixManager:
         if not live_dir.is_dir():
             return
         reloaded = []
+        collected_mods: list[str] = []
         for py_file in live_dir.rglob("*.py"):
             rel_path = py_file.relative_to(live_dir)
             parts = list(rel_path.parts)
@@ -307,13 +322,37 @@ class HotfixManager:
             if parts[-1] == "__init__":
                 parts.pop()
             mod_name = ".".join(parts)
-            if mod_name in sys.modules and mod_name != __name__:
+            if mod_name and mod_name != __name__:
+                collected_mods.append(mod_name)
+
+        collected_mods = sorted(set(collected_mods), key=lambda m: (m.count("."), m))
+
+        previously_loaded: list[str] = []
+        api_previously_loaded: list[str] = []
+
+        for mod_name in collected_mods:
+            if mod_name in sys.modules:
+                previously_loaded.append(mod_name)
                 del sys.modules[mod_name]
-                try:
-                    importlib.import_module(mod_name)
-                    reloaded.append(mod_name)
-                except Exception:
-                    pass
+            if mod_name.startswith("src.core."):
+                api_mod_name = "mcw_core.api." + mod_name.removeprefix("src.core.")
+                if api_mod_name in sys.modules:
+                    api_previously_loaded.append(api_mod_name)
+                    del sys.modules[api_mod_name]
+
+        for mod_name in previously_loaded:
+            try:
+                importlib.import_module(mod_name)
+                reloaded.append(mod_name)
+            except Exception:
+                pass
+
+        for api_mod in api_previously_loaded:
+            try:
+                importlib.import_module(api_mod)
+                reloaded.append(api_mod)
+            except Exception:
+                pass
         if "mcw_core.facade" in sys.modules:
             try:
                 import mcw_core.facade

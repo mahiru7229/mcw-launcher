@@ -66,6 +66,7 @@ class ModCatalogController(BaseController):
             task,
             tr("task.mod_catalog.load_versions", loader=normalized_loader.title()),
             blocking=False,
+            group="mod_catalog.versions",
         )
 
     @Slot(str, object)

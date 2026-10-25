@@ -319,6 +319,18 @@ QLabel#UnsavedChangesBanner {
     font-weight: 900;
 }
 
+
+QFrame#FloatingSettingsBar {
+    background: rgba(28, 31, 26, 244);
+    border: 2px solid #454d3e;
+    border-radius: 6px;
+}
+
+QFrame#FloatingSettingsBar[unsavedChanges="true"] {
+    background: rgba(42, 34, 21, 250);
+    border: 2px solid #d6a93c;
+}
+
 QPushButton#PrimaryButton[unsavedChanges="true"] {
     background: #d6a93c;
     color: #ffffff;

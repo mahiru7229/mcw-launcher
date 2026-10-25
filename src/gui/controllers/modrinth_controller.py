@@ -45,13 +45,13 @@ class ModrinthController(BaseController):
         normalized_loader = self._normalize_loader(loader)
         task_id = f"modrinth.versions.{project_type}.{normalized_loader}.{project_id}"
         task = lambda: (project_type, project_id, normalized_loader, ModrinthClient.list_project_versions(project_id, loader=normalized_loader, game_version=game_version, version_types=("release", "beta", "alpha")))
-        self._run_network_task(self._task_runner, task_id, task, tr("task.modrinth.load_versions", loader=normalized_loader.title()), blocking=False)
+        self._run_network_task(self._task_runner, task_id, task, tr("task.modrinth.load_versions", loader=normalized_loader.title()), blocking=False, group=f"modrinth.versions.{project_type}")
 
     def load_project_details(self, project_type: str, project_id: str, loader: str = ModLoaderManager.FABRIC) -> None:
         normalized_loader = self._normalize_loader(loader)
         task_id = f"modrinth.details.{project_type}.{normalized_loader}.{project_id}"
         task = lambda: (project_type, project_id, normalized_loader, ModrinthClient.get_project(project_id))
-        self._run_network_task(self._task_runner, task_id, task, tr("task.modrinth.load_project_details"), blocking=False)
+        self._run_network_task(self._task_runner, task_id, task, tr("task.modrinth.load_project_details"), blocking=False, group=f"modrinth.details.{project_type}")
 
     def install_mod(self, instance_name: str, version_id: str, allowed_version_types: tuple[str, ...] = ("release",)) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)

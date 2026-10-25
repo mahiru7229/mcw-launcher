@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from urllib.parse import urlsplit
 from typing import Any
 
 from src.config import DEFAULT_CLOUDFLARE_RELEASES_URL, GITHUB_REPOSITORY
@@ -125,6 +126,10 @@ class CloudflareReleaseClient(BaseReleaseClient):
                 ).strip()
                 if dl_url:
                     asset_copy["browser_download_url"] = dl_url
+                if not name and dl_url:
+                    name = PurePosixPath(urlsplit(dl_url).path).name
+                    if name:
+                        asset_copy["name"] = name
 
                 # If asset doesn't explicitly declare mirrors, synthesize GitHub fallback mirror
                 existing_mirrors = asset_copy.get("mirror_urls") or asset_copy.get("mirrors") or []

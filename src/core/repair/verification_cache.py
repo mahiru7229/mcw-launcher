@@ -83,6 +83,36 @@ class VerificationCache:
             self.remove(normalized_key)
         return VerificationResult(valid, False, True, stat_result.st_size, actual_hash, "" if valid else "hash_mismatch")
 
+    def record_verified(
+        self,
+        key: str,
+        path: Path,
+        expected_hash: str,
+        algorithm: str = "sha1",
+    ) -> bool:
+        normalized_key = str(key).strip().casefold()
+        target = Path(path)
+        normalized_expected = str(expected_hash or "").strip().lower()
+        if not normalized_expected or not target.is_file():
+            return False
+        try:
+            stat_result = target.stat()
+        except OSError:
+            return False
+        if stat_result.st_size <= 0:
+            return False
+        mtime_ns = getattr(stat_result, "st_mtime_ns", int(stat_result.st_mtime * 1_000_000_000))
+        with self._lock:
+            self._records[normalized_key] = {
+                "path": str(target),
+                "size": stat_result.st_size,
+                "mtimeNs": int(mtime_ns),
+                "algorithm": str(algorithm or "sha1").strip().lower(),
+                "hash": normalized_expected,
+            }
+            self._dirty = True
+        return True
+
     def remove(self, key: str) -> None:
         normalized = str(key).strip().casefold()
         with self._lock:

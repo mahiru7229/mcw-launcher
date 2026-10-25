@@ -25,7 +25,8 @@ from src.core.progress.progress_reporter import ProgressReporter
 from src.models.progress.progress_stage import ProgressStage
 
 
-CHUNK_SIZE = 1024 * 1024
+CHUNK_SIZE = 64 * 1024
+SPEED_REPORT_INTERVAL_SECONDS = 0.08
 DEFAULT_PER_HOST_LIMIT = 8
 CONTENT_RANGE_PATTERN = re.compile(r"^bytes\s+(\d+)-(\d+)/(\d+|\*)$", re.IGNORECASE)
 
@@ -38,7 +39,7 @@ class DownloadManager:
         self._global_semaphore = BoundedSemaphore(self._global_limit)
         self._host_semaphores: dict[str, BoundedSemaphore] = defaultdict(lambda: BoundedSemaphore(self._per_host_limit))
         cores = max(1, int(cpu_count() or 1))
-        self._hash_limit = 1 if cores <= 4 else 2
+        self._hash_limit = max(2, min(8, cores))
         self._hash_semaphore = BoundedSemaphore(self._hash_limit)
         self._path_locks: dict[Path, RLock] = {}
 
@@ -273,6 +274,8 @@ class DownloadManager:
                 response_bytes = 0
                 last_percentage = -1
                 rate_meter = DownloadRateMeter(downloaded)
+                last_report_at = monotonic()
+                last_speed: float | None = None
                 self._report(reporter, stage, message, downloaded, total)
                 make_directory(temporary_path.parent)
                 with open_file(temporary_path, "ab" if append else "wb") as output:
@@ -290,18 +293,27 @@ class DownloadManager:
                         if request.max_bytes > 0 and downloaded > request.max_bytes:
                             raise DownloadSizeMismatchError(f"Downloaded file '{request.display_name}' exceeds the allowed size limit.")
                         journal_progress = self._update_journal_progress(request, downloaded, journal_progress)
+                        current_speed = rate_meter.update(downloaded)
+                        if current_speed is not None:
+                            last_speed = current_speed
+                        now = monotonic()
                         if total > 0:
                             percentage = min(int(downloaded * 100 / total), 100)
-                            if percentage != last_percentage:
+                            should_report_speed = current_speed is not None and (now - last_report_at) >= SPEED_REPORT_INTERVAL_SECONDS
+                            if percentage != last_percentage or should_report_speed:
                                 last_percentage = percentage
-                                self._report(reporter, stage, message, downloaded, total, rate_meter.update(downloaded))
+                                last_report_at = now
+                                self._report(reporter, stage, message, downloaded, total, current_speed)
+                        elif current_speed is not None and (now - last_report_at) >= SPEED_REPORT_INTERVAL_SECONDS:
+                            last_report_at = now
+                            self._report(reporter, stage, message, downloaded, downloaded, current_speed)
                     output.flush()
                 if content_length > 0 and response_bytes != content_length:
                     raise DownloadSizeMismatchError(f"Incomplete HTTP response for '{request.display_name}': received {response_bytes} of {content_length} bytes.")
                 if request.expected_size > 0 and downloaded != request.expected_size:
                     raise DownloadSizeMismatchError(f"Size mismatch for '{request.display_name}': received {downloaded} of {request.expected_size} bytes.")
                 if total > 0 and last_percentage < 100:
-                    self._report(reporter, stage, message, downloaded, total, rate_meter.update(downloaded))
+                    self._report(reporter, stage, message, downloaded, total, last_speed)
                 return existing, response
 
     def verify(self, path: Path, expected_size: int, hashes: dict | object) -> bool:

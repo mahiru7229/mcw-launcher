@@ -45,7 +45,7 @@ class NetworkSession:
                 max_keepalive = max(6, self._max_concurrent_downloads * 2)
                 self._client = httpx.Client(
                     follow_redirects=True,
-                    headers={"User-Agent": MODRINTH_USER_AGENT, "Accept-Encoding": "identity"},
+                    headers={"User-Agent": MODRINTH_USER_AGENT},
                     limits=httpx.Limits(max_connections=max_connections, max_keepalive_connections=max_keepalive, keepalive_expiry=30.0),
                 )
             return self._client

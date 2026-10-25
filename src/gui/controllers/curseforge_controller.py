@@ -83,6 +83,7 @@ class CurseForgeController(BaseController):
             task,
             tr("task.curseforge.load_project_details"),
             blocking=False,
+            group=f"curseforge.details.{project_type}",
         )
 
     def load_files(self, project_type: str, project_id: int, game_version: str, loader: str, allowed_release_types: tuple[str, ...], force_refresh: bool = False, manual_refresh: bool = False, context: str = DIALOG_CONTEXT) -> bool:
@@ -110,6 +111,7 @@ class CurseForgeController(BaseController):
             task,
             tr("task.curseforge.load_compatible_files"),
             blocking=False,
+            group=f"curseforge.files.{normalized_context}.{project_type}",
         )
 
     def install_mod(self, instance_name: str, project_id: int, file_id: int, allowed_release_types: tuple[str, ...], allow_unverified: bool = False) -> bool:

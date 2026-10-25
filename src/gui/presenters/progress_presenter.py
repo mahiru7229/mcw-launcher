@@ -69,6 +69,13 @@ class ProgressPresenter:
     }
 
     @classmethod
+    def format_speed_text(cls, bytes_per_second: float | None) -> str:
+        speed = float(bytes_per_second or 0.0)
+        if speed <= 0:
+            return ""
+        return tr("progress.speed", speed=cls._format_bytes(round(speed)))
+
+    @classmethod
     def present(cls, event: object) -> ProgressView:
         state = cls._state(event)
         stage_value = cls._stage_value(event)

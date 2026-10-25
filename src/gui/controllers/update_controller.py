@@ -9,7 +9,7 @@ from mcw_core.api.config.launcher_settings_manager import LauncherSettingsManage
 from mcw_core.api.language.language_manager import tr
 from mcw_core.api.progress.progress_reporter import ProgressReporter
 from mcw_core.api.update.update_manager import UpdateManager
-from src.gui.config import GITHUB_REPOSITORY, UPDATE_CHANNEL, VERSION_ID
+from src.gui.config import GITHUB_REPOSITORY, UPDATE_CHANNEL, VERSION_ID, get_active_hotfix_version
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskConflictPolicy, TaskRunner
 from mcw_core.api.models.update.update_info import UpdateInfo
@@ -26,6 +26,10 @@ class UpdateController(BaseController):
     MANUAL_CHECK_TASK_ID = "update.check.manual"
     PREPARE_TASK_ID = "update.prepare"
 
+    @classmethod
+    def _effective_version(cls) -> str:
+        return get_active_hotfix_version() or VERSION_ID
+
     def __init__(self, task_runner: TaskRunner, channel: str = UPDATE_CHANNEL, source: str = "cloudflare") -> None:
         super().__init__()
         self._task_runner = task_runner
@@ -33,7 +37,7 @@ class UpdateController(BaseController):
         self._source = self._normalize_source(source)
         self._manager = UpdateManager(
             repository=GITHUB_REPOSITORY,
-            current_version=VERSION_ID,
+            current_version=self._effective_version(),
             channel=self._channel,
             source=self._source,
         )
@@ -60,7 +64,7 @@ class UpdateController(BaseController):
         self._channel = normalized
         self._manager = UpdateManager(
             repository=GITHUB_REPOSITORY,
-            current_version=VERSION_ID,
+            current_version=self._effective_version(),
             channel=self._channel,
             source=self._source,
         )
@@ -72,7 +76,7 @@ class UpdateController(BaseController):
         self._source = normalized
         self._manager = UpdateManager(
             repository=GITHUB_REPOSITORY,
-            current_version=VERSION_ID,
+            current_version=self._effective_version(),
             channel=self._channel,
             source=self._source,
         )
@@ -88,6 +92,14 @@ class UpdateController(BaseController):
         return value if value in {"cloudflare", "github", "auto"} else "cloudflare"
 
     def check(self, manual: bool = False) -> None:
+        effective_ver = self._effective_version()
+        if self._manager.current_version != effective_ver:
+            self._manager = UpdateManager(
+                repository=GITHUB_REPOSITORY,
+                current_version=effective_ver,
+                channel=self._channel,
+                source=self._source,
+            )
         task_id = self.MANUAL_CHECK_TASK_ID if manual else self.AUTO_CHECK_TASK_ID
         self._task_runner.run(task_id, lambda: self._manager.check_for_update(force_refresh=manual), tr("update.status.checking"), blocking=False)
 

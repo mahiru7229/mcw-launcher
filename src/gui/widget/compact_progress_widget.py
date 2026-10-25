@@ -69,6 +69,7 @@ class CompactProgressWidget(QFrame):
         self._download_bytes_str = ""
         self._overall_pct = 0
         self._active = False
+        self._last_non_speed_key: tuple | None = None
 
         self._build_ui()
         self._update_labels()
@@ -166,17 +167,43 @@ class CompactProgressWidget(QFrame):
             except ValueError:
                 state_val = ProgressState.RUNNING
 
-        view = ProgressPresenter.present(event)
-        self.stage_label.setText(view.stage_text)
+        non_speed_key = (
+            getattr(event, "stage", None),
+            state_val,
+            getattr(event, "message", None),
+            getattr(event, "detail", None),
+            getattr(event, "current", None),
+            getattr(event, "total", None),
+            getattr(event, "unit", None),
+            getattr(event, "percentage", None),
+        )
 
-        if state_val is ProgressState.SUCCEEDED:
-            self.stage_label.setProperty("state", "success")
-        elif state_val in (ProgressState.FAILED, ProgressState.CANCELLED):
-            self.stage_label.setProperty("state", "error")
-        else:
-            self.stage_label.setProperty("state", "busy")
-        self.stage_label.style().unpolish(self.stage_label)
-        self.stage_label.style().polish(self.stage_label)
+        stage = getattr(event, "stage", None)
+        stage_str = str(getattr(stage, "value", stage or "")).strip().casefold()
+
+        if state_val is ProgressState.RUNNING and non_speed_key == self._last_non_speed_key:
+            speed = getattr(event, "bytes_per_second", None)
+            if speed is not None and float(speed) > 0:
+                new_speed_str = ProgressPresenter._format_bytes(round(float(speed))) + "/s"
+            elif stage_str in self._DOWNLOAD_STAGES:
+                new_speed_str = "0 B/s"
+            else:
+                new_speed_str = "---"
+            if new_speed_str != self._speed_str:
+                self._speed_str = new_speed_str
+                self.speed_label.setText(f"⚡ {tr('progress.network_speed', speed=self._speed_str)}")
+            return
+
+        self._last_non_speed_key = non_speed_key
+        view = ProgressPresenter.present(event)
+        if self.stage_label.text() != view.stage_text:
+            self.stage_label.setText(view.stage_text)
+
+        target_state = "success" if state_val is ProgressState.SUCCEEDED else ("error" if state_val in (ProgressState.FAILED, ProgressState.CANCELLED) else "busy")
+        if self.stage_label.property("state") != target_state:
+            self.stage_label.setProperty("state", target_state)
+            self.stage_label.style().unpolish(self.stage_label)
+            self.stage_label.style().polish(self.stage_label)
 
         if view.title and view.detail and view.detail != view.title:
             status_text = f"{view.title} — {view.detail}"

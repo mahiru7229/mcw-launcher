@@ -125,13 +125,11 @@ class AssetManager:
             kwargs.update({"reporter": reporter, "progress_stage": ProgressStage.DOWNLOADING_ASSETS, "progress_message": f"Downloading asset {asset.logical_name}..."})
         downloaded = HttpDownloader.download(**kwargs)
         if verification_cache is not None:
-            verification_cache.verify(
+            verification_cache.record_verified(
                 "asset:" + asset.sha1,
                 downloaded,
-                asset.size,
                 asset.sha1,
                 "sha1",
-                force_hash=True,
             )
         return downloaded
 

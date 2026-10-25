@@ -49,7 +49,7 @@ class ContentPackController(BaseController):
             task = lambda: (source, kind, str(project_id), ModrinthClient.get_project(str(project_id)))
         else:
             task = lambda: (source, kind, str(project_id), CurseForgeClient.get_project_details(int(project_id)))
-        return self._run_network_task(self._task_runner, task_id, task, tr("task.content.load_project_details"), blocking=False)
+        return self._run_network_task(self._task_runner, task_id, task, tr("task.content.load_project_details"), blocking=False, group=f"content.details.{source}.{kind}")
 
     def load_versions(self, provider: str, content_type: str, project_id: str, game_version: str = "", release_types: tuple[str, ...] = ("release", "beta", "alpha")) -> bool:
         source = self._provider(provider)
@@ -59,7 +59,7 @@ class ContentPackController(BaseController):
             task = lambda: (source, kind, str(project_id), ModrinthClient.list_project_versions(str(project_id), loader="", game_version=game_version, version_types=release_types))
         else:
             task = lambda: (source, kind, int(project_id), CurseForgeClient.list_files(int(project_id), game_version=game_version, loader="", release_types=release_types))
-        return self._run_network_task(self._task_runner, task_id, task, tr("task.content.load_compatible_versions"), blocking=False)
+        return self._run_network_task(self._task_runner, task_id, task, tr("task.content.load_compatible_versions"), blocking=False, group=f"content.versions.{source}.{kind}")
 
     def install_modrinth(self, instance_name: str, content_type: str, version_id: str) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)

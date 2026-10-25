@@ -90,3 +90,17 @@ def test_unused_version_retention_days_round_trip_through_gui_settings(tmp_path:
 
     assert controller.current["unused_version_retention_days"] == 21
     assert LauncherSettingsManager(settings_path).load()["storage"]["unused_version_retention_days"] == 21
+
+def test_update_source_round_trips_through_gui_settings(tmp_path: Path) -> None:
+    settings_path = tmp_path / "launcher_settings.json"
+    controller = _controller(settings_path)
+    data = controller.load()
+
+    assert data["update_source"] == "cloudflare"
+
+    data["update_source"] = "github"
+    controller.save(data)
+
+    assert controller.current["update_source"] == "github"
+    assert LauncherSettingsManager(settings_path).load()["updates"]["source"] == "github"
+

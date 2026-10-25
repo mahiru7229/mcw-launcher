@@ -30,6 +30,7 @@ class GuiSettingsController(BaseController):
         "show_content_descriptions": False,
         "auto_check_updates": True,
         "update_channel": "stable",
+        "update_source": "cloudflare",
         "tester_mode": False,
         "theme": "mcw-default",
         "show_static_text": False,
@@ -70,6 +71,7 @@ class GuiSettingsController(BaseController):
         gui = data.get("gui", {})
         launch = data.get("launch", {})
         updates = data.get("updates", {})
+        raw_source = str(updates.get("source", self.DEFAULTS["update_source"]) or "cloudflare").strip().lower()
         appearance = data.get("appearance", {})
         modrinth = data.get("modrinth", {})
         managed_content = data.get("managed_content", {})
@@ -92,6 +94,7 @@ class GuiSettingsController(BaseController):
             "show_content_descriptions": bool(gui.get("show_content_descriptions", self.DEFAULTS["show_content_descriptions"])),
             "auto_check_updates": bool(updates.get("auto_check", self.DEFAULTS["auto_check_updates"])),
             "update_channel": str(updates.get("channel", self.DEFAULTS["update_channel"])),
+            "update_source": raw_source if raw_source in {"cloudflare", "github", "auto"} else "cloudflare",
             "tester_mode": str(updates.get("channel", self.DEFAULTS["update_channel"])).strip().lower() == "beta",
             "theme": str(appearance.get("theme", self.DEFAULTS["theme"])),
             "show_static_text": bool(appearance.get("show_static_text", self.DEFAULTS["show_static_text"])),
@@ -134,6 +137,8 @@ class GuiSettingsController(BaseController):
         download_performance_mode = self._normalize_download_performance_mode(data.get("download_performance_mode"))
         tester_mode = bool(data.get("tester_mode", self.DEFAULTS["tester_mode"]))
         update_channel = "beta" if tester_mode else "stable"
+        raw_source = str(data.get("update_source", self._current.get("update_source", self.DEFAULTS["update_source"])) or "cloudflare").strip().lower()
+        update_source = raw_source if raw_source in {"cloudflare", "github", "auto"} else "cloudflare"
         self._current = {
             "start_page": self._normalize_start_page(data.get("start_page")),
             "show_snapshots": bool(data.get("show_snapshots", self.DEFAULTS["show_snapshots"])),
@@ -147,6 +152,7 @@ class GuiSettingsController(BaseController):
             "show_content_descriptions": bool(data.get("show_content_descriptions", self.DEFAULTS["show_content_descriptions"])),
             "auto_check_updates": bool(data.get("auto_check_updates", self.DEFAULTS["auto_check_updates"])),
             "update_channel": update_channel,
+            "update_source": update_source,
             "tester_mode": tester_mode,
             "theme": str(data.get("theme", self.DEFAULTS["theme"])),
             "show_static_text": bool(data.get("show_static_text", self.DEFAULTS["show_static_text"])),
@@ -187,6 +193,7 @@ class GuiSettingsController(BaseController):
             "updates": {
                 "auto_check": self._current["auto_check_updates"],
                 "channel": self._current["update_channel"],
+                "source": self._current["update_source"],
             },
             "appearance": {"theme": self._current["theme"], "show_static_text": self._current["show_static_text"], "motion_mode": self._current["motion_mode"], "live_theme_reload": self._current["live_theme_reload"], "accent_mode": self._current["accent_mode"], "accent_color": self._current["accent_color"], "text_color_mode": self._current["text_color_mode"], "text_color": self._current["text_color"]},
             "modrinth": {

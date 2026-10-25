@@ -349,10 +349,13 @@ class GlobalTaskIndicator(QFrame):
         # Stage Badge
         stage_text = self._extract_stage_text(primary_task)
         if stage_text:
-            self.stage_badge.setText(stage_text)
-            self.stage_badge.setVisible(True)
+            if self.stage_badge.text() != stage_text:
+                self.stage_badge.setText(stage_text)
+            if not self.stage_badge.isVisible():
+                self.stage_badge.setVisible(True)
         else:
-            self.stage_badge.setVisible(False)
+            if self.stage_badge.isVisible():
+                self.stage_badge.setVisible(False)
 
         # 1. Hàng Trên (Top row): Tên task và chi tiết
         if count == 1:
@@ -364,17 +367,23 @@ class GlobalTaskIndicator(QFrame):
                 display_msg = f"{msg} — {detail}"
             else:
                 display_msg = msg
-            self.text_label.setText(display_msg)
+            if self.text_label.text() != display_msg:
+                self.text_label.setText(display_msg)
         else:
-            self.text_label.setText(tr("tasks.indicator.active_multiple", count=count, percent="").strip())
+            msg_multiple = tr("tasks.indicator.active_multiple", count=count, percent="").strip()
+            if self.text_label.text() != msg_multiple:
+                self.text_label.setText(msg_multiple)
 
         # 2. Hàng Giữa (Middle row): Thanh tiến trình
         if percentage is not None:
-            self.progress_bar.setRange(0, 100)
+            if self.progress_bar.minimum() != 0 or self.progress_bar.maximum() != 100:
+                self.progress_bar.setRange(0, 100)
             val = max(0, min(100, int(percentage)))
-            self.progress_bar.setValue(val)
+            if self.progress_bar.value() != val:
+                self.progress_bar.setValue(val)
         else:
-            self.progress_bar.setRange(0, 0)
+            if self.progress_bar.maximum() != 0:
+                self.progress_bar.setRange(0, 0)
 
         # 3. Hàng Dưới (Bottom row): Số liệu đầy đủ (tiến lượng, tốc độ, tỷ lệ %)
         if primary_task.progress_text:
@@ -388,11 +397,15 @@ class GlobalTaskIndicator(QFrame):
             self.progress_detail_label.setVisible(False)
 
         if primary_task.speed_text:
-            self.speed_label.setText(f"⚡ {primary_task.speed_text}")
-            self.speed_label.setVisible(True)
+            speed_val = f"⚡ {primary_task.speed_text}"
+            if self.speed_label.text() != speed_val:
+                self.speed_label.setText(speed_val)
+            if not self.speed_label.isVisible():
+                self.speed_label.setVisible(True)
         else:
-            self.speed_label.setText("")
-            self.speed_label.setVisible(False)
+            if self.speed_label.isVisible():
+                self.speed_label.setText("")
+                self.speed_label.setVisible(False)
 
         if percentage is not None:
             val = max(0, min(100, int(percentage)))

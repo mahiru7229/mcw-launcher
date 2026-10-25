@@ -2323,7 +2323,9 @@
     "hotfix.installing": "Downloading and applying hotfix v{version}...",
     "hotfix.install_failed": "Failed to apply hotfix v{version}: {error}",
     "restart.failed_title": "Restart failed",
-    "restart.failed_message": "Could not restart launcher."
+    "restart.failed_message": "Could not restart launcher.",
+    "launcher_settings.reset_defaults.title": "Reset launcher settings",
+    "launcher_settings.reset_defaults.detail": "Restore all launcher settings back to their factory default values."
   },
   "aliases": {
     "MCW Launcher": "app.name",

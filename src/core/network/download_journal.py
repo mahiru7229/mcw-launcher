@@ -22,6 +22,7 @@ class DownloadJournal:
         self._lock = RLock()
         self._pending_progress: dict[str, dict] = {}
         self._last_progress_flush_at = 0.0
+        self._known_disk_ids: set[str] | None = None
 
     def start(self, request: DownloadRequest, downloaded_bytes: int = 0) -> None:
         self._update_entry(request, DownloadState.DOWNLOADING, downloaded_bytes=downloaded_bytes, error="", force=True)
@@ -73,6 +74,11 @@ class DownloadJournal:
     def complete(self, request: DownloadRequest, size: int) -> None:
         with self._lock:
             self._pending_progress.pop(request.request_id, None)
+            if self._known_disk_ids is not None and request.request_id not in self._known_disk_ids:
+                return
+            if self._known_disk_ids is None and not self.path.exists():
+                self._known_disk_ids = set()
+                return
             payload = self._read()
             entries = payload.setdefault("entries", {})
             if entries.pop(request.request_id, None) is None:
@@ -146,6 +152,7 @@ class DownloadJournal:
                 for key, value in payload["entries"].items()
                 if isinstance(value, dict) and value.get("state") != DownloadState.COMPLETED.value
             }
+        self._known_disk_ids = set(payload["entries"].keys())
         return payload
 
     def _write(self, payload: dict) -> bool:
@@ -157,7 +164,10 @@ class DownloadJournal:
                 file.write("\n")
                 file.flush()
                 os.fsync(file.fileno())
-            return self._replace_with_retry(temporary, self.path)
+            success = self._replace_with_retry(temporary, self.path)
+            if success:
+                self._known_disk_ids = set(payload.get("entries", {}).keys())
+            return success
         except OSError:
             return False
         finally:

@@ -984,7 +984,7 @@ class MainWindow(QMainWindow):
         self.content_pack_controller.installed.connect(self._content_pack_installed)
 
         self.launch_controller.progress_received.connect(self._on_progress)
-        self.launch_controller.progress_received.connect(lambda _event: self.instance_controller.refresh_running())
+        self.launch_controller.progress_received.connect(lambda event: self.instance_controller.refresh_running() if getattr(event, 'current', None) is None else None)
         self.modrinth_controller.progress_received.connect(self._on_progress)
         self.curseforge_controller.progress_received.connect(self._on_progress)
         self.ftb_controller.progress_received.connect(self._on_progress)
@@ -3189,6 +3189,10 @@ class MainWindow(QMainWindow):
 
         QTimer.singleShot(0, apply_if_current)
 
+    @staticmethod
+    def _is_metadata_lookup_task(task_id: str) -> bool:
+        return any(token in task_id for token in (".details.", ".versions.", ".version.", ".files."))
+
     def _on_task_started(self, task_id: str, message: str, blocking: bool) -> None:
         if blocking:
             self._suppress_loader_progress = False
@@ -3210,24 +3214,24 @@ class MainWindow(QMainWindow):
         if task_id.startswith("update."):
             self.launcher_settings_page.set_update_busy(True)
             self.launcher_settings_page.set_update_status(message)
-        if task_id.startswith("modrinth."):
+        if task_id.startswith("modrinth.") and not self._is_metadata_lookup_task(task_id):
             self._modrinth_tasks.add(task_id)
             if self._modrinth_mod_dialog is not None:
                 self._modrinth_mod_dialog.set_busy(True)
             if self._modrinth_modpack_dialog is not None:
                 self._modrinth_modpack_dialog.set_busy(True)
-        if task_id.startswith("mod_catalog."):
+        if task_id.startswith("mod_catalog.") and not self._is_metadata_lookup_task(task_id):
             self._mod_catalog_tasks.add(task_id)
             self.mods_page.set_busy(True)
-        if task_id.startswith("ftb."):
+        if task_id.startswith("ftb.") and not self._is_metadata_lookup_task(task_id):
             self._ftb_tasks.add(task_id)
             if self._ftb_modpack_dialog is not None:
                 self._ftb_modpack_dialog.set_busy(True)
-        if task_id.startswith("atlauncher."):
+        if task_id.startswith("atlauncher.") and not self._is_metadata_lookup_task(task_id):
             self._atlauncher_tasks.add(task_id)
             if self._atlauncher_modpack_dialog is not None:
                 self._atlauncher_modpack_dialog.set_busy(True)
-        if task_id.startswith("content."):
+        if task_id.startswith("content.") and not self._is_metadata_lookup_task(task_id):
             self._content_tasks.add(task_id)
             if self._content_pack_manager_dialog is not None:
                 self._content_pack_manager_dialog.set_busy(True)
@@ -3237,7 +3241,7 @@ class MainWindow(QMainWindow):
                 self._resource_pack_browser_dialog.set_busy(True)
             if self._shader_pack_browser_dialog is not None:
                 self._shader_pack_browser_dialog.set_busy(True)
-        if task_id.startswith("curseforge."):
+        if task_id.startswith("curseforge.") and not self._is_metadata_lookup_task(task_id):
             self._curseforge_tasks.add(task_id)
             if self._curseforge_mod_dialog is not None:
                 self._curseforge_mod_dialog.set_busy(True)
@@ -3318,15 +3322,15 @@ class MainWindow(QMainWindow):
         if task_id.startswith("update."):
             self.launcher_settings_page.set_update_busy(update_busy)
 
-        self._modrinth_tasks = {value for value in active_ids if value.startswith("modrinth.")}
-        self._mod_catalog_tasks = {value for value in active_ids if value.startswith("mod_catalog.")}
-        self._ftb_tasks = {value for value in active_ids if value.startswith("ftb.")}
-        self._atlauncher_tasks = {value for value in active_ids if value.startswith("atlauncher.")}
-        self._content_tasks = {value for value in active_ids if value.startswith("content.")}
-        self._curseforge_tasks = {value for value in active_ids if value.startswith("curseforge.")}
+        self._modrinth_tasks = {value for value in active_ids if value.startswith("modrinth.") and not self._is_metadata_lookup_task(value)}
+        self._mod_catalog_tasks = {value for value in active_ids if value.startswith("mod_catalog.") and not self._is_metadata_lookup_task(value)}
+        self._ftb_tasks = {value for value in active_ids if value.startswith("ftb.") and not self._is_metadata_lookup_task(value)}
+        self._atlauncher_tasks = {value for value in active_ids if value.startswith("atlauncher.") and not self._is_metadata_lookup_task(value)}
+        self._content_tasks = {value for value in active_ids if value.startswith("content.") and not self._is_metadata_lookup_task(value)}
+        self._curseforge_tasks = {value for value in active_ids if value.startswith("curseforge.") and not self._is_metadata_lookup_task(value)}
         self._curseforge_catalog_tasks = {
             value for value in self._curseforge_tasks
-            if ".catalog." in value or value.endswith(".catalog")
+            if (".catalog." in value or value.endswith(".catalog")) and not self._is_metadata_lookup_task(value)
         }
 
         if task_id.startswith("modrinth."):
@@ -3524,8 +3528,10 @@ class MainWindow(QMainWindow):
                 self.gui_context.tasks.update_progress(task_id, event)
 
         message = tr(str(getattr(event, "message", "Working...")))
-        self.home_page.set_status(message)
-        self.right_panel.set_status(message)
+        if getattr(self, "_last_progress_status_message", None) != message:
+            self._last_progress_status_message = message
+            self.home_page.set_status(message)
+            self.right_panel.set_status(message)
 
     def _set_status(self, message: str) -> None:
         self.home_page.set_status(message)

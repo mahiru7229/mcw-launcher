@@ -2,6 +2,40 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.4-beta.1] - 2026-10-25
+
+### Added
+- **Thanh hành động nổi (`FloatingSettingsBar`) trên Viewport**:
+  - Tích hợp `install_floating_action_bar` trên `BasePage`, neo thanh lưu/hủy cài đặt cố định ở đáy viewport trên `LauncherSettingsPage` và `InstanceSettingsPage`.
+  - Hỗ trợ thông báo thay đổi chưa lưu (`UnsavedChangesBanner`), nút hủy thay đổi (`Discard`) và nút lưu cài đặt (`Save`) trực tiếp trên thanh nổi.
+- **Thẻ khôi phục cài đặt gốc (`reset_defaults_card`) trong Cài đặt chung**:
+  - Đưa nút "Reset to defaults" vào thẻ chuyên biệt trong phần General của `LauncherSettingsPage`, lấp kín bố cục lưới 2x2.
+- **Cơ chế ghi nhận kết quả xác thực tức thì (`VerificationCache.record_verified`)**:
+  - Lưu trực tiếp thông tin hash hợp lệ vào cache ngay sau khi tải xong trong `AssetManager` và `DownloadLibraryManager`, loại bỏ lần đọc đĩa và băm SHA1 lần 2.
+
+### Changed
+- **Tối ưu hóa tốc độ tải mạng & Cập nhật tốc độ thực liên tục (~80ms)**:
+  - `DownloadManager._stream` đổi kích thước chunk xuống 64 KB và phát sự kiện tốc độ mạng thực mỗi 80ms (`SPEED_REPORT_INTERVAL_SECONDS = 0.08`), loại bỏ cổng chặn phần trăm nguyên.
+  - `LaunchControlWidget`, `CompactProgressWidget`, và `GlobalTaskIndicator` áp dụng fast-path chỉ cập nhật riêng chuỗi tốc độ mạng, không vẽ lại thanh tiến trình hay dịch lại text khi các thuộc tính khác không đổi.
+  - Loại bỏ header ép buộc `"Accept-Encoding": "identity"` toàn cục tại `NetworkSession.get_client()`, cho phép tự động nén Gzip/Deflate cho API và Manifest JSON.
+  - Mở rộng luồng băm hash `_hash_limit = max(2, min(8, cores))`.
+
+### Fixed
+- **Khắc phục tự che khuất (Self-shadowing) và làm mới Module trong Hotfix**:
+  - `HotfixMetaPathFinder` bảo toàn đường dẫn package gốc trong `submodule_search_locations` khi `hotfixes/live` nằm tại `sys.path[0]`.
+  - `HotfixManager._evict_cached_hotfix_modules` áp dụng cơ chế 2 giai đoạn làm mới cả các module tương ứng trong `mcw_core.api.*`.
+- **Đồng bộ phiên bản Hotfix vào `UpdateController` & Hoàn thiện `CloudflareReleaseClient`**:
+  - `UpdateController` tự động đồng bộ phiên bản hotfix đang hoạt động làm `current_version`.
+  - `GuiSettingsController` bảo toàn trường `update_source`.
+  - `CloudflareReleaseClient` tự động suy ra tên file asset từ URL khi metadata rút gọn.
+- **Loại bỏ đóng băng giao diện khi nạp Metadata & Chống gọi đúp Modpack**:
+  - `MainWindow` không kích hoạt `set_busy(True)` cho các tác vụ tra cứu metadata nền.
+  - Phân nhóm `group=...` cho các tác vụ mạng để hủy tự động tác vụ cũ khi chuyển dòng.
+  - Tích hợp khóa `RLock` chống gọi đúp `get_project` trong `FTBClient` và `ATLauncherClient`.
+  - Giới hạn 2000 block tối đa cho `LogsPage`.
+- **Fast-path bộ nhớ trong cho `DownloadJournal`**:
+  - Bổ sung `_known_disk_ids`, loại bỏ hơn 3.000 lần đọc file `download-journal.json` đồng bộ từ đĩa khi tải hàng loạt file nhỏ.
+
 ## [1.8.3.1] - 2026-10-19
 
 ### Added

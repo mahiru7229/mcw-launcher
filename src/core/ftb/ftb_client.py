@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Iterable
@@ -112,23 +114,36 @@ class FTBClient:
             cache_info=lookup.cache_info,
         )
 
+    _PROJECT_LOCKS_GUARD = threading.Lock()
+    _PROJECT_LOCKS: dict[int, threading.RLock] = {}
+
+    @classmethod
+    def _project_lock(cls, identifier: int) -> threading.RLock:
+        with cls._PROJECT_LOCKS_GUARD:
+            lock = cls._PROJECT_LOCKS.get(identifier)
+            if lock is None:
+                lock = threading.RLock()
+                cls._PROJECT_LOCKS[identifier] = lock
+            return lock
+
     @staticmethod
     def get_project(project_id: int | str, force_refresh: bool = False) -> FTBProject:
         identifier = FTBClient._positive_int(project_id, "FTB project ID")
-        lookup = FTBClient._request_json(
-            f"/modpack/{identifier}",
-            ttl=FTBClient.PROJECT_TTL_SECONDS,
-            force_refresh=force_refresh,
-            allow_stale_on_error=True,
-            namespace="project",
-        )
-        payload = FTBClient._unwrap_payload(lookup.payload)
-        if not isinstance(payload, dict):
-            raise RuntimeError(f"FTB modpack {identifier} is unavailable.")
-        project = FTBClient._parse_project(payload)
-        if project.project_id <= 0:
-            raise RuntimeError(f"FTB modpack {identifier} returned invalid metadata.")
-        return project
+        with FTBClient._project_lock(identifier):
+            lookup = FTBClient._request_json(
+                f"/modpack/{identifier}",
+                ttl=FTBClient.PROJECT_TTL_SECONDS,
+                force_refresh=force_refresh,
+                allow_stale_on_error=True,
+                namespace="project",
+            )
+            payload = FTBClient._unwrap_payload(lookup.payload)
+            if not isinstance(payload, dict):
+                raise RuntimeError(f"FTB modpack {identifier} is unavailable.")
+            project = FTBClient._parse_project(payload)
+            if project.project_id <= 0:
+                raise RuntimeError(f"FTB modpack {identifier} returned invalid metadata.")
+            return project
 
     @staticmethod
     def get_project_details(project_id: int | str, force_refresh: bool = False) -> FTBProject:

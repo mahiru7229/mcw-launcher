@@ -429,5 +429,60 @@ def test_bootstrap_sys_path_with_auto_sync_timeout(tmp_path: Path, monkeypatch: 
 
     assert called_timeout == [1.5]
 
+def test_hotfix_meta_path_finder_preserves_original_package_path(tmp_path: Path) -> None:
+    live_dir = tmp_path / "live"
+    orig_dir = tmp_path / "orig"
+    live_pkg = live_dir / "mypkg"
+    orig_pkg = orig_dir / "mypkg"
 
+    live_pkg.mkdir(parents=True)
+    orig_pkg.mkdir(parents=True)
+    (live_pkg / "__init__.py").write_text("# live init", encoding="utf-8")
+    (orig_pkg / "__init__.py").write_text("# orig init", encoding="utf-8")
+
+    sys.path.insert(0, str(live_dir.resolve()))
+    sys.path.append(str(orig_dir.resolve()))
+
+    from src.core.update.hotfix_manager import HotfixMetaPathFinder
+    finder = HotfixMetaPathFinder(live_dir)
+    sys.meta_path.insert(0, finder)
+
+    spec = finder.find_spec("mypkg", None)
+    assert spec is not None
+    assert spec.submodule_search_locations is not None
+    locations = list(spec.submodule_search_locations)
+    assert str(live_pkg) in locations
+    assert str(orig_pkg) in locations
+
+
+def test_evict_cached_hotfix_modules_refreshes_mcw_core_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import types
+    live_dir = tmp_path / "live"
+    core_dir = live_dir / "src" / "core"
+    core_dir.mkdir(parents=True)
+    (core_dir / "sample_mod.py").write_text("VALUE = 999\n", encoding="utf-8")
+
+    fake_core = types.ModuleType("src.core.sample_mod")
+    fake_core.VALUE = 111
+    fake_api = types.ModuleType("mcw_core.api.sample_mod")
+    fake_api.VALUE = 111
+
+    monkeypatch.setitem(sys.modules, "src.core.sample_mod", fake_core)
+    monkeypatch.setitem(sys.modules, "mcw_core.api.sample_mod", fake_api)
+
+    reloaded_names = []
+
+    def mock_import(name, *args, **kwargs):
+        reloaded_names.append(name)
+        mod = types.ModuleType(name)
+        mod.VALUE = 999
+        sys.modules[name] = mod
+        return mod
+
+    monkeypatch.setattr("importlib.import_module", mock_import)
+
+    HotfixManager._evict_cached_hotfix_modules(live_dir)
+
+    assert "src.core.sample_mod" in reloaded_names
+    assert "mcw_core.api.sample_mod" in reloaded_names
 

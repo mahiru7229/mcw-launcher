@@ -30,6 +30,7 @@ class LogsPage(BasePage):
         self.output = QTextEdit()
         self.output.setObjectName("LogOutput")
         self.output.setReadOnly(True)
+        self.output.document().setMaximumBlockCount(2000)
         buttons = QHBoxLayout()
         copy_button = set_theme_icon(QPushButton("Copy all"), "icon.action.copy")
         clear_button = set_theme_icon(QPushButton("Clear"), "icon.action.clear")

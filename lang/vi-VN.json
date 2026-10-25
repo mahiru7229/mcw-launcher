@@ -2323,7 +2323,9 @@
     "hotfix.installing": "Đang tải và cài đặt bản vá lỗi hotfix v{version}...",
     "hotfix.install_failed": "Cài đặt bản vá lỗi hotfix v{version} thất bại: {error}",
     "restart.failed_title": "Khởi động lại thất bại",
-    "restart.failed_message": "Không thể khởi động lại launcher."
+    "restart.failed_message": "Không thể khởi động lại launcher.",
+    "launcher_settings.reset_defaults.title": "Khôi phục cài đặt mặc định",
+    "launcher_settings.reset_defaults.detail": "Khôi phục tất cả cài đặt trình khởi chạy về giá trị mặc định ban đầu."
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

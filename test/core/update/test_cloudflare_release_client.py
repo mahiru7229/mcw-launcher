@@ -177,3 +177,30 @@ def test_cloudflare_client_raises_on_invalid_payload(tmp_path: Path, monkeypatch
 
     with pytest.raises(RuntimeError, match="invalid releases payload"):
         client.check(force_refresh=True)
+
+def test_cloudflare_client_infers_asset_name_from_url_when_missing(tmp_path: Path) -> None:
+    client = CloudflareReleaseClient(
+        current_version="1.8.2",
+        channel="stable",
+        endpoint_url="https://mcw-download.pages.dev/releases/manifest.json",
+        repository="example/repo",
+        cache_path=tmp_path / "cache.json",
+        platform_id="windows-x64",
+    )
+    raw_item = {
+        "version": "1.8.3",
+        "tag_name": "v1.8.3",
+        "assets": {
+            "windows-x64": {
+                "url": "https://mcw-download.pages.dev/releases/v1.8.3/MCW-Launcher-v1.8.3-windows-x64.zip",
+                "size": 83000000,
+            }
+        }
+    }
+    normalized = client._normalize_release_item(raw_item)
+    assert len(normalized["assets"]) == 1
+    asset = normalized["assets"][0]
+    assert asset["name"] == "MCW-Launcher-v1.8.3-windows-x64.zip"
+    assert asset["browser_download_url"] == "https://mcw-download.pages.dev/releases/v1.8.3/MCW-Launcher-v1.8.3-windows-x64.zip"
+    assert "https://github.com/example/repo/releases/download/v1.8.3/MCW-Launcher-v1.8.3-windows-x64.zip" in asset["mirror_urls"]
+

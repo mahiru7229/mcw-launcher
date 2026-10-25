@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QSignalBlocker, QTimer, Signal
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy, QSpinBox
+from PySide6.QtWidgets import QCheckBox, QColorDialog, QFrame, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy, QSpinBox
 
 from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
 from mcw_core.api.hardware.gpu_preference_manager import GraphicsDetectionResult
@@ -79,12 +79,6 @@ class LauncherSettingsPage(BasePage):
         return self._dirty
 
     def _build_ui(self) -> None:
-        self.unsaved_label = QLabel()
-        self.unsaved_label.setObjectName("UnsavedChangesBanner")
-        self.unsaved_label.setWordWrap(True)
-        self.unsaved_label.setVisible(False)
-        self.root_layout.addWidget(self.unsaved_label)
-
         general_section = SettingsSection("settings.section.general", "settings.section.general_detail")
         downloads_section = SettingsSection("settings.section.downloads", "settings.section.downloads_detail")
         storage_section = SettingsSection("storage.settings.section", "storage.settings.section_detail")
@@ -154,6 +148,16 @@ class LauncherSettingsPage(BasePage):
         self.first_run_setup_button.clicked.connect(self.first_run_setup_requested.emit)
         self.first_run_card.layout.addWidget(self.first_run_setup_button)
         general_section.add_card(self.first_run_card)
+
+        self.reset_defaults_card = CardWidget(
+            tr("launcher_settings.reset_defaults.title", "Reset launcher settings"),
+            tr("launcher_settings.reset_defaults.detail", "Restore all launcher settings back to their factory default values."),
+        )
+        self.reset_button = set_theme_icon(QPushButton(tr("launcher_settings.reset", "Reset to defaults")), "icon.action.reset")
+        self.reset_button.clicked.connect(self.request_reset)
+        self.reset_defaults_card.layout.addStretch(1)
+        self.reset_defaults_card.layout.addWidget(self.reset_button)
+        general_section.add_card(self.reset_defaults_card)
 
         self.content_browser_card = CardWidget(tr("content.settings.title"), tr("content.settings.detail"))
         self.show_content_descriptions = QCheckBox(tr("content.settings.show_descriptions"))
@@ -497,13 +501,34 @@ class LauncherSettingsPage(BasePage):
         self.motion_preview_card.layout.addWidget(self.preview_toast_button)
         appearance_section.add_card(self.motion_preview_card, span=2)
 
+        self.floating_action_bar = QFrame()
+        self.floating_action_bar.setObjectName("FloatingSettingsBar")
+        floating_layout = QHBoxLayout(self.floating_action_bar)
+        floating_layout.setContentsMargins(16, 10, 16, 10)
+        floating_layout.setSpacing(12)
+
+        self.unsaved_label = QLabel(tr("settings.unsaved.banner"))
+        self.unsaved_label.setObjectName("UnsavedChangesBanner")
+        self.unsaved_label.setWordWrap(True)
+        self.unsaved_label.setVisible(False)
+
+        self.discard_button = set_theme_icon(QPushButton(tr("common.discard", "Discard")), "icon.action.reset")
+        self.discard_button.setObjectName("SecondaryButton")
+        self.discard_button.setMinimumHeight(40)
+        self.discard_button.setEnabled(False)
+        self.discard_button.clicked.connect(self.discard_changes)
+
         self.save_button = set_theme_icon(QPushButton("Save launcher settings"), "icon.action.save")
         self.save_button.setObjectName("PrimaryButton")
+        self.save_button.setMinimumHeight(40)
         self.save_button.clicked.connect(self.request_save)
-        reset_button = set_theme_icon(QPushButton("Reset to defaults"), "icon.action.reset")
-        reset_button.clicked.connect(self.request_reset)
-        self.root_layout.addWidget(self.save_button)
-        self.root_layout.addWidget(reset_button)
+
+        floating_layout.addWidget(self.unsaved_label, 1)
+        floating_layout.addStretch(1)
+        floating_layout.addWidget(self.discard_button)
+        floating_layout.addWidget(self.save_button)
+        self.install_floating_action_bar(self.floating_action_bar)
+
         self.root_layout.addStretch()
         prevent_wheel_value_changes(self)
 
@@ -987,6 +1012,14 @@ class LauncherSettingsPage(BasePage):
         if self.first_run_card.subtitle_label is not None:
             self.first_run_card.subtitle_label.setText(tr("launcher_settings.first_run.detail"))
         self.first_run_setup_button.setText(tr("launcher_settings.first_run.button"))
+        if hasattr(self, "reset_defaults_card"):
+            if self.reset_defaults_card.title_label is not None:
+                self.reset_defaults_card.title_label.setText(tr("launcher_settings.reset_defaults.title", "Reset launcher settings"))
+            if self.reset_defaults_card.subtitle_label is not None:
+                self.reset_defaults_card.subtitle_label.setText(tr("launcher_settings.reset_defaults.detail", "Restore all launcher settings back to their factory default values."))
+            self.reset_button.setText(tr("launcher_settings.reset", "Reset to defaults"))
+        if hasattr(self, "discard_button"):
+            self.discard_button.setText(tr("common.discard", "Discard"))
         self.current_version_label.setText(tr("launcher_settings.update.current_version", version=get_display_version()))
         self._refresh_hotfix_status_label()
         if self.storage_cleanup_card.title_label is not None:
@@ -1348,6 +1381,12 @@ class LauncherSettingsPage(BasePage):
         self._dirty = dirty
         self.unsaved_label.setVisible(dirty)
         self.unsaved_label.setText(tr("settings.unsaved.banner"))
+        if hasattr(self, "discard_button"):
+            self.discard_button.setEnabled(dirty)
+        if hasattr(self, "floating_action_bar"):
+            self.floating_action_bar.setProperty("unsavedChanges", dirty)
+            self.floating_action_bar.style().unpolish(self.floating_action_bar)
+            self.floating_action_bar.style().polish(self.floating_action_bar)
         self.save_button.setProperty("unsavedChanges", dirty)
         self.save_button.style().unpolish(self.save_button)
         self.save_button.style().polish(self.save_button)

@@ -130,13 +130,11 @@ class DownloadLibraryManager:
             kwargs.update({"reporter": reporter, "progress_stage": ProgressStage.DOWNLOADING_LIBRARIES, "progress_message": f"Downloading library {library_path.name}..."})
         downloaded_path = HttpDownloader.download(**kwargs)
         if verification_cache is not None:
-            verification_cache.verify(
+            verification_cache.record_verified(
                 "library:" + library.path.as_posix(),
                 downloaded_path,
-                library.size,
                 library.sha1,
                 "sha1",
-                force_hash=True,
             )
 
         if library.is_native:

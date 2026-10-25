@@ -68,6 +68,7 @@ class BasePage(QScrollArea):
         self._compact = False
         self._interaction_locked = False
         self._busy_overlay = _BusyPageOverlay(self)
+        self._floating_action_bar: QWidget | None = None
 
         self.title_label = QLabel(title)
         self.title_label.setObjectName("PageTitle")
@@ -101,19 +102,48 @@ class BasePage(QScrollArea):
             self._wheel_guard_installed = True
             prevent_wheel_value_changes(self)
 
+    def install_floating_action_bar(self, bar: QWidget) -> None:
+        self._floating_action_bar = bar
+        bar.setParent(self.viewport())
+        bar.show()
+        bar.raise_()
+        self._apply_root_margins()
+        self._sync_busy_overlay_geometry()
+
+    def _apply_root_margins(self) -> None:
+        if getattr(self, "_floating_action_bar", None) is not None:
+            bottom_margin = 84 if self._compact else 96
+        else:
+            bottom_margin = 14 if self._compact else 24
+        if self._compact:
+            self.root_layout.setContentsMargins(18, 14, 18, bottom_margin)
+            self.root_layout.setSpacing(12)
+        else:
+            self.root_layout.setContentsMargins(28, 24, 28, bottom_margin)
+            self.root_layout.setSpacing(18)
+
     def _sync_busy_overlay_geometry(self) -> None:
+        vp_rect = self.viewport().rect()
+        if getattr(self, "_floating_action_bar", None) is not None:
+            margin = 12 if self._compact else 16
+            bar_height = max(56, self._floating_action_bar.sizeHint().height())
+            bar_width = max(260, vp_rect.width() - margin * 2)
+            self._floating_action_bar.setGeometry(
+                margin,
+                max(margin, vp_rect.height() - bar_height - margin),
+                bar_width,
+                bar_height,
+            )
+            self._floating_action_bar.raise_()
         if hasattr(self, "_busy_overlay"):
-            self._busy_overlay.setGeometry(self.viewport().rect())
+            self._busy_overlay.setGeometry(vp_rect)
+            if self._interaction_locked:
+                self._busy_overlay.raise_()
 
     def set_compact_mode(self, compact: bool) -> None:
         self._compact = bool(compact)
         self.page_viewport.setProperty("compactLayout", self._compact)
-        if self._compact:
-            self.root_layout.setContentsMargins(18, 14, 18, 14)
-            self.root_layout.setSpacing(12)
-        else:
-            self.root_layout.setContentsMargins(28, 24, 28, 24)
-            self.root_layout.setSpacing(18)
+        self._apply_root_margins()
 
         for section in self.findChildren(SettingsSection):
             section.set_compact_mode(self._compact)
@@ -138,6 +168,9 @@ class BasePage(QScrollArea):
         """
         self.viewport().update()
         self.page_viewport.update()
+        if getattr(self, "_floating_action_bar", None) is not None:
+            self._floating_action_bar.raise_()
+            self._floating_action_bar.update()
         buttons = tuple(self.page_viewport.findChildren(QPushButton))
         for button in buttons:
             button.update()
