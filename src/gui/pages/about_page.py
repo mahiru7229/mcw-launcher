@@ -86,15 +86,7 @@ class AboutPage(BasePage):
         self.core_desc.setOpenExternalLinks(True)
         self.core_desc.setWordWrap(True)
 
-        self.gateway_desc = QLabel(
-            f'• <b>CurseForge Gateway:</b> {tr("about.ecosystem.gateway")}<br>'
-            f'&nbsp;&nbsp;<a href="https://github.com/mahiru7229/mcw-curseforge-gateway" style="color: #8ed35b;">https://github.com/mahiru7229/mcw-curseforge-gateway</a>'
-        )
-        self.gateway_desc.setOpenExternalLinks(True)
-        self.gateway_desc.setWordWrap(True)
-
         self.ecosystem_card.layout.addWidget(self.core_desc)
-        self.ecosystem_card.layout.addWidget(self.gateway_desc)
         self.root_layout.addWidget(self.ecosystem_card)
 
         # Credits & References Card
@@ -127,10 +119,6 @@ class AboutPage(BasePage):
         self.core_desc.setText(
             f'• <b>MCW Core Engine:</b> {tr("about.ecosystem.core")}<br>'
             f'&nbsp;&nbsp;<a href="https://mahiru7229.github.io/mcw_core/index.html" style="color: #8ed35b;">https://mahiru7229.github.io/mcw_core/index.html</a>'
-        )
-        self.gateway_desc.setText(
-            f'• <b>CurseForge Gateway:</b> {tr("about.ecosystem.gateway")}<br>'
-            f'&nbsp;&nbsp;<a href="https://github.com/mahiru7229/mcw-curseforge-gateway" style="color: #8ed35b;">https://github.com/mahiru7229/mcw-curseforge-gateway</a>'
         )
         if self.credits_card.title_label:
             self.credits_card.title_label.setText(tr("about.credits.title"))

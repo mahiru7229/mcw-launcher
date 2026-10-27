@@ -416,7 +416,11 @@ class MainWindow(QMainWindow):
         dialog.analyze_requested.connect(self.mod_controller.analyze)
         settings = getattr(self, "_cached_gui_settings", {})
         dialog.set_channel_preferences(bool(settings.get("modrinth_include_beta", False)), bool(settings.get("modrinth_include_alpha", False)))
-        dialog.curseforge_button.setVisible(bool(settings.get("curseforge_gateway_urls", ())))
+        dialog.curseforge_button.setVisible(
+            CurseForgeConfigManager.is_configured()
+            or bool(settings.get("curseforge_api_key", ""))
+            or bool(settings.get("curseforge_gateway_urls", ()))
+        )
         if hasattr(self, "mod_controller") and self.mod_controller.current_instance is not None:
             dialog.set_instance(self.mod_controller.current_instance)
         return self._finalize_lazy_dialog(dialog)
@@ -1982,6 +1986,7 @@ class MainWindow(QMainWindow):
         self.curseforge_mod_dialog.show()
         self.curseforge_mod_dialog.raise_()
         self.curseforge_mod_dialog.activateWindow()
+        self.curseforge_mod_dialog.request_initial_search()
 
     def _open_curseforge_modpacks(self) -> None:
         if not self._require_curseforge_gateway():
@@ -1990,6 +1995,7 @@ class MainWindow(QMainWindow):
         self.curseforge_modpack_dialog.show()
         self.curseforge_modpack_dialog.raise_()
         self.curseforge_modpack_dialog.activateWindow()
+        self.curseforge_modpack_dialog.request_initial_search()
 
     def _open_ftb_modpacks(self) -> None:
         self.ftb_modpack_dialog.show()
@@ -2843,7 +2849,11 @@ class MainWindow(QMainWindow):
             self._resource_pack_browser_dialog.set_show_project_descriptions(show_content_descriptions)
         if self._shader_pack_browser_dialog is not None:
             self._shader_pack_browser_dialog.set_show_project_descriptions(show_content_descriptions)
-        curseforge_available = bool(settings.get("curseforge_gateway_urls", ()))
+        curseforge_available = (
+            CurseForgeConfigManager.is_configured()
+            or bool(settings.get("curseforge_api_key", ""))
+            or bool(settings.get("curseforge_gateway_urls", ()))
+        )
         self.instances_page.browse_curseforge_modpacks_button.setVisible(curseforge_available)
         if self._mod_manager_dialog is not None:
             self._mod_manager_dialog.curseforge_button.setVisible(curseforge_available)

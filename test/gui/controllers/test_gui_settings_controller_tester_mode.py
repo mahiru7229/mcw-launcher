@@ -14,6 +14,8 @@ from src.gui.controllers.gui_settings_controller import GuiSettingsController
 def isolate_curseforge_gateway_storage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr("src.gui.controllers.gui_settings_controller.CurseForgeConfigManager.gateway_urls", lambda: ())
     monkeypatch.setattr("src.gui.controllers.gui_settings_controller.CurseForgeConfigManager.save_local", lambda *_args, **_kwargs: tmp_path / "curseforge.json")
+    monkeypatch.setattr("src.gui.controllers.gui_settings_controller.CurseForgeConfigManager.custom_api_key", lambda: "")
+    monkeypatch.setattr("src.gui.controllers.gui_settings_controller.CurseForgeConfigManager.save_api_key", lambda *_args, **_kwargs: tmp_path / "curseforge.json")
 
 
 def _controller(path: Path) -> GuiSettingsController:

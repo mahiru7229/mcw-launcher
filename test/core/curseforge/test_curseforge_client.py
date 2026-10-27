@@ -14,6 +14,7 @@ from src.models.curseforge.file import CurseForgeFile
 
 
 def configure_gateway(monkeypatch, tmp_path: Path, client: httpx.Client, token: str = "") -> None:
+    monkeypatch.setattr(CurseForgeConfigManager, "api_key", staticmethod(lambda: ""))
     monkeypatch.setattr(CurseForgeConfigManager, "gateway_urls", staticmethod(lambda: ("https://gateway.example/api/curseforge",)))
     monkeypatch.setattr(CurseForgeConfigManager, "client_token", staticmethod(lambda: token))
     monkeypatch.setattr(HttpDownloader, "get_client", classmethod(lambda cls: client))
@@ -589,3 +590,32 @@ def test_parse_file_extracts_loaders_from_sortable_game_versions() -> None:
 
     assert file.game_versions == ("1.12.2",)
     assert file.loaders == ("forge",)
+
+
+def test_curseforge_client_routes_directly_to_official_v1_api_when_api_key_is_configured(monkeypatch, tmp_path: Path) -> None:
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["request"] = request
+        return httpx.Response(200, request=request, json=search_payload())
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    monkeypatch.setattr(CurseForgeConfigManager, "api_key", staticmethod(lambda: "cf-test-key"))
+    monkeypatch.setattr(CurseForgeConfigManager, "gateway_urls", staticmethod(lambda: ()))
+    monkeypatch.setattr(HttpDownloader, "get_client", classmethod(lambda cls: client))
+    monkeypatch.setattr(CurseForgeCache, "root", staticmethod(lambda: tmp_path))
+    CurseForgeClient._inflight.clear()
+
+    result = CurseForgeClient.search_projects("mod", query="", game_version="1.20.1", loader="fabric")
+
+    request = captured["request"]
+    assert str(request.url).startswith("https://api.curseforge.com/v1/mods/search")
+    assert request.headers.get("x-api-key") == "cf-test-key"
+    assert request.headers.get("Accept") == "application/json"
+    assert request.url.params.get("gameId") == "432"
+    assert request.url.params.get("classId") == "6"
+    assert request.url.params.get("gameVersion") == "1.20.1"
+    assert request.url.params.get("modLoaderType") == "4"
+    assert "searchFilter" not in request.url.params
+    assert len(result.projects) == 1
+    assert result.projects[0].name == "Example"

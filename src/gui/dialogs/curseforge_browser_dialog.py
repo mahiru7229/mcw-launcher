@@ -61,7 +61,6 @@ class CurseForgeBrowserDialog(QDialog):
         self._cooldown_timer = QTimer(self)
         self._cooldown_timer.setInterval(1000)
         self._cooldown_timer.timeout.connect(self._render_cache_status)
-        self._cooldown_timer.start()
         self._build_ui()
         self.retranslate_dynamic()
         self.set_cache_info(self._cache_info)
@@ -423,15 +422,16 @@ class CurseForgeBrowserDialog(QDialog):
         self.next_button.setEnabled(False)
         self._clear_selection(tr("curseforge.results.ready"))
         self.retranslate_dynamic()
-        if self.isVisible() and self.search_input.text().strip():
+        if self.isVisible():
+            self._request_search()
+
+    def request_initial_search(self) -> None:
+        if not self._busy and self._result is None and not self._projects:
             self._request_search()
 
     def _request_search(self) -> None:
         if self.project_type == "mod" and self._instance is None and not self._catalog_loader:
             QMessageBox.information(self, tr("curseforge.title"), tr("curseforge.mod.no_instance"))
-            return
-        if not self.search_input.text().strip():
-            QMessageBox.information(self, tr("curseforge.title"), tr("curseforge.search.required"))
             return
         self._index = 0
         self.set_searching(self.loader)
@@ -441,9 +441,6 @@ class CurseForgeBrowserDialog(QDialog):
         QTimer.singleShot(0, lambda values=request: self.search_requested.emit(*values))
 
     def _request_refresh(self) -> None:
-        if not self.search_input.text().strip():
-            QMessageBox.information(self, tr("curseforge.title"), tr("curseforge.search.required"))
-            return
         if CurseForgeClient.manual_refresh_remaining_seconds() > 0:
             self._render_cache_status()
             return
@@ -640,6 +637,12 @@ class CurseForgeBrowserDialog(QDialog):
             text += " · " + tr("curseforge.cache.last_error")
         self.cache_status_label.setText(text)
         remaining = CurseForgeClient.manual_refresh_remaining_seconds()
+        if remaining > 0:
+            if not self._cooldown_timer.isActive():
+                self._cooldown_timer.start()
+        else:
+            if self._cooldown_timer.isActive():
+                self._cooldown_timer.stop()
         self.refresh_button.setEnabled(remaining <= 0 and self.search_button.isEnabled())
         self.refresh_button.setText(tr("curseforge.cache.refresh_wait", seconds=remaining) if remaining > 0 else tr("curseforge.cache.refresh"))
 

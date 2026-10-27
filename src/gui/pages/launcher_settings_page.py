@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QSignalBlocker, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import QCheckBox, QColorDialog, QFrame, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy, QSpinBox
+from PySide6.QtWidgets import QCheckBox, QColorDialog, QFrame, QComboBox, QDoubleSpinBox, QFileDialog, QGridLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QSizePolicy, QSpinBox
 
 from mcw_core.api.config.managed_content_policy import ManagedContentPolicy
 from mcw_core.api.hardware.gpu_preference_manager import GraphicsDetectionResult
@@ -181,26 +181,34 @@ class LauncherSettingsPage(BasePage):
         downloads_section.add_card(managed_checks_card, span=2)
 
         curseforge_card = CardWidget(
-            "Private CurseForge gateways",
-            "Configure up to five private HTTPS gateway links. They are stored outside the launcher settings file and protected with Windows DPAPI. Requests try each link in order when an earlier gateway is unavailable.",
+            tr("curseforge.api_key.settings.title"),
+            tr("curseforge.api_key.settings.subtitle"),
         )
-        self.curseforge_gateway_labels: list[QLabel] = []
-        self.curseforge_gateway_inputs: list[QLineEdit] = []
-        for index in range(1, 6):
-            label = QLabel(tr("curseforge.gateway.slot", index=index))
-            field = QLineEdit()
-            field.setPlaceholderText("Paste private HTTPS gateway link")
-            field.setEchoMode(QLineEdit.EchoMode.Password)
-            field.setClearButtonEnabled(True)
-            self.curseforge_gateway_labels.append(label)
-            self.curseforge_gateway_inputs.append(field)
-            curseforge_card.layout.addWidget(label)
-            curseforge_card.layout.addWidget(field)
-        self.reveal_curseforge_gateways = QCheckBox("Reveal protected gateway links")
+        self.curseforge_card = curseforge_card
+        curseforge_grid = QGridLayout()
+        curseforge_grid.setHorizontalSpacing(14)
+        curseforge_grid.setVerticalSpacing(10)
+        curseforge_grid.setColumnStretch(1, 1)
+
+        self.curseforge_api_key_label = QLabel(tr("curseforge.api_key.label"))
+        self.curseforge_api_key_label.setObjectName("MutedLabel")
+        self.curseforge_api_key_input = QLineEdit()
+        self.curseforge_api_key_input.setPlaceholderText(tr("curseforge.api_key.placeholder"))
+        self.curseforge_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.curseforge_api_key_input.setClearButtonEnabled(True)
+        curseforge_grid.addWidget(self.curseforge_api_key_label, 0, 0)
+        curseforge_grid.addWidget(self.curseforge_api_key_input, 0, 1)
+
+        self.curseforge_gateway_labels: list[QLabel] = [self.curseforge_api_key_label]
+        self.curseforge_gateway_inputs: list[QLineEdit] = [self.curseforge_api_key_input]
+
+        self.reveal_curseforge_gateways = QCheckBox(tr("curseforge.api_key.reveal.toggle"))
         self.reveal_curseforge_gateways.toggled.connect(self._set_gateway_links_revealed)
-        self.curseforge_gateway_security = QLabel("Gateway links are masked in the interface and encrypted for the current Windows account.")
+        self.curseforge_gateway_security = QLabel(tr("curseforge.api_key.security.note"))
         self.curseforge_gateway_security.setObjectName("MutedLabel")
         self.curseforge_gateway_security.setWordWrap(True)
+
+        curseforge_card.layout.addLayout(curseforge_grid)
         curseforge_card.layout.addWidget(self.reveal_curseforge_gateways)
         curseforge_card.layout.addWidget(self.curseforge_gateway_security)
         downloads_section.add_card(curseforge_card, span=2)
@@ -944,7 +952,8 @@ class LauncherSettingsPage(BasePage):
             "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
             "block_launch_on_modrinth_failure": self.block_modrinth_failure.isChecked(),
             "block_launch_on_curseforge_failure": self.block_curseforge_failure.isChecked(),
-            "curseforge_gateway_urls": [field.text().strip() for field in self.curseforge_gateway_inputs],
+            "curseforge_api_key": self.curseforge_api_key_input.text().strip(),
+            "curseforge_gateway_urls": (),
             "download_limit_mbps": self.download_limit_mbps.value() if self.limit_download_speed.isChecked() else 0.0,
             "download_performance_mode": str(self.download_performance_mode.currentData() or "automatic"),
             "download_concurrency": int(self.download_concurrency.currentData() or 0),
@@ -1058,10 +1067,15 @@ class LauncherSettingsPage(BasePage):
         self.discord_rpc_enabled.setText(tr("discord_rpc.launcher.toggle"))
         self.discord_client_id_label.setText(tr("discord_rpc.launcher.custom_client_id"))
         self.discord_client_id_input.setPlaceholderText(tr("discord_rpc.launcher.custom_client_id_placeholder"))
-        for index, label in enumerate(self.curseforge_gateway_labels, start=1):
-            label.setText(tr("curseforge.gateway.slot", index=index))
-        self.reveal_curseforge_gateways.setText(tr("curseforge.gateway.reveal.toggle"))
-        self.curseforge_gateway_security.setText(tr("curseforge.gateway.security.note"))
+        if hasattr(self, "curseforge_card"):
+            if self.curseforge_card.title_label is not None:
+                self.curseforge_card.title_label.setText(tr("curseforge.api_key.settings.title"))
+            if self.curseforge_card.subtitle_label is not None:
+                self.curseforge_card.subtitle_label.setText(tr("curseforge.api_key.settings.subtitle"))
+        self.curseforge_api_key_label.setText(tr("curseforge.api_key.label"))
+        self.curseforge_api_key_input.setPlaceholderText(tr("curseforge.api_key.placeholder"))
+        self.reveal_curseforge_gateways.setText(tr("curseforge.api_key.reveal.toggle"))
+        self.curseforge_gateway_security.setText(tr("curseforge.api_key.security.note"))
         if self.content_browser_card.title_label is not None:
             self.content_browser_card.title_label.setText(tr("content.settings.title"))
         if self.content_browser_card.subtitle_label is not None:
@@ -1164,10 +1178,8 @@ class LauncherSettingsPage(BasePage):
         self.modrinth_include_alpha.setChecked(bool(settings.get("modrinth_include_alpha", False)))
         self.block_modrinth_failure.setChecked(bool(settings.get("block_launch_on_modrinth_failure", True)))
         self.block_curseforge_failure.setChecked(bool(settings.get("block_launch_on_curseforge_failure", True)))
-        gateway_urls = list(settings.get("curseforge_gateway_urls", ()) or ())[:5]
-        gateway_urls.extend([""] * (5 - len(gateway_urls)))
-        for field, value in zip(self.curseforge_gateway_inputs, gateway_urls):
-            field.setText(str(value or ""))
+        api_key = str(settings.get("curseforge_api_key", "") or "").strip()
+        self.curseforge_api_key_input.setText(api_key)
         self._mask_gateway_links()
         download_limit = max(0.0, float(settings.get("download_limit_mbps", 0.0) or 0.0))
         self.limit_download_speed.setChecked(download_limit > 0)

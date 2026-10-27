@@ -116,9 +116,11 @@ jobs:
             executable: dist/mcw-launcher
             updater: dist/mcw-updater
     runs-on: ${{ matrix.os }}
+    environment: CURSEFORGE API KEYS
     env:
       QT_QPA_PLATFORM: offscreen
       SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+      CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
     steps:
       - name: Checkout release tag
         uses: actions/checkout@v6
@@ -151,8 +153,25 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"version={VERSION_ID}\n")
 
+      - name: Prepare CurseForge build configuration
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          from src.core.security.bundled_secrets import write_sealed_build_secrets
+          key = os.environ.get("CURSEFORGE_API_KEY", "").strip()
+          if key:
+              write_sealed_build_secrets(Path("src/_build_secrets.py"), key)
+
       - name: Build launcher executable
         run: python -m PyInstaller --clean --noconfirm mcw_launcher.spec
+
+      - name: Remove temporary build secrets
+        if: always()
+        shell: python
+        run: |
+          from pathlib import Path
+          Path("src/_build_secrets.py").unlink(missing_ok=True)
 
       - name: Build bundled updater executable
         run: python -m PyInstaller --clean --noconfirm mcw_updater.spec

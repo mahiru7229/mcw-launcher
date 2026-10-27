@@ -144,6 +144,7 @@ def test_curseforge_manual_link_resolves_via_cflookup_when_gateway_fails(monkeyp
 def test_resolve_curseforge_project_slug(monkeypatch) -> None:
     import src.core.curseforge.curseforge_links as cf_links
     cf_links._PROJECT_SLUG_CACHE.clear()
+    monkeypatch.setattr(cf_links, "_resolve_from_client", lambda _pid: "")
     monkeypatch.setattr(
         cf_links,
         "_resolve_from_cflookup",
@@ -151,5 +152,3 @@ def test_resolve_curseforge_project_slug(monkeypatch) -> None:
     )
     assert cf_links.resolve_curseforge_project_slug(238222) == "https://www.curseforge.com/minecraft/mc-mods/jei"
     assert cf_links.resolve_curseforge_project_slug(999999) == ""
-
-

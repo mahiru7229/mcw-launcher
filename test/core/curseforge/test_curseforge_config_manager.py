@@ -1,10 +1,18 @@
 from pathlib import Path
 import base64
 import json
+import sys
+import types
 
 import pytest
 
 from src.core.config.curseforge_config_manager import CurseForgeConfigManager
+from src.core.security.bundled_secrets import (
+    seal_curseforge_api_key,
+    unseal_Payload,
+    unseal_bundled_curseforge_key,
+)
+from src.core.security.sensitive_data_redactor import SensitiveDataRedactor
 from src.core.security.token_cipher import TokenCipher
 
 
@@ -25,11 +33,14 @@ class FakeDPAPI:
 
 
 def clear_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(CurseForgeConfigManager.ENV_API_KEY, raising=False)
     monkeypatch.delenv(CurseForgeConfigManager.ENV_GATEWAY_URL, raising=False)
     monkeypatch.delenv(CurseForgeConfigManager.ENV_CLIENT_TOKEN, raising=False)
     for index in range(1, CurseForgeConfigManager.MAX_GATEWAYS + 1):
         monkeypatch.delenv(f"{CurseForgeConfigManager.ENV_GATEWAY_URL_PREFIX}{index}", raising=False)
     monkeypatch.setattr(CurseForgeConfigManager, "DEFAULT_GATEWAY_URLS", ())
+    monkeypatch.setattr(CurseForgeConfigManager, "DEFAULT_API_KEY", "")
+    monkeypatch.setattr("src.core.config.curseforge_config_manager.unseal_bundled_curseforge_key", lambda: "")
 
 
 def test_indexed_environment_gateways_and_token_have_priority(monkeypatch, tmp_path: Path) -> None:
@@ -150,3 +161,82 @@ def test_default_gateway_url_is_used_when_no_local_config(monkeypatch, tmp_path:
     assert CurseForgeConfigManager.gateway_urls() == ("https://gateway.example.com/api/curseforge",)
     assert CurseForgeConfigManager.is_configured() is True
     assert CurseForgeConfigManager.gateway_url() == "https://gateway.example.com/api/curseforge"
+
+
+def test_curseforge_config_manager_encrypts_and_prioritizes_api_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    clear_environment(monkeypatch)
+    config_file = tmp_path / "private" / "curseforge_endpoints.json"
+    monkeypatch.setattr(CurseForgeConfigManager, "path", staticmethod(lambda: config_file))
+    monkeypatch.setattr(CurseForgeConfigManager, "legacy_path", staticmethod(lambda: tmp_path / "curseforge.json"))
+    monkeypatch.setattr(TokenCipher, "_backend", FakeDPAPI)
+
+    # 1. When nothing configured, api_key() is empty
+    assert CurseForgeConfigManager.api_key() == ""
+    assert CurseForgeConfigManager.is_configured() is False
+
+    # 2. Bundled key works when no custom key
+    monkeypatch.setattr(CurseForgeConfigManager, "DEFAULT_API_KEY", "bundled-key-123")
+    assert CurseForgeConfigManager.bundled_api_key() == "bundled-key-123"
+    assert CurseForgeConfigManager.api_key() == "bundled-key-123"
+    assert CurseForgeConfigManager.is_configured() is True
+
+    # 3. Custom key encrypts and overrides bundled key
+    CurseForgeConfigManager.save_api_key("custom-key-456")
+    raw = json.loads(config_file.read_text(encoding="utf-8"))
+    assert "protected_api_key" in raw
+    assert "custom-key-456" not in config_file.read_text(encoding="utf-8")
+    assert CurseForgeConfigManager.custom_api_key() == "custom-key-456"
+    assert CurseForgeConfigManager.api_key() == "custom-key-456"
+
+    # 4. Environment variable overrides both
+    monkeypatch.setenv(CurseForgeConfigManager.ENV_API_KEY, "env-key-789")
+    assert CurseForgeConfigManager.api_key() == "env-key-789"
+
+
+def test_bundled_curseforge_key_sealing_and_unsealing_hides_plaintext(monkeypatch: pytest.MonkeyPatch) -> None:
+    sample_key = "$2a$10$SyntheticUnitTestCurseForgeKey0123456789ABCDEFGHIJKLMN"
+    module_source = seal_curseforge_api_key(sample_key)
+
+    # Neither the raw key nor the "$2a$10$" prefix may appear in source or bytecode constants
+    assert sample_key not in module_source
+    assert "$2a$10$" not in module_source
+    assert "CURSEFORGE" not in module_source.upper()
+
+    code_obj = compile(module_source, "<_build_secrets>", "exec")
+    for const in code_obj.co_consts:
+        assert not (isinstance(const, str) and "$2a$" in const)
+
+    namespace: dict[str, object] = {}
+    exec(code_obj, namespace)
+
+    fake_module = types.ModuleType("src._build_secrets")
+    for attr in ("_S0", "_S1", "_S2", "_S3", "_S4"):
+        setattr(fake_module, attr, namespace[attr])
+    monkeypatch.setitem(sys.modules, "src._build_secrets", fake_module)
+
+    assert unseal_bundled_curseforge_key() == sample_key
+
+    # Tampering with any ciphertext byte must fail AES-GCM verification
+    s4 = list(namespace["_S4"])  # type: ignore[arg-type]
+    s4[0] ^= 0xFF
+    with pytest.raises(Exception):
+        unseal_Payload(
+            namespace["_S0"],  # type: ignore[arg-type]
+            namespace["_S1"],  # type: ignore[arg-type]
+            namespace["_S2"],  # type: ignore[arg-type]
+            namespace["_S3"],  # type: ignore[arg-type]
+            tuple(s4),
+        )
+
+
+def test_sensitive_data_redactor_masks_curseforge_keys() -> None:
+    sample_key = "$2a$10$SyntheticUnitTestCurseForgeKey0123456789ABCDEFGHIJKLMN"
+    assert SensitiveDataRedactor.redact_text(f"Header x-api-key={sample_key} failed") == (
+        f"Header x-api-key={SensitiveDataRedactor.REDACTED} failed"
+    )
+    assert SensitiveDataRedactor.redact_text(f"Raw key leaked: {sample_key}") == (
+        f"Raw key leaked: {SensitiveDataRedactor.REDACTED}"
+    )
+    assert SensitiveDataRedactor.redact_value({"x-api-key": sample_key}) == {
+        "x-api-key": SensitiveDataRedactor.REDACTED
+    }

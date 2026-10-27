@@ -50,6 +50,7 @@ def _launcher_settings() -> dict:
         "block_launch_on_modrinth_failure": True,
         "block_launch_on_curseforge_failure": True,
         "curseforge_gateway_urls": ("https://one.example/api/curseforge",),
+        "curseforge_api_key": "test-key-123",
         "download_limit_mbps": 0.0,
     }
 
@@ -86,16 +87,15 @@ def test_launcher_settings_highlights_unsaved_changes_and_can_discard(gui_app):
     assert page.show_snapshots.isChecked() is False
 
 
-def test_launcher_settings_has_five_masked_gateway_slots(gui_app):
+def test_launcher_settings_has_masked_curseforge_api_key(gui_app):
     from PySide6.QtWidgets import QLineEdit
 
     page = LauncherSettingsPage()
     page.set_settings(_launcher_settings())
 
-    assert len(page.curseforge_gateway_inputs) == 5
-    assert all(field.echoMode() == QLineEdit.EchoMode.Password for field in page.curseforge_gateway_inputs)
-    assert page.curseforge_gateway_inputs[0].text() == "https://one.example/api/curseforge"
-    assert page.form_data()["curseforge_gateway_urls"][1:] == ["", "", "", ""]
+    assert page.curseforge_api_key_input.echoMode() == QLineEdit.EchoMode.Password
+    assert page.curseforge_api_key_input.text() == "test-key-123"
+    assert page.form_data()["curseforge_api_key"] == "test-key-123" 
 
 
 def test_launcher_settings_round_trips_content_description_visibility(gui_app):

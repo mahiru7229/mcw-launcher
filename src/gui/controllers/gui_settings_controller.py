@@ -44,6 +44,7 @@ class GuiSettingsController(BaseController):
         "modrinth_include_alpha": False,
         "block_launch_on_modrinth_failure": True,
         "block_launch_on_curseforge_failure": True,
+        "curseforge_api_key": "",
         "curseforge_gateway_urls": (),
         "download_limit_mbps": 0.0,
         "download_concurrency": 0,
@@ -78,6 +79,10 @@ class GuiSettingsController(BaseController):
         network = data.get("network", {})
         storage = data.get("storage", {})
         try:
+            curseforge_api_key = CurseForgeConfigManager.custom_api_key()
+        except Exception:
+            curseforge_api_key = ""
+        try:
             curseforge_gateway_urls = CurseForgeConfigManager.gateway_urls()
         except (RuntimeError, ValueError):
             curseforge_gateway_urls = ()
@@ -108,6 +113,7 @@ class GuiSettingsController(BaseController):
             "modrinth_include_alpha": bool(modrinth.get("include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
             "block_launch_on_modrinth_failure": ManagedContentPolicy.normalize_global(managed_content.get("modrinth_failure_policy")) == ManagedContentPolicy.BLOCK,
             "block_launch_on_curseforge_failure": ManagedContentPolicy.normalize_global(managed_content.get("curseforge_failure_policy")) == ManagedContentPolicy.BLOCK,
+            "curseforge_api_key": str(curseforge_api_key or ""),
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": float(network.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]) or 0.0),
             "download_concurrency": int(network.get("download_concurrency", self.DEFAULTS["download_concurrency"]) or 0),
@@ -123,10 +129,14 @@ class GuiSettingsController(BaseController):
 
     def save(self, data: dict) -> None:
         try:
-            CurseForgeConfigManager.save_local(data.get("curseforge_gateway_urls", self.DEFAULTS["curseforge_gateway_urls"]))
+            if "curseforge_api_key" in data:
+                CurseForgeConfigManager.save_api_key(str(data.get("curseforge_api_key") or ""))
+            if "curseforge_gateway_urls" in data:
+                CurseForgeConfigManager.save_local(data.get("curseforge_gateway_urls", self.DEFAULTS["curseforge_gateway_urls"]))
+            curseforge_api_key = CurseForgeConfigManager.custom_api_key()
             curseforge_gateway_urls = CurseForgeConfigManager.gateway_urls()
         except (OSError, RuntimeError, ValueError) as error:
-            self._emit_error(tr("curseforge.gateway.save.error.title"), error)
+            self._emit_error(tr("curseforge.api_key.save.error.title"), error)
             return
         download_limit_mbps = download_bandwidth_limiter.configure_mbps(data.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]))
         try:
@@ -166,6 +176,7 @@ class GuiSettingsController(BaseController):
             "modrinth_include_alpha": bool(data.get("modrinth_include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
             "block_launch_on_modrinth_failure": bool(data.get("block_launch_on_modrinth_failure", self.DEFAULTS["block_launch_on_modrinth_failure"])),
             "block_launch_on_curseforge_failure": bool(data.get("block_launch_on_curseforge_failure", self.DEFAULTS["block_launch_on_curseforge_failure"])),
+            "curseforge_api_key": str(curseforge_api_key or ""),
             "curseforge_gateway_urls": tuple(curseforge_gateway_urls),
             "download_limit_mbps": download_limit_mbps,
             "download_concurrency": download_concurrency,

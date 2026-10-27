@@ -24,3 +24,4 @@ venv/
 .idea/
 .vscode/
 hotfixes/
+src/_build_secrets.py

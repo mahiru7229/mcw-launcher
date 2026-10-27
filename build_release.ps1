@@ -1,5 +1,6 @@
 param(
     [string]$ExeName = "MCW Launcher.exe",
+    [string]$CurseForgeApiKey = "",
     [switch]$SkipTests,
     [switch]$AllowDirty
 )
@@ -74,8 +75,21 @@ Remove-Item ".\build" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item ".\dist" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item ".\release" -Recurse -Force -ErrorAction SilentlyContinue
 
-Write-Step "Building launcher EXE"
-Invoke-Checked "Launcher PyInstaller build" { & $PythonExe -m PyInstaller --clean --noconfirm mcw_launcher.spec }
+$BuildSecretsPath = ".\src\_build_secrets.py"
+$EffectiveCfKey = if ($CurseForgeApiKey) { $CurseForgeApiKey.Trim() } elseif ($env:MCW_CURSEFORGE_API_KEY) { $env:MCW_CURSEFORGE_API_KEY.Trim() } elseif ($env:CURSEFORGE_API_KEY) { $env:CURSEFORGE_API_KEY.Trim() } else { "" }
+try {
+    if ($EffectiveCfKey) {
+        Write-Step "Preparing CurseForge build configuration"
+        & $PythonExe -c "import pathlib, sys; from src.core.security.bundled_secrets import write_sealed_build_secrets; write_sealed_build_secrets(pathlib.Path('src/_build_secrets.py'), sys.argv[1])" $EffectiveCfKey
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to write src/_build_secrets.py"
+        }
+    }
+    Write-Step "Building launcher EXE"
+    Invoke-Checked "Launcher PyInstaller build" { & $PythonExe -m PyInstaller --clean --noconfirm mcw_launcher.spec }
+} finally {
+    Remove-Item $BuildSecretsPath -Force -ErrorAction SilentlyContinue
+}
 
 Write-Step "Building bundled updater EXE"
 Invoke-Checked "Updater PyInstaller build" { & $PythonExe -m PyInstaller --clean --noconfirm mcw_updater.spec }

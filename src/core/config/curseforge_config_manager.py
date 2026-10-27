@@ -6,29 +6,38 @@ from urllib.parse import urlparse
 import json
 import os
 
-from src.config import CURSEFORGE_DEFAULT_GATEWAY_URL
+from src.config import (
+    CURSEFORGE_BUNDLED_API_KEY,
+    CURSEFORGE_DEFAULT_GATEWAY_URL,
+    CURSEFORGE_OFFICIAL_API_URL,
+)
 from src.core.fs.paths import Paths
+from src.core.security.bundled_secrets import unseal_bundled_curseforge_key
 from src.core.security.token_cipher import TokenCipher
 
 
 class CurseForgeConfigManager:
-    """Loads CurseForge gateway endpoints with safe local overrides.
+    """Loads CurseForge API configuration and gateway endpoints with safe local overrides.
 
-    The public MCW gateway is the default on fresh installations. User-provided
-    overrides are protected with Windows DPAPI and environment variables remain
-    available for managed deployments. No CurseForge API credential is stored in
-    the launcher.
+    Official CurseForge Core API v1 is the preferred direct access mechanism.
+    A bundled API key may be embedded at build time, while user-provided overrides
+    are protected with DPAPI/Fernet encryption. Environment variables remain
+    available for managed deployments. Legacy gateway endpoints remain supported.
     """
 
     SCHEMA_VERSION = 3
     MAX_GATEWAYS = 5
     PURPOSE_PREFIX = "curseforge:gateway"
     TOKEN_PURPOSE = "curseforge:client-token"
+    API_KEY_PURPOSE = "curseforge:api-key"
 
+    ENV_API_KEY = "MCW_CURSEFORGE_API_KEY"
     ENV_GATEWAY_URL = "MCW_CURSEFORGE_GATEWAY_URL"  # Legacy single endpoint.
     ENV_GATEWAY_URL_PREFIX = "MCW_CURSEFORGE_GATEWAY_URL_"
     ENV_CLIENT_TOKEN = "MCW_CURSEFORGE_CLIENT_TOKEN"
     DEFAULT_GATEWAY_URLS = (CURSEFORGE_DEFAULT_GATEWAY_URL,)
+    DEFAULT_API_KEY = CURSEFORGE_BUNDLED_API_KEY
+    OFFICIAL_API_URL = CURSEFORGE_OFFICIAL_API_URL
 
     @staticmethod
     def path() -> Path:
@@ -37,6 +46,73 @@ class CurseForgeConfigManager:
     @staticmethod
     def legacy_path() -> Path:
         return Paths.CONFIG_ROOT / "curseforge.json"
+
+    @classmethod
+    def custom_api_key(cls) -> str:
+        raw = cls._load()
+        protected = raw.get("protected_api_key")
+        if isinstance(protected, str) and protected.strip():
+            try:
+                value = TokenCipher.decrypt(protected.strip(), cls.API_KEY_PURPOSE).strip()
+            except RuntimeError:
+                value = ""
+            if value and not any(ch in value for ch in ("\r", "\n", "\x00")):
+                return value
+        plain = raw.get("api_key")
+        if isinstance(plain, str) and plain.strip():
+            value = plain.strip()
+            if not any(ch in value for ch in ("\r", "\n", "\x00")):
+                return value
+        return ""
+
+    @classmethod
+    def bundled_api_key(cls) -> str:
+        value = str(cls.DEFAULT_API_KEY or "").strip()
+        if value and not any(ch in value for ch in ("\r", "\n", "\x00")):
+            return value
+        unsealed = str(unseal_bundled_curseforge_key() or "").strip()
+        if unsealed and not any(ch in unsealed for ch in ("\r", "\n", "\x00")):
+            return unsealed
+        return ""
+
+    @classmethod
+    def api_key(cls) -> str:
+        env_key = str(os.environ.get(cls.ENV_API_KEY) or "").strip()
+        if env_key and not any(ch in env_key for ch in ("\r", "\n", "\x00")):
+            return env_key
+        custom = cls.custom_api_key()
+        if custom:
+            return custom
+        return cls.bundled_api_key()
+
+    @classmethod
+    def save_api_key(cls, api_key: str | None = None) -> Path:
+        cleaned_key = str(api_key or "").strip()
+        if any(ch in cleaned_key for ch in ("\r", "\n", "\x00")):
+            raise ValueError("Invalid CurseForge API key.")
+        raw = cls._load()
+        payload: dict[str, object] = {"schema_version": cls.SCHEMA_VERSION}
+        for field in ("protected_gateway_urls", "gateway_urls", "gateway_url", "protected_client_token", "client_token"):
+            if field in raw:
+                payload[field] = raw[field]
+        if cleaned_key:
+            try:
+                payload["protected_api_key"] = TokenCipher.encrypt(cleaned_key, cls.API_KEY_PURPOSE)
+            except RuntimeError as error:
+                raise RuntimeError("CurseForge API key could not be protected with Windows DPAPI.") from error
+
+        target = cls.path()
+        has_other_data = any(k in payload for k in ("protected_gateway_urls", "gateway_urls", "gateway_url", "protected_client_token", "client_token"))
+        if not cleaned_key and not has_other_data:
+            cls._remove_local_files(target)
+            return target
+
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_suffix(target.suffix + ".tmp")
+        temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        temporary.replace(target)
+        cls._remove_legacy_file(target)
+        return target
 
     @classmethod
     def gateway_urls(cls) -> tuple[str, ...]:
@@ -58,8 +134,6 @@ class CurseForgeConfigManager:
                 values.append(plaintext)
             return cls._normalize_urls(values)
 
-        # Legacy/plaintext formats remain readable for migration. The next save
-        # rewrites them using DPAPI protection.
         legacy_values = data.get("gateway_urls")
         if isinstance(legacy_values, list):
             normalized = cls._normalize_urls(legacy_values)
@@ -96,7 +170,7 @@ class CurseForgeConfigManager:
     @classmethod
     def is_configured(cls) -> bool:
         try:
-            return bool(cls.gateway_urls())
+            return bool(cls.api_key()) or bool(cls.gateway_urls())
         except (RuntimeError, ValueError):
             return False
 
@@ -108,9 +182,11 @@ class CurseForgeConfigManager:
             raise ValueError(f"At most {cls.MAX_GATEWAYS} CurseForge gateway URLs can be configured.")
         normalized = cls._normalize_urls(nonempty_values)
 
+        raw = cls._load()
         existing_token = cls._stored_client_token() if client_token is None else str(client_token).strip()
+        existing_api_key = raw.get("protected_api_key")
         path = cls.path()
-        if not normalized and not existing_token:
+        if not normalized and not existing_token and not existing_api_key:
             cls._remove_local_files(path)
             return path
 
@@ -123,24 +199,20 @@ class CurseForgeConfigManager:
         except RuntimeError as error:
             raise RuntimeError("CurseForge gateway links could not be protected with Windows DPAPI.") from error
 
+        payload: dict[str, object] = {
+            "schema_version": cls.SCHEMA_VERSION,
+            "protected_gateway_urls": protected_urls,
+            "protected_client_token": protected_token,
+        }
+        if existing_api_key:
+            payload["protected_api_key"] = existing_api_key
+
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_suffix(path.suffix + ".tmp")
-        temporary.write_text(
-            json.dumps(
-                {
-                    "schema_version": cls.SCHEMA_VERSION,
-                    "protected_gateway_urls": protected_urls,
-                    "protected_client_token": protected_token,
-                },
-                indent=2,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
+        temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         temporary.replace(path)
         cls._remove_legacy_file(path)
         return path
-
 
     @classmethod
     def _remove_local_files(cls, current_path: Path) -> None:

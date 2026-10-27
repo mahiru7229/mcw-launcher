@@ -61,6 +61,8 @@ DATAS += collect_data_files("certifi")
 # run outside Windows. Keep it explicit so Microsoft token DPAPI is always
 # available in the Windows executable.
 HIDDEN_IMPORTS = ["win32crypt", "pywintypes"] if IS_WINDOWS else ["keyring.backends.SecretService", "secretstorage"]
+if (PROJECT_ROOT / "src" / "_build_secrets.py").is_file():
+    HIDDEN_IMPORTS.append("src._build_secrets")
 
 # Only QtCore, QtGui and QtWidgets are used by the launcher. Excluding unrelated
 # bindings and optional Qt modules prevents accidental size growth when the

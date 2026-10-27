@@ -5,6 +5,7 @@ from pathlib import Path
 from threading import Event, Lock
 from urllib.parse import quote, urlparse
 import json
+import os
 import re
 
 import httpx
@@ -34,6 +35,15 @@ class CurseForgeClient:
     CLASS_MODPACKS = 4471
     CLASS_SHADERS = 6552
     CLASS_IDS = {"mod": CLASS_MODS, "modpack": CLASS_MODPACKS, "resourcepack": CLASS_RESOURCE_PACKS, "shader": CLASS_SHADERS}
+    SORT_FIELDS = {"popularity": 2, "updated": 3, "newest": 11, "downloads": 6}
+    LOADER_TYPES = {
+        "forge": 1,
+        "cauldron": 2,
+        "liteloader": 3,
+        "fabric": 4,
+        "quilt": 5,
+        "neoforge": 6,
+    }
     SEARCH_TTL_SECONDS = 2 * 60
     FILES_TTL_SECONDS = 5 * 60
     PROJECT_TTL_SECONDS = 10 * 60
@@ -101,27 +111,27 @@ class CurseForgeClient:
         kind = str(project_type).strip().lower()
         if kind not in CurseForgeClient.CLASS_IDS:
             raise ValueError("Unsupported CurseForge project type.")
-        normalized_query = " ".join(str(query).strip().split())
-        if not normalized_query:
-            return CurseForgeSearchResult(
-                projects=(),
-                total_count=0,
-                index=0,
-                page_size=min(max(1, int(page_size)), 50),
-                cache_info=CurseForgeApiCache.status(),
-            )
+        normalized_query = " ".join(str(query or "").strip().split())
         normalized_loader = CurseForgeClient.normalize_loader(loader) if kind in {"mod", "modpack"} else ""
         class_id = CurseForgeClient.CLASS_IDS[kind]
-        sort_field = {"popularity": 2, "updated": 3, "newest": 11, "downloads": 6}.get(str(sort).lower(), 2)
+        sort_field = CurseForgeClient.SORT_FIELDS.get(str(sort).lower(), 2)
         params: dict[str, object] = {
-            "query": normalized_query,
+            "gameId": CurseForgeClient.MINECRAFT_GAME_ID,
             "classId": class_id,
             "sortField": sort_field,
             "sortOrder": "desc",
             "index": max(0, int(index)),
             "pageSize": min(max(1, int(page_size)), 50),
         }
-        normalized_game_version = str(game_version).strip()
+        if normalized_query:
+            params["query"] = normalized_query
+        if normalized_loader:
+            mod_loader_type = CurseForgeClient.LOADER_TYPES.get(normalized_loader)
+            if mod_loader_type is not None:
+                params["modLoaderType"] = mod_loader_type
+        normalized_game_version = str(game_version or "").strip()
+        if normalized_game_version:
+            params["gameVersion"] = normalized_game_version
         # CurseForge's gameVersion field is advisory. Projects that declare a
         # nearby patch version can still work, so do not let the API hide them.
         lookup = CurseForgeClient._request_json(
@@ -457,8 +467,109 @@ class CurseForgeClient:
             with CurseForgeClient._inflight_guard:
                 CurseForgeClient._inflight.pop(cache_key, None)
 
-    @staticmethod
-    def _perform_request(method: str, route: str, params: dict[str, object], body: object | None, ttl: int, cache_key: str, namespace: str, cache_response: bool) -> CacheLookup:
+    @classmethod
+    def _build_official_request(
+        cls,
+        method: str,
+        route: str,
+        params: dict[str, object] | None = None,
+        body: dict[str, object] | None = None,
+    ) -> tuple[str, dict[str, object] | None, dict[str, object] | None]:
+        params = dict(params or {})
+        base = CurseForgeConfigManager.OFFICIAL_API_URL.rstrip("/")
+        if route == "/search":
+            official_params: dict[str, object] = {
+                "gameId": params.get("gameId", cls.MINECRAFT_GAME_ID),
+                "classId": params.get("classId"),
+                "sortField": params.get("sortField"),
+                "sortOrder": params.get("sortOrder", "desc"),
+                "index": params.get("index", 0),
+                "pageSize": params.get("pageSize", 25),
+            }
+            if params.get("query"):
+                official_params["searchFilter"] = params["query"]
+            if params.get("gameVersion"):
+                official_params["gameVersion"] = params["gameVersion"]
+            if params.get("modLoaderType") is not None:
+                official_params["modLoaderType"] = params["modLoaderType"]
+            return f"{base}/v1/mods/search", official_params, None
+        if route == "/mod":
+            return f"{base}/v1/mods/{int(params['modId'])}", None, None
+        if route == "/description":
+            return f"{base}/v1/mods/{int(params['modId'])}/description", None, None
+        if route == "/mods/batch":
+            return f"{base}/v1/mods", None, body
+        if route == "/files":
+            official_params = {
+                "index": params.get("index", 0),
+                "pageSize": params.get("pageSize", 50),
+            }
+            if params.get("gameVersion"):
+                official_params["gameVersion"] = params["gameVersion"]
+            if params.get("modLoaderType") is not None:
+                official_params["modLoaderType"] = params["modLoaderType"]
+            return f"{base}/v1/mods/{int(params['modId'])}/files", official_params, None
+        if route == "/file":
+            return f"{base}/v1/mods/{int(params['modId'])}/files/{int(params['fileId'])}", None, None
+        if route == "/files/batch":
+            return f"{base}/v1/mods/files", None, body
+        if route == "/download-url":
+            return f"{base}/v1/mods/{int(params['modId'])}/files/{int(params['fileId'])}/download-url", None, None
+        return f"{base}{route}", params or None, body
+
+    @classmethod
+    def _perform_request(cls, method: str, route: str, params: dict[str, object], body: object | None, ttl: int, cache_key: str, namespace: str, cache_response: bool) -> CacheLookup:
+        client = HttpDownloader.get_client()
+        api_key = CurseForgeConfigManager.api_key()
+        env_key = str(os.environ.get(CurseForgeConfigManager.ENV_API_KEY) or "").strip()
+        custom_key = CurseForgeConfigManager.custom_api_key()
+
+        try:
+            gateways = CurseForgeConfigManager.gateway_urls()
+        except Exception:
+            gateways = ()
+
+        use_official_api = bool(env_key or custom_key or (api_key and not gateways))
+
+        if use_official_api and api_key:
+            req_url, req_params, req_body = cls._build_official_request(
+                method, route, params=params, body=body if isinstance(body, dict) else None
+            )
+            headers = {
+                "Accept": "application/json",
+                "User-Agent": CURSEFORGE_USER_AGENT,
+                "x-api-key": api_key,
+            }
+            try:
+                response = client.request(
+                    method.upper(),
+                    req_url,
+                    params=req_params,
+                    json=req_body if method.upper() != "GET" else None,
+                    headers=headers,
+                    timeout=cls.REQUEST_TIMEOUT_SECONDS,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                if not isinstance(payload, dict):
+                    raise ValueError("response root is not an object")
+            except httpx.HTTPStatusError as error:
+                status = int(error.response.status_code)
+                if status in (401, 403):
+                    raise RuntimeError("CurseForge API key was rejected by the server.") from error
+                if status == 404:
+                    raise RuntimeError("The requested CurseForge resource was not found.") from error
+                raise RuntimeError(f"CurseForge API request failed with status {status}.") from error
+            except httpx.HTTPError as error:
+                raise RuntimeError("Unable to contact CurseForge Core API.") from error
+            except ValueError as error:
+                raise RuntimeError("CurseForge Core API returned invalid JSON.") from error
+
+            if cache_response:
+                return CurseForgeApiCache.put(cache_key, namespace, payload, ttl)
+            return CacheLookup(payload=payload, cache_info=CurseForgeApiCache.status())
+
+        # Fallback to gateway routing if configured
         headers = {
             "Accept": "application/json",
             "User-Agent": CURSEFORGE_USER_AGENT,
@@ -468,8 +579,13 @@ class CurseForgeClient:
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
-        gateways = CurseForgeClient.gateway_urls()
-        client = HttpDownloader.get_client()
+        # Clean params for gateway backwards compatibility
+        gateway_params = dict(params or {})
+        if route == "/search":
+            gateway_params.pop("gameId", None)
+            gateway_params.pop("modLoaderType", None)
+            gateway_params.pop("gameVersion", None)
+
         last_error: RuntimeError | None = None
         for index, gateway in enumerate(gateways):
             has_fallback = index + 1 < len(gateways)
@@ -477,18 +593,18 @@ class CurseForgeClient:
                 response = client.request(
                     method.upper(),
                     gateway + route,
-                    params=params or None,
+                    params=gateway_params or None,
                     json=body if method.upper() != "GET" else None,
                     headers=headers,
-                    timeout=CurseForgeClient.REQUEST_TIMEOUT_SECONDS,
+                    timeout=cls.REQUEST_TIMEOUT_SECONDS,
                 )
                 response.raise_for_status()
                 payload = response.json()
                 if not isinstance(payload, dict):
                     raise ValueError("response root is not an object")
             except httpx.HTTPStatusError as error:
-                converted = CurseForgeClient._gateway_error(error.response)
-                if has_fallback and int(error.response.status_code) in CurseForgeClient.FAILOVER_STATUS_CODES:
+                converted = cls._gateway_error(error.response)
+                if has_fallback and int(error.response.status_code) in cls.FAILOVER_STATUS_CODES:
                     last_error = converted
                     continue
                 raise converted from error
@@ -514,7 +630,8 @@ class CurseForgeClient:
             setattr(error, "gateway_failover_attempts", len(gateways))
             setattr(error, "retry_after_seconds", int(getattr(last_error, "retry_after_seconds", 0) or 0))
             raise error from last_error
-        raise RuntimeError("No CurseForge gateway is configured. Add at least one protected gateway link in Launcher Settings.")
+
+        raise RuntimeError("No CurseForge API key or gateway is configured. Add an API key in Launcher Settings.")
 
     @staticmethod
     def _gateway_error(response: httpx.Response) -> RuntimeError:

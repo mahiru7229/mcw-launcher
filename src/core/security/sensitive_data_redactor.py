@@ -19,16 +19,20 @@ class SensitiveDataRedactor:
         "token",
         "xsts_token",
         "xbox_token",
+        "x-api-key",
+        "api_key",
+        "protected_api_key",
     }
 
     _BEARER_PATTERN = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+")
     _ASSIGNMENT_PATTERN = re.compile(
-        r"(?i)(\b(?:access_token|refresh_token|authorization|code|code_verifier|client_secret|password|xsts_token|xbox_token|token)\b\s*[:=]\s*)([^\s,&;\]\}\"']+|\"[^\"]*\"|'[^']*')"
+        r"(?i)(\b(?:access_token|refresh_token|authorization|code|code_verifier|client_secret|password|xsts_token|xbox_token|token|x-api-key|api_key|protected_api_key)\b\s*[:=]\s*)([^\s,&;\]\}\"']+|\"[^\"]*\"|'[^']*')"
     )
     _QUERY_PATTERN = re.compile(
-        r"(?i)([?&](?:access_token|refresh_token|code|code_verifier|client_secret|token)=)([^&#\s]+)"
+        r"(?i)([?&](?:access_token|refresh_token|code|code_verifier|client_secret|token|api_key)=)([^&#\s]+)"
     )
     _JWT_PATTERN = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")
+    _CF_BCRYPT_KEY_PATTERN = re.compile(r"\$2[aby]\$\d{2}\$[./A-Za-z0-9]{50,55}")
 
     @classmethod
     def redact_text(cls, value: object) -> str:
@@ -37,6 +41,7 @@ class SensitiveDataRedactor:
         text = cls._QUERY_PATTERN.sub(lambda match: f"{match.group(1)}{cls.REDACTED}", text)
         text = cls._ASSIGNMENT_PATTERN.sub(lambda match: f"{match.group(1)}{cls.REDACTED}", text)
         text = cls._JWT_PATTERN.sub(cls.REDACTED, text)
+        text = cls._CF_BCRYPT_KEY_PATTERN.sub(cls.REDACTED, text)
         return text
 
     @classmethod

@@ -19,3 +19,53 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+================================================================================
+ADDITIONAL NOTICE FOR FORKS, THIRD-PARTY API KEYS, AND PROJECT IDENTITY
+(ĐIỀU KHOẢN BỔ SUNG DÀNH CHO BẢN FORK, KHÓA API BÊN THỨ BA VÀ ĐỊNH DANH DỰ ÁN)
+================================================================================
+
+1. Third-Party API Keys & Service Identifiers (English)
+-------------------------------------------------------
+The MIT License above applies solely to the source code of MCW Launcher. It does
+NOT grant any right to use, extract, redistribute, or impersonate the third-party
+service credentials, API keys, or application identifiers issued exclusively to
+the official MCW Launcher project, including:
+  - The official CurseForge Core API Key issued by Overwolf/CurseForge for
+    MCW Launcher.
+  - The Microsoft Entra / Azure Application Client ID (`MICROSOFT_CLIENT_ID`).
+  - The project identity, name ("MCW Launcher"), icons, and HTTP `User-Agent`
+    identifiers (`mahiru7229/mcw-launcher`).
+
+If you fork, modify, redistribute, or publish derivative builds of this software
+(in source or binary form), you MUST:
+  a) Register and supply your own CurseForge API Key via the Overwolf Developer
+     Console (https://console.curseforge.com/) and your own Microsoft Azure
+     Application Client ID.
+  b) Never extract, reuse, or redistribute any API key embedded in official
+     MCW Launcher release binaries.
+  c) Change the application name, branding, and `User-Agent` strings in
+     `src/config.py` so your derivative work does not impersonate MCW Launcher
+     when communicating with CurseForge, Modrinth, FTB, ATLauncher, or Microsoft.
+
+2. Điều khoản về Khóa API bên thứ ba & Định danh Dự án (Tiếng Việt)
+-------------------------------------------------------------------
+Giấy phép MIT ở trên chỉ áp dụng cho mã nguồn của MCW Launcher và KHÔNG cấp
+quyền sử dụng, trích xuất, tái phân phối hoặc mạo danh các thông tin xác thực,
+khóa API hay định danh ứng dụng được cấp riêng cho dự án MCW Launcher chính thức,
+bao gồm:
+  - Khóa CurseForge Core API chính thức do Overwolf/CurseForge cấp riêng cho
+    MCW Launcher.
+  - Mã định danh ứng dụng Microsoft (`MICROSOFT_CLIENT_ID`).
+  - Tên dự án ("MCW Launcher"), biểu tượng và chuỗi định danh `User-Agent`
+    (`mahiru7229/mcw-launcher`).
+
+Bất kỳ cá nhân hoặc tổ chức nào fork, sửa đổi, đóng gói hoặc phân phối lại phần
+mềm này (dưới dạng mã nguồn hoặc bản thực thi) BẮT BUỘC phải:
+  a) Tự đăng ký và sử dụng khóa CurseForge API riêng tại Overwolf Developer
+     Console (https://console.curseforge.com/) cũng như Microsoft Client ID riêng.
+  b) Nghiêm cấm trích xuất, tái sử dụng hoặc phân phối lại khóa API từ các bản
+     phát hành chính thức của MCW Launcher.
+  c) Thay đổi tên ứng dụng, bộ nhận diện và chuỗi `User-Agent` trong
+     `src/config.py` để không mạo danh MCW Launcher khi kết nối tới CurseForge,
+     Modrinth, FTB, ATLauncher và Microsoft.

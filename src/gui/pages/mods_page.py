@@ -62,7 +62,6 @@ class ModsPage(BasePage):
         self._cooldown_timer = QTimer(self)
         self._cooldown_timer.setInterval(1000)
         self._cooldown_timer.timeout.connect(self._render_cache_status)
-        self._cooldown_timer.start()
 
         self._build_ui()
         self.retranslate_dynamic()
@@ -424,16 +423,11 @@ class ModsPage(BasePage):
         self._render_cache_status()
 
     def start_search(self) -> None:
-        if self.selected_provider == "modrinth":
-            self._request_search()
+        self._request_search()
 
     def _request_search(self) -> None:
         self._offset = 0
         if self.selected_provider == "curseforge":
-            if not self.search_input.text().strip():
-                self.result_count_label.setText(tr("curseforge.results.ready"))
-                self._clear_project_selection(tr("curseforge.search.required"))
-                return
             self._refresh_files_after_search = False
             self.set_searching(self.selected_loader, "curseforge")
             self.search_button.setEnabled(False)
@@ -449,10 +443,6 @@ class ModsPage(BasePage):
 
     def _request_refresh(self) -> None:
         if self.selected_provider != "curseforge":
-            return
-        if not self.search_input.text().strip():
-            self.result_count_label.setText(tr("curseforge.results.ready"))
-            self._clear_project_selection(tr("curseforge.search.required"))
             return
         if CurseForgeClient.manual_refresh_remaining_seconds() > 0:
             self._render_cache_status()
@@ -893,6 +883,12 @@ class ModsPage(BasePage):
             text += " · " + tr("curseforge.cache.last_error")
         self.cache_status_label.setText(text)
         remaining = CurseForgeClient.manual_refresh_remaining_seconds()
+        if remaining > 0:
+            if not self._cooldown_timer.isActive():
+                self._cooldown_timer.start()
+        else:
+            if self._cooldown_timer.isActive():
+                self._cooldown_timer.stop()
         self.refresh_button.setEnabled(not self._busy and remaining <= 0)
         self.refresh_button.setText(tr("curseforge.cache.refresh_wait", seconds=remaining) if remaining > 0 else tr("curseforge.cache.refresh"))
 
@@ -931,8 +927,10 @@ class ModsPage(BasePage):
         self.provider_combo.setItemText(0, tr("mods.catalog.provider.modrinth"))
         self.provider_combo.setItemText(1, tr("mods.catalog.provider.curseforge"))
         self.loader_label.setText(tr("mods.catalog.loader.label"))
-        self.loader_combo.setItemText(0, tr("modrinth.loader.fabric"))
-        self.loader_combo.setItemText(1, tr("modrinth.loader.forge"))
+        self.loader_combo.setItemText(0, tr("curseforge.loader.fabric"))
+        self.loader_combo.setItemText(1, tr("curseforge.loader.quilt"))
+        self.loader_combo.setItemText(2, tr("curseforge.loader.forge"))
+        self.loader_combo.setItemText(3, tr("curseforge.loader.neoforge"))
         self.search_button.setText(tr("common.search"))
         self.clear_cache_button.setText(tr("curseforge.cache.clear"))
         self.previous_button.setText(tr("common.previous"))
