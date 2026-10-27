@@ -112,6 +112,13 @@ class CurseForgeClient:
         if kind not in CurseForgeClient.CLASS_IDS:
             raise ValueError("Unsupported CurseForge project type.")
         normalized_query = " ".join(str(query or "").strip().split())
+        if not normalized_query and not CurseForgeConfigManager.api_key():
+            return CurseForgeSearchResult(
+                projects=(),
+                total_count=0,
+                index=max(0, int(index)),
+                page_size=min(max(1, int(page_size)), 50),
+            )
         normalized_loader = CurseForgeClient.normalize_loader(loader) if kind in {"mod", "modpack"} else ""
         class_id = CurseForgeClient.CLASS_IDS[kind]
         sort_field = CurseForgeClient.SORT_FIELDS.get(str(sort).lower(), 2)
@@ -521,15 +528,13 @@ class CurseForgeClient:
     def _perform_request(cls, method: str, route: str, params: dict[str, object], body: object | None, ttl: int, cache_key: str, namespace: str, cache_response: bool) -> CacheLookup:
         client = HttpDownloader.get_client()
         api_key = CurseForgeConfigManager.api_key()
-        env_key = str(os.environ.get(CurseForgeConfigManager.ENV_API_KEY) or "").strip()
-        custom_key = CurseForgeConfigManager.custom_api_key()
 
         try:
             gateways = CurseForgeConfigManager.gateway_urls()
         except Exception:
             gateways = ()
 
-        use_official_api = bool(env_key or custom_key or (api_key and not gateways))
+        use_official_api = bool(api_key)
 
         if use_official_api and api_key:
             req_url, req_params, req_body = cls._build_official_request(

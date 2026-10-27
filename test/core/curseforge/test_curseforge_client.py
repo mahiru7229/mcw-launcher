@@ -13,6 +13,11 @@ from src.core.network.httpx_downloader import HttpDownloader
 from src.models.curseforge.file import CurseForgeFile
 
 
+@pytest.fixture(autouse=True)
+def _isolate_default_curseforge_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(CurseForgeConfigManager, "api_key", staticmethod(lambda: ""))
+
+
 def configure_gateway(monkeypatch, tmp_path: Path, client: httpx.Client, token: str = "") -> None:
     monkeypatch.setattr(CurseForgeConfigManager, "api_key", staticmethod(lambda: ""))
     monkeypatch.setattr(CurseForgeConfigManager, "gateway_urls", staticmethod(lambda: ("https://gateway.example/api/curseforge",)))
