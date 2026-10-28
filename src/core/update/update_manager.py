@@ -45,6 +45,7 @@ class UpdateManager:
         cloudflare_url: str | None = None,
     ) -> None:
         self.platform_id = platform_id or self._current_platform_id()
+        self.channel = str(channel).strip().lower()
         self.source = self._normalize_source(source)
         self.current_version = str(current_version).strip()
         self.repository = str(repository).strip().strip("/")
@@ -102,7 +103,7 @@ class UpdateManager:
                 )
                 raise
 
-        if update is None or self.source == "auto":
+        if (update is None and self.channel == "beta") or (self.source == "auto" and update is not None):
             try:
                 fallback_update = fallback_client.check(force_refresh=force_refresh)
                 if fallback_update is not None:

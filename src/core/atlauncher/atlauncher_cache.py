@@ -71,9 +71,6 @@ class ATLauncherApiCache:
             if stale and not allow_stale:
                 return None
             metadata["lastAccessedAt"] = time()
-            metadata["size"] = ATLauncherApiCache._safe_size(path)
-            ATLauncherApiCache._recalculate(index)
-            ATLauncherApiCache._write_index(index)
             return ATLauncherApiCacheLookup(
                 payload=entry.get("payload"),
                 cache_info=ATLauncherApiCache._info(index, refreshed_at, True, stale, age),

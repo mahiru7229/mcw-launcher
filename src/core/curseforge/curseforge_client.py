@@ -244,6 +244,9 @@ class CurseForgeClient:
             "pageSize": min(max(1, int(page_size)), 50),
             "index": 0,
         }
+        normalized_game_version = str(game_version).strip()
+        if normalized_game_version:
+            params["gameVersion"] = normalized_game_version
         # Do not send a strict loader filter. CurseForge metadata can label a
         # dual-loader JAR as only Fabric or only Forge. The selected loader is
         # therefore used for ranking and UI warnings; the downloaded JAR is the
@@ -378,6 +381,8 @@ class CurseForgeClient:
         if status in {400, 401, 403, 404}:
             return True
         message = str(error).casefold()
+        if any(f"status {s}" in message or f"error {s}" in message for s in (400, 401, 403, 404)):
+            return True
         return any(
             marker in message
             for marker in (
@@ -386,6 +391,8 @@ class CurseForgeClient:
                 "must be downloaded manually",
                 "manual download required",
                 "gateway credentials",
+                "api key was rejected",
+                "resource was not found",
             )
         )
 
@@ -498,7 +505,10 @@ class CurseForgeClient:
             if params.get("gameVersion"):
                 official_params["gameVersion"] = params["gameVersion"]
             if params.get("modLoaderType") is not None:
-                official_params["modLoaderType"] = params["modLoaderType"]
+                # Quilt mods on CurseForge are predominantly tagged under Fabric (modLoaderType 4).
+                # Sending modLoaderType=5 excludes almost all compatible mods on the server side.
+                if not (params.get("classId") == 6 and params.get("modLoaderType") == 5):
+                    official_params["modLoaderType"] = params["modLoaderType"]
             return f"{base}/v1/mods/search", official_params, None
         if route == "/mod":
             return f"{base}/v1/mods/{int(params['modId'])}", None, None
@@ -560,11 +570,19 @@ class CurseForgeClient:
                     raise ValueError("response root is not an object")
             except httpx.HTTPStatusError as error:
                 status = int(error.response.status_code)
+                retry_after = 0
+                raw_retry = error.response.headers.get("retry-after", "")
+                if raw_retry.isdigit():
+                    retry_after = int(raw_retry)
                 if status in (401, 403):
-                    raise RuntimeError("CurseForge API key was rejected by the server.") from error
-                if status == 404:
-                    raise RuntimeError("The requested CurseForge resource was not found.") from error
-                raise RuntimeError(f"CurseForge API request failed with status {status}.") from error
+                    converted = RuntimeError("CurseForge API key was rejected by the server.")
+                elif status == 404:
+                    converted = RuntimeError("The requested CurseForge resource was not found.")
+                else:
+                    converted = RuntimeError(f"CurseForge API request failed with status {status}.")
+                setattr(converted, "gateway_status", status)
+                setattr(converted, "retry_after_seconds", retry_after)
+                raise converted from error
             except httpx.HTTPError as error:
                 raise RuntimeError("Unable to contact CurseForge Core API.") from error
             except ValueError as error:
@@ -590,6 +608,9 @@ class CurseForgeClient:
             gateway_params.pop("gameId", None)
             gateway_params.pop("modLoaderType", None)
             gateway_params.pop("gameVersion", None)
+        elif route == "/files":
+            gateway_params.pop("gameVersion", None)
+            gateway_params.pop("modLoaderType", None)
 
         last_error: RuntimeError | None = None
         for index, gateway in enumerate(gateways):

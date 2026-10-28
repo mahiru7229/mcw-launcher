@@ -26,15 +26,31 @@ class ThemedProgressBar(QProgressBar):
         self._refresh_animation(force=True)
         self.update()
 
+    def _sync_animation_state(self) -> None:
+        if not hasattr(self, "_animation_player") or self._animation_player.animation is None or not self.isVisible():
+            if hasattr(self, "_animation_player"):
+                self._animation_player.stop()
+            return
+        is_indeterminate = self.minimum() == 0 and self.maximum() == 0
+        is_active_determinate = self.minimum() < self.maximum() and self.minimum() < self.value() < self.maximum()
+        if is_indeterminate or is_active_determinate:
+            self._animation_player.start()
+        else:
+            self._animation_player.stop()
+
+    def setValue(self, value: int) -> None:
+        super().setValue(value)
+        self._sync_animation_state()
+
     def setRange(self, minimum: int, maximum: int) -> None:
         super().setRange(minimum, maximum)
         if hasattr(self, "_animation_player"):
             self._refresh_animation()
+            self._sync_animation_state()
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
-        if self._animation_player.animation is not None:
-            self._animation_player.start()
+        self._sync_animation_state()
 
     def hideEvent(self, event) -> None:
         self._animation_player.stop()
@@ -42,8 +58,7 @@ class ThemedProgressBar(QProgressBar):
 
     def changeEvent(self, event) -> None:
         super().changeEvent(event)
-        if self.isVisible() and self._animation_player.animation is not None:
-            self._animation_player.start()
+        self._sync_animation_state()
 
     def paintEvent(self, event) -> None:
         frame = self._animation_player.current_frame
@@ -82,8 +97,7 @@ class ThemedProgressBar(QProgressBar):
         fallback = self._theme_manager.resolve_animation_fallback(key, fallback_to_default=True)
         fallback_pixmap = QPixmap(str(fallback)) if fallback is not None else QPixmap()
         self._fallback_pixmap = theme_accent_runtime.tint_pixmap(fallback_pixmap, key)
-        if self.isVisible() and animation is not None:
-            self._animation_player.start()
+        self._sync_animation_state()
 
     def _fill_rect(self, contents: QRect) -> QRect:
         if self.minimum() == 0 and self.maximum() == 0:

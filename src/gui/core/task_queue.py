@@ -207,6 +207,9 @@ class TaskQueue(QObject):
         self.queue_changed.emit(self.all_tasks())
 
     def _on_task_failed(self, task_id: str, error: Any) -> None:
+        if self._runner is not None and callable(getattr(self._runner, "is_task_active", None)):
+            if self._runner.is_task_active(task_id):
+                return
         item = self._items.get(task_id)
         if item is None:
             return
@@ -216,6 +219,9 @@ class TaskQueue(QObject):
         self.queue_changed.emit(self.all_tasks())
 
     def _on_task_cancelled(self, task_id: str) -> None:
+        if self._runner is not None and callable(getattr(self._runner, "is_task_active", None)):
+            if self._runner.is_task_active(task_id):
+                return
         item = self._items.get(task_id)
         if item is None:
             return

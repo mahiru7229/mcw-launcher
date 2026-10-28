@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import copy
 import json
+import time
 import math
 import os
 import threading
@@ -143,16 +144,32 @@ class LauncherSettingsManager:
         self.update_section("window", {"geometry": encoded})
 
     def _read_or_recover(self) -> dict[str, Any]:
-        try:
-            data = json.loads(self.path.read_text(encoding="utf-8"))
-            if not isinstance(data, dict):
-                raise ValueError("Launcher settings root must be an object.")
-            return data
-        except (FileNotFoundError, json.JSONDecodeError, OSError, ValueError):
-            self._backup_broken_file()
-            defaults = copy.deepcopy(self.DEFAULT_SETTINGS)
-            self._write(defaults)
-            return defaults
+        for attempt in range(4):
+            try:
+                data = json.loads(self.path.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    raise ValueError("Launcher settings root must be an object.")
+                return data
+            except FileNotFoundError:
+                break
+            except (PermissionError, BlockingIOError):
+                if attempt < 3:
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                return copy.deepcopy(self.DEFAULT_SETTINGS)
+            except OSError as oe:
+                if getattr(oe, "winerror", None) in (5, 32):
+                    if attempt < 3:
+                        time.sleep(0.05 * (attempt + 1))
+                        continue
+                    return copy.deepcopy(self.DEFAULT_SETTINGS)
+                break
+            except (json.JSONDecodeError, ValueError):
+                break
+        self._backup_broken_file()
+        defaults = copy.deepcopy(self.DEFAULT_SETTINGS)
+        self._write(defaults)
+        return defaults
 
     def _backup_broken_file(self) -> None:
         if not self.path.exists():

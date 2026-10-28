@@ -71,9 +71,6 @@ class FTBApiCache:
             if stale and not allow_stale:
                 return None
             metadata["lastAccessedAt"] = time()
-            metadata["size"] = FTBApiCache._safe_size(path)
-            FTBApiCache._recalculate(index)
-            FTBApiCache._write_index(index)
             return FTBApiCacheLookup(
                 payload=entry.get("payload"),
                 cache_info=FTBApiCache._info(index, refreshed_at, True, stale, age),

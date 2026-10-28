@@ -63,8 +63,10 @@ class HttpRpcServer:
                 origin = str(self.headers.get("Origin", "") or "").strip().casefold()
                 if not origin:
                     return True
+                if origin == "null":
+                    return False
                 return (
-                    origin in {"null", "tauri://localhost", "https://tauri.localhost", "http://tauri.localhost"}
+                    origin in {"tauri://localhost", "https://tauri.localhost", "http://tauri.localhost"}
                     or origin.startswith("http://127.0.0.1:")
                     or origin == "http://127.0.0.1"
                     or origin.startswith("http://localhost:")
@@ -147,7 +149,25 @@ class HttpRpcServer:
 
             def do_POST(self) -> None:
                 if not self._is_trusted_origin():
+                    length = int(self.headers.get("Content-Length", "0") or "0")
+                    if length > 0:
+                        try:
+                            self.rfile.read(min(length, 65536))
+                        except Exception:
+                            pass
                     self.send_response(403)
+                    self._send_cors_headers()
+                    self.end_headers()
+                    return
+                content_type = str(self.headers.get("Content-Type", "") or "").strip().lower()
+                if not content_type.startswith("application/json"):
+                    length = int(self.headers.get("Content-Length", "0") or "0")
+                    if length > 0:
+                        try:
+                            self.rfile.read(min(length, 65536))
+                        except Exception:
+                            pass
+                    self.send_response(415)
                     self.end_headers()
                     return
                 if self.path != "/rpc":

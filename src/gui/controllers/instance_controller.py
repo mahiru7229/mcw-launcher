@@ -580,14 +580,7 @@ class InstanceController(BaseController):
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if task_id.startswith(self.KILL_TASK_PREFIX):
-            instance_name, killed = result
-            if not killed:
-                self._emit_error(tr("workspace.kill.title"), tr("workspace.kill.not_running", name=instance_name))
-                return
-            self.instance_killed.emit(instance_name)
-            self.status_changed.emit(tr("status.instance.killed", name=instance_name))
-            self.log_created.emit(f"Instance killed by user: {instance_name}")
-            self.refresh_running(force=True)
+            self._emit_error(tr("workspace.kill.title"), error)
             return
 
         if task_id.startswith(self.RUNTIME_PROFILE_TASK_PREFIX):
@@ -605,8 +598,13 @@ class InstanceController(BaseController):
             self.status_changed.emit(tr("status.instance.repair_center_failed"))
             self.log_created.emit(f"Repair Center failed: {error}")
             return
+        if task_id.startswith("modpack."):
+            self._emit_error("Modpack", error)
+            return
         if task_id.startswith("instance."):
             self._emit_error("Instance task", error)
+            return
+        self._emit_error("Task failed", error)
 
     def _validated_name(self, name: str) -> str | None:
         name = name.strip()

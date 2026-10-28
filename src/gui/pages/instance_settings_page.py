@@ -294,6 +294,7 @@ class InstanceSettingsPage(BasePage):
                 self._loaded_instance_name = instance_name.strip()
                 if instance_name and self.instance_combo.currentText() != instance_name:
                     self.select_instance(instance_name)
+                self._loaded_forge_preflight_policy = getattr(settings, "forge_preflight_failure_policy", ManagedContentPolicy.INHERIT)
                 self._apply_form_data({
                     "java_mode": "custom" if str(getattr(settings, "java_path", "") or "").strip() else "auto",
                     "java_path": str(getattr(settings, "java_path", "") or ""),
@@ -328,6 +329,7 @@ class InstanceSettingsPage(BasePage):
             "lan_connection_provider": str(self.lan_connection_provider.currentData() or "manual"),
             "modrinth_failure_policy": str(self.modrinth_failure_policy.currentData() or ManagedContentPolicy.INHERIT),
             "curseforge_failure_policy": str(self.curseforge_failure_policy.currentData() or ManagedContentPolicy.INHERIT),
+            "forge_preflight_failure_policy": getattr(self, "_loaded_forge_preflight_policy", ManagedContentPolicy.INHERIT),
             "jvm_arguments": self._lines(self.jvm_arguments.toPlainText()),
             "game_arguments": self._lines(self.game_arguments.toPlainText()),
         }

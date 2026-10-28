@@ -768,12 +768,13 @@ class UpdateApplier:
             replace_error = 2
 
         MOVEFILE_REPLACE_EXISTING = 0x00000001
+        MOVEFILE_COPY_ALLOWED = 0x00000002
         MOVEFILE_WRITE_THROUGH = 0x00000008
         kernel32.MoveFileExW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD]
         kernel32.MoveFileExW.restype = wintypes.BOOL
         ctypes.set_last_error(0)
         if kernel32.MoveFileExW(
-            str(replacement), str(destination), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+            str(replacement), str(destination), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH
         ):
             return True, "MoveFileExW(REPLACE_EXISTING)", 0
         move_error = cls._windows_last_error()
@@ -787,8 +788,9 @@ class UpdateApplier:
         from ctypes import wintypes
         kernel32 = cls._windows_kernel32()
         MOVEFILE_REPLACE_EXISTING = 0x00000001
+        MOVEFILE_COPY_ALLOWED = 0x00000002
         MOVEFILE_WRITE_THROUGH = 0x00000008
-        flags = MOVEFILE_WRITE_THROUGH | (MOVEFILE_REPLACE_EXISTING if replace_existing else 0)
+        flags = MOVEFILE_WRITE_THROUGH | MOVEFILE_COPY_ALLOWED | (MOVEFILE_REPLACE_EXISTING if replace_existing else 0)
         kernel32.MoveFileExW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD]
         kernel32.MoveFileExW.restype = wintypes.BOOL
         ctypes.set_last_error(0)

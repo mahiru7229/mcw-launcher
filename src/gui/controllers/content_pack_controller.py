@@ -31,14 +31,14 @@ class ContentPackController(BaseController):
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
 
-    def search(self, provider: str, content_type: str, query: str, sort: str, offset: int, game_version: str = "") -> bool:
+    def search(self, provider: str, content_type: str, query: str, sort: str, offset: int, game_version: str = "", force_refresh: bool = False) -> bool:
         source = self._provider(provider)
         kind = ContentPackManager.normalize_type(content_type)
         task_id = f"content.search.{source}.{kind}"
         if source == "modrinth":
-            task = lambda: (source, kind, ModrinthClient.search_projects(kind, query=query, game_version=game_version, loader="", index=sort, offset=offset, limit=25, force_refresh=True))
+            task = lambda: (source, kind, ModrinthClient.search_projects(kind, query=query, game_version=game_version, loader="", index=sort, offset=offset, limit=25, force_refresh=force_refresh))
         else:
-            task = lambda: (source, kind, CurseForgeClient.search_projects(kind, query=query, game_version=game_version, loader="", sort=sort, index=offset, page_size=25, force_refresh=True))
+            task = lambda: (source, kind, CurseForgeClient.search_projects(kind, query=query, game_version=game_version, loader="", sort=sort, index=offset, page_size=25, force_refresh=force_refresh))
         return self._run_network_task(self._task_runner, task_id, task, tr("task.content.search", provider=source.title(), content_type=ContentPackManager.display_name(kind)), blocking=False)
 
     def load_project_details(self, provider: str, content_type: str, project_id: str) -> bool:

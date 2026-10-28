@@ -219,6 +219,7 @@ class ModManagerDialog(QDialog):
         self._update_checking = False
         self._updates_checked = True
         self._update_error = str(message).strip()
+        self._set_actions_enabled(not self._busy and self._is_modded_instance())
         self._render_update_notice()
 
     def set_health_report(self, report: ModHealthReport) -> None:
@@ -307,7 +308,7 @@ class ModManagerDialog(QDialog):
         self.health_label.setText(tr("mod_manager.health_summary", errors=self._health.error_count, warnings=self._health.warning_count, tracked=tracked, updates=self._updates.update_count, channels=channels))
 
     def _render_update_notice(self) -> None:
-        if self._instance is None or not self._is_fabric_instance():
+        if self._instance is None or not self._is_modded_instance():
             self.update_notice_label.clear()
             self.update_notice_label.hide()
             return
@@ -536,8 +537,14 @@ class ModManagerDialog(QDialog):
         loader_name, _ = ModLoaderManager.normalize(self._instance.mod_loader)
         return loader_name in ModLoaderManager.FORGE_FAMILY
 
+    def _is_quilt_instance(self) -> bool:
+        if self._instance is None:
+            return False
+        loader_name, _ = ModLoaderManager.normalize(self._instance.mod_loader)
+        return loader_name == ModLoaderManager.QUILT
+
     def _is_modded_instance(self) -> bool:
-        return self._is_fabric_instance() or self._is_forge_instance()
+        return self._is_fabric_instance() or self._is_forge_instance() or self._is_quilt_instance()
 
     def _curseforge_files(self) -> set[str]:
         if self._instance is None:

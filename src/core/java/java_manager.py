@@ -273,9 +273,16 @@ class JavaManager:
         return path
 
     @staticmethod
+    def is_valid_executable_name(java_path: Path) -> bool:
+        name = Path(java_path).name.casefold()
+        return name in {"java", "java.exe", "javaw.exe", "javaw"}
+
+    @staticmethod
     def _get_major_version(
         java_path: Path
     ) -> int | None:
+        if not JavaManager.is_valid_executable_name(java_path):
+            return None
         probe_path = JavaManager._version_probe_executable(java_path)
         try:
             result = subprocess.run(

@@ -12,12 +12,12 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.8.5-brightgreen" alt="v1.8.5">
+  <img src="https://img.shields.io/badge/version-v1.8.6-brightgreen" alt="v1.8.6">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
 > [!NOTE]
-> **Phiên bản mới nhất (v1.8.5)**:
+> **Phiên bản mới nhất (v1.8.6)**:
 > - **Tích hợp trực tiếp CurseForge Core API v1 chính thức**: Duyệt, tìm kiếm và cài đặt Mod / Modpack trực tiếp từ CurseForge ngay trên bản phát hành chính thức mà không cần tự thiết lập Gateway trung gian; tinh gọn phần cài đặt thành 1 ô nhập Khóa API cá nhân (tùy chọn).
 > - **Duyệt danh sách Mod & Modpack phổ biến tức thì**: Tự động nạp danh sách các dự án nổi bật ngay khi mở trình duyệt CurseForge hoặc đổi bộ lọc Mod Loader mà không bắt buộc phải gõ từ khóa tìm kiếm.
 > - **Sửa lỗi giao diện & Tối ưu hiệu năng Timer nền**: Khắc phục lỗi hiển thị nhãn bộ lọc Loader (`Quilt` / `Forge`) trên `ModsPage` và tối ưu hóa `_cooldown_timer` chỉ kích hoạt khi có thời gian chờ làm mới.
@@ -43,7 +43,7 @@
 
 ## Hỗ trợ nền tảng
 
-| Nền tảng | Trạng thái (v1.8.5) | Ghi chú |
+| Nền tảng | Trạng thái (v1.8.6) | Ghi chú |
 | --- | --- | --- |
 | **Windows 10/11 x64** | Hỗ trợ chính thức | Bản build portable một file thực thi duy nhất (`MCW Launcher.exe`). |
 | **Linux x64** | Hỗ trợ chính thức | Bản build portable một file thực thi (`mcw-launcher`). Đã kiểm thử trên Lubuntu/Ubuntu. |
@@ -130,7 +130,7 @@ mcw-launcher/
 - [Hệ thống Hotfix CDN](docs/HOTFIX_SYSTEM.md)
 - [Hướng dẫn tạo Theme tùy chỉnh](docs/THEME_CREATION_GUIDE.md)
 - [Lịch sử thay đổi chi tiết (Changelog)](CHANGELOG.md)
-- [Ghi chú bản phát hành v1.8.5](docs/releases/v1.8.5.md)
+- [Ghi chú bản phát hành v1.8.6](docs/releases/v1.8.6.md)
 
 ---
 

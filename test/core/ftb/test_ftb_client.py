@@ -133,7 +133,7 @@ def test_popular_search_accepts_ids_and_uses_project_cache(monkeypatch, tmp_path
 
     def handler(request: httpx.Request) -> httpx.Response:
         calls.append(request.url.path)
-        if request.url.path.endswith("/popular/installs/25"):
+        if "/popular/installs/" in request.url.path:
             return httpx.Response(200, request=request, json={"packs": [25]})
         if request.url.path.endswith("/modpack/25"):
             return httpx.Response(200, request=request, json=project_payload())
@@ -145,7 +145,7 @@ def test_popular_search_accepts_ids_and_uses_project_cache(monkeypatch, tmp_path
 
     assert first.projects[0].project_id == 25
     assert second.projects[0].project_id == 25
-    assert calls.count("/v1/modpacks/public/modpack/popular/installs/25") == 1
+    assert calls.count("/v1/modpacks/public/modpack/popular/installs/100") == 1
     assert calls.count("/v1/modpacks/public/modpack/25") == 1
     assert second.cache_info.from_cache is True
     client.close()
@@ -157,7 +157,7 @@ def test_search_filters_private_projects_and_release_channels(monkeypatch, tmp_p
     private["private"] = True
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path.endswith("/search/25"):
+        if "/search/" in request.url.path:
             assert request.url.params["term"] == "example"
             return httpx.Response(200, request=request, json={"packs": [public, private]})
         if request.url.path.endswith("/modpack/25"):

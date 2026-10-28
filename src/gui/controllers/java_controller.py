@@ -50,7 +50,7 @@ class JavaController(BaseController):
 
         started = self._task_runner.run(task_id, task, tr("java.install.task", major=managed_major), blocking=True)
         if not started:
-            self._core.operations.finish()
+            return
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:

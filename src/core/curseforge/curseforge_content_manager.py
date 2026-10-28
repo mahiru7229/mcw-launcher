@@ -197,12 +197,28 @@ class CurseForgeContentManager:
         )
         batch_progress.start()
 
+        batch_files: dict[int, object] = {}
+        missing_metadata_ids: list[int] = []
+        for item in missing:
+            _cand = CurseForgeContentManager._file_from_entry(item["entry"])
+            if (not _cand.file_name or not _cand.sha1) and _cand.file_id > 0:
+                missing_metadata_ids.append(_cand.file_id)
+        if missing_metadata_ids:
+            try:
+                batch_files = CurseForgeClient.get_files_batch(missing_metadata_ids)
+            except Exception:
+                batch_files = {}
+
         def download_item(item: dict, child_reporter: ProgressReporter | None):
             download_pause_controller.raise_if_requested()
             entry = item["entry"]
             file = CurseForgeContentManager._file_from_entry(entry)
             if not file.file_name or not file.sha1:
-                file = CurseForgeClient.get_file(file.project_id, file.file_id, force_refresh=True)
+                batch_file = batch_files.get(file.file_id)
+                if batch_file is not None and getattr(batch_file, "file_name", None) and getattr(batch_file, "sha1", None):
+                    file = batch_file
+                else:
+                    file = CurseForgeClient.get_file(file.project_id, file.file_id, force_refresh=True)
             cache = Paths.curseforge_file_cache(file.project_id, file.file_id, file.file_name)
             CurseForgeDownloader.download_file(
                 file,

@@ -297,9 +297,9 @@ class LaunchController(BaseController):
             return
 
         if isinstance(error, CompatibilityConfirmationRequired):
-            self.compatibility_confirmation_required.emit(error)
-            self.status_changed.emit(tr("compatibility.confirmation.required"))
-            self.log_created.emit(f"CompatibilityConfirmationRequired: {len(error.issues)} issue(s)")
+            self.launch_cancelled.emit()
+            self.status_changed.emit(tr("compatibility.confirmation.cancelled"))
+            self.log_created.emit(f"CompatibilityConfirmationRequired: launch cancelled ({len(error.issues)} issue(s))")
             return
 
         if isinstance(error, PortableManualDownloadRequired):

@@ -242,6 +242,9 @@ class CurseForgeManualDownloadDialog(QDialog):
                     continue
                 if entry in self._scanned_files:
                     continue
+                if not self._could_match_any_requirement(entry):
+                    continue
+
                 try:
                     stat = entry.stat()
                     if stat.st_mtime < threshold:
@@ -254,9 +257,8 @@ class CurseForgeManualDownloadDialog(QDialog):
                 except OSError:
                     continue
 
-                if self._could_match_any_requirement(entry):
-                    candidates.append(entry)
-                    self._scanned_files.add(entry)
+                candidates.append(entry)
+                self._scanned_files.add(entry)
         except OSError:
             return
 

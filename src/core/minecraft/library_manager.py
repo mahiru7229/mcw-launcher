@@ -274,6 +274,6 @@ class DownloadLibraryManager:
             path = MinecraftMetadataValidation.relative_path(data["path"], "library path")
         except (KeyError, TypeError, ValueError) as error:
             raise RuntimeError("Invalid Minecraft library metadata.") from error
-        if not url or size <= 0:
+        if not url or size < 0:
             raise RuntimeError("Invalid Minecraft library metadata.")
         return DownloadLibrary(url=url, sha1=sha1, size=size, path=path, is_native=is_native)

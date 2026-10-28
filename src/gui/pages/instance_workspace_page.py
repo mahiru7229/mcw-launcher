@@ -420,6 +420,7 @@ class InstanceWorkspacePage(BasePage):
 
         self.hub_tabs.currentChanged.connect(self._on_hub_tab_changed)
         self.worlds_tab.quick_play_requested.connect(self._request_quick_play_world)
+        self.mods_tab.open_advanced_mod_manager_requested.connect(self._on_manage_mods_clicked)
 
         hub_layout.addWidget(self.hub_tabs, 1)
 

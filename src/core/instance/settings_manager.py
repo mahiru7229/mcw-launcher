@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import time
 import os
 from pathlib import Path
 from typing import Any
@@ -127,18 +128,30 @@ class SettingsManager:
     @staticmethod
     def _load_instance_settings(instance: Instance) -> dict:
         path = Paths.instance_settings_path(instance)
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if not isinstance(data, dict):
-                raise ValueError("Instance settings root must be an object.")
-            return data
-        except FileNotFoundError:
-            return {}
-        except (json.JSONDecodeError, UnicodeError, TypeError, ValueError):
-            SettingsManager._backup_broken_file(path)
-            return {}
-        except OSError:
-            return {}
+        for attempt in range(4):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    raise ValueError("Instance settings root must be an object.")
+                return data
+            except FileNotFoundError:
+                return {}
+            except (PermissionError, BlockingIOError):
+                if attempt < 3:
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                return copy.deepcopy(SettingsManager.DEFAULT_SETTINGS)
+            except OSError as oe:
+                if getattr(oe, "winerror", None) in (5, 32):
+                    if attempt < 3:
+                        time.sleep(0.05 * (attempt + 1))
+                        continue
+                    return copy.deepcopy(SettingsManager.DEFAULT_SETTINGS)
+                return {}
+            except (json.JSONDecodeError, UnicodeError, TypeError, ValueError):
+                SettingsManager._backup_broken_file(path)
+                return {}
+        return {}
 
     @staticmethod
     def _parse_instance_settings(data: dict) -> InstanceSettings:

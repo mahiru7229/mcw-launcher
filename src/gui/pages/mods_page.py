@@ -731,6 +731,8 @@ class ModsPage(BasePage):
         QTimer.singleShot(0, lambda values=request: self.search_requested.emit(*values))
 
     def _provider_changed(self, _index: int) -> None:
+        if hasattr(self, "_cooldown_timer") and self._cooldown_timer.isActive():
+            self._cooldown_timer.stop()
         self._reset_catalog()
         self._update_provider_ui()
 

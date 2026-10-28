@@ -40,7 +40,9 @@ from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.core.modrinth.modrinth_registry import ModrinthRegistry
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
 from src.core.network.artifact_download_service import ArtifactDownloadError
-from src.core.network.download_pause import DownloadCancelledError, download_pause_controller
+from src.core.network.download_pause import DownloadCancelledError, DownloadPausedError, download_pause_controller
+from src.core.package.portable_content_manager import PortableManualDownloadRequired
+from src.models.mod.dependency_resolution import RequiredModDependenciesMissing
 from src.core.progress.progress_reporter import ProgressReporter
 from src.core.package.portable_content_manager import PortableContentManager
 from src.core.repair.verification_cache import VerificationCache
@@ -291,9 +293,19 @@ class MinecraftExecutor:
                     on_manual_content_required=on_manual_content_required,
                 )
                 PortableContentManager.finalize_disabled(instance)
-            except (ArtifactDownloadError, DownloadCancelledError):
+            except (
+                ArtifactDownloadError,
+                DownloadCancelledError,
+                DownloadPausedError,
+                ModrinthManagedFilesRequired,
+                CurseForgeManagedFilesRequired,
+                PortableManualDownloadRequired,
+                RequiredModDependenciesMissing,
+            ):
                 raise
             except Exception as modpack_check_error:
+                if block_modrinth_failure or block_curseforge_failure:
+                    raise
                 dependency_resolution_after_download = DependencyResolutionResult(
                     warnings=(str(modpack_check_error),)
                 )

@@ -2,6 +2,40 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.6] - 2026-10-28
+
+### Fixed
+- **Sửa dứt điểm lỗi thanh tiến trình bị kẹt đỏ ("in vết")**:
+  - Loại bỏ quét ngược lịch sử `failed_tasks` cũ trong `GlobalTaskIndicator`; tác vụ mới thành công 100% lập tức ghi đè màu xanh lá và tự ẩn.
+  - Bổ sung bảo vệ tác vụ `REPLACE` trong `TaskQueue` trước các sự kiện hủy/thất bại muộn của thế hệ cũ.
+  - Bật nhận sự kiện chuột cho các thành phần con trên thanh tiến trình và hỗ trợ click để xóa thông báo lỗi.
+- **Sửa lỗi điều khiển Instance & Quản lý Mod GUI**:
+  - Khắc phục `NameError` khi tác vụ buộc dừng instance thất bại và bổ sung xử lý lỗi cho toàn bộ tác vụ `modpack.*`.
+  - Thêm hỗ trợ loader Quilt vào `_is_modded_instance()` và hiển thị thông báo cập nhật cho tất cả loader trong `ModManagerDialog`.
+  - Kết nối nút "Quản lý nâng cao" trong `InstanceModsTab` và đồng bộ registry mod khi xóa file `.jar`.
+  - Sửa đường dẫn kiểm tra shader mod thành `instance.instance_dir / "mods"` trong `MainWindow`.
+  - Dừng timer animation 60 FPS khi `ThemedProgressBar` đứng yên ở 0% hoặc 100% để giảm tải CPU.
+  - Ngắt xử lý ngay sau khi người dùng bấm hủy xác nhận tương thích mod để tránh lặp lại dialog.
+  - Bảo toàn thiết lập `forge_preflight_failure_policy` khi lưu cài đặt instance.
+  - Kiểm tra tên file trước khi mở đọc trong `CurseForgeManualDownloadDialog` để loại bỏ khựng giao diện.
+- **Khắc phục lỗi mạng, CurseForge API v1 & Download**:
+  - Gắn mã lỗi HTTP và thời gian `Retry-After` trong `CurseForgeClient` cho Official API v1; cập nhật `is_permanent_error` loại bỏ retry vô ích với mã 400/401/403/404.
+  - Hỗ trợ truyền `gameVersion` lên server CurseForge để không bị giới hạn ở 50 file mới nhất.
+  - Bỏ lọc cứng `modLoaderType=5` cho Quilt để hiển thị các mod tương thích Fabric.
+  - Loại bỏ deadlock semaphore trong `DownloadManager` khi chọn file tải lúc đang tạm dừng.
+  - Chấp nhận thư viện Maven có `size >= 0` trong `DownloadLibraryManager`.
+  - Loại bỏ `_recalculate` và `_write_index()` + `os.fsync` ở mỗi lần đọc cache hit trong `CurseForgeApiCache`, `FTBApiCache` và `ATLauncherApiCache`.
+  - Sửa lỗi phân trang trong `FTBClient.search_projects`.
+  - Thêm cờ `MOVEFILE_COPY_ALLOWED` trong `UpdateApplier` cho thao tác di chuyển file khác ổ đĩa trên Windows.
+- **Khắc phục lỗi Core Engine, Khởi chạy, Backup & Runtime**:
+  - Re-raise đầy đủ ngoại lệ tạm dừng tải và yêu cầu file thủ công trong `MinecraftExecutor.run`.
+  - Bảo toàn thư mục `rollback` trong `InstanceBackupManager.restore` khi quá trình khôi phục gặp lỗi.
+  - Tra cứu lịch sử phiên trong `ProcessSupervisor.load(include_history=True)` để không nhận nhầm dừng chủ động là game crash.
+  - Thử đọc lại có backoff khi gặp `PermissionError` trên Windows trong `LauncherSettingsManager` và `SettingsManager`.
+  - Thêm bộ nhớ đệm `(path, mtime, size)` cho `ModManager.read_mod`, `_scan_owner` và SHA-1 modpack.
+  - Khai báo đầy đủ `argtypes`/`restype` 64-bit cho các hàm Win32 API trong `GameWindowActivator`.
+  - Chặn `Origin: null`, yêu cầu `Content-Type: application/json` và xả luồng dữ liệu unread trên `HttpRpcServer`.
+
 ## [1.8.5] - 2026-10-27
 
 ### Added

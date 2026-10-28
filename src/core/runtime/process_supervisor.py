@@ -117,7 +117,11 @@ class ProcessSupervisor:
         if not session_id:
             return False
         try:
-            return cls.load(session_id).state in {ProcessSessionState.STOPPING, ProcessSessionState.KILLING}
+            session = cls.load(session_id, include_history=True)
+            if session.state in {ProcessSessionState.STOPPING, ProcessSessionState.KILLING, ProcessSessionState.INTERRUPTED}:
+                return True
+            detail = str(getattr(session, "detail", "") or "").lower()
+            return "stop" in detail or "kill" in detail or "abort" in detail
         except (FileNotFoundError, RuntimeError):
             return False
 
@@ -126,7 +130,11 @@ class ProcessSupervisor:
         if not session_id:
             return False
         try:
-            return cls.load(session_id).state is ProcessSessionState.KILLING
+            session = cls.load(session_id, include_history=True)
+            if session.state is ProcessSessionState.KILLING:
+                return True
+            detail = str(getattr(session, "detail", "") or "").lower()
+            return "kill" in detail
         except (FileNotFoundError, RuntimeError):
             return False
 
@@ -267,9 +275,13 @@ class ProcessSupervisor:
         return tuple(sorted(dict.fromkeys(interrupted), key=str.casefold))
 
     @classmethod
-    def load(cls, session_id: str) -> ProcessSession:
+    def load(cls, session_id: str, include_history: bool = False) -> ProcessSession:
         path = Paths.process_sessions_root() / f"{session_id}.json"
         if not path.is_file():
+            if include_history:
+                history_path = Paths.process_session_history_root() / f"{session_id}.json"
+                if history_path.is_file():
+                    return cls._read(history_path)
             raise FileNotFoundError(path)
         return cls._read(path)
 

@@ -122,24 +122,25 @@ class DownloadManager:
 
         with self.get_path_lock(request.destination):
             self._checkpoint(request, self._safe_size(request.temporary_path))
-            valid = self.verify(request.destination, request.expected_size, request.hashes)
+            valid, cached_hashes = self.verify_with_hashes(request.destination, request.expected_size, request.hashes)
             if valid:
                 self._checkpoint(request, self._safe_size(request.destination))
                 size = stat_path(request.destination).st_size
                 self._report(reporter, progress_stage, progress_message, size, size)
                 download_journal.complete(request, size)
-                return DownloadResult(request.destination, size, self.calculate_hashes(request.destination, request.hashes), 0, "cache")
+                return DownloadResult(request.destination, size, cached_hashes, 0, "cache")
 
             make_directory(request.destination.parent)
             if request.force:
                 self.delete_file(request.temporary_path)
-            if self.verify(request.temporary_path, request.expected_size, request.hashes):
+            temp_valid, temp_hashes = self.verify_with_hashes(request.temporary_path, request.expected_size, request.hashes)
+            if temp_valid:
                 self._checkpoint(request, self._safe_size(request.temporary_path))
                 replace_path(request.temporary_path, request.destination)
                 size = stat_path(request.destination).st_size
                 self._report(reporter, progress_stage, progress_message, size, size)
                 download_journal.complete(request, size)
-                return DownloadResult(request.destination, size, self.calculate_hashes(request.destination, request.hashes), size, "partial-cache")
+                return DownloadResult(request.destination, size, temp_hashes, size, "partial-cache")
 
             last_error: Exception | None = None
             last_url = ""
@@ -316,19 +317,23 @@ class DownloadManager:
                     self._report(reporter, stage, message, downloaded, total, last_speed)
                 return existing, response
 
-    def verify(self, path: Path, expected_size: int, hashes: dict | object) -> bool:
+    def verify_with_hashes(self, path: Path, expected_size: int, hashes: dict | object) -> tuple[bool, dict[str, str]]:
         if not is_file(path):
-            return False
+            return False, {}
         try:
             if expected_size > 0 and stat_path(path).st_size != expected_size:
-                return False
+                return False, {}
             expected = dict(hashes or {})
             if not expected:
-                return True
+                return True, {}
             actual = self.calculate_hashes(Path(path), expected)
-            return all(actual.get(algorithm) == value.lower() for algorithm, value in expected.items())
+            valid = all(actual.get(algorithm) == value.lower() for algorithm, value in expected.items())
+            return valid, (actual if valid else {})
         except OSError:
-            return False
+            return False, {}
+
+    def verify(self, path: Path, expected_size: int, hashes: dict | object) -> bool:
+        return self.verify_with_hashes(path, expected_size, hashes)[0]
 
     def _validate_file(self, request: DownloadRequest, actual_hashes: dict[str, str]) -> None:
         size = self._safe_size(request.temporary_path)
@@ -372,13 +377,13 @@ class DownloadManager:
 
     @contextmanager
     def _hash_slot(self, *, allow_while_paused: bool = False):
+        if allow_while_paused:
+            yield
+            return
         acquired = False
         try:
             while not acquired:
-                if allow_while_paused:
-                    download_pause_controller.raise_if_cancel_requested()
-                else:
-                    download_pause_controller.raise_if_requested()
+                download_pause_controller.raise_if_requested()
                 acquired = self._hash_semaphore.acquire(timeout=0.25)
             yield
         finally:

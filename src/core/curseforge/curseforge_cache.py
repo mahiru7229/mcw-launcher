@@ -83,10 +83,7 @@ class CurseForgeApiCache:
                 return None
 
             metadata["lastAccessedAt"] = now
-            metadata["size"] = CurseForgeApiCache._safe_file_size(path)
             index["entries"][cache_key] = metadata
-            CurseForgeApiCache._recalculate_size(index)
-            CurseForgeApiCache._write_index(index)
             return CacheLookup(
                 payload=entry.get("payload"),
                 cache_info=CurseForgeApiCache._cache_info(

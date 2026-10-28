@@ -9,7 +9,10 @@ import shutil
 import stat
 import zipfile
 
+import logging
 from src.config import VERSION_TAG
+
+logger = logging.getLogger(__name__)
 from src.core.fs.paths import Paths
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.models.backup.instance_backup import InstanceBackupInfo, InstanceBackupResult, InstanceRestoreResult
@@ -101,6 +104,7 @@ class InstanceBackupManager:
         staging.mkdir(parents=True, exist_ok=False)
         rollback.mkdir(parents=True, exist_ok=False)
         safety_backup: Path | None = None
+        restore_succeeded = False
 
         try:
             with zipfile.ZipFile(backup_path, "r") as archive:
@@ -115,10 +119,22 @@ class InstanceBackupManager:
                 safety_backup = InstanceBackupManager.create(instance, InstanceBackupManager.SCOPE_FULL, reason="pre-restore").backup.path
 
             InstanceBackupManager._apply_payload(instance, staging, rollback, scope)
+            restore_succeeded = True
             return InstanceRestoreResult(instance_name=instance.name, backup_path=backup_path, restored_files=restored_files, scope=scope, safety_backup=safety_backup)
         finally:
             shutil.rmtree(staging, ignore_errors=True)
-            shutil.rmtree(rollback, ignore_errors=True)
+            if restore_succeeded:
+                shutil.rmtree(rollback, ignore_errors=True)
+            else:
+                has_files = False
+                try:
+                    has_files = any(rollback.iterdir()) if rollback.exists() else False
+                except OSError:
+                    has_files = True
+                if not has_files:
+                    shutil.rmtree(rollback, ignore_errors=True)
+                else:
+                    logger.error("Restore failed and rollback folder %s retained to protect user data.", rollback)
 
     @staticmethod
     def _apply_payload(instance: Instance, staging: Path, rollback: Path, scope: str) -> None:

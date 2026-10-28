@@ -25,7 +25,7 @@ class ModCatalogController(BaseController):
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
 
-    def search(self, query: str, index: str, offset: int, loader: str = ModLoaderManager.FABRIC) -> None:
+    def search(self, query: str, index: str, offset: int, loader: str = ModLoaderManager.FABRIC, force_refresh: bool = False) -> None:
         normalized_loader = self._normalize_loader(loader)
         task_id = f"{self.SEARCH_PREFIX}{normalized_loader}"
         task = lambda: (
@@ -37,7 +37,7 @@ class ModCatalogController(BaseController):
                 index=index,
                 offset=offset,
                 limit=25,
-                force_refresh=True,
+                force_refresh=force_refresh,
             ),
         )
         self._run_network_task(

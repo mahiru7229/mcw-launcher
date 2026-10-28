@@ -7,6 +7,7 @@ from typing import Iterable
 import json
 import re
 import tomllib
+import threading
 import zipfile
 
 from src.core.mod.mod_manager import ModManager
@@ -24,6 +25,8 @@ class ModCapability:
 
 
 class ModCapabilityIndex:
+    _SCAN_CACHE: dict[tuple, tuple[ModCapability, ...]] = {}
+    _SCAN_CACHE_LOCK = threading.Lock()
     """Indexes mod IDs supplied by top-level and safely nested JARs.
 
     Forge/NeoForge Jar-in-Jar dependencies are runtime capabilities, not
@@ -117,6 +120,17 @@ class ModCapabilityIndex:
 
     @staticmethod
     def _scan_owner(path: Path) -> tuple[ModCapability, ...]:
+        cache_key = None
+        try:
+            st = path.stat()
+            cache_key = (path.resolve(), st.st_mtime_ns, st.st_size)
+            with ModCapabilityIndex._SCAN_CACHE_LOCK:
+                cached = ModCapabilityIndex._SCAN_CACHE.get(cache_key)
+            if cached is not None:
+                return cached
+        except OSError:
+            cache_key = None
+
         output: list[ModCapability] = []
         budget = {"count": 0, "bytes": 0}
         try:
@@ -131,7 +145,13 @@ class ModCapabilityIndex:
                 )
         except (OSError, zipfile.BadZipFile, RuntimeError, ValueError):
             return ()
-        return tuple(output)
+        result = tuple(output)
+        if cache_key is not None:
+            with ModCapabilityIndex._SCAN_CACHE_LOCK:
+                if len(ModCapabilityIndex._SCAN_CACHE) > 3000:
+                    ModCapabilityIndex._SCAN_CACHE.clear()
+                ModCapabilityIndex._SCAN_CACHE[cache_key] = result
+        return result
 
     @staticmethod
     def _scan_nested_archive(archive: zipfile.ZipFile, owner_file: str, parent_path: str, depth: int, output: list[ModCapability], budget: dict[str, int]) -> None:

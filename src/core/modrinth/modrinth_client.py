@@ -50,7 +50,7 @@ class ModrinthClient:
             index=normalized_index,
             offset=normalized_offset,
             limit=normalized_limit,
-            force_refresh=force_refresh or not normalized_query,
+            force_refresh=force_refresh,
             allow_stale_on_error=True,
         )
         projects = ModrinthClient._projects_from_search_payload(payload)

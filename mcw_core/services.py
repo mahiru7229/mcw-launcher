@@ -151,6 +151,8 @@ class InstanceService:
         configured = str(java_path or "").strip()
         if configured:
             executable = JavaManager.normalize_executable(Path(configured))
+            if not JavaManager.is_valid_executable_name(executable):
+                raise RuntimeError(f"Invalid Java executable name: {executable.name}. Expected 'java', 'java.exe', or 'javaw.exe'.")
             if not executable.is_file():
                 raise RuntimeError(f"Java path does not exist: {executable}")
             actual_major = JavaManager.get_major_version(executable)

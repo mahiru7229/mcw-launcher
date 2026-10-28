@@ -275,6 +275,14 @@ class InstanceModsTab(QWidget):
             try:
                 if file_path.exists():
                     file_path.unlink()
+                if self._instance is not None:
+                    from mcw_core.api.modrinth.modrinth_registry import ModrinthRegistry
+                    from mcw_core.api.curseforge.curseforge_registry import CurseForgeRegistry
+                    from mcw_core.api.mod.mod_manager import ModManager
+
+                    raw_name = file_path.name[:-len(ModManager.DISABLED_SUFFIX)] if file_path.name.endswith(ModManager.DISABLED_SUFFIX) else file_path.name
+                    ModrinthRegistry.remove_by_filenames(self._instance, [raw_name])
+                    CurseForgeRegistry.remove_by_filenames(self._instance, [raw_name])
                 self.reload()
             except Exception as err:
                 QMessageBox.critical(self, tr("instance_mods.confirm_remove.title"), str(err))
@@ -294,8 +302,7 @@ class InstanceModsTab(QWidget):
         self.remove_btn.setText(tr("instance_mods.action.remove"))
         self.empty_label.setText(tr("instance_mods.empty"))
         self.table.setHorizontalHeaderLabels([
-            tr("instance_mods.column.status"),
-            tr("instance_mods.column.name"),
-            tr("instance_mods.column.size"),
-            tr("instance_mods.column.modified"),
+            tr("instance_mods.status"),
+            tr("instance_mods.name"),
+            tr("instance_mods.size"),
         ])

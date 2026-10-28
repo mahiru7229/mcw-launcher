@@ -1554,9 +1554,13 @@ class MainWindow(QMainWindow):
             instance = InstanceManager.load(instance_name)
         except Exception:
             return False
-        mods_dir = Path(instance.instance_dir) / "minecraft" / "mods"
+        mods_dir = Path(instance.instance_dir) / "mods"
         if not mods_dir.is_dir():
-            return False
+            alt_mods_dir = Path(instance.instance_dir) / ".minecraft" / "mods"
+            if alt_mods_dir.is_dir():
+                mods_dir = alt_mods_dir
+            else:
+                return False
         markers = ("iris", "oculus", "optifine", "canvas")
         return any(path.is_file() and any(marker in path.name.casefold() for marker in markers) for path in mods_dir.iterdir())
 
@@ -1590,10 +1594,12 @@ class MainWindow(QMainWindow):
         instance = self.mod_controller.current_instance
         if instance is None:
             QMessageBox.information(self, tr("modrinth.title"), tr("modrinth.mod.no_instance"))
+            self.modrinth_mod_dialog.set_busy(False)
             return
         instance_loader, _ = ModLoaderManager.normalize(instance.mod_loader)
         if instance_loader != loader:
             QMessageBox.information(self, tr("modrinth.title"), tr("modrinth.loader.instance_mismatch", instance_loader=instance_loader.title(), selected_loader=loader.title()))
+            self.modrinth_mod_dialog.set_busy(False)
             return
         self.modrinth_controller.install_mod(instance.name, version_id, self.modrinth_mod_dialog.allowed_version_types)
 
@@ -1603,9 +1609,15 @@ class MainWindow(QMainWindow):
             dialog = CompatibleInstanceDialog(version, loader, instances, self)
         except Exception as error:
             self._show_error(tr("mods.instance_dialog.title"), str(error))
+            self.mods_page.set_busy(False)
+            if self._curseforge_mod_dialog is not None:
+                self._curseforge_mod_dialog.set_busy(False)
             return
 
         if not dialog.exec():
+            self.mods_page.set_busy(False)
+            if self._curseforge_mod_dialog is not None:
+                self._curseforge_mod_dialog.set_busy(False)
             return
         if dialog.requested_instance_creation:
             self._pending_mod_install_after_create = {
@@ -1623,15 +1635,24 @@ class MainWindow(QMainWindow):
             )
             if not started:
                 self._pending_mod_install_after_create = None
+                self.mods_page.set_busy(False)
+                if self._curseforge_mod_dialog is not None:
+                    self._curseforge_mod_dialog.set_busy(False)
             return
 
         instance_name = dialog.selected_instance_name
         if not instance_name:
+            self.mods_page.set_busy(False)
+            if self._curseforge_mod_dialog is not None:
+                self._curseforge_mod_dialog.set_busy(False)
             return
         try:
             target_instance = InstanceManager.load(instance_name)
         except Exception as error:
             self._show_error(tr("mods.instance_dialog.title"), str(error))
+            self.mods_page.set_busy(False)
+            if self._curseforge_mod_dialog is not None:
+                self._curseforge_mod_dialog.set_busy(False)
             return
         self.mod_controller.set_instance(target_instance, refresh=False)
         self.modrinth_controller.install_mod(instance_name, str(getattr(version, "version_id", "")), tuple(allowed_version_types))
@@ -2027,16 +2048,19 @@ class MainWindow(QMainWindow):
         if self.curseforge_mod_dialog.catalog_mode:
             file = self.curseforge_mod_dialog.selected_file()
             if file is None:
+                self.curseforge_mod_dialog.set_busy(False)
                 return
             self._choose_instance_for_curseforge_install(file, self.curseforge_mod_dialog.loader, tuple(allowed_release_types))
             return
         instance = self.mod_controller.current_instance
         if instance is None:
             QMessageBox.information(self, tr("curseforge.title"), tr("curseforge.mod.no_instance"))
+            self.curseforge_mod_dialog.set_busy(False)
             return
         file = self.curseforge_mod_dialog.selected_file()
         allow_unverified = self._confirm_curseforge_unverified_install(file, instance)
         if allow_unverified is None:
+            self.curseforge_mod_dialog.set_busy(False)
             return
         self.curseforge_controller.install_mod(instance.name, int(project_id), int(file_id), tuple(allowed_release_types), allow_unverified=allow_unverified)
 
@@ -2046,12 +2070,21 @@ class MainWindow(QMainWindow):
             dialog = CompatibleInstanceDialog(file, loader, instances, self)
         except Exception as error:
             self._show_error(tr("mods.instance_dialog.title"), str(error))
+            self.mods_page.set_busy(False)
+            if self._curseforge_mod_dialog is not None:
+                self._curseforge_mod_dialog.set_busy(False)
             return
         if not dialog.exec():
+            self.mods_page.set_busy(False)
+            if self._curseforge_mod_dialog is not None:
+                self._curseforge_mod_dialog.set_busy(False)
             return
         if dialog.requested_instance_creation:
             allow_unverified = self._confirm_curseforge_unverified_install(file, str(loader))
             if allow_unverified is None:
+                self.mods_page.set_busy(False)
+                if self._curseforge_mod_dialog is not None:
+                    self._curseforge_mod_dialog.set_busy(False)
                 return
             self._pending_mod_install_after_create = {
                 "provider": "curseforge",
@@ -2065,17 +2098,29 @@ class MainWindow(QMainWindow):
             started = self.instance_controller.create(dialog.created_instance_name, dialog.created_game_version, loader, ModLoaderManager.AUTO)
             if not started:
                 self._pending_mod_install_after_create = None
+                self.mods_page.set_busy(False)
+                if self._curseforge_mod_dialog is not None:
+                    self._curseforge_mod_dialog.set_busy(False)
             return
         instance_name = dialog.selected_instance_name
         if not instance_name:
+            self.mods_page.set_busy(False)
+            if self._curseforge_mod_dialog is not None:
+                self._curseforge_mod_dialog.set_busy(False)
             return
         try:
             target_instance = InstanceManager.load(instance_name)
         except Exception as error:
             self._show_error(tr("mods.instance_dialog.title"), str(error))
+            self.mods_page.set_busy(False)
+            if self._curseforge_mod_dialog is not None:
+                self._curseforge_mod_dialog.set_busy(False)
             return
         allow_unverified = self._confirm_curseforge_unverified_install(file, target_instance)
         if allow_unverified is None:
+            self.mods_page.set_busy(False)
+            if self._curseforge_mod_dialog is not None:
+                self._curseforge_mod_dialog.set_busy(False)
             return
         self.mod_controller.set_instance(target_instance, refresh=False)
         self.curseforge_controller.install_mod(

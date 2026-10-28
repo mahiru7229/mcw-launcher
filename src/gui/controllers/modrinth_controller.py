@@ -35,10 +35,10 @@ class ModrinthController(BaseController):
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
 
-    def search(self, project_type: str, query: str, index: str, offset: int, game_version: str = "", loader: str = ModLoaderManager.FABRIC) -> None:
+    def search(self, project_type: str, query: str, index: str, offset: int, game_version: str = "", loader: str = ModLoaderManager.FABRIC, force_refresh: bool = True) -> None:
         normalized_loader = self._normalize_loader(loader)
         task_id = f"modrinth.search.{project_type}.{normalized_loader}"
-        task = lambda: (project_type, normalized_loader, ModrinthClient.search_projects(project_type=project_type, query=query, game_version=game_version, loader=normalized_loader, index=index, offset=offset, limit=25, force_refresh=True))
+        task = lambda: (project_type, normalized_loader, ModrinthClient.search_projects(project_type=project_type, query=query, game_version=game_version, loader=normalized_loader, index=index, offset=offset, limit=25, force_refresh=force_refresh))
         self._run_network_task(self._task_runner, task_id, task, tr("task.modrinth.search", project_type=project_type, loader=normalized_loader.title()), blocking=False)
 
     def load_versions(self, project_type: str, project_id: str, game_version: str = "", loader: str = ModLoaderManager.FABRIC) -> None:

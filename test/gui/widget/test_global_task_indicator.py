@@ -151,3 +151,58 @@ def test_global_task_indicator_failure_state(gui_app) -> None:
     assert "Network connection lost" in indicator.toolTip()
     assert indicator._hide_timer.isActive()
 
+
+
+def test_global_task_indicator_succeeded_task_clears_previous_error(gui_app) -> None:
+    runner = MockRunner()
+    queue = TaskQueue(runner)
+    indicator = GlobalTaskIndicator(queue)
+
+    # 1. Task 1 fails -> indicator turns red
+    runner.task_started.emit("task-1", "Task 1", False)
+    runner.task_failed.emit("task-1", RuntimeError("Network error"))
+    assert indicator.isVisible()
+    assert indicator._current_visual_state == "error"
+    assert indicator.icon_label.text() == chr(0x2715)
+
+    # 2. Task 2 starts -> normal state
+    runner.task_started.emit("task-2", "Task 2", False)
+    assert indicator._current_visual_state == "normal"
+
+    # 3. Task 2 succeeds -> indicator turns green 100%, hide_timer=2500, error is wiped
+    runner.task_succeeded.emit("task-2", None)
+    assert indicator.isVisible()
+    assert indicator._current_visual_state == "success"
+    assert indicator.icon_label.text() == chr(0x2713)
+    assert indicator.progress_bar.value() == 100
+    assert "Network error" not in indicator.text_label.text()
+    assert "Network error" not in indicator.toolTip()
+    assert indicator._hide_timer.isActive()
+    assert indicator._hide_timer.interval() == 2500
+
+
+def test_global_task_indicator_clicking_error_dismisses_immediately(gui_app) -> None:
+    from PySide6.QtCore import QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+
+    runner = MockRunner()
+    queue = TaskQueue(runner)
+    indicator = GlobalTaskIndicator(queue)
+
+    runner.task_started.emit("task-1", "Failing task", False)
+    runner.task_failed.emit("task-1", RuntimeError("Some error"))
+    assert indicator.isVisible()
+    assert indicator._current_visual_state == "error"
+
+    # Clicking the indicator in error state dismisses it
+    click_event = QMouseEvent(
+        QMouseEvent.Type.MouseButtonPress,
+        QPointF(5.0, 5.0),
+        QPointF(5.0, 5.0),
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    indicator.mousePressEvent(click_event)
+    assert indicator.isVisible() is False
+    assert indicator._last_failed_task is None

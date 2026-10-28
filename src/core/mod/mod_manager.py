@@ -9,6 +9,7 @@ import json
 import re
 import shutil
 import tomllib
+import threading
 import zipfile
 
 from src.core.fs.paths import Paths
@@ -22,6 +23,10 @@ from src.models.mod.mod_info import ModInfo
 
 
 class ModManager:
+    _READ_MOD_CACHE: dict[tuple, ModInfo] = {}
+    _READ_MOD_CACHE_LOCK = threading.Lock()
+    _SHA1_CACHE: dict[tuple, str] = {}
+    _SHA1_CACHE_LOCK = threading.Lock()
     DISABLED_SUFFIX = ".disabled"
     _INVALID_STATUSES = {"Broken JAR", "Not a mod", "Broken metadata", "Unverified"}
     MAX_EMBEDDED_MOD_JARS = 64
@@ -79,7 +84,16 @@ class ModManager:
             if target.suffix.casefold() != ".jar" or not target.is_file():
                 continue
             try:
-                digest = ModManager._sha1(target)
+                st = target.stat()
+                sha_key = (target.resolve(), st.st_mtime_ns, st.st_size)
+                with ModManager._SHA1_CACHE_LOCK:
+                    digest = ModManager._SHA1_CACHE.get(sha_key)
+                if digest is None:
+                    digest = ModManager._sha1(target)
+                    with ModManager._SHA1_CACHE_LOCK:
+                        if len(ModManager._SHA1_CACHE) > 5000:
+                            ModManager._SHA1_CACHE.clear()
+                        ModManager._SHA1_CACHE[sha_key] = digest
             except OSError:
                 continue
             if digest != expected_sha1:
@@ -260,6 +274,17 @@ class ModManager:
         file_name = path.name[:-len(ModManager.DISABLED_SUFFIX)] if not enabled else path.name
         normalized_preference = str(preferred_loader).strip().casefold()
 
+        cache_key = None
+        try:
+            st = path.stat()
+            cache_key = (path.resolve(), st.st_mtime_ns, st.st_size, normalized_preference, str(provider_version))
+            with ModManager._READ_MOD_CACHE_LOCK:
+                cached = ModManager._READ_MOD_CACHE.get(cache_key)
+            if cached is not None:
+                return dataclass_replace(cached, path=path, file_name=file_name, enabled=enabled)
+        except OSError:
+            cache_key = None
+
         try:
             with zipfile.ZipFile(path, "r") as archive:
                 names = set(archive.namelist())
@@ -267,11 +292,16 @@ class ModManager:
                 provided_mods = ModManager._embedded_mods(archive, provider_version=provider_version)
 
                 def finalize(mod: ModInfo) -> ModInfo:
-                    if not provided_mods:
-                        return mod
-                    merged = {(mod_id.casefold(), version) for mod_id, version in mod.provided_mods if mod_id}
-                    merged.update((mod_id.casefold(), version) for mod_id, version in provided_mods if mod_id and mod_id.casefold() != mod.mod_id.casefold())
-                    return dataclass_replace(mod, provided_mods=tuple(sorted(merged)))
+                    if provided_mods:
+                        merged = {(mod_id.casefold(), version) for mod_id, version in mod.provided_mods if mod_id}
+                        merged.update((mod_id.casefold(), version) for mod_id, version in provided_mods if mod_id and mod_id.casefold() != mod.mod_id.casefold())
+                        mod = dataclass_replace(mod, provided_mods=tuple(sorted(merged)))
+                    if cache_key is not None:
+                        with ModManager._READ_MOD_CACHE_LOCK:
+                            if len(ModManager._READ_MOD_CACHE) > 3000:
+                                ModManager._READ_MOD_CACHE.clear()
+                            ModManager._READ_MOD_CACHE[cache_key] = mod
+                    return mod
 
                 has_fabric = "fabric.mod.json" in names
                 has_quilt = "quilt.mod.json" in names

@@ -57,7 +57,7 @@ class FTBClient:
         normalized_query = " ".join(str(query).split())
         normalized_page_size = min(max(1, int(page_size)), 50)
         normalized_index = max(0, int(index))
-        fetch_limit = min(FTBClient.MAX_SEARCH_FETCH, max(normalized_page_size, normalized_index + normalized_page_size))
+        fetch_limit = max(FTBClient.MAX_SEARCH_FETCH, normalized_index + normalized_page_size)
         if normalized_query:
             path = f"/modpack/search/{fetch_limit}"
             params = {"term": normalized_query}

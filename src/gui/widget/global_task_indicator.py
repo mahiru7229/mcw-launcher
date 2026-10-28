@@ -124,6 +124,17 @@ class GlobalTaskIndicator(QFrame):
         layout.addWidget(self.progress_bar)
         layout.addLayout(bottom_row)
 
+        for widget in (
+            self.icon_label,
+            self.stage_badge,
+            self.text_label,
+            self.progress_bar,
+            self.progress_detail_label,
+            self.speed_label,
+            self.percent_label,
+        ):
+            widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
         self._set_visual_state("normal")
 
     def _apply_normal_frame_style(self) -> None:
@@ -279,8 +290,7 @@ class GlobalTaskIndicator(QFrame):
                 self._was_active = False
 
                 # Check if the run finished with an error
-                failed_tasks = [t for t in (self._queue.all_tasks() if self._queue else ()) if t.status == "failed"]
-                failed_item = self._last_failed_task or (failed_tasks[-1] if failed_tasks else None)
+                failed_item = self._last_failed_task
 
                 if failed_item is not None:
                     # Show Error State (Red)
@@ -459,10 +469,20 @@ class GlobalTaskIndicator(QFrame):
         self._last_refresh_time = time.monotonic()
         if getattr(item, "status", "") == "failed":
             self._last_failed_task = item
+        elif getattr(item, "status", "") == "succeeded":
+            self._last_failed_task = None
+            self._hide_timer.stop()
+            self._was_active = True
         self.refresh()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
+            if self._current_visual_state == "error":
+                self._last_failed_task = None
+                self._hide_timer.stop()
+                self.setVisible(False)
+                event.accept()
+                return
             self._toggle_drawer()
             event.accept()
             return
