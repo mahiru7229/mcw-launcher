@@ -166,29 +166,38 @@ class StartupSplash(QWidget):
             return
         self._message_key = str(message_key)
         self._detail_key = str(detail_key)
-        self.progress_bar.setValue(max(0, min(100, int(percent))))
-        self.retranslate()
+        try:
+            self.progress_bar.setValue(max(0, min(100, int(percent))))
+            self.retranslate()
+        except RuntimeError:
+            return
         app = QGuiApplication.instance()
         if app is not None:
             app.processEvents()
 
     def retranslate(self) -> None:
-        self.eyebrow_label.setText(tr("startup.eyebrow"))
-        self.version_label.setText(get_display_version())
-        self.status_label.setText(tr(self._message_key))
-        self.detail_label.setText(tr(self._detail_key))
+        try:
+            self.eyebrow_label.setText(tr("startup.eyebrow"))
+            self.version_label.setText(get_display_version())
+            self.status_label.setText(tr(self._message_key))
+            self.detail_label.setText(tr(self._detail_key))
+        except RuntimeError:
+            return
 
     def show_error(self) -> None:
         self._failed = True
         self._message_key = "startup.failed"
         self._detail_key = "startup.failed_detail"
-        self.progress_bar.setValue(100)
-        self.status_label.setText(tr(self._message_key))
-        self.detail_label.setText(tr(self._detail_key))
-        self.progress_bar.setStyleSheet(
-            "QProgressBar { background: #111310; border: 1px solid #6d5656; border-radius: 5px; }"
-            "QProgressBar::chunk { background: #c47a7a; border-radius: 4px; }"
-        )
+        try:
+            self.progress_bar.setValue(100)
+            self.status_label.setText(tr(self._message_key))
+            self.detail_label.setText(tr(self._detail_key))
+            self.progress_bar.setStyleSheet(
+                "QProgressBar { background: #111310; border: 1px solid #6d5656; border-radius: 5px; }"
+                "QProgressBar::chunk { background: #c47a7a; border-radius: 4px; }"
+            )
+        except RuntimeError:
+            return
         app = QGuiApplication.instance()
         if app is not None:
             app.processEvents()
@@ -198,6 +207,12 @@ class StartupSplash(QWidget):
         QTimer.singleShot(remaining, lambda: self._complete_finish(window))
 
     def _complete_finish(self, window: QWidget) -> None:
-        self.close()
-        window.raise_()
-        window.activateWindow()
+        try:
+            self.close()
+        except RuntimeError:
+            pass
+        try:
+            window.raise_()
+            window.activateWindow()
+        except RuntimeError:
+            pass

@@ -80,7 +80,7 @@ class OAuthCallbackServer:
     POLL_INTERVAL_SECONDS = 0.25
 
     @staticmethod
-    def wait_for_callback(timeout: float = 180.0, cancel_event: Event | None = None) -> tuple[str, str]:
+    def wait_for_callback(timeout: float = 180.0, cancel_event: Event | None = None, on_ready=None) -> tuple[str, str]:
         OAuthCallbackHandler.authorization_code = None
         OAuthCallbackHandler.returned_state = None
         OAuthCallbackHandler.error = None
@@ -91,6 +91,8 @@ class OAuthCallbackServer:
         deadline = monotonic() + max(0.0, float(timeout))
 
         try:
+            if callable(on_ready):
+                on_ready()
             while True:
                 if cancel_event is not None and cancel_event.is_set():
                     raise MicrosoftAuthorizationCancelledError("Microsoft sign-in was cancelled.")

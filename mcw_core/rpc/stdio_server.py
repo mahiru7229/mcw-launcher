@@ -20,6 +20,8 @@ class StdioRpcServer:
         self.dispatcher = dispatcher or CoreRpcDispatcher()
         self.stdin = stdin or sys.stdin
         self.stdout = stdout or sys.stdout
+        if stdout is None and sys.stderr is not None:
+            sys.stdout = sys.stderr
         self._write_lock = RLock()
         self._unsubscribe = self.dispatcher.subscribe(self._on_event)
 

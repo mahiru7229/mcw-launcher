@@ -2,6 +2,27 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.7] - 2026-11-16
+
+### Added
+- **Tự động phát hiện phiên bản Java từ Bytecode Mod & Metadata (`JavaMajorPolicy.required_for_instance`)**:
+  - Quét nhanh header `.class` và khai báo `depends.java` trong `fabric.mod.json` / `quilt.mod.json` (kèm cache theo `(path, mtime_ns, size)`) để tự động nâng Java yêu cầu cho các instance Fabric/Quilt (tránh lỗi `UnsupportedClassVersionError`).
+  - Hỗ trợ `allow_higher=True` trong `JavaMajorPolicy.accepted_majors` và `JavaResolver` cho phép chọn phiên bản Java cao hơn trên các instance `vanilla`, `fabric`, `quilt`.
+- **Trích xuất phiên bản Java yêu cầu từ crash log (`JavaRuntime.extract_required_java_major`)**:
+  - Phân tích thông báo `class file version XX.Y` trong log khi khởi chạy thất bại để `MinecraftExecutor._start_with_java_recovery` tự động chuyển sang bản Java tương thích cao hơn.
+
+### Fixed
+- **Khắc phục lỗi C++ Object Deleted trên `StartupSplash`**:
+  - Bọc bảo vệ `RuntimeError` trong `update_progress`, `retranslate`, `show_error` và `_complete_finish` khi widget màn hình chờ đã đóng.
+- **Loại bỏ race condition cổng callback trong `MicrosoftOAuth`**:
+  - Đảm bảo `OAuthCallbackServer` bind xong cổng `127.0.0.1:8400` trước khi mở trình duyệt đăng nhập.
+- **Ngăn chặn deadlock pipe `stderr` & bảo vệ luồng JSON-RPC**:
+  - Dùng `subprocess.DEVNULL` cho `stderr` trong `CoreRpcClient` ở chế độ `stdio` và chuyển hướng `sys.stdout` sang `sys.stderr` trong `StdioRpcServer`.
+
+### Changed
+- **Tối ưu hiệu năng kết nối SQLite trong `AccountDatabase.connect`**:
+  - Chỉ thực thi `PRAGMA quick_check` và khởi tạo DDL schema một lần cho mỗi chữ ký `(resolved_path, st_size)` của file cơ sở dữ liệu.
+
 ## [1.8.6] - 2026-10-28
 
 ### Fixed

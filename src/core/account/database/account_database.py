@@ -14,6 +14,7 @@ class AccountDatabase:
     CONNECTION_TIMEOUT_SECONDS = 10.0
 
     _schema_lock = Lock()
+    _verified_databases: set[tuple[str, int]] = set()
 
     _CREATE_ACCOUNTS_TABLE = """
         CREATE TABLE IF NOT EXISTS accounts (
@@ -67,11 +68,25 @@ class AccountDatabase:
             connection = sqlite3.connect(database_path, timeout=AccountDatabase.CONNECTION_TIMEOUT_SECONDS)
             connection.row_factory = sqlite3.Row
             AccountDatabase._configure_connection(connection)
-            AccountDatabase._verify_integrity(connection)
+
+            try:
+                stat = database_path.stat()
+                db_signature = (str(database_path.resolve(strict=False)), int(stat.st_size))
+            except OSError:
+                db_signature = (str(database_path), -1)
 
             with AccountDatabase._schema_lock:
-                AccountDatabase._ensure_schema(connection)
-                connection.commit()
+                if db_signature not in AccountDatabase._verified_databases or db_signature[1] <= 0:
+                    AccountDatabase._verify_integrity(connection)
+                    AccountDatabase._ensure_schema(connection)
+                    connection.commit()
+                    try:
+                        updated_stat = database_path.stat()
+                        AccountDatabase._verified_databases.add(
+                            (str(database_path.resolve(strict=False)), int(updated_stat.st_size))
+                        )
+                    except OSError:
+                        pass
 
             return connection
         except (sqlite3.Error, RuntimeError) as error:

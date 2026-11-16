@@ -146,7 +146,18 @@ class MinecraftExecutor:
 
     @staticmethod
     def _start_with_java_recovery(instance: Instance, command: list[str], required_java_major: int, reporter: ProgressReporter, preferred_java: str, lan_log_path) -> tuple[object, object, tuple[str, ...]]:
-        resolution = JavaResolver.resolve_with_recovery(required_java_major, reporter, preferred_java)
+        mod_loader = getattr(instance, "mod_loader", ("vanilla", "-1")) or ("vanilla", "-1")
+        loader_name = str(mod_loader[0] if isinstance(mod_loader, (list, tuple)) and mod_loader else mod_loader).strip().casefold()
+        allow_higher_preferred = loader_name in {"vanilla", "fabric", "quilt"}
+        try:
+            resolution = JavaResolver.resolve_with_recovery(
+                required_java_major,
+                reporter,
+                preferred_java,
+                allow_higher_preferred=allow_higher_preferred,
+            )
+        except TypeError:
+            resolution = JavaResolver.resolve_with_recovery(required_java_major, reporter, preferred_java)
         java = resolution.path
         recovery_warnings: list[str] = []
         recovery_used = resolution.recovered
@@ -163,14 +174,16 @@ class MinecraftExecutor:
         if probe is not None and probe.java_runtime_failure:
             failed_java = java
             failed_output = MinecraftExecutor._startup_log_tail(probe.output)
+            detected_major = JavaRuntime.extract_required_java_major(probe.output)
+            recovery_major = max(required_java_major, detected_major or required_java_major)
             JavaRuntime.close_process_log(process)
             reporter.status(stage=ProgressStage.SELECTING_JAVA, message="java.recovery.runtime_failed")
             LanAgentManager.append_log_path(
                 lan_log_path,
-                f"Java runtime failed during startup and will be replaced: {failed_java}; exit={probe.exit_code}; details={failed_output}",
+                f"Java runtime failed during startup and will be replaced: {failed_java}; exit={probe.exit_code}; required={recovery_major}; details={failed_output}",
             )
             try:
-                java = JavaResolver.resolve_alternative(required_java_major, {failed_java}, reporter)
+                java = JavaResolver.resolve_alternative(recovery_major, {failed_java}, reporter)
             except Exception as recovery_error:
                 raise JavaRecoveryError(
                     "Minecraft could not start with the selected Java runtime, and MCW could not prepare a compatible alternative. "
@@ -367,8 +380,8 @@ class MinecraftExecutor:
             download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.SELECTING_JAVA, message="Selecting Java runtime...")
-            required_java_major = JavaMajorPolicy.required_for_minecraft(
-                instance.version_id,
+            required_java_major = JavaMajorPolicy.required_for_instance(
+                instance,
                 version.java_version.get("majorVersion"),
             )
             java_major = JavaMajorPolicy.resolve(required_java_major)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import threading
 import time
@@ -170,6 +171,17 @@ class JavaRuntime:
             "class file version",
         )
         return any(signature in normalized for signature in signatures)
+
+    @staticmethod
+    def extract_required_java_major(output: str) -> int | None:
+        text = str(output or "")
+        matches = [int(value) for value in re.findall(r"class file version (\d+)\.\d+", text)]
+        if not matches:
+            return None
+        highest_class_major = max(matches)
+        if highest_class_major < 52:
+            return None
+        return highest_class_major - 44
 
     @staticmethod
     def _read_log(log_path: Path | None) -> str:

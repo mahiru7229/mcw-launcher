@@ -125,8 +125,8 @@ class InstanceService:
         version = VersionManager.load(instance.version_id)
         settings = SettingsManager.load(instance)
         loader_name, loader_version = ModLoaderManager.normalize(instance.mod_loader)
-        required_java_major = JavaMajorPolicy.required_for_minecraft(
-            instance.version_id,
+        required_java_major = JavaMajorPolicy.required_for_instance(
+            instance,
             (getattr(version, "java_version", None) or {}).get("majorVersion"),
         )
         configured_java_path = str(getattr(settings, "java_path", "") or "").strip()
@@ -158,7 +158,8 @@ class InstanceService:
             actual_major = JavaManager.get_major_version(executable)
             if actual_major is None:
                 raise RuntimeError(f"Unable to determine the Java version at: {executable}")
-            accepted = JavaMajorPolicy.accepted_majors(profile.required_java_major)
+            allow_higher = str(profile.loader_name or "").strip().casefold() in {"vanilla", "fabric", "quilt"}
+            accepted = JavaMajorPolicy.accepted_majors(profile.required_java_major, allow_higher=allow_higher)
             if actual_major not in accepted:
                 expected = " or ".join(f"Java {major}" for major in accepted)
                 raise RuntimeError(f"Java {actual_major} is incompatible with this Minecraft runtime. Required: {expected}.")

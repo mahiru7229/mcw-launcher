@@ -227,14 +227,18 @@ class MicrosoftOAuth:
     def request_authorization_code(prompt: str = "select_account", cancel_event: Event | None = None) -> tuple[str, str]:
         session = MicrosoftOAuth.create_session(prompt=prompt)
 
-        opened = MicrosoftOAuth.open_browser(session)
+        def _open_browser_when_bound() -> None:
+            if not MicrosoftOAuth.open_browser(session):
+                raise RuntimeError("Could not open the default browser.")
 
-        if not opened:
-            raise RuntimeError(
-                "Could not open the default browser."
+        try:
+            authorization_code, returned_state = OAuthCallbackServer.wait_for_callback(
+                cancel_event=cancel_event,
+                on_ready=_open_browser_when_bound,
             )
-
-        authorization_code, returned_state = OAuthCallbackServer.wait_for_callback(cancel_event=cancel_event)
+        except TypeError:
+            _open_browser_when_bound()
+            authorization_code, returned_state = OAuthCallbackServer.wait_for_callback(cancel_event=cancel_event)
 
         if not secrets.compare_digest(
             returned_state,

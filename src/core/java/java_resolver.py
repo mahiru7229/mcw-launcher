@@ -28,11 +28,16 @@ class JavaResolution:
 
 class JavaResolver:
     @staticmethod
-    def resolve(required_major: int, reporter: ProgressReporter | None = None, preferred_path: str | Path | None = None) -> Path:
+    def resolve(required_major: int, reporter: ProgressReporter | None = None, preferred_path: str | Path | None = None, *, allow_higher_preferred: bool = False) -> Path:
         managed_major = JavaMajorPolicy.resolve(required_major)
         preferred = str(preferred_path or "").strip()
         if preferred:
-            selected = JavaResolver._validate_preferred(Path(preferred), required_major, managed_major)
+            selected = JavaResolver._validate_preferred(
+                Path(preferred),
+                required_major,
+                managed_major,
+                allow_higher=allow_higher_preferred,
+            )
             JavaRecoveryDiagnostics.record("preferred_selected", required_major=managed_major, java_path=selected)
             return selected
 
@@ -74,14 +79,17 @@ class JavaResolver:
             return installed
 
     @staticmethod
-    def resolve_with_recovery(required_major: int, reporter: ProgressReporter | None = None, preferred_path: str | Path | None = None) -> JavaResolution:
+    def resolve_with_recovery(required_major: int, reporter: ProgressReporter | None = None, preferred_path: str | Path | None = None, *, allow_higher_preferred: bool = False) -> JavaResolution:
         preferred = str(preferred_path or "").strip()
         if not preferred:
             return JavaResolution(JavaResolver.resolve(required_major, reporter), automatic=True)
 
         rejected = JavaManager.normalize_executable(Path(preferred))
         try:
-            return JavaResolution(JavaResolver.resolve(required_major, reporter, rejected), automatic=False)
+            return JavaResolution(
+                JavaResolver.resolve(required_major, reporter, rejected, allow_higher_preferred=allow_higher_preferred),
+                automatic=False,
+            )
         except RuntimeError as preferred_error:
             if reporter is not None:
                 reporter.status(ProgressStage.SELECTING_JAVA, "java.recovery.preferred_invalid")
@@ -148,7 +156,7 @@ class JavaResolver:
             ) from (provision_error or selection_error)
 
     @staticmethod
-    def _validate_preferred(path: Path, required_major: int, managed_major: int) -> Path:
+    def _validate_preferred(path: Path, required_major: int, managed_major: int, *, allow_higher: bool = False) -> Path:
         executable = JavaManager.normalize_executable(path)
         if not executable.is_file():
             raise RuntimeError(f"Java path does not exist: {executable}")
@@ -157,7 +165,7 @@ class JavaResolver:
         if actual_major is None:
             raise RuntimeError(f"Unable to determine the Java version at: {executable}")
 
-        accepted = JavaMajorPolicy.accepted_majors(required_major)
+        accepted = JavaMajorPolicy.accepted_majors(required_major, allow_higher=allow_higher)
         if actual_major not in accepted:
             expected = " or ".join(f"Java {major}" for major in accepted)
             raise RuntimeError(f"Java {actual_major} is incompatible with this Minecraft runtime. Required: {expected}.")
