@@ -16,13 +16,6 @@
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
-> [!NOTE]
-> **Phiên bản mới nhất (v1.8.7)**:
-> - **Tích hợp trực tiếp CurseForge Core API v1 chính thức**: Duyệt, tìm kiếm và cài đặt Mod / Modpack trực tiếp từ CurseForge ngay trên bản phát hành chính thức mà không cần tự thiết lập Gateway trung gian; tinh gọn phần cài đặt thành 1 ô nhập Khóa API cá nhân (tùy chọn).
-> - **Duyệt danh sách Mod & Modpack phổ biến tức thì**: Tự động nạp danh sách các dự án nổi bật ngay khi mở trình duyệt CurseForge hoặc đổi bộ lọc Mod Loader mà không bắt buộc phải gõ từ khóa tìm kiếm.
-> - **Sửa lỗi giao diện & Tối ưu hiệu năng Timer nền**: Khắc phục lỗi hiển thị nhãn bộ lọc Loader (`Quilt` / `Forge`) trên `ModsPage` và tối ưu hóa `_cooldown_timer` chỉ kích hoạt khi có thời gian chờ làm mới.
-> - **Tối ưu hóa tốc độ tải mạng (~80ms / 12.5 Hz) & [Thử nghiệm] Cầu nối cập nhật (Legacy Update Bridge)**: Cập nhật tốc độ tải thực theo thời gian thực, hỗ trợ nguồn cập nhật kép Cloudflare CDN / GitHub kèm cơ chế thử nghiệm nâng cấp tự động cho các bản Launcher cũ.
-
 > [!IMPORTANT]
 > **Dự án liên quan & Nguồn tham khảo:**
 > 1. **Core**: [MCW Launcher Core · Download & Docs](https://mahiru7229.github.io/mcw_core/index.html) — Thư viện core headless độc lập (`mcw_core`), máy chủ JSON-RPC 2.0 và tài liệu API.
