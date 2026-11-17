@@ -103,7 +103,7 @@ class UpdateManager:
                 )
                 raise
 
-        if (update is None and self.channel == "beta") or (self.source == "auto" and update is not None):
+        if update is None or self.source == "auto":
             try:
                 fallback_update = fallback_client.check(force_refresh=force_refresh)
                 if fallback_update is not None:

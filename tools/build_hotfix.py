@@ -3,23 +3,17 @@ import os
 from pathlib import Path
 import zipfile
 
-dest_zip = Path("d:/WORKBASE/mcw-download/public/hotfixes/v1.8.5.1.zip")
+dest_zip = Path("d:/WORKBASE/mcw-download/public/hotfixes/v1.8.6.1.zip")
 
 files_to_pack = [
-    "mcw_core/api/config/curseforge_config_manager.py",
-    "mcw_core/api/curseforge/curseforge_client.py",
-    "mcw_core/api/security/bundled_secrets.py",
-    "mcw_core/api/security/sensitive_data_redactor.py",
-    "src/core/config/curseforge_config_manager.py",
-    "src/core/curseforge/curseforge_client.py",
-    "src/core/security/bundled_secrets.py",
-    "src/core/security/sensitive_data_redactor.py",
+    "mcw_core/api/update/update_manager.py",
+    "src/core/update/update_manager.py",
 ]
 
 config_content = '''from __future__ import annotations
 
-VERSION = "v1.8.5.1"
-VERSION_ID = "1.8.5.1"
+VERSION = "v1.8.6.1"
+VERSION_ID = "1.8.6.1"
 VERSION_TAG = f"v{VERSION_ID}"
 UPDATE_CHANNEL = "stable"
 GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
