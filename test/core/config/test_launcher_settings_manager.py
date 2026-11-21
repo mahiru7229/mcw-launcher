@@ -85,6 +85,7 @@ def test_update_settings_are_created_and_persisted(tmp_path: Path) -> None:
         "channel_policy_version": manager.UPDATE_CHANNEL_POLICY_VERSION,
         "last_checked_at": None,
         "source": "cloudflare",
+        "dismiss_final_release_notice": False,
     }
 
     manager.update_section("updates", {"auto_check": False, "last_checked_at": "2026-07-15T12:00:00+00:00"})

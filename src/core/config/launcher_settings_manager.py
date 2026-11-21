@@ -76,6 +76,7 @@ class LauncherSettingsManager:
             "channel_policy_version": UPDATE_CHANNEL_POLICY_VERSION,
             "last_checked_at": None,
             "source": "cloudflare",
+            "dismiss_final_release_notice": False,
         },
     }
 
@@ -281,6 +282,7 @@ class LauncherSettingsManager:
         updates["source"] = source if source in {"cloudflare", "github", "auto"} else "cloudflare"
         last_checked_at = updates.get("last_checked_at")
         updates["last_checked_at"] = last_checked_at if isinstance(last_checked_at, str) and last_checked_at else None
+        updates["dismiss_final_release_notice"] = self._as_bool(updates.get("dismiss_final_release_notice"), False)
 
         return normalized
 

@@ -2,6 +2,14 @@
 
 Các thay đổi đáng chú ý của MCW Launcher được ghi tại đây. Dự án dùng semantic versioning cho version public; bản `alpha`, `beta` và `rc` có thể thay đổi API nội bộ.
 
+## [1.8.8] - 2026-11-22
+
+### Added
+- **Thông báo bản phát hành chính thức cuối cùng & chuyển đổi sang MCW Launcher: Rust Edition (`FinalReleaseNoticeDialog`)**:
+  - Hiển thị hộp thoại thông báo khi khởi động ứng dụng cho biết `v1.8.8` là phiên bản chính thức cuối cùng của nhánh MCW Launcher (Python/PySide6) trước khi đóng băng kho lưu trữ.
+  - Bổ sung nút chuyển trực tiếp đến trang tải chính thức của MCW Launcher (`https://mcw-download.pages.dev/`) để tải **MCW Launcher: Rust Edition**.
+  - Hỗ trợ tùy chọn **Không hiển thị lại** (`dismiss_final_release_notice`) được lưu bền vững trong cấu hình launcher (`updates.dismiss_final_release_notice`).
+
 ## [1.8.7] - 2026-11-16
 
 ### Added

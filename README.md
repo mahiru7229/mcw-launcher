@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml"><img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/version-v1.8.7-brightgreen" alt="v1.8.7">
+  <img src="https://img.shields.io/badge/version-v1.8.8-brightgreen" alt="v1.8.8">
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB" alt="Python 3.12+">
 </p>
 
@@ -36,7 +36,7 @@
 
 ## Hỗ trợ nền tảng
 
-| Nền tảng | Trạng thái (v1.8.7) | Ghi chú |
+| Nền tảng | Trạng thái (v1.8.8) | Ghi chú |
 | --- | --- | --- |
 | **Windows 10/11 x64** | Hỗ trợ chính thức | Bản build portable một file thực thi duy nhất (`MCW Launcher.exe`). |
 | **Linux x64** | Hỗ trợ chính thức | Bản build portable một file thực thi (`mcw-launcher`). Đã kiểm thử trên Lubuntu/Ubuntu. |
@@ -123,7 +123,7 @@ mcw-launcher/
 - [Hệ thống Hotfix CDN](docs/HOTFIX_SYSTEM.md)
 - [Hướng dẫn tạo Theme tùy chỉnh](docs/THEME_CREATION_GUIDE.md)
 - [Lịch sử thay đổi chi tiết (Changelog)](CHANGELOG.md)
-- [Ghi chú bản phát hành v1.8.7](docs/releases/v1.8.7.md)
+- [Ghi chú bản phát hành v1.8.8](docs/releases/v1.8.8.md)
 
 ---
 

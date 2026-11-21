@@ -268,6 +268,7 @@ def main() -> None:
 
         from PySide6.QtWidgets import QDialog
         from mcw_core.api.config.launcher_settings_manager import LauncherSettingsManager
+        from src.gui.dialogs.final_release_notice_dialog import FinalReleaseNoticeDialog
         from src.gui.dialogs.first_run_setup_dialog import FirstRunSetupDialog
 
         if FirstRunSetupDialog.should_show(settings):
@@ -283,6 +284,10 @@ def main() -> None:
                 window.gui_settings_controller.load()
                 window.launcher_settings_page.set_gpu_detection(window._gpu_detection)
                 window.account_controller.refresh()
+
+        current_settings = LauncherSettingsManager().load()
+        if FinalReleaseNoticeDialog.show_if_needed(current_settings, window):
+            window.gui_settings_controller.load()
     except Exception as error:
         from PySide6.QtWidgets import QMessageBox
         from mcw_core.api.language.language_manager import tr
